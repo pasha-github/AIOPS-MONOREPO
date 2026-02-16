@@ -298,7 +298,7 @@
                 // Add to chat select
                 if (a.isEnabled) {
                     const opt = document.createElement('option');
-                    opt.value = a.name; // ADK uses name for routing usually (appName in run payload)
+                    opt.value = a.agent_id;
                     opt.textContent = a.name;
                     chatSelectEl.appendChild(opt);
                 }
@@ -344,11 +344,11 @@
         let currentUserId = 'u_' + Math.floor(Math.random() * 1000);
 
         // Chat
-        async function createSession(agentName) {
+        async function createSession(agentId) {
             const sessionId = 's_' + Date.now();
             try {
                 // Explicitly create session
-                const res = await fetch(`${API_BASE}/agent-server/apps/${agentName}/users/${currentUserId}/sessions/${sessionId}`, {
+                const res = await fetch(`${API_BASE}/agent-server/apps/${agentId}/users/${currentUserId}/sessions/${sessionId}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' }
                 });
@@ -367,14 +367,14 @@
         }
 
         async function sendMessage() {
-            const agentName = document.getElementById('chat-agent-select').value;
+            const agentId = document.getElementById('chat-agent-select').value;
             const inputEl = document.getElementById('chat-input');
             const msgText = inputEl.value.trim();
-            if (!agentName || !msgText) return;
+            if (!agentId || !msgText) return;
 
             // Ensure session exists
             if (!currentSessionId) {
-                const created = await createSession(agentName);
+                const created = await createSession(agentId);
                 if (!created) {
                     alert("Could not create session. check console.");
                     return;
@@ -396,7 +396,7 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        appName: agentName,
+                        appName: agentId,
                         userId: currentUserId,
                         sessionId: currentSessionId,
                         newMessage: {

@@ -1,0 +1,5 @@
+- [ ] Add support for MCP
+- [ ] Add support for LLMLite
+- [ ] Add support for Custom Tools
+- [ ] Add support for Supervisor Agent
+- [ ] Add support for Session Storage

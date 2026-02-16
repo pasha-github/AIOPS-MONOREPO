@@ -17,7 +17,7 @@ class DatabaseAgentLoader(BaseAgentLoader):
     def list_agents(self) -> List[str]:
         """Lists the names of enabled agents from the database."""
         with Session(engine) as session:
-            statement = select(Agent.name).where(Agent.isEnabled == True)
+            statement = select(Agent.agent_id).where(Agent.isEnabled == True)
             results = session.exec(statement).all()
             return list(results)
 
@@ -31,7 +31,7 @@ class DatabaseAgentLoader(BaseAgentLoader):
 
         with Session(engine) as session:
             # Fetch agent config
-            statement = select(Agent).where(Agent.name == agent_name)
+            statement = select(Agent).where(Agent.agent_id == agent_name)
             agent_config = session.exec(statement).first()
 
             if not agent_config:
@@ -60,7 +60,7 @@ class DatabaseAgentLoader(BaseAgentLoader):
             
             # Create LlmAgent
             agent = LlmAgent(
-                name=agent_config.name,
+                name=agent_config.agent_id,
                 description=agent_config.description,
                 instruction=agent_config.instruction,
                 model=model_config.name, # Passing model name to LiteLLM

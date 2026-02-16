@@ -67,3 +67,5 @@ dmypy.json
 .idea/
 .vscode/
 
+agent_management.db
+agent_management.db

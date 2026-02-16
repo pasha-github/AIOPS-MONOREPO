@@ -47,8 +47,8 @@ def delete_agent(agent_id: str, session: Session = Depends(get_session)):
     # AgentLoader uses names for set/get. Models have IDs. 
     # If agent_id != name, we need to know the name to remove from cache.
     # Assuming we remove by name as that's what loader uses.
-    if agent.name:
-         cache.remove_agent(agent.name)
+    if agent.agent_id:
+         cache.remove_agent(agent.agent_id)
     return {"ok": True}
 
 @router.patch("/")
@@ -66,6 +66,6 @@ def update_agent(update_data: AgentUpdate, session: Session = Depends(get_sessio
     
     # If disabled, remove from cache
     if not agent.isEnabled:
-        cache.remove_agent(agent.name)
+        cache.remove_agent(agent.agent_id)
         
     return agent

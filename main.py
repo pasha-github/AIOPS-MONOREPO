@@ -4,6 +4,8 @@ from database import create_db_and_tables
 from routers import agents, llms
 from google.adk.cli.fast_api import get_fast_api_app # as requested
 from agent_loader import DatabaseAgentLoader
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
 
 @asynccontextmanager
@@ -23,21 +25,14 @@ app.include_router(agents.router)
 app.include_router(llms.router)
 
 # Mount ADK App
-
-# User requested: "We will mount our main fast api app with get_fast_api_app() from google.adk.cli.fast_api import get_fast_api_app. This will be mounted with /agent-server"
-# Note: get_fast_api_app likely returns a FastAPI app or similar callable.
-# We mount it as a sub-application.
 # agents_dir is required, we use 'agents' as dummy/default.
 adk_app = get_fast_api_app(agents_dir="agents", web=True, agent_loader=DatabaseAgentLoader(), auto_create_session=True)
 
-
-
 app.mount("/agent-server", adk_app)
-# Mount Static Files for UI
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
 
+# Mount Static Files for UI
 # Serve index.html at root
+# This is for testing only 
 @app.get("/")
 async def read_index():
     return FileResponse('static/index.html')
