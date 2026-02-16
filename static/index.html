@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent Management Kit</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            margin: 20px;
+            line-height: 1.6;
+        }
+
+        h1,
+        h2,
+        h3 {
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .section {
+            margin-bottom: 40px;
+            border: 1px solid #ddd;
+            padding: 20px;
+            border-radius: 8px;
+        }
+
+        .status {
+            padding: 10px;
+            background: #f0f0f0;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .card {
+            border: 1px solid #eee;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 10px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        input[type="text"],
+        textarea,
+        select {
+            width: 100%;
+            padding: 8px;
+            box-sizing: border-box;
+        }
+
+        button {
+            padding: 8px 15px;
+            background: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        button:hover {
+            background: #0056b3;
+        }
+
+        button.delete {
+            background: #dc3545;
+        }
+
+        button.delete:hover {
+            background: #a71d2a;
+        }
+
+        #chat-messages {
+            height: 300px;
+            overflow-y: scroll;
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-bottom: 10px;
+            background: #fafafa;
+        }
+
+        .message {
+            margin-bottom: 10px;
+            padding: 8px;
+            border-radius: 4px;
+        }
+
+        .message.user {
+            background: #e3f2fd;
+            text-align: right;
+        }
+
+        .message.agent {
+            background: #f1f8e9;
+            text-align: left;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Agent Management Kit</h1>
+        <div id="health-status" class="status">Checking connection...</div>
+
+        <div class="grid">
+            <!-- LLM Models Section -->
+            <div class="section">
+                <h2>LLM Models</h2>
+                <div id="model-list">Loading models...</div>
+
+                <h3>Add New Model</h3>
+                <form id="add-model-form">
+                    <div class="form-group">
+                        <label>Model ID (e.g., gemini-1.5-flash)</label>
+                        <input type="text" id="model-id" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Provider (e.g., google)</label>
+                        <input type="text" id="model-provider" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Name (Display Name)</label>
+                        <input type="text" id="model-name" required>
+                    </div>
+                    <div class="form-group">
+                        <label>API Key</label>
+                        <input type="text" id="model-api-key" required>
+                    </div>
+                    <button type="submit">Add Model</button>
+                </form>
+            </div>
+
+            <!-- Agents Section -->
+            <div class="section">
+                <h2>Agents</h2>
+                <div id="agent-list">Loading agents...</div>
+
+                <h3>Add New Agent</h3>
+                <form id="add-agent-form">
+                    <div class="form-group">
+                        <label>Agent ID (Unique)</label>
+                        <input type="text" id="agent-id" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Name</label>
+                        <input type="text" id="agent-name" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Description</label>
+                        <input type="text" id="agent-desc" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Instructions</label>
+                        <textarea id="agent-instr" rows="3" required></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Model</label>
+                        <select id="agent-model-select" required>
+                            <option>Loading models...</option>
+                        </select>
+                    </div>
+                    <button type="submit">Add Agent</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Chat Section -->
+        <div class="section">
+            <h2>Chat with Agent</h2>
+            <div class="form-group">
+                <label>Select Agent</label>
+                <select id="chat-agent-select">
+                    <option>Loading agents...</option>
+                </select>
+            </div>
+            <div id="chat-messages"></div>
+            <div style="display: flex; gap: 10px;">
+                <input type="text" id="chat-input" placeholder="Type your message here...">
+                <button id="send-msg-btn">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = window.location.origin;
+
+        // Health Check
+        async function checkHealth() {
+            try {
+                const res = await fetch(`${API_BASE}/health/`);
+                const data = await res.json();
+                document.getElementById('health-status').textContent = `System Status: ${data.status}`;
+                document.getElementById('health-status').style.color = 'green';
+            } catch (e) {
+                document.getElementById('health-status').textContent = `System Status: Offline or Error (${e})`;
+                document.getElementById('health-status').style.color = 'red';
+            }
+        }
+
+        // Models
+        async function loadModels() {
+            const res = await fetch(`${API_BASE}/llms/`);
+            const models = await res.json();
+            const listEl = document.getElementById('model-list');
+            const selectEl = document.getElementById('agent-model-select');
+
+            listEl.innerHTML = '';
+            selectEl.innerHTML = '';
+
+            models.forEach(m => {
+                // Add to list
+                const div = document.createElement('div');
+                div.className = 'card';
+                div.innerHTML = `
+                    <strong>${m.name}</strong> (${m.provider})<br>
+                    ID: ${m.model_id}
+                    <button class="delete" onclick="deleteModel('${m.model_id}')" style="float:right;">Delete</button>
+                `;
+                listEl.appendChild(div);
+
+                // Add to select
+                const opt = document.createElement('option');
+                opt.value = m.model_id;
+                opt.textContent = m.name;
+                selectEl.appendChild(opt);
+            });
+        }
+
+        async function addModel(e) {
+            e.preventDefault();
+            const data = {
+                model_id: document.getElementById('model-id').value,
+                provider: document.getElementById('model-provider').value,
+                name: document.getElementById('model-name').value,
+                api_key: document.getElementById('model-api-key').value
+            };
+            await fetch(`${API_BASE}/llms/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            loadModels();
+            e.target.reset();
+        }
+
+        async function deleteModel(id) {
+            if (confirm('Delete this model?')) {
+                await fetch(`${API_BASE}/llms/${id}`, { method: 'DELETE' });
+                loadModels();
+            }
+        }
+
+        // Agents
+        async function loadAgents() {
+            const res = await fetch(`${API_BASE}/agent/`);
+            const agents = await res.json();
+            const listEl = document.getElementById('agent-list');
+            const chatSelectEl = document.getElementById('chat-agent-select');
+
+            listEl.innerHTML = '';
+            chatSelectEl.innerHTML = '';
+
+            agents.forEach(a => {
+                // Add to list
+                const div = document.createElement('div');
+                div.className = 'card';
+                div.style.opacity = a.isEnabled ? 1 : 0.6;
+                div.innerHTML = `
+                    <strong>${a.name}</strong> (${a.model_id})<br>
+                    ${a.description}<br>
+                    <small>Status: ${a.isEnabled ? 'Enabled' : 'Disabled'}</small>
+                    <div style="margin-top:5px;">
+                        <button onclick="toggleAgent('${a.agent_id}', ${!a.isEnabled})">${a.isEnabled ? 'Disable' : 'Enable'}</button>
+                        <button class="delete" onclick="deleteAgent('${a.agent_id}')">Delete</button>
+                    </div>
+                `;
+                listEl.appendChild(div);
+
+                // Add to chat select
+                if (a.isEnabled) {
+                    const opt = document.createElement('option');
+                    opt.value = a.name; // ADK uses name for routing usually (appName in run payload)
+                    opt.textContent = a.name;
+                    chatSelectEl.appendChild(opt);
+                }
+            });
+        }
+
+        async function addAgent(e) {
+            e.preventDefault();
+            const data = {
+                agent_id: document.getElementById('agent-id').value,
+                name: document.getElementById('agent-name').value,
+                description: document.getElementById('agent-desc').value,
+                instruction: document.getElementById('agent-instr').value,
+                model_id: document.getElementById('agent-model-select').value,
+                isEnabled: true
+            };
+            await fetch(`${API_BASE}/agent/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            loadAgents();
+            e.target.reset();
+        }
+
+        async function deleteAgent(id) {
+            if (confirm('Delete this agent?')) {
+                await fetch(`${API_BASE}/agent/${id}`, { method: 'DELETE' });
+                loadAgents();
+            }
+        }
+
+        async function toggleAgent(id, status) {
+            await fetch(`${API_BASE}/agent/`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ agent_id: id, isEnabled: status })
+            });
+            loadAgents();
+        }
+
+        let currentSessionId = null;
+        let currentUserId = 'u_' + Math.floor(Math.random() * 1000);
+
+        // Chat
+        async function createSession(agentName) {
+            const sessionId = 's_' + Date.now();
+            try {
+                // Explicitly create session
+                const res = await fetch(`${API_BASE}/agent-server/apps/${agentName}/users/${currentUserId}/sessions/${sessionId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                if (res.ok) {
+                    currentSessionId = sessionId;
+                    console.log(`Session created: ${sessionId}`);
+                    return true;
+                } else {
+                    console.error("Failed to create session", await res.text());
+                    return false;
+                }
+            } catch (e) {
+                console.error("Error creating session", e);
+                return false;
+            }
+        }
+
+        async function sendMessage() {
+            const agentName = document.getElementById('chat-agent-select').value;
+            const inputEl = document.getElementById('chat-input');
+            const msgText = inputEl.value.trim();
+            if (!agentName || !msgText) return;
+
+            // Ensure session exists
+            if (!currentSessionId) {
+                const created = await createSession(agentName);
+                if (!created) {
+                    alert("Could not create session. check console.");
+                    return;
+                }
+            }
+
+            const chatBox = document.getElementById('chat-messages');
+
+            // User Message
+            const userDiv = document.createElement('div');
+            userDiv.className = 'message user';
+            userDiv.textContent = msgText;
+            chatBox.appendChild(userDiv);
+
+            inputEl.value = '';
+
+            try {
+                const res = await fetch(`${API_BASE}/agent-server/run`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        appName: agentName,
+                        userId: currentUserId,
+                        sessionId: currentSessionId,
+                        newMessage: {
+                            role: "user",
+                            parts: [{ text: msgText }]
+                        }
+                    })
+                });
+
+                if (!res.ok) {
+                    throw new Error(await res.text());
+                }
+
+                const responseData = await res.json();
+
+                // Parse Response
+                // ADK returns a list of events. We look for model content.
+                let replyText = "";
+                if (Array.isArray(responseData)) {
+                    responseData.forEach(event => {
+                        if (event.content && event.content.parts) {
+                            event.content.parts.forEach(part => {
+                                if (part.text) replyText += part.text;
+                            });
+                        }
+                    });
+                } else {
+                    replyText = "Error: Unexpected response format";
+                }
+
+                // Agent Message
+                const agentDiv = document.createElement('div');
+                agentDiv.className = 'message agent';
+                agentDiv.textContent = replyText || "(No response text)";
+                chatBox.appendChild(agentDiv);
+
+                chatBox.scrollTop = chatBox.scrollHeight;
+
+            } catch (e) {
+                console.error(e);
+                const errDiv = document.createElement('div');
+                errDiv.className = 'message agent';
+                errDiv.textContent = `Error: ${e.message}`;
+                errDiv.style.color = 'red';
+                chatBox.appendChild(errDiv);
+            }
+        }
+
+        // Reset session on agent change
+        document.getElementById('chat-agent-select').addEventListener('change', () => {
+            currentSessionId = null;
+            document.getElementById('chat-messages').innerHTML = '';
+        });
+
+        // Listeners
+        document.getElementById('add-model-form').addEventListener('submit', addModel);
+        document.getElementById('add-agent-form').addEventListener('submit', addAgent);
+        document.getElementById('send-msg-btn').addEventListener('click', sendMessage);
+
+        // Init
+        checkHealth();
+        loadModels();
+        loadAgents();
+
+        // Poll health
+        setInterval(checkHealth, 30000);
+    </script>
+</body>
+
+</html>

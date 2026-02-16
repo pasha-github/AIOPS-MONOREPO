@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+sqlmodel
+litellm
+# Assumed package name, user to verify
+google-adk
