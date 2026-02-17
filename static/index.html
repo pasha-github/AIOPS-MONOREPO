@@ -173,6 +173,14 @@
                         <textarea id="agent-instr" rows="3" required></textarea>
                     </div>
                     <div class="form-group">
+                        <label>Custom Tools (Python Code)</label>
+                        <textarea id="agent-tools" rows="5" placeholder="def my_tool(): ..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>MCP Server SSE URL</label>
+                        <input type="text" id="agent-mcp-sse" placeholder="http://localhost:8000/sse">
+                    </div>
+                    <div class="form-group">
                         <label>Model</label>
                         <select id="agent-model-select" required>
                             <option>Loading models...</option>
@@ -307,12 +315,17 @@
 
         async function addAgent(e) {
             e.preventDefault();
+            const toolsCode = document.getElementById('agent-tools').value;
+            const mcpConfig = document.getElementById('agent-mcp-sse').value;
+            
             const data = {
                 agent_id: document.getElementById('agent-id').value,
                 name: document.getElementById('agent-name').value,
                 description: document.getElementById('agent-desc').value,
                 instruction: document.getElementById('agent-instr').value,
                 model_id: document.getElementById('agent-model-select').value,
+                tools: toolsCode ? toolsCode : null,
+                mcp_server_sse_config: mcpConfig ? mcpConfig : null,
                 isEnabled: true
             };
             await fetch(`${API_BASE}/agent/`, {

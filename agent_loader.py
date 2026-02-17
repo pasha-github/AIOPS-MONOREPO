@@ -1,4 +1,6 @@
 from typing import List, Optional, Dict, Any, Union
+from google.adk.tools.mcp_tool import McpToolset
+from google.adk.tools.mcp_tool.mcp_session_manager import SseConnectionParams, StreamableHTTPConnectionParams
 from google.adk.cli.utils.base_agent_loader import BaseAgentLoader
 from google.adk.agents import LlmAgent
 from sqlmodel import select
@@ -58,15 +60,10 @@ class DatabaseAgentLoader(BaseAgentLoader):
                  # This is a simple way, might strictly need to be scoped if multiple providers
                 os.environ[f"{model_config.provider.upper()}_API_KEY"] = model_config.api_key
             
-            # Create LlmAgent
-            agent = LlmAgent(
-                name=agent_config.agent_id,
-                description=agent_config.description,
-                instruction=agent_config.instruction,
-                model=model_config.name, # Passing model name to LiteLLM
-            )
+            # Prepare Tools List
+            tools_list = []
 
-            # Attach Tools (Python functions)
+            # Attach Custom Python Tools
             if agent_config.tools:
                 try:
                     # Execute the tool code to define functions
@@ -74,25 +71,41 @@ class DatabaseAgentLoader(BaseAgentLoader):
                     local_scope = {}
                     exec(agent_config.tools, {}, local_scope)
                     
-                    # Assume tools are functions in local_scope
-                    # adk might have a specific way to attach tools, e.g., agent.add_tool()
-                    # For now, we will iterate and add callables
+                    # Iterate and add callables to tools_list
                     for name, func in local_scope.items():
                         if callable(func):
-                             # Verify if adk supports add_tool or we pass in constructor
-                             # If constructor, we'd need to change instantiation above.
-                             # Checking LlmAgent signature (from memory/docs), it often takes `tools` list.
-                             # If dynamic execution is needed, we might need to recreate agent or use setter.
-                             # Assuming a method exists or we can pass to LlmAgent
-                             pass 
-                             # TODO: implementations detail on how to attach tools to LlmAgent
+                            tools_list.append(func)
                 except Exception as e:
                     logger.error(f"Error loading tools for agent {agent_name}: {e}")
 
-            # Attach MCP Config
+            # Attach MCP Tools (SSE Only)
             if agent_config.mcp_server_sse_config:
-                # TODO: Implement MCP Client attachment
-                pass
+                try:
+                    # Treat mcp_server_sse_config as the SSE URL
+                    url:str = agent_config.mcp_server_sse_config
+
+                    if url.endswith("/sse"):
+                        connection_params = SseConnectionParams(url=url)
+                    elif url.endswith("/mcp"):
+                        connection_params = StreamableHTTPConnectionParams(url=url)
+                    else:
+                        raise ValueError(f"Invalid MCP server URL: {url}")
+                    
+                    # Create McpToolset with SseConnectionParams
+                    mcp_toolset = McpToolset(connection_params=connection_params)
+                    
+                    tools_list.append(mcp_toolset)
+                except Exception as e:
+                    logger.error(f"Error loading MCP tools for agent {agent_name}: {e}")
+
+            # Create LlmAgent
+            agent = LlmAgent(
+                model=model_config.name, # Passing model name to LiteLLM
+                name=agent_config.agent_id,
+                description=agent_config.description,
+                instruction=agent_config.instruction,
+                tools=tools_list,
+            )
 
             # Store in cache
             cache.set_agent(agent_name, agent)
