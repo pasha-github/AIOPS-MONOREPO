@@ -26,7 +26,13 @@ app.include_router(llms.router)
 
 # Mount ADK App
 # agents_dir is required, we use 'agents' as dummy/default.
-adk_app = get_fast_api_app(agents_dir="agents", web=True, agent_loader=DatabaseAgentLoader(), auto_create_session=True)
+adk_app = get_fast_api_app(
+    agents_dir="agents",
+    web=False,
+    agent_loader=DatabaseAgentLoader(),
+    auto_create_session=True,
+    session_service_uri="sqlite:///agent_management.db"
+)
 
 app.mount("/agent-server", adk_app)
 
