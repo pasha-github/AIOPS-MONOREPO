@@ -3,6 +3,7 @@ from google.adk.tools.mcp_tool import McpToolset
 from google.adk.tools.mcp_tool.mcp_session_manager import SseConnectionParams, StreamableHTTPConnectionParams
 from google.adk.cli.utils.base_agent_loader import BaseAgentLoader
 from google.adk.agents import LlmAgent
+from google.adk.models.lite_llm import LiteLlm
 from sqlmodel import select
 from database import get_session, engine
 from models import Agent, Model
@@ -99,13 +100,22 @@ class DatabaseAgentLoader(BaseAgentLoader):
                     logger.error(f"Error loading MCP tools for agent {agent_name}: {e}")
 
             # Create LlmAgent
-            agent = LlmAgent(
-                model=model_config.name, # Passing model name to LiteLLM
-                name=agent_config.agent_id,
-                description=agent_config.description,
-                instruction=agent_config.instruction,
-                tools=tools_list,
-            )
+            if model_config.provider.lower() == "google":
+                agent = LlmAgent(
+                    model=model_config.name, # Using google's default
+                    name=agent_config.agent_id,
+                    description=agent_config.description,
+                    instruction=agent_config.instruction,
+                    tools=tools_list,
+                )
+            else:
+                agent = LlmAgent(
+                    model=LiteLlm(model=f"{model_config.provider}/{model_config.name}"), # Passing model name to LiteLLM
+                    name=agent_config.agent_id,
+                    description=agent_config.description,
+                    instruction=agent_config.instruction,
+                    tools=tools_list,
+                )
 
             # Store in cache
             cache.set_agent(agent_name, agent)

@@ -1,5 +1,6 @@
 - [X] Add support for MCP
-- [ ] Add support for LLMLite
+- [X] Add support for LLMLite
 - [X] Add support for Custom Tools
 - [ ] Add support for Supervisor Agent
 - [X] Add support for Session Storage
+- [ ] Take db url as env variable.
