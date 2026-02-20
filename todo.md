@@ -4,3 +4,5 @@
 - [ ] Add support for Supervisor Agent
 - [X] Add support for Session Storage
 - [ ] Take db url as env variable.
+- [ ] Create contianer of this server.
+- [ ] Add support for Multiple MCP Servers
