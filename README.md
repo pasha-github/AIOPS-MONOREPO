@@ -1,0 +1,49 @@
+# Agent Management Kit
+
+A FastAPI-based application for managing and running agents, featuring SQLite/Environment-URL database support, and MCP (Model Context Protocol) integrations.
+
+## Prerequisites
+
+- Python 3.11+ (or Docker)
+
+## Setup Locally
+
+1. **Clone the repository:**
+   ```bash
+   git clone <repository-url>
+   cd agent-management-kit
+   ```
+
+2. **Create a virtual environment and install dependencies:**
+   ```bash
+   python -m venv .venv
+   source .venv/bin/activate  # On Windows use: .venv\Scripts\activate
+   pip install -r requirements.txt
+   ```
+
+3. **Environment Setup:**
+   Create a `.env` file in the root directory. You can specify a custom database URL if you don't want to use the default SQLite setup:
+   ```env
+   DATABASE_URL=sqlite:///agent_management.db
+   ```
+
+4. **Run the server:**
+   ```bash
+   uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+   ```
+
+## Running with Docker
+
+You can easily containerize and run the application using Docker.
+
+1. **Build the Docker image:**
+   ```bash
+   docker build -t agent-management-kit .
+   ```
+
+2. **Run the container:**
+   ```bash
+   docker run -d -p 8000:8000 --env-file .env agent-management-kit
+   ```
+
+The application will be available at `http://localhost:8000`. You can access the UI by navigating to `http://localhost:8000/` or access the Agent Server API at `http://localhost:8000/agent-server`.
