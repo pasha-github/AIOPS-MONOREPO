@@ -4,9 +4,9 @@ from sqlmodel.pool import StaticPool
 from fastapi.testclient import TestClient
 from sqlmodel import Session, SQLModel, create_engine
 from sqlmodel.pool import StaticPool
-from main import app
-from database import get_session
-from models import Agent, Model
+from ..main import app
+from database.database import get_session
+from database.models import Agent, Model
 import pytest
 
 # Use in-memory SQLite for testing

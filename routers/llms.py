@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
-from database import get_session
-from models import Model
+from database.database import get_session
+from database.models import Model
 from typing import List
 from pydantic import BaseModel
 
