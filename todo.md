@@ -6,3 +6,4 @@
 - [X] Take db url as env variable.
 - [ ] Create contianer of this server.
 - [ ] Add support for Multiple MCP Servers
+- [ ] Add support for multiple API Keys depending on the model.

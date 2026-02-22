@@ -30,10 +30,13 @@ app.include_router(llms.router)
 # agents_dir is required, we use 'agents' as dummy/default.
 adk_app = get_fast_api_app(
     agents_dir="agents",
-    web=False,
+    web=True,
     agent_loader=DatabaseAgentLoader(),
     auto_create_session=True,
-    session_service_uri=DATABASE_URL
+    session_service_uri=DATABASE_URL,
+    url_prefix="/agent-server",
+    logo_text="RC AIOps - DEV",
+    logo_image_url="/static/royal_cyber.jpeg"
 )
 
 app.mount("/agent-server", adk_app)
