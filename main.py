@@ -1,12 +1,14 @@
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
-from database import create_db_and_tables
+from database import create_db_and_tables, DATABASE_URL
 from routers import agents, llms
 from google.adk.cli.fast_api import get_fast_api_app # as requested
 from agent_loader import DatabaseAgentLoader
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from dotenv import load_dotenv
 
+load_dotenv()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -31,7 +33,7 @@ adk_app = get_fast_api_app(
     web=False,
     agent_loader=DatabaseAgentLoader(),
     auto_create_session=True,
-    session_service_uri="sqlite:///agent_management.db"
+    session_service_uri=DATABASE_URL
 )
 
 app.mount("/agent-server", adk_app)
