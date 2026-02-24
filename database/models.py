@@ -1,5 +1,5 @@
 from typing import Optional, List
-from sqlmodel import Field, SQLModel
+from sqlmodel import Field, SQLModel, Column, JSON
 import json
 from datetime import datetime
 
@@ -11,7 +11,7 @@ class Agent(SQLModel, table=True):
     model_id: str = Field(foreign_key="model.model_id")
     tools: Optional[str] = None # JSON string of tools code
     isEnabled: bool = True
-    mcp_server_sse_config: Optional[str] = None # JSON string of MCP config
+    mcp_servers: List[str] = Field(default_factory=list, sa_column=Column(JSON)) # JSON List of MCP server URLs
     created_at: datetime = Field(default=datetime.now())
     updated_at: datetime = Field(default=datetime.now())
     tags: Optional[str] = None 

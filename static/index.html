@@ -177,8 +177,9 @@
                         <textarea id="agent-tools" rows="5" placeholder="def my_tool(): ..."></textarea>
                     </div>
                     <div class="form-group">
-                        <label>MCP Server SSE URL</label>
-                        <input type="text" id="agent-mcp-sse" placeholder="http://localhost:8000/sse">
+                        <label>MCP Server URLs (comma-separated)</label>
+                        <input type="text" id="agent-mcp-sse"
+                            placeholder="http://localhost:8000/sse, http://localhost:8001/mcp">
                     </div>
                     <div class="form-group">
                         <label>Model</label>
@@ -316,8 +317,9 @@
         async function addAgent(e) {
             e.preventDefault();
             const toolsCode = document.getElementById('agent-tools').value;
-            const mcpConfig = document.getElementById('agent-mcp-sse').value;
-            
+            const mcpInput = document.getElementById('agent-mcp-sse').value;
+            const mcpServersList = mcpInput ? mcpInput.split(',').map(url => url.trim()).filter(url => url.length > 0) : [];
+
             const data = {
                 agent_id: document.getElementById('agent-id').value,
                 name: document.getElementById('agent-name').value,
@@ -325,7 +327,7 @@
                 instruction: document.getElementById('agent-instr').value,
                 model_id: document.getElementById('agent-model-select').value,
                 tools: toolsCode ? toolsCode : null,
-                mcp_server_sse_config: mcpConfig ? mcpConfig : null,
+                mcp_servers: mcpServersList,
                 isEnabled: true
             };
             await fetch(`${API_BASE}/agent/`, {

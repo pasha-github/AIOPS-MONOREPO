@@ -79,25 +79,21 @@ class DatabaseAgentLoader(BaseAgentLoader):
                 except Exception as e:
                     logger.error(f"Error loading tools for agent {agent_name}: {e}")
 
-            # Attach MCP Tools (SSE Only)
-            if agent_config.mcp_server_sse_config:
-                try:
-                    # Treat mcp_server_sse_config as the SSE URL
-                    url:str = agent_config.mcp_server_sse_config
-
-                    if url.endswith("/sse"):
-                        connection_params = SseConnectionParams(url=url)
-                    elif url.endswith("/mcp"):
-                        connection_params = StreamableHTTPConnectionParams(url=url)
-                    else:
-                        raise ValueError(f"Invalid MCP server URL: {url}")
-                    
-                    # Create McpToolset with SseConnectionParams
-                    mcp_toolset = McpToolset(connection_params=connection_params)
-                    
-                    tools_list.append(mcp_toolset)
-                except Exception as e:
-                    logger.error(f"Error loading MCP tools for agent {agent_name}: {e}")
+            # Attach MCP Tools
+            if agent_config.mcp_servers:
+                for url in agent_config.mcp_servers:
+                    try:
+                        if url.endswith("/sse"):
+                            connection_params = SseConnectionParams(url=url)
+                        elif url.endswith("/mcp"):
+                            connection_params = StreamableHTTPConnectionParams(url=url)
+                        else:
+                            raise ValueError(f"Invalid MCP server URL: {url}")
+                        
+                        mcp_toolset = McpToolset(connection_params=connection_params)
+                        tools_list.append(mcp_toolset)
+                    except Exception as e:
+                        logger.error(f"Error loading MCP tool '{url}' for agent {agent_name}: {e}")
 
             # Create LlmAgent
             if model_config.provider.lower() == "google":

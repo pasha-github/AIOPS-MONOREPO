@@ -15,7 +15,7 @@ class AgentCreate(BaseModel):
     instruction: str
     model_id: str
     tools: Optional[str] = None
-    mcp_server_sse_config: Optional[str] = None
+    mcp_servers: List[str] = []
     isEnabled: bool = True
 
 class AgentUpdate(BaseModel):
