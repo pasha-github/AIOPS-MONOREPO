@@ -7,10 +7,18 @@
 - [X] Add support for Session Storage
 - [X] Take db url as env variable.
 - [X] Create contianer of this server.
-- [ ] Add support for Multiple MCP Servers
+- [ ] Add support for Multiple MCP Servers.
 - [ ] Add support for multiple API Keys depending on the model.
+- [ ] Add support for automated triggers.
+- [ ] Update database models to support new features.
+- [ ] Encrypt API Keys in database.
+- [ ] Add support for modular custom python tools.
+- [ ] Add support for Connectorers.
 
 # Testing
 
-- [ ] Add tests for all the endpoints.
 - [ ] Test with postgres database url.
+
+# Deployment
+
+- [ ] Best practices for deployment on production.
