@@ -107,6 +107,23 @@ class DatabaseAgentLoader(BaseAgentLoader):
                     except Exception as e:
                         logger.error(f"Error loading connector config '{connector_config_id}' for agent {agent_name}: {e}")
 
+            # Attach Sub Agents
+            sub_agents = []
+            loaded_sub_agent_ids = set()
+            if agent_config.sub_agents:
+                for sub_agent_id in agent_config.sub_agents:
+                    # Skip self-references and duplicates
+                    if sub_agent_id == agent_name or sub_agent_id in loaded_sub_agent_ids:
+                        continue
+                    try:
+                        sub_agent = self.load_agent(sub_agent_id)
+                        if sub_agent:
+                            sub_agents.append(sub_agent)
+                            loaded_sub_agent_ids.add(sub_agent_id)
+                    except Exception as e:
+                        logger.error(f"Error loading sub agent config '{sub_agent_id}' for agent {agent_name}: {e}")
+
+
             # Create LlmAgent
             print(tools_list)
             if model_config.provider.lower() == "google":
@@ -116,7 +133,9 @@ class DatabaseAgentLoader(BaseAgentLoader):
                     description=agent_config.description,
                     instruction=agent_config.instruction,
                     tools=tools_list,
+                    sub_agents=sub_agents,
                 )
+                
             else:
                 agent = LlmAgent(
                     model=LiteLlm(model=f"{model_config.provider}/{model_config.name}"), # Passing model name to LiteLLM
@@ -124,6 +143,7 @@ class DatabaseAgentLoader(BaseAgentLoader):
                     description=agent_config.description,
                     instruction=agent_config.instruction,
                     tools=tools_list,
+                    sub_agents=sub_agents,
                 )
 
             # Store in cache

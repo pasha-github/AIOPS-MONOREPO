@@ -18,6 +18,7 @@ class AgentCreate(BaseModel):
     mcp_servers: List[str] = []
     connector_config_ids: List[str] = []
     isEnabled: bool = True
+    sub_agents: List[str] = []
 
 class AgentUpdate(BaseModel):
     agent_id: str 

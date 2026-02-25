@@ -16,7 +16,8 @@ class Agent(SQLModel, table=True):
     mcp_servers: List[str] = Field(default_factory=list, sa_column=Column(JSON)) # JSON List of MCP server URLs
     created_at: datetime = Field(default=datetime.now())
     updated_at: datetime = Field(default=datetime.now())
-    tags: Optional[str] = None 
+    tags: Optional[str] = None
+    sub_agents: List[str] = Field(default_factory=list, sa_column=Column(JSON))
     status: str = "active" 
 
 
