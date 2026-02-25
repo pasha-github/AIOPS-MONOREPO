@@ -8,16 +8,16 @@
 - [X] Take db url as env variable.
 - [X] Create contianer of this server.
 - [X] Add support for Multiple MCP Servers.
-- [ ] Add support for multiple API Keys depending on the model.
-- [ ] Add support for automated triggers.
 - [X] Update database models to support new features.
+- [ ] Add support for Connectors.
 - [ ] Encrypt API Keys in database.
+- [ ] Add support for multiple API Keys depending on the model.
 - [ ] Add support for modular custom python tools.
-- [ ] Add support for Connectorers.
+- [ ] Add support for automated triggers.
 
 # Testing
 
-- [ ] Test with postgres database url.
+- [X] Test with postgres database url.
 
 # Deployment
 
