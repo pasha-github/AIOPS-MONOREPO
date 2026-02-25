@@ -4,7 +4,7 @@ load_dotenv()
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from database.database import create_db_and_tables
-from routers import agents, llms
+from routers import agents, llms, connectors
 from google.adk.cli.fast_api import get_fast_api_app # as requested
 from utils.agent_loader import DatabaseAgentLoader
 from fastapi.staticfiles import StaticFiles
@@ -28,7 +28,7 @@ def health_check():
 # Routers
 app.include_router(agents.router)
 app.include_router(llms.router)
-
+app.include_router(connectors.router)
 # Mount ADK App
 # agents_dir is required, we use 'agents' as dummy/default.
 adk_app = get_fast_api_app(

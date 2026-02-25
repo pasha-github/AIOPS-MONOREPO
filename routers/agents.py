@@ -16,10 +16,11 @@ class AgentCreate(BaseModel):
     model_id: str
     tools: Optional[str] = None
     mcp_servers: List[str] = []
+    connector_config_ids: List[str] = []
     isEnabled: bool = True
 
 class AgentUpdate(BaseModel):
-    agent_id: str # Added to identify which agent to patch, though path param is cleaner, user asked for body in PATCH /agent/
+    agent_id: str 
     isEnabled: bool
 
 @router.post("/", response_model=Agent)

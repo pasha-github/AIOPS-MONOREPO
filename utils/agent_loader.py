@@ -6,10 +6,13 @@ from google.adk.agents import LlmAgent
 from google.adk.models.lite_llm import LiteLlm
 from sqlmodel import select
 from database.database import get_session, engine
-from database.models import Agent, Model
+from database.models import Agent, Model, ConnectorConfig
 from utils.cache import cache
 from sqlmodel import Session
+from utils.helper import resolve_connector_tools
 import logging
+from uuid import UUID
+
 
 logger = logging.getLogger(__name__)
 
@@ -95,7 +98,17 @@ class DatabaseAgentLoader(BaseAgentLoader):
                     except Exception as e:
                         logger.error(f"Error loading MCP tool '{url}' for agent {agent_name}: {e}")
 
+            if agent_config.connector_config_ids:
+                for connector_config_id in agent_config.connector_config_ids:
+                    try:
+                        connector_config = session.get(ConnectorConfig, UUID(connector_config_id))
+                        connector_tools = resolve_connector_tools(connector_config)
+                        tools_list.extend(connector_tools)
+                    except Exception as e:
+                        logger.error(f"Error loading connector config '{connector_config_id}' for agent {agent_name}: {e}")
+
             # Create LlmAgent
+            print(tools_list)
             if model_config.provider.lower() == "google":
                 agent = LlmAgent(
                     model=model_config.name, # Using google's default

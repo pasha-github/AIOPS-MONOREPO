@@ -68,6 +68,10 @@
             box-sizing: border-box;
         }
 
+        select[multiple] {
+            height: 100px;
+        }
+
         button {
             padding: 8px 15px;
             background: #007bff;
@@ -112,6 +116,38 @@
         .message.agent {
             background: #f1f8e9;
             text-align: left;
+        }
+
+        /* Connector config fields rendered dynamically */
+        #connector-config-fields .config-field {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+
+        #connector-config-fields .config-field label {
+            min-width: 140px;
+            margin: 0;
+        }
+
+        #connector-config-fields .config-field input {
+            flex: 1;
+        }
+
+        .badge {
+            display: inline-block;
+            font-size: 0.75em;
+            padding: 2px 6px;
+            border-radius: 4px;
+            background: #dc3545;
+            color: white;
+            margin-left: 4px;
+            vertical-align: middle;
+        }
+
+        .badge.optional {
+            background: #6c757d;
         }
     </style>
 </head>
@@ -182,6 +218,12 @@
                             placeholder="http://localhost:8000/sse, http://localhost:8001/mcp">
                     </div>
                     <div class="form-group">
+                        <label>Connector Configs <small>(hold Ctrl/Cmd to select multiple)</small></label>
+                        <select id="agent-connector-configs" multiple>
+                            <option disabled>Loading connector configs...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
                         <label>Model</label>
                         <select id="agent-model-select" required>
                             <option>Loading models...</option>
@@ -189,6 +231,51 @@
                     </div>
                     <button type="submit">Add Agent</button>
                 </form>
+            </div>
+        </div>
+
+        <!-- Connectors Section -->
+        <div class="section">
+            <h2>Connectors</h2>
+            <div class="grid">
+                <!-- Left: Available connectors + create config -->
+                <div>
+                    <h3>Available Connectors</h3>
+                    <div id="connector-list">Loading connectors...</div>
+
+                    <h3>Create Connector Config</h3>
+                    <form id="add-connector-config-form">
+                        <div class="form-group">
+                            <label>Connector</label>
+                            <select id="connector-select">
+                                <option value="">-- Select a connector --</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Config Name</label>
+                            <input type="text" id="connector-config-name" placeholder="e.g. My JSONPlaceholder Config"
+                                required>
+                        </div>
+                        <div id="connector-config-fields">
+                            <!-- Dynamically populated when a connector is selected -->
+                        </div>
+                        <div id="connector-details-doc" style="margin-bottom:10px; color: #555; font-style: italic;">
+                        </div>
+                        <button type="submit">Save Config</button>
+                    </form>
+                </div>
+
+                <!-- Right: Saved connector configs -->
+                <div>
+                    <h3>Saved Connector Configs</h3>
+                    <div class="form-group">
+                        <label>Filter by Connector</label>
+                        <select id="connector-config-filter">
+                            <option value="">-- All --</option>
+                        </select>
+                    </div>
+                    <div id="connector-config-list">Select a connector to view its saved configs.</div>
+                </div>
             </div>
         </div>
 
@@ -212,7 +299,7 @@
     <script>
         const API_BASE = window.location.origin;
 
-        // Health Check
+        // ─── Health ───────────────────────────────────────────────────────────
         async function checkHealth() {
             try {
                 const res = await fetch(`${API_BASE}/health/`);
@@ -225,7 +312,7 @@
             }
         }
 
-        // Models
+        // ─── Models ───────────────────────────────────────────────────────────
         async function loadModels() {
             const res = await fetch(`${API_BASE}/llms/`);
             const models = await res.json();
@@ -236,7 +323,6 @@
             selectEl.innerHTML = '';
 
             models.forEach(m => {
-                // Add to list
                 const div = document.createElement('div');
                 div.className = 'card';
                 div.innerHTML = `
@@ -246,7 +332,6 @@
                 `;
                 listEl.appendChild(div);
 
-                // Add to select
                 const opt = document.createElement('option');
                 opt.value = m.model_id;
                 opt.textContent = m.name;
@@ -278,7 +363,7 @@
             }
         }
 
-        // Agents
+        // ─── Agents ───────────────────────────────────────────────────────────
         async function loadAgents() {
             const res = await fetch(`${API_BASE}/agent/`);
             const agents = await res.json();
@@ -289,14 +374,16 @@
             chatSelectEl.innerHTML = '';
 
             agents.forEach(a => {
-                // Add to list
                 const div = document.createElement('div');
                 div.className = 'card';
                 div.style.opacity = a.isEnabled ? 1 : 0.6;
+                const connectorBadges = (a.connector_config_ids || []).length > 0
+                    ? `<br><small>Connectors: ${(a.connector_config_ids || []).length} attached</small>`
+                    : '';
                 div.innerHTML = `
                     <strong>${a.name}</strong> (${a.model_id})<br>
                     ${a.description}<br>
-                    <small>Status: ${a.isEnabled ? 'Enabled' : 'Disabled'}</small>
+                    <small>Status: ${a.isEnabled ? 'Enabled' : 'Disabled'}</small>${connectorBadges}
                     <div style="margin-top:5px;">
                         <button onclick="toggleAgent('${a.agent_id}', ${!a.isEnabled})">${a.isEnabled ? 'Disable' : 'Enable'}</button>
                         <button class="delete" onclick="deleteAgent('${a.agent_id}')">Delete</button>
@@ -304,7 +391,6 @@
                 `;
                 listEl.appendChild(div);
 
-                // Add to chat select
                 if (a.isEnabled) {
                     const opt = document.createElement('option');
                     opt.value = a.agent_id;
@@ -320,6 +406,10 @@
             const mcpInput = document.getElementById('agent-mcp-sse').value;
             const mcpServersList = mcpInput ? mcpInput.split(',').map(url => url.trim()).filter(url => url.length > 0) : [];
 
+            // Collect selected connector config IDs from multi-select
+            const connectorSelect = document.getElementById('agent-connector-configs');
+            const connectorConfigIds = Array.from(connectorSelect.selectedOptions).map(o => o.value);
+
             const data = {
                 agent_id: document.getElementById('agent-id').value,
                 name: document.getElementById('agent-name').value,
@@ -328,6 +418,7 @@
                 model_id: document.getElementById('agent-model-select').value,
                 tools: toolsCode ? toolsCode : null,
                 mcp_servers: mcpServersList,
+                connector_config_ids: connectorConfigIds,
                 isEnabled: true
             };
             await fetch(`${API_BASE}/agent/`, {
@@ -337,6 +428,8 @@
             });
             loadAgents();
             e.target.reset();
+            document.getElementById('connector-config-fields').innerHTML = '';
+            document.getElementById('connector-details-doc').textContent = '';
         }
 
         async function deleteAgent(id) {
@@ -355,21 +448,209 @@
             loadAgents();
         }
 
+        // ─── Connectors ───────────────────────────────────────────────────────
+
+        /** Fetches available connector types and populates selects + list */
+        async function loadConnectors() {
+            const res = await fetch(`${API_BASE}/connectors/`);
+            const connectors = await res.json();
+
+            const listEl = document.getElementById('connector-list');
+            const selectEl = document.getElementById('connector-select');
+            const filterEl = document.getElementById('connector-config-filter');
+
+            listEl.innerHTML = '';
+            // Keep the placeholder option, then add connector options
+            selectEl.innerHTML = '<option value="">-- Select a connector --</option>';
+            filterEl.innerHTML = '<option value="">-- All --</option>';
+
+            connectors.forEach(c => {
+                // Card in the list
+                const div = document.createElement('div');
+                div.className = 'card';
+                div.innerHTML = `<strong>${c.name}</strong><br><small>ID: ${c.id}</small>`;
+                listEl.appendChild(div);
+
+                // Option in the create-config form
+                const opt = document.createElement('option');
+                opt.value = c.id;
+                opt.textContent = c.name;
+                selectEl.appendChild(opt);
+
+                // Option in the filter select
+                const fopt = opt.cloneNode(true);
+                filterEl.appendChild(fopt);
+            });
+
+            if (connectors.length === 0) {
+                listEl.textContent = 'No connectors found.';
+            }
+        }
+
+        /** Loads connector details (config_variables + docs + tools) and renders input fields */
+        async function onConnectorSelected() {
+            const connectorId = document.getElementById('connector-select').value;
+            const fieldsEl = document.getElementById('connector-config-fields');
+            const docEl = document.getElementById('connector-details-doc');
+
+            fieldsEl.innerHTML = '';
+            docEl.textContent = '';
+
+            if (!connectorId) return;
+
+            const res = await fetch(`${API_BASE}/connectors/${connectorId}`);
+            if (!res.ok) {
+                fieldsEl.innerHTML = '<em style="color:red;">Could not load connector details.</em>';
+                return;
+            }
+
+            const details = await res.json();
+
+            // ── Documentation ──────────────────────────────────────────────
+            if (details.documentation) {
+                docEl.textContent = details.documentation;
+            }
+
+            // ── Config variable inputs ─────────────────────────────────────
+            const configVars = details.config_variables || [];
+            configVars.forEach(v => {
+                const row = document.createElement('div');
+                row.className = 'config-field';
+                row.innerHTML = `
+                    <label for="cfg-${v.name}">
+                        ${v.name}
+                        <span class="badge ${v.required ? '' : 'optional'}">${v.required ? 'required' : 'optional'}</span>
+                    </label>
+                    <input type="text" id="cfg-${v.name}" data-config-name="${v.name}" placeholder="${v.name}" ${v.required ? 'required' : ''}>
+                `;
+                fieldsEl.appendChild(row);
+            });
+
+            // ── Tools list ─────────────────────────────────────────────────
+            const tools = details.tools || [];
+            if (tools.length > 0) {
+                const toolsSection = document.createElement('div');
+                toolsSection.style.cssText = 'margin-top:14px; border-top:1px solid #eee; padding-top:10px;';
+                toolsSection.innerHTML = '<strong style="font-size:0.9em; color:#555;">Tools exposed by this connector:</strong>';
+
+                tools.forEach(tool => {
+                    const toolCard = document.createElement('div');
+                    toolCard.style.cssText = 'margin-top:6px; padding:8px 10px; background:#f8f9fa; border-radius:4px; border-left:3px solid #007bff;';
+                    toolCard.innerHTML = `
+                        <code style="font-size:0.9em; font-weight:bold;">${tool.name}</code>
+                        ${tool.documentation
+                            ? `<p style="margin:4px 0 0; font-size:0.82em; color:#555; white-space:pre-wrap;">${tool.documentation}</p>`
+                            : ''}
+                    `;
+                    toolsSection.appendChild(toolCard);
+                });
+
+                fieldsEl.appendChild(toolsSection);
+            }
+        }
+
+        /** POST /connectors/{connector_id}/config */
+        async function addConnectorConfig(e) {
+            e.preventDefault();
+            const connectorId = document.getElementById('connector-select').value;
+            if (!connectorId) {
+                alert('Please select a connector first.');
+                return;
+            }
+
+            const name = document.getElementById('connector-config-name').value;
+
+            // Collect all rendered config fields
+            const configInputs = document.querySelectorAll('#connector-config-fields input[data-config-name]');
+            const config = Array.from(configInputs).map(inp => ({
+                name: inp.dataset.configName,
+                value: inp.value
+            }));
+
+            const payload = { connector_id: connectorId, name, config };
+
+            const res = await fetch(`${API_BASE}/connectors/${connectorId}/config`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!res.ok) {
+                alert('Failed to save config: ' + await res.text());
+                return;
+            }
+
+            e.target.reset();
+            document.getElementById('connector-config-fields').innerHTML = '';
+            document.getElementById('connector-details-doc').textContent = '';
+
+            // Refresh saved configs list and agent connector select
+            await loadAllConnectorConfigs();
+        }
+
+        /** Load all saved connector configs for current filter and populate agent multi-select */
+        async function loadAllConnectorConfigs() {
+            const filterConnectorId = document.getElementById('connector-config-filter').value;
+            const listEl = document.getElementById('connector-config-list');
+            const agentSelect = document.getElementById('agent-connector-configs');
+
+            listEl.innerHTML = 'Loading...';
+            agentSelect.innerHTML = '';
+
+            // Fetch connectors list to iterate through all if no filter
+            const connectorsRes = await fetch(`${API_BASE}/connectors/`);
+            const connectors = await connectorsRes.json();
+
+            const toFetch = filterConnectorId
+                ? connectors.filter(c => c.id === filterConnectorId)
+                : connectors;
+
+            listEl.innerHTML = '';
+
+            for (const connector of toFetch) {
+                const res = await fetch(`${API_BASE}/connectors/${connector.id}/config`);
+                if (!res.ok) continue;
+                const configs = await res.json();
+
+                configs.forEach(cfg => {
+                    // Card in config list
+                    const div = document.createElement('div');
+                    div.className = 'card';
+                    div.innerHTML = `
+                        <strong>${cfg.name}</strong><br>
+                        <small>Connector: ${connector.name} &bull; ID: ${cfg.connector_config_id}</small><br>
+                        <small>Fields: ${(cfg.config || []).map(f => f.name).join(', ') || '(none)'}</small>
+                    `;
+                    listEl.appendChild(div);
+
+                    // Option in agent multi-select
+                    const opt = document.createElement('option');
+                    opt.value = cfg.connector_config_id;
+                    opt.textContent = `${cfg.name} (${connector.name})`;
+                    agentSelect.appendChild(opt);
+                });
+            }
+
+            if (listEl.innerHTML === '') {
+                listEl.textContent = filterConnectorId
+                    ? 'No configs saved for this connector yet.'
+                    : 'No connector configs saved yet.';
+            }
+        }
+
+        // ─── Chat ─────────────────────────────────────────────────────────────
         let currentSessionId = null;
         let currentUserId = 'u_' + Math.floor(Math.random() * 1000);
 
-        // Chat
         async function createSession(agentId) {
             const sessionId = 's_' + Date.now();
             try {
-                // Explicitly create session
                 const res = await fetch(`${API_BASE}/agent-server/apps/${agentId}/users/${currentUserId}/sessions/${sessionId}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' }
                 });
                 if (res.ok) {
                     currentSessionId = sessionId;
-                    console.log(`Session created: ${sessionId}`);
                     return true;
                 } else {
                     console.error("Failed to create session", await res.text());
@@ -387,23 +668,19 @@
             const msgText = inputEl.value.trim();
             if (!agentId || !msgText) return;
 
-            // Ensure session exists
             if (!currentSessionId) {
                 const created = await createSession(agentId);
                 if (!created) {
-                    alert("Could not create session. check console.");
+                    alert("Could not create session. Check console.");
                     return;
                 }
             }
 
             const chatBox = document.getElementById('chat-messages');
-
-            // User Message
             const userDiv = document.createElement('div');
             userDiv.className = 'message user';
             userDiv.textContent = msgText;
             chatBox.appendChild(userDiv);
-
             inputEl.value = '';
 
             try {
@@ -421,14 +698,9 @@
                     })
                 });
 
-                if (!res.ok) {
-                    throw new Error(await res.text());
-                }
+                if (!res.ok) throw new Error(await res.text());
 
                 const responseData = await res.json();
-
-                // Parse Response
-                // ADK returns a list of events. We look for model content.
                 let replyText = "";
                 if (Array.isArray(responseData)) {
                     responseData.forEach(event => {
@@ -442,12 +714,10 @@
                     replyText = "Error: Unexpected response format";
                 }
 
-                // Agent Message
                 const agentDiv = document.createElement('div');
                 agentDiv.className = 'message agent';
                 agentDiv.textContent = replyText || "(No response text)";
                 chatBox.appendChild(agentDiv);
-
                 chatBox.scrollTop = chatBox.scrollHeight;
 
             } catch (e) {
@@ -460,23 +730,25 @@
             }
         }
 
-        // Reset session on agent change
+        // ─── Event Listeners ──────────────────────────────────────────────────
         document.getElementById('chat-agent-select').addEventListener('change', () => {
             currentSessionId = null;
             document.getElementById('chat-messages').innerHTML = '';
         });
 
-        // Listeners
         document.getElementById('add-model-form').addEventListener('submit', addModel);
         document.getElementById('add-agent-form').addEventListener('submit', addAgent);
         document.getElementById('send-msg-btn').addEventListener('click', sendMessage);
+        document.getElementById('add-connector-config-form').addEventListener('submit', addConnectorConfig);
+        document.getElementById('connector-select').addEventListener('change', onConnectorSelected);
+        document.getElementById('connector-config-filter').addEventListener('change', loadAllConnectorConfigs);
 
-        // Init
+        // ─── Init ─────────────────────────────────────────────────────────────
         checkHealth();
         loadModels();
         loadAgents();
+        loadConnectors().then(() => loadAllConnectorConfigs());
 
-        // Poll health
         setInterval(checkHealth, 30000);
     </script>
 </body>
