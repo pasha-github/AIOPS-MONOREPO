@@ -14,11 +14,12 @@ class Agent(SQLModel, table=True):
     isEnabled: bool = True
     connector_config_ids: List[str] = Field(default_factory=list, sa_column=Column(JSON))
     mcp_servers: List[str] = Field(default_factory=list, sa_column=Column(JSON)) # JSON List of MCP server URLs
-    created_at: datetime = Field(default=datetime.now())
-    updated_at: datetime = Field(default=datetime.now())
+    created_at: datetime = Field(default_factory=datetime.now)
+    updated_at: datetime = Field(default_factory=datetime.now)
     tags: Optional[str] = None
     sub_agents: List[str] = Field(default_factory=list, sa_column=Column(JSON))
     status: str = "active" 
+    type: str = Field(default="agent")
 
 
 class Model(SQLModel, table=True):
@@ -26,8 +27,8 @@ class Model(SQLModel, table=True):
     provider: str
     name: str
     api_key: str
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=datetime.now)
+    updated_at: datetime = Field(default_factory=datetime.now)
     description: Optional[str] = None
     isEnabled: bool = True
 
@@ -39,7 +40,7 @@ class ConnectorConfig(SQLModel, table=True):
     name: str
     description: Optional[str] = None
     config: List[Dict[str, str]] = Field(default_factory=list, sa_column=Column(JSON))
-    created_at: datetime = Field(default=datetime.now())
-    updated_at: datetime = Field(default=datetime.now())
+    created_at: datetime = Field(default_factory=datetime.now)
+    updated_at: datetime = Field(default_factory=datetime.now)
     connector_id: str
     

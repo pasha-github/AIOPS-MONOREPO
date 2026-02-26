@@ -19,6 +19,7 @@
 
 - [X] Test with postgres database url.
 - [ ] Create and test with more pre built connectors.
+- [ ] Create more test cases for better code coverage.
 
 # Design
 - [ ] Use sub agents or Agent-as-a-Tool.
