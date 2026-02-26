@@ -34,6 +34,7 @@ app.include_router(connectors.router)
 adk_app = get_fast_api_app(
     agents_dir="agents",
     web=True,
+    a2a=False,
     agent_loader=DatabaseAgentLoader(),
     auto_create_session=True,
     session_service_uri=AGENT_SERVER_DATABASE_URL,

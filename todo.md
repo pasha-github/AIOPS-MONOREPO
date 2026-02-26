@@ -14,6 +14,7 @@
 - [ ] Add support for multiple API Keys depending on the model.
 - [ ] Add support for modular custom python tools.
 - [ ] Add support for automated triggers.
+- [X] Added database migrations.
 
 # Testing
 
