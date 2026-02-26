@@ -1,5 +1,6 @@
 from typing import List, Optional, Dict, Any, Union
 from google.adk.tools.mcp_tool import McpToolset
+from google.adk.tools.agent_tool import AgentTool
 from google.adk.tools.mcp_tool.mcp_session_manager import SseConnectionParams, StreamableHTTPConnectionParams
 from google.adk.cli.utils.base_agent_loader import BaseAgentLoader
 from google.adk.agents import LlmAgent
@@ -116,9 +117,10 @@ class DatabaseAgentLoader(BaseAgentLoader):
                     if sub_agent_id == agent_name or sub_agent_id in loaded_sub_agent_ids:
                         continue
                     try:
+                        #TODO: Remove recursive call
                         sub_agent = self.load_agent(sub_agent_id)
                         if sub_agent:
-                            sub_agents.append(sub_agent)
+                            sub_agents.append(AgentTool(agent=sub_agent))
                             loaded_sub_agent_ids.add(sub_agent_id)
                     except Exception as e:
                         logger.error(f"Error loading sub agent config '{sub_agent_id}' for agent {agent_name}: {e}")
@@ -126,6 +128,7 @@ class DatabaseAgentLoader(BaseAgentLoader):
 
             # Create LlmAgent
             print(tools_list)
+            tools_list.extend(sub_agents)
             if model_config.provider.lower() == "google":
                 agent = LlmAgent(
                     model=model_config.name, # Using google's default
@@ -133,7 +136,7 @@ class DatabaseAgentLoader(BaseAgentLoader):
                     description=agent_config.description,
                     instruction=agent_config.instruction,
                     tools=tools_list,
-                    sub_agents=sub_agents,
+                    sub_agents=[],
                 )
                 
             else:
@@ -143,7 +146,7 @@ class DatabaseAgentLoader(BaseAgentLoader):
                     description=agent_config.description,
                     instruction=agent_config.instruction,
                     tools=tools_list,
-                    sub_agents=sub_agents,
+                    sub_agents=[],
                 )
 
             # Store in cache

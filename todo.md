@@ -23,7 +23,7 @@
 - [ ] Create more test cases for better code coverage.
 
 # Design
-- [ ] Use sub agents or Agent-as-a-Tool.
+- [X] Use sub agents or Agent-as-a-Tool. 1st Phase Agent-as-a-Tool
 
 # Deployment
 
