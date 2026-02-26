@@ -12,6 +12,9 @@ from fastapi.responses import FileResponse
 import os
 
 AGENT_SERVER_DATABASE_URL = os.getenv("AGENT_SERVER_DATABASE_URL", "sqlite:///agent_management.db")
+ENV = os.getenv("ENV", "DEV")
+A2A = os.getenv("A2A", False)
+WEB = True if ENV == "DEV" else False
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -33,8 +36,8 @@ app.include_router(connectors.router)
 # agents_dir is required, we use 'agents' as dummy/default.
 adk_app = get_fast_api_app(
     agents_dir="agents",
-    web=True,
-    a2a=False,
+    web=WEB,
+    a2a=bool(A2A),
     agent_loader=DatabaseAgentLoader(),
     auto_create_session=True,
     session_service_uri=AGENT_SERVER_DATABASE_URL,
@@ -48,11 +51,12 @@ app.mount("/agent-server", adk_app)
 # Mount Static Files for UI
 # Serve index.html at root
 # This is for testing only 
-@app.get("/")
-async def read_index():
-    return FileResponse('static/index.html')
+if WEB:
+    @app.get("/")
+    async def read_index():
+        return FileResponse('static/index.html')
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
+    app.mount("/static", StaticFiles(directory="static"), name="static")
 
 if __name__ == "__main__":
     import uvicorn
