@@ -47,3 +47,11 @@ You can easily containerize and run the application using Docker.
    ```
 
 The application will be available at `http://localhost:8000`. You can access the UI by navigating to `http://localhost:8000/` or access the Agent Server API at `http://localhost:8000/agent-server`.
+
+
+# Database Migration
+
+```bash
+alembic revision --autogenerate -m "added_new_column"
+alembic upgrade head
+```

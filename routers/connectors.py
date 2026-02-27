@@ -21,7 +21,7 @@ def list_connectors():
     connectors_dir = "connectors"
     if os.path.exists(connectors_dir):
         for filename in os.listdir(connectors_dir):
-            if filename == "__init__.py" or filename == "base_connector.py":
+            if filename in {"base_connector.py", "__init__.py", "example_connector.py"}:
                 continue
             if filename.endswith("_connector.py"):
                 # Take prefix before _connector.py and making it capital case

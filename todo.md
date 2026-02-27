@@ -19,11 +19,12 @@
 # Testing
 
 - [X] Test with postgres database url.
-- [ ] Create and test with more pre built connectors.
+- [X] Create and test with more pre built connectors (Basic Servicenow Connector).
 - [ ] Create more test cases for better code coverage.
 
 # Design
 - [X] Use sub agents or Agent-as-a-Tool. 1st Phase Agent-as-a-Tool
+- [ ] Built update APIs with auto-updation of agents in cache.
 
 # Deployment
 
