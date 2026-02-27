@@ -55,3 +55,12 @@ The application will be available at `http://localhost:8000`. You can access the
 alembic revision --autogenerate -m "added_new_column"
 alembic upgrade head
 ```
+# Terminology
+
+- **AI Agent**: A program that can call other agents, tools and connectors to perform tasks autonomously.
+- **Tool**: A function that can be called by an agent to perform a specific task.
+- **Connector**: Pre-built tools that can connect to an external system (e.g., ServiceNow, Jira) and perform actions on it.
+- **MCP**: Model Context Protocol, a protocol for communication between agents and tools.
+- **Supervisor Agent**: An agent that can call other agents to perform tasks autonomously.
+- **LLM**: Large Language Model, a model that can generate text, code, and other content.
+- **Session Storage**: A storage mechanism that can be used to store the state  of an agent with conversation history.
