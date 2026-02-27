@@ -1,7 +1,7 @@
 # Features 
 
 - [X] Add support for MCP
-- [X] Add support for LLMLite
+- [X] Add support for LLMLite (Multi LLM Support)
 - [X] Add support for Custom Tools
 - [X] Add support for Supervisor Agent
 - [X] Add support for Session Storage
@@ -25,6 +25,7 @@
 # Design
 - [X] Use sub agents or Agent-as-a-Tool. 1st Phase Agent-as-a-Tool
 - [ ] Built update APIs with auto-updation of agents in cache.
+- [ ] Design Agent Marketplace with pre-built agents.
 
 # Deployment
 
