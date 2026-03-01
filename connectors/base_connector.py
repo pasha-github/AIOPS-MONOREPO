@@ -53,6 +53,7 @@ class BaseConnector(ABC):
         method: str = "GET",
         headers: Optional[Dict[str, str]] = None,
         data: Optional[Dict[str, str]] = None,
+        json: Optional[Dict[str, str]] = None,
         params: Optional[Dict[str, str]] = None,
         basic_auth: Optional[Tuple[str, str]] = None,
         bearer_token: Optional[str] = None,
@@ -81,6 +82,9 @@ class BaseConnector(ABC):
         if params is None:
             params = None
 
+        if json is None:
+            json = None
+
         # Basic Auth support
         if basic_auth:
             username, password = basic_auth
@@ -92,6 +96,6 @@ class BaseConnector(ABC):
         if bearer_token:
             headers["Authorization"] = f"Bearer {bearer_token}"
 
-        return requests.request(method, url, headers=headers, data=data, params=params)
+        return requests.request(method, url, headers=headers, data=data, params=params, json=json)
 
 

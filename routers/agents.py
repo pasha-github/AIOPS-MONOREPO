@@ -67,7 +67,6 @@ def update_agent(update_data: AgentUpdate, session: Session = Depends(get_sessio
     session.refresh(agent)
     
     # If disabled, remove from cache
-    if not agent.isEnabled:
-        cache.remove_agent(agent.agent_id)
+    cache.remove_agent(agent.agent_id)
         
     return agent

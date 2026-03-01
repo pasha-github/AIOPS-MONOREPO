@@ -29,8 +29,8 @@ class DatadogConnector(BaseConnector):
         super().__init__(prefix=prefix)
         self.api_key = DD_API_KEY
         self.app_key = DD_APP_KEY
-        self.base_url = f"https://api.{DD_SITE}"
-
+        site = DD_SITE.removeprefix("https://").removeprefix("http://").rstrip("/")
+        self.base_url = f"https://api.{site}"
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
@@ -56,7 +56,7 @@ class DatadogConnector(BaseConnector):
             method=method,
             headers=headers,
             params=params,
-            data=data,
+            json=data,
         )
 
         if response.status_code == 401:
