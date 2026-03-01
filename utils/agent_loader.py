@@ -63,7 +63,10 @@ class DatabaseAgentLoader(BaseAgentLoader):
             import os
             if model_config.api_key:
                  # This is a simple way, might strictly need to be scoped if multiple providers
-                os.environ[f"{model_config.provider.upper()}_API_KEY"] = model_config.api_key
+                if model_config.provider.upper() == "BEDROCK":
+                    os.environ["AWS_BEARER_TOKEN_BEDROCK"] = model_config.api_key
+                else:
+                    os.environ[f"{model_config.provider.upper()}_API_KEY"] = model_config.api_key
             
             # Prepare Tools List
             tools_list = []
