@@ -4,6 +4,7 @@ from database.database import get_session
 from database.models import Model
 from typing import List
 from pydantic import BaseModel
+from utils.secrets import encrypt_secret
 
 router = APIRouter(prefix="/llms", tags=["llms"])
 
@@ -21,7 +22,9 @@ class ModelRead(BaseModel):
 
 @router.post("/", response_model=ModelRead)
 def create_model(model: ModelCreate, session: Session = Depends(get_session)):
-    db_model = Model.model_validate(model)
+    model_data = model.model_dump()
+    model_data["api_key"] = encrypt_secret(model.api_key)
+    db_model = Model.model_validate(model_data)
     session.add(db_model)
     session.commit()
     session.refresh(db_model)

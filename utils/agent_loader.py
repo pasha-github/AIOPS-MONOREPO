@@ -11,6 +11,7 @@ from database.models import Agent, Model, ConnectorConfig
 from utils.cache import cache
 from sqlmodel import Session
 from utils.helper import resolve_connector_tools
+from utils.secrets import decrypt_secret
 import logging
 from uuid import UUID
 
@@ -62,11 +63,12 @@ class DatabaseAgentLoader(BaseAgentLoader):
             # LiteLLM usually reads from env, so we might need to set os.environ temporarily or globally.
             import os
             if model_config.api_key:
+                decrypted_api_key = decrypt_secret(model_config.api_key)
                  # This is a simple way, might strictly need to be scoped if multiple providers
                 if model_config.provider.upper() == "BEDROCK":
-                    os.environ["AWS_BEARER_TOKEN_BEDROCK"] = model_config.api_key
+                    os.environ["AWS_BEARER_TOKEN_BEDROCK"] = decrypted_api_key
                 else:
-                    os.environ[f"{model_config.provider.upper()}_API_KEY"] = model_config.api_key
+                    os.environ[f"{model_config.provider.upper()}_API_KEY"] = decrypted_api_key
             
             # Prepare Tools List
             tools_list = []
