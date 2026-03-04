@@ -34,4 +34,6 @@
 - [ ] Check Google Vertex Agent Engine.
 - [ ] Check AWS AgentCore
 - [ ] Check Azure AI Foundry
+- [X] Deploy on K8s local.
+- [ ] Convert pip to uv.
 

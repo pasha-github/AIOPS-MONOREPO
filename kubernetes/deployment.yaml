@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agent-manager-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: agent-manager
+  template:
+    metadata:
+      labels:
+        app: agent-manager
+    spec:
+      containers:
+      - name: agent-manager
+        # Use a local tag for now. For AKS, this will be your ACR image URL.
+        image: agent-manager:local 
+        imagePullPolicy: IfNotPresent # Important for local development
+        ports:
+        - containerPort: 8000
+        envFrom:
+        - configMapRef:
+            name: agent-manager-config
+        - secretRef:
+            name: agent-manager-secrets

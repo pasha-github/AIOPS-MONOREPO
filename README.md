@@ -64,3 +64,22 @@ alembic upgrade head
 - **Supervisor Agent**: An agent that can call other agents to perform tasks autonomously.
 - **LLM**: Large Language Model, a model that can generate text, code, and other content.
 - **Session Storage**: A storage mechanism that can be used to store the state  of an agent with conversation history.
+
+# Deploy on K8s local
+
+## Build your local image
+```bash
+docker build -t agent-manager:local .
+```
+
+## Deploy the manifests
+```bash
+kubectl apply -f kubernetes/
+```
+
+## Check the status
+```bash
+kubectl get pods
+kubectl get services
+```
+

@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: agent-manager-config
+data:
+  ENV: "DEV"
+  A2A: "False"
