@@ -2,6 +2,8 @@
 
 A FastAPI-based application for managing and running agents, featuring SQLite/Environment-URL database support, and MCP (Model Context Protocol) integrations.
 
+![Architecture Diagram](docs/image.png)
+
 ## Prerequisites
 
 - Python 3.11+ (or Docker)
