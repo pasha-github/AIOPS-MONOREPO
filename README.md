@@ -83,3 +83,15 @@ kubectl get pods
 kubectl get services
 ```
 
+# Push Image to Artifact Registry
+
+```bash
+# Authenticate Docker to Artifact Registry
+gcloud auth configure-docker us-central1-docker.pkg.dev
+
+# Tag the image
+docker tag agent-manager us-central1-docker.pkg.dev/rc-ai-ops-internal/aiops-registry/agent-manager:latest
+
+# Push the image
+docker push us-central1-docker.pkg.dev/rc-ai-ops-internal/aiops-registry/agent-manager:latest
+```
