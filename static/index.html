@@ -178,6 +178,10 @@
                         <input type="text" id="model-name" required>
                     </div>
                     <div class="form-group">
+                        <label>Description</label>
+                        <input type="text" id="model-description" required>
+                    </div>
+                    <div class="form-group">
                         <label>API Key</label>
                         <input type="text" id="model-api-key" required>
                     </div>
@@ -351,7 +355,8 @@
                 model_id: document.getElementById('model-id').value,
                 provider: document.getElementById('model-provider').value,
                 name: document.getElementById('model-name').value,
-                api_key: document.getElementById('model-api-key').value
+                api_key: document.getElementById('model-api-key').value,
+                description: document.getElementById('model-description').value
             };
             await fetch(`${API_BASE}/llms/`, {
                 method: 'POST',

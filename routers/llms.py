@@ -2,9 +2,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 from database.database import get_session
 from database.models import Model
-from typing import List
+from typing import List, Optional
 from pydantic import BaseModel
 from utils.secrets import encrypt_secret
+from datetime import datetime
 
 router = APIRouter(prefix="/llms", tags=["llms"])
 
@@ -12,12 +13,15 @@ class ModelCreate(BaseModel):
     model_id: str
     provider: str
     name: str
+    description: Optional[str]
     api_key: str
 
 class ModelRead(BaseModel):
     model_id: str
     provider: str
     name: str
+    created_at: datetime
+    description: Optional[str]
     # Exclude api_key
 
 @router.post("/", response_model=ModelRead)
