@@ -1,5 +1,7 @@
 # Agent Management Kit
 
+[![Build & Deploy to Cloud Run](https://github.com/royal-cyber-inc/aiops-agent-management/actions/workflows/main.yml/badge.svg)](https://github.com/royal-cyber-inc/aiops-agent-management/actions/workflows/main.yml)
+
 A FastAPI-based application for managing and running agents, featuring SQLite/Environment-URL database support, and MCP (Model Context Protocol) integrations.
 
 ![Architecture Diagram](docs/image.png)
