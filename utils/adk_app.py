@@ -1,0 +1,39 @@
+import inspect
+from google.adk.cli.fast_api import get_fast_api_app # as requested
+from utils.agent_loader import DatabaseAgentLoader
+from google.adk.cli.adk_web_server import AdkWebServer
+from utils.constants import AGENT_SERVER_DATABASE_URL, A2A, WEB
+
+
+def _get_adk_web_server_instance(fastapi_app):
+    """Extracts the internal AdkWebServer instance from route closures."""
+    for route in fastapi_app.routes:
+        if getattr(route, "name", "") == "run_agent":
+            # The route endpoint is a nested function that closes over 'self'
+            closure_vars = inspect.getclosurevars(route.endpoint)
+            return closure_vars.nonlocals.get('self')
+    return None
+
+
+def invalidate_runner_cache(app_name: str):
+    if adk_web_server_instance:
+        # The next time a request hits this app, it will safely close 
+        # the old runner and load a fresh one via your custom loader.
+        adk_web_server_instance.runners_to_clean.add(app_name)
+
+# agents_dir is required, we use 'agents' as dummy/default.
+ADK_APP = get_fast_api_app(
+    agents_dir="agents",
+    web=WEB,
+    a2a=bool(A2A),
+    agent_loader=DatabaseAgentLoader(),
+    auto_create_session=True,
+    session_service_uri=AGENT_SERVER_DATABASE_URL,
+    url_prefix="/agent-server",
+    logo_text="RC AIOps - DEV",
+    logo_image_url="/static/royal_cyber.jpeg"
+)
+
+# Retrieve the server instance
+adk_web_server_instance: AdkWebServer = _get_adk_web_server_instance(ADK_APP)
+

@@ -3,6 +3,7 @@ from sqlmodel import Session, select
 from database.database import get_session
 from database.models import Agent
 from utils.cache import cache
+from utils.adk_app import invalidate_runner_cache
 from typing import List, Optional
 from pydantic import BaseModel
 
@@ -23,6 +24,12 @@ class AgentCreate(BaseModel):
 class AgentUpdate(BaseModel):
     agent_id: str 
     isEnabled: bool
+
+
+def _invalidate_cache(agent_id: str):
+    cache.remove_agent(agent_id)
+    invalidate_runner_cache(agent_id)
+
 
 @router.post("/", response_model=Agent)
 def create_agent(agent: AgentCreate, session: Session = Depends(get_session)):
@@ -50,7 +57,8 @@ def delete_agent(agent_id: str, session: Session = Depends(get_session)):
     # If agent_id != name, we need to know the name to remove from cache.
     # Assuming we remove by name as that's what loader uses.
     if agent.agent_id:
-         cache.remove_agent(agent.agent_id)
+        _invalidate_cache(agent.agent_id)
+        
     return {"ok": True}
 
 @router.patch("/")
@@ -67,6 +75,7 @@ def update_agent(update_data: AgentUpdate, session: Session = Depends(get_sessio
     session.refresh(agent)
     
     # If disabled, remove from cache
-    cache.remove_agent(agent.agent_id)
+    if not update_data.isEnabled:
+        _invalidate_cache(agent.agent_id)
         
     return agent
