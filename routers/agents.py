@@ -2,10 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 from database.database import get_session
 from database.models import Agent
-from utils.cache import cache
-from utils.adk_app import invalidate_runner_cache
 from typing import List, Optional
 from pydantic import BaseModel
+from utils.adk_app import invalidate_cache
 
 router = APIRouter(prefix="/agent", tags=["agent"])
 
@@ -24,12 +23,6 @@ class AgentCreate(BaseModel):
 class AgentUpdate(BaseModel):
     agent_id: str 
     isEnabled: bool
-
-
-def _invalidate_cache(agent_id: str):
-    cache.remove_agent(agent_id)
-    invalidate_runner_cache(agent_id)
-
 
 @router.post("/", response_model=Agent)
 def create_agent(agent: AgentCreate, session: Session = Depends(get_session)):
@@ -57,7 +50,7 @@ def delete_agent(agent_id: str, session: Session = Depends(get_session)):
     # If agent_id != name, we need to know the name to remove from cache.
     # Assuming we remove by name as that's what loader uses.
     if agent.agent_id:
-        _invalidate_cache(agent.agent_id)
+        invalidate_cache(agent.agent_id)
         
     return {"ok": True}
 
@@ -76,6 +69,6 @@ def update_agent(update_data: AgentUpdate, session: Session = Depends(get_sessio
     
     # If disabled, remove from cache
     if not update_data.isEnabled:
-        _invalidate_cache(agent.agent_id)
+        invalidate_cache(agent.agent_id)
         
     return agent

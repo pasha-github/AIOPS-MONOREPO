@@ -3,6 +3,7 @@ from google.adk.cli.fast_api import get_fast_api_app # as requested
 from utils.agent_loader import DatabaseAgentLoader
 from google.adk.cli.adk_web_server import AdkWebServer
 from utils.constants import AGENT_SERVER_DATABASE_URL, A2A, WEB
+from utils.cache import cache
 
 
 def _get_adk_web_server_instance(fastapi_app):
@@ -15,11 +16,22 @@ def _get_adk_web_server_instance(fastapi_app):
     return None
 
 
-def invalidate_runner_cache(app_name: str):
+def _invalidate_runner_cache(app_name: str):
     if adk_web_server_instance:
         # The next time a request hits this app, it will safely close 
         # the old runner and load a fresh one via your custom loader.
         adk_web_server_instance.runners_to_clean.add(app_name)
+
+def invalidate_cache(agent_id: str):
+    """Invalidates the cache for a specific agent."""
+    agent_in_cache = cache.get_agent(agent_id)
+    if not agent_in_cache:
+        return
+    # Remove from cache
+    cache.remove_agent(agent_id)
+    # Invalidate runner cache
+    _invalidate_runner_cache(agent_id)
+
 
 # agents_dir is required, we use 'agents' as dummy/default.
 ADK_APP = get_fast_api_app(
