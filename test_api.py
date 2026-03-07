@@ -43,7 +43,8 @@ def test_create_model(client: TestClient):
             "model_id": "gemini-pro",
             "provider": "google",
             "name": "gemini-1.5-pro",
-            "api_key": "test-key"
+            "api_key": "test-key",
+            "description": "A test model"
         }
     )
     assert response.status_code == 200
