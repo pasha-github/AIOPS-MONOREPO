@@ -1,0 +1,16 @@
+.git
+.gitignore
+.python-version
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.log
+*.tmp
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+.venv/
+venv/
+.env
