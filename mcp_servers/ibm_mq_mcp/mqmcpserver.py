@@ -28,9 +28,9 @@ mcp = FastMCP("mqmcpserver", host = "0.0.0.0", port=8000)
 load_dotenv()
 
 # Set these in .env (or as environment variables).
-URL_BASE = os.getenv("URL_BASE", "https://119.63.131.235:9444/ibmmq/rest/v3/admin/")
-USER_NAME = os.getenv("USER_NAME", "mqreader")
-PASSWORD = os.getenv("PASSWORD", "mqreader")
+URL_BASE = os.getenv("URL_BASE", "")
+USER_NAME = os.getenv("USER_NAME", "")
+PASSWORD = os.getenv("PASSWORD", "")
 
 @mcp.tool()
 async def dspmq() -> str:
