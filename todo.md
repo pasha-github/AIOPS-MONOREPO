@@ -27,6 +27,7 @@
 - [X] Use sub agents or Agent-as-a-Tool. 1st Phase Agent-as-a-Tool
 - [ ] Built update APIs with auto-updation of agents in cache.
 - [ ] Design Agent Marketplace with pre-built agents.
+- [ ] Add model and tools gateway through callbacks. 
 
 # Deployment
 
