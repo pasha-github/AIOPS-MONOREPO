@@ -198,6 +198,10 @@
                         </select>
                     </div>
                     <div class="form-group">
+                        <label>New Name</label>
+                        <input type="text" id="model-update-name" placeholder="Leave blank to keep current value">
+                    </div>
+                    <div class="form-group">
                         <label>New Description</label>
                         <input type="text" id="model-update-description" placeholder="Leave blank to keep current value">
                     </div>
@@ -405,6 +409,7 @@
             e.preventDefault();
 
             const modelId = document.getElementById('model-update-select').value;
+            const name = document.getElementById('model-update-name').value;
             const description = document.getElementById('model-update-description').value;
             const apiKey = document.getElementById('model-update-api-key').value;
             const data = {};
@@ -414,6 +419,9 @@
                 return;
             }
 
+            if (name.trim() !== '') {
+                data.name = name;
+            }
             if (description.trim() !== '') {
                 data.description = description;
             }
@@ -422,7 +430,7 @@
             }
 
             if (Object.keys(data).length === 0) {
-                alert('Enter a new description or API key.');
+                alert('Enter a new name, description, or API key.');
                 return;
             }
 

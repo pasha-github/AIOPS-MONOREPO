@@ -26,6 +26,7 @@ class ModelRead(BaseModel):
     # Exclude api_key
 
 class ModelUpdate(BaseModel):
+    name: Optional[str] = None
     description: Optional[str] = None
     api_key: Optional[str] = None
 
@@ -51,6 +52,8 @@ def update_model(model_id: str, model_update: ModelUpdate, session: Session = De
         raise HTTPException(status_code=404, detail="Model not found")
 
     update_data = model_update.model_dump(exclude_unset=True)
+    if "name" in update_data:
+        model.name = update_data["name"]
     if "description" in update_data:
         model.description = update_data["description"]
     if "api_key" in update_data and update_data["api_key"] is not None:
