@@ -1,0 +1,36 @@
+export const AGENT_ORG_KEY = "ORG-00001-KEY";
+export const AGENT_API_BASE_URL = "http://192.168.18.20:8000/";
+export const AGENT_HOST = "http://192.168.18.20";
+export const AGENT_WS_HOST = "ws://192.168.18.20";
+export const AGENT_CONNECTORS_BASE_URL = "http://192.168.18.20:9001";
+export const LLM_MANAGER_API_BASE_URL =
+  "https://agent-manager-428716175586.us-central1.run.app";
+
+export const LLM_PROVIDER_MODELS = {
+  google: [
+    "gemini-3-flash-preview",
+    "gemini-3.1-pro-preview",
+    "gemini-3.1-flash-lite-preview",
+    "gemini-2.5-flash",
+    "gemini-2.5-pro",
+  ],
+  anthropic: [
+    "claude-haiku-4-5-20251001",
+    "claude-sonnet-4-6",
+    "claude-opus-4-6",
+  ],
+  groq: [
+    "openai/gpt-oss-120b",
+    "llama-3.3-70b-versatile",
+    "moonshotai/kimi-k2-instruct-0905",
+  ],
+  bedrock: [
+    "global.anthropic.claude-haiku-4-5-20251001-v1:0",
+    "global.anthropic.claude-sonnet-4-6",
+    "global.amazon.nova-2-lite-v1:0",
+  ],
+} as const;
+
+export type LlmProviderKey = keyof typeof LLM_PROVIDER_MODELS;
+
+export const getProviderIconPath = (provider: string) => `/img/${provider}.webp`;
