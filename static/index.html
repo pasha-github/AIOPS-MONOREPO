@@ -61,6 +61,7 @@
         }
 
         input[type="text"],
+        input[type="password"],
         textarea,
         select {
             width: 100%;
@@ -186,6 +187,29 @@
                         <input type="text" id="model-api-key" required>
                     </div>
                     <button type="submit">Add Model</button>
+                </form>
+
+                <h3 style="margin-top: 24px;">Update Model</h3>
+                <form id="update-model-form">
+                    <div class="form-group">
+                        <label>Select Model</label>
+                        <select id="model-update-select" required>
+                            <option value="">Loading models...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>New Name</label>
+                        <input type="text" id="model-update-name" placeholder="Leave blank to keep current value">
+                    </div>
+                    <div class="form-group">
+                        <label>New Description</label>
+                        <input type="text" id="model-update-description" placeholder="Leave blank to keep current value">
+                    </div>
+                    <div class="form-group">
+                        <label>New API Key</label>
+                        <input type="password" id="model-update-api-key" placeholder="Leave blank to keep current value">
+                    </div>
+                    <button type="submit">Update Model</button>
                 </form>
             </div>
 
@@ -328,9 +352,11 @@
             const models = await res.json();
             const listEl = document.getElementById('model-list');
             const selectEl = document.getElementById('agent-model-select');
+            const updateSelectEl = document.getElementById('model-update-select');
 
             listEl.innerHTML = '';
             selectEl.innerHTML = '';
+            updateSelectEl.innerHTML = '<option value="">-- Select a model --</option>';
 
             models.forEach(m => {
                 const div = document.createElement('div');
@@ -346,6 +372,11 @@
                 opt.value = m.model_id;
                 opt.textContent = m.name;
                 selectEl.appendChild(opt);
+
+                const updateOpt = document.createElement('option');
+                updateOpt.value = m.model_id;
+                updateOpt.textContent = `${m.name} (${m.model_id})`;
+                updateSelectEl.appendChild(updateOpt);
             });
         }
 
@@ -372,6 +403,50 @@
                 await fetch(`${API_BASE}/llms/${id}`, { method: 'DELETE' });
                 loadModels();
             }
+        }
+
+        async function updateModel(e) {
+            e.preventDefault();
+
+            const modelId = document.getElementById('model-update-select').value;
+            const name = document.getElementById('model-update-name').value;
+            const description = document.getElementById('model-update-description').value;
+            const apiKey = document.getElementById('model-update-api-key').value;
+            const data = {};
+
+            if (!modelId) {
+                alert('Please select a model.');
+                return;
+            }
+
+            if (name.trim() !== '') {
+                data.name = name;
+            }
+            if (description.trim() !== '') {
+                data.description = description;
+            }
+            if (apiKey.trim() !== '') {
+                data.api_key = apiKey;
+            }
+
+            if (Object.keys(data).length === 0) {
+                alert('Enter a new name, description, or API key.');
+                return;
+            }
+
+            const res = await fetch(`${API_BASE}/llms/${modelId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            if (!res.ok) {
+                alert('Failed to update model: ' + await res.text());
+                return;
+            }
+
+            e.target.reset();
+            loadModels();
         }
 
         // ─── Agents ───────────────────────────────────────────────────────────
@@ -768,6 +843,7 @@
         });
 
         document.getElementById('add-model-form').addEventListener('submit', addModel);
+        document.getElementById('update-model-form').addEventListener('submit', updateModel);
         document.getElementById('add-agent-form').addEventListener('submit', addAgent);
         document.getElementById('send-msg-btn').addEventListener('click', sendMessage);
         document.getElementById('add-connector-config-form').addEventListener('submit', addConnectorConfig);
