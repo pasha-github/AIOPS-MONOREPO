@@ -1,6 +1,6 @@
 "use client";
 
-import { AGENT_API_BASE_URL, LLM_MANAGER_API_BASE_URL } from "@/config/agent";
+import { LLM_MANAGER_API_BASE_URL } from "@/config/agent";
 import AgentChatWorkspace from "./AgentChatWorkspace";
 import {
   Bot,
@@ -64,12 +64,6 @@ export default function AgentManagementSection() {
   const [agents, setAgents] = useState<AgentRecord[]>([]);
   const [isAgentsLoading, setIsAgentsLoading] = useState(true);
   const [agentsError, setAgentsError] = useState("");
-  const [pendingAction, setPendingAction] = useState<{
-    agent: AgentRecord;
-    action: "start" | "stop";
-  } | null>(null);
-  const [isUpdating, setIsUpdating] = useState(false);
-  const [updateError, setUpdateError] = useState("");
   const [agentFilter, setAgentFilter] = useState<
     "all" | "running" | "stopped"
   >("all");
@@ -80,10 +74,8 @@ export default function AgentManagementSection() {
   );
   const agentsRef = useRef<AgentRecord[]>([]);
   const requestIdRef = useRef(0);
-
-  const agentApiBase = AGENT_API_BASE_URL.endsWith("/")
-    ? AGENT_API_BASE_URL.slice(0, -1)
-    : AGENT_API_BASE_URL;
+  const firstAgentCardRef = useRef<HTMLDivElement | null>(null);
+  const [agentListMaxHeight, setAgentListMaxHeight] = useState<number | null>(null);
 
   const totalAgents = agents.length;
 
@@ -102,6 +94,22 @@ export default function AgentManagementSection() {
   useEffect(() => {
     agentsRef.current = agents;
   }, [agents]);
+
+  useEffect(() => {
+    const updateListHeight = () => {
+      const cardHeight = firstAgentCardRef.current?.getBoundingClientRect().height;
+      if (!cardHeight) {
+        setAgentListMaxHeight(null);
+        return;
+      }
+      const gapPx = 16; // matches space-y-4
+      setAgentListMaxHeight(cardHeight * 3 + gapPx * 2);
+    };
+
+    updateListHeight();
+    window.addEventListener("resize", updateListHeight);
+    return () => window.removeEventListener("resize", updateListHeight);
+  }, [filteredAgents.length, isAgentsLoading, agentsError]);
 
   const loadAgents = useCallback(
     async (options?: { signal?: AbortSignal; refresh?: boolean }) => {
@@ -194,75 +202,6 @@ export default function AgentManagementSection() {
     };
   }, [loadAgents]);
 
-  const handleConfirmToggle = async () => {
-    if (!pendingAction || isUpdating) {
-      return;
-    }
-
-    const { agent, action } = pendingAction;
-    setIsUpdating(true);
-    setUpdateError("");
-
-    try {
-      const url = `${agentApiBase}/aiops/agent/${action}?agentId=${encodeURIComponent(
-        agent.agentId
-      )}`;
-      const response = await fetch(url, {
-        method: "POST",
-        headers: { accept: "application/json" },
-      });
-      const data = await response.json();
-      console.log(`Agent ${action} response:`, {
-        ok: response.ok,
-        status: response.status,
-        data,
-      });
-
-      if (!response.ok) {
-        setUpdateError(
-          data?.message || `Unable to ${action} ${agent.name}.`
-        );
-        return;
-      }
-
-      const updatedAgent = {
-        ...agent,
-        status: action === "start" ? "STARTED" : "STOPPED",
-        port:
-          action === "start"
-            ? typeof data?.port === "number"
-              ? data.port
-              : agent.port
-            : null,
-      };
-
-      setAgents((prev) =>
-        prev.map((item) => {
-          if (item.agentId !== agent.agentId) {
-            return item;
-          }
-          return updatedAgent;
-        })
-      );
-      window.dispatchEvent(
-        new CustomEvent("agents:statusChanged", {
-          detail: {
-            agentId: updatedAgent.agentId,
-            enterprise: updatedAgent.enterprise,
-            status: updatedAgent.status,
-            port: updatedAgent.port,
-            action,
-          },
-        })
-      );
-      setPendingAction(null);
-    } catch {
-      setUpdateError(`Unable to ${action} ${agent.name}.`);
-    } finally {
-      setIsUpdating(false);
-    }
-  };
-
   const closeSeeAll = () => {
     setIsSeeAllOpen(false);
     setIsFilterOpen(false);
@@ -345,7 +284,10 @@ export default function AgentManagementSection() {
         </div>
       ) : null}
 
-      <div className="mt-6 flex-1 space-y-4 overflow-y-auto pr-2 no-scrollbar">
+      <div
+        className="mt-6 flex-1 space-y-4 overflow-y-auto pr-2 no-scrollbar"
+        style={agentListMaxHeight ? { maxHeight: `${agentListMaxHeight}px` } : undefined}
+      >
         {isAgentsLoading ? (
           <div className="flex items-center gap-3 rounded-2xl border border-[#eef1f7] bg-white px-5 py-6 text-sm text-[#647087] shadow-[0_10px_30px_-28px_rgba(16,24,40,0.4)]">
             <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-[#ecebff] text-[#5b4cf0]">
@@ -362,7 +304,7 @@ export default function AgentManagementSection() {
             No agents yet.
           </div>
         ) : (
-          filteredAgents.map((agent) => {
+          filteredAgents.map((agent, index) => {
             const isRunning = agent.status?.toUpperCase() === "STARTED";
             const isMule =
               (agent.enterprise ?? "").trim().toLowerCase() === "mule";
@@ -370,6 +312,7 @@ export default function AgentManagementSection() {
             return (
               <div
                 key={agent.agentId}
+                ref={index === 0 ? firstAgentCardRef : undefined}
                 className="rounded-2xl border border-[#eef1f7] bg-white px-5 py-4 shadow-[0_10px_30px_-28px_rgba(16,24,40,0.4)]"
               >
                 <div className="flex items-center justify-between">
@@ -390,16 +333,11 @@ export default function AgentManagementSection() {
                     <span>{isRunning ? "Running" : "Stopped"}</span>
                     <button
                       type="button"
-                      onClick={() =>
-                        setPendingAction({
-                          agent,
-                          action: isRunning ? "stop" : "start",
-                        })
-                      }
-                      disabled={isUpdating}
-                      className={`relative inline-flex h-5 w-10 items-center rounded-full transition ${
+                      disabled
+                      aria-label={`${isRunning ? "Running" : "Stopped"} status`}
+                      className={`relative inline-flex h-5 w-10 cursor-default items-center rounded-full ${
                         isRunning ? "bg-[#5b4cf0]" : "bg-[#e3e6ee]"
-                      } ${isUpdating ? "cursor-not-allowed opacity-70" : ""}`}
+                      }`}
                     >
                       <span
                         className={`absolute h-4 w-4 rounded-full bg-white shadow transition ${
@@ -564,17 +502,10 @@ export default function AgentManagementSection() {
                             <span>{isRunning ? "Running" : "Stopped"}</span>
                             <button
                               type="button"
-                              onClick={() =>
-                                setPendingAction({
-                                  agent,
-                                  action: isRunning ? "stop" : "start",
-                                })
-                              }
-                              disabled={isUpdating}
-                              className={`relative inline-flex h-5 w-10 items-center rounded-full transition ${
+                              disabled
+                              aria-label={`${isRunning ? "Running" : "Stopped"} status`}
+                              className={`relative inline-flex h-5 w-10 cursor-default items-center rounded-full ${
                                 isRunning ? "bg-[#5b4cf0]" : "bg-[#e3e6ee]"
-                              } ${
-                                isUpdating ? "cursor-not-allowed opacity-70" : ""
                               }`}
                             >
                               <span
@@ -627,65 +558,6 @@ export default function AgentManagementSection() {
                 className="text-sm font-semibold text-[#4f49e2] hover:underline"
               >
                 Close
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {pendingAction ? (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 px-4 py-8">
-          <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-[0_18px_50px_-30px_rgba(15,23,42,0.6)]">
-            <div className="flex items-center justify-between border-b border-[#eef1f7] px-6 py-4">
-              <h4 className="text-lg font-semibold text-[#111827]">
-                {pendingAction.action === "start" ? "Start Agent" : "Stop Agent"}
-              </h4>
-              <button
-                type="button"
-                onClick={() => setPendingAction(null)}
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-[#f3f4f6] text-[#111827]"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="px-6 py-5">
-              <p className="text-sm text-[#374151]">
-                Are you sure you want to{" "}
-                {pendingAction.action === "start" ? "start" : "stop"}{" "}
-                <span className="font-semibold text-[#111827]">
-                  {pendingAction.agent.name}
-                </span>
-                ?
-              </p>
-              {updateError ? (
-                <p className="mt-3 text-sm text-[#dc2626]">{updateError}</p>
-              ) : null}
-            </div>
-            <div className="flex items-center justify-end gap-3 border-t border-[#eef1f7] px-6 py-4">
-              <button
-                type="button"
-                onClick={() => setPendingAction(null)}
-                className="rounded-xl border border-[#e5e7eb] px-5 py-2 text-sm font-semibold text-[#374151]"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmToggle}
-                disabled={isUpdating}
-                className={`rounded-xl px-5 py-2 text-sm font-semibold text-white ${
-                  isUpdating
-                    ? "cursor-not-allowed bg-[#c7c4f7]"
-                    : "bg-[#4f49e2] shadow-[0_10px_24px_-18px_rgba(79,73,226,0.9)] hover:bg-[#433ccf]"
-                }`}
-              >
-                {isUpdating
-                  ? pendingAction.action === "start"
-                    ? "Starting..."
-                    : "Stopping..."
-                  : pendingAction.action === "start"
-                    ? "Start"
-                    : "Stop"}
               </button>
             </div>
           </div>
