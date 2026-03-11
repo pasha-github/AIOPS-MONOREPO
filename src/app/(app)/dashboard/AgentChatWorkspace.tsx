@@ -30,8 +30,23 @@ type AgentChatWorkspaceProps = {
   onClose: () => void;
 };
 
+type AdkFunctionCall = {
+  id?: string | null;
+  name?: string | null;
+  args?: unknown;
+};
+
+type AdkFunctionResponse = {
+  id?: string | null;
+  name?: string | null;
+  response?: unknown;
+};
+
 type AdkPart = {
   text?: string | null;
+  thought?: boolean | null;
+  functionCall?: AdkFunctionCall | null;
+  functionResponse?: AdkFunctionResponse | null;
 };
 
 type AdkContent = {
@@ -75,7 +90,85 @@ const getSessionsUrl = (appName: string, userId: string) =>
 const getSessionUrl = (appName: string, userId: string, sessionId: string) =>
   `${getSessionsUrl(appName, userId)}/${encodeURIComponent(sessionId)}`;
 
-const getRunUrl = () => `${ADK_BASE_URL}/run`;
+const getRunSseUrl = () => `${ADK_BASE_URL}/run_sse`;
+
+type StreamStep = {
+  id: string;
+  label: string;
+  status: "running" | "done";
+};
+
+const mergeStreamingText = (currentText: string, incomingText: string): string => {
+  if (!incomingText) {
+    return currentText;
+  }
+  if (!currentText) {
+    return incomingText;
+  }
+  if (incomingText.startsWith(currentText)) {
+    return incomingText;
+  }
+  if (currentText.endsWith(incomingText)) {
+    return currentText;
+  }
+  return `${currentText}${incomingText}`;
+};
+
+type AdkSsePayload = {
+  partial?: boolean;
+  error?: string;
+  content?: AdkContent | null;
+  actions?: {
+    requestedToolConfirmations?: Record<string, unknown> | null;
+  } | null;
+};
+
+const parseSsePayload = (rawData: string): AdkSsePayload | null => {
+  try {
+    return JSON.parse(rawData) as AdkSsePayload;
+  } catch {
+    return null;
+  }
+};
+
+const normalizeToolName = (value: string) =>
+  value
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const extractVisibleTextFromParts = (parts: AdkPart[]) =>
+  parts
+    .filter((part) => typeof part.text === "string" && !part.thought)
+    .map((part) => part.text ?? "")
+    .join("");
+
+const extractThoughtTextFromParts = (parts: AdkPart[]) =>
+  parts
+    .filter((part) => typeof part.text === "string" && part.thought)
+    .map((part) => part.text ?? "")
+    .join("");
+
+const extractFunctionCallNames = (parts: AdkPart[]) =>
+  parts
+    .map((part) => part.functionCall?.name ?? "")
+    .filter((name): name is string => Boolean(name));
+
+const extractFunctionResponseNames = (parts: AdkPart[]) =>
+  parts
+    .map((part) => part.functionResponse?.name ?? "")
+    .filter((name): name is string => Boolean(name));
+
+const summarizeStreamError = (errorText: string) => {
+  const compact = errorText.replace(/\s+/g, " ").trim();
+  if (compact.toLowerCase().includes("reasoning_content")) {
+    return "Model rejected reasoning content from a prior step. Start a new session and try again.";
+  }
+  if (compact.length <= 180) {
+    return compact;
+  }
+  return "Agent failed while generating a response.";
+};
 
 const formatTime = (timestamp?: number | null) => {
   if (!timestamp || Number.isNaN(timestamp)) {
@@ -86,12 +179,8 @@ const formatTime = (timestamp?: number | null) => {
 };
 
 const extractText = (event: AdkEvent) => {
-  const parts = event.content?.parts ?? [];
-  const text = parts
-    .map((part) => (typeof part?.text === "string" ? part.text : ""))
-    .join("")
-    .trim();
-  return text;
+  const parts = Array.isArray(event.content?.parts) ? event.content.parts : [];
+  return extractVisibleTextFromParts(parts).trim();
 };
 
 const normalizeRole = (event: AdkEvent): ChatMessage["role"] | null => {
@@ -436,6 +525,9 @@ export default function AgentChatWorkspace({
   const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null);
   const [openMenuSessionId, setOpenMenuSessionId] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
+  const [isStreamingReply, setIsStreamingReply] = useState(false);
+  const [streamingText, setStreamingText] = useState("");
+  const [streamSteps, setStreamSteps] = useState<StreamStep[]>([]);
 
   const [sessionsError, setSessionsError] = useState("");
   const [messagesError, setMessagesError] = useState("");
@@ -445,6 +537,7 @@ export default function AgentChatWorkspace({
   const messageListRef = useRef<HTMLDivElement | null>(null);
   const selectedSessionIdRef = useRef<string | null>(null);
   const copyResetTimerRef = useRef<number | null>(null);
+  const streamStepCounterRef = useRef(0);
 
   useEffect(() => {
     selectedSessionIdRef.current = selectedSessionId;
@@ -545,6 +638,222 @@ export default function AgentChatWorkspace({
     }
   }, [appName, userId, loadSessionMessages]);
 
+  const startStreamingState = useCallback(() => {
+    streamStepCounterRef.current = 0;
+    setStreamingText("");
+    setStreamSteps([
+      {
+        id: "stream-step-0",
+        label: "Thinking",
+        status: "running",
+      },
+    ]);
+    setIsStreamingReply(true);
+  }, []);
+
+  const addRunningStep = useCallback((label: string) => {
+    const cleanLabel = label.trim();
+    if (!cleanLabel) {
+      return;
+    }
+
+    setStreamSteps((prev) => {
+      if (prev.length === 0) {
+        streamStepCounterRef.current += 1;
+        return [
+          {
+            id: `stream-step-${streamStepCounterRef.current}`,
+            label: cleanLabel,
+            status: "running",
+          },
+        ];
+      }
+
+      const next = [...prev];
+      const lastIndex = next.length - 1;
+      const lastStep = next[lastIndex];
+
+      if (lastStep.label === cleanLabel) {
+        if (lastStep.status === "done") {
+          next[lastIndex] = { ...lastStep, status: "running" };
+        }
+        return next;
+      }
+
+      if (lastStep.status === "running") {
+        next[lastIndex] = { ...lastStep, status: "done" };
+      }
+
+      streamStepCounterRef.current += 1;
+      next.push({
+        id: `stream-step-${streamStepCounterRef.current}`,
+        label: cleanLabel,
+        status: "running",
+      });
+      return next;
+    });
+  }, []);
+
+  const completeLastRunningStep = useCallback(() => {
+    setStreamSteps((prev) => {
+      if (prev.length === 0) {
+        return prev;
+      }
+      const next = [...prev];
+      const lastIndex = next.length - 1;
+      if (next[lastIndex].status === "running") {
+        next[lastIndex] = { ...next[lastIndex], status: "done" };
+      }
+      return next;
+    });
+  }, []);
+
+  const processSseFrame = useCallback((frame: string): boolean => {
+    const lines = frame.split("\n");
+    const dataLines: string[] = [];
+
+    lines.forEach((line) => {
+      if (line.startsWith("data:")) {
+        dataLines.push(line.slice(5).trimStart());
+      }
+    });
+
+    const rawData = dataLines.join("\n").trim();
+    if (!rawData) {
+      return true;
+    }
+    if (rawData === "[DONE]") {
+      completeLastRunningStep();
+      return true;
+    }
+
+    const payload = parseSsePayload(rawData);
+    if (!payload) {
+      return true;
+    }
+
+    if (payload.error) {
+      addRunningStep("Request failed");
+      completeLastRunningStep();
+      setSendError(summarizeStreamError(payload.error));
+      return false;
+    }
+
+    const parts = Array.isArray(payload.content?.parts) ? payload.content.parts : [];
+    const thoughtText = extractThoughtTextFromParts(parts);
+    const visibleText = extractVisibleTextFromParts(parts);
+    const functionCalls = extractFunctionCallNames(parts);
+    const functionResponses = extractFunctionResponseNames(parts);
+
+    if (thoughtText.trim()) {
+      addRunningStep("Thinking");
+    }
+
+    functionCalls.forEach((toolName) => {
+      addRunningStep(`Running ${normalizeToolName(toolName)}`);
+    });
+
+    const confirmations = payload.actions?.requestedToolConfirmations;
+    if (
+      confirmations &&
+      Object.keys(confirmations).length > 0 &&
+      functionCalls.length === 0
+    ) {
+      addRunningStep("Awaiting tool confirmation");
+    }
+
+    functionResponses.forEach((toolName) => {
+      addRunningStep(`Received ${normalizeToolName(toolName)} results`);
+    });
+
+    if (visibleText) {
+      addRunningStep("Composing answer");
+      if (payload.partial === false) {
+        setStreamingText(visibleText);
+        completeLastRunningStep();
+      } else {
+        setStreamingText((prev) => mergeStreamingText(prev, visibleText));
+      }
+    } else if (payload.partial === false && functionCalls.length === 0) {
+      completeLastRunningStep();
+    }
+
+    return true;
+  }, [addRunningStep, completeLastRunningStep]);
+
+  const runPromptSse = useCallback(async (sessionId: string, prompt: string) => {
+    const response = await fetch(getRunSseUrl(), {
+      method: "POST",
+      headers: {
+        accept: "text/event-stream",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        appName,
+        userId,
+        sessionId,
+        streaming: true,
+        newMessage: {
+          role: "user",
+          parts: [{ text: prompt }],
+        },
+      }),
+    });
+
+    if (!response.ok || !response.body) {
+      return false;
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let streamOk = true;
+    let shouldStop = false;
+
+    while (!shouldStop) {
+      const { value, done } = await reader.read();
+      if (done) {
+        break;
+      }
+
+      buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, "\n");
+      let separatorIndex = buffer.indexOf("\n\n");
+
+      while (separatorIndex !== -1) {
+        const frame = buffer.slice(0, separatorIndex).trim();
+        buffer = buffer.slice(separatorIndex + 2);
+        if (frame) {
+          const frameOk = processSseFrame(frame);
+          if (!frameOk) {
+            streamOk = false;
+            shouldStop = true;
+            break;
+          }
+        }
+        separatorIndex = buffer.indexOf("\n\n");
+      }
+    }
+
+    if (shouldStop) {
+      try {
+        await reader.cancel();
+      } catch {
+        // no-op
+      }
+    } else {
+      const tail = buffer.trim();
+      if (tail) {
+        const tailOk = processSseFrame(tail);
+        if (!tailOk) {
+          streamOk = false;
+        }
+      }
+    }
+
+    completeLastRunningStep();
+    return streamOk;
+  }, [appName, completeLastRunningStep, processSseFrame, userId]);
+
   useEffect(() => {
     void loadSessions();
   }, [loadSessions]);
@@ -585,6 +894,9 @@ export default function AgentChatWorkspace({
     setIsDraftSession(true);
     setOpenMenuSessionId(null);
     setMessages([]);
+    setIsStreamingReply(false);
+    setStreamingText("");
+    setStreamSteps([]);
     setMessagesError("");
     setSendError("");
     setDraft("");
@@ -635,6 +947,7 @@ export default function AgentChatWorkspace({
 
       setSendError("");
       setIsSending(true);
+      startStreamingState();
 
       try {
         let sessionId = selectedSessionId;
@@ -646,30 +959,13 @@ export default function AgentChatWorkspace({
           return false;
         }
 
-        const response = await fetch(getRunUrl(), {
-          method: "POST",
-          headers: {
-            accept: "application/json",
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            appName,
-            userId,
-            sessionId,
-            streaming: false,
-            newMessage: {
-              role: "user",
-              parts: [{ text }],
-            },
-          }),
-        });
+        const streamed = await runPromptSse(sessionId, text);
 
-        if (!response.ok) {
-          setSendError("Unable to send message.");
+        if (!streamed) {
+          setSendError((prev) => prev || "Unable to send message.");
           return false;
         }
 
-        await loadSessionMessages(sessionId);
         await loadSessions(sessionId);
         return true;
       } catch {
@@ -677,9 +973,19 @@ export default function AgentChatWorkspace({
         return false;
       } finally {
         setIsSending(false);
+        setIsStreamingReply(false);
+        setStreamingText("");
+        setStreamSteps([]);
       }
     },
-    [appName, createSession, isSending, loadSessionMessages, loadSessions, selectedSessionId, userId]
+    [
+      createSession,
+      isSending,
+      loadSessions,
+      runPromptSse,
+      selectedSessionId,
+      startStreamingState,
+    ]
   );
 
   const sendMessage = useCallback(async () => {
@@ -887,81 +1193,144 @@ export default function AgentChatWorkspace({
                   );
                 })}
               </div>
-            ) : messages.length === 0 ? (
-              <p className="text-sm text-[#6b7280]">
-                No messages yet. Start the conversation.
-              </p>
             ) : (
-              messages.map((message) => {
-                const isUser = message.role === "user";
-                return (
-                  <div
-                    key={message.id}
-                    className={`flex ${isUser ? "justify-end" : "justify-start"}`}
-                  >
+              <>
+                {messages.length === 0 && !isStreamingReply ? (
+                  <p className="text-sm text-[#6b7280]">
+                    No messages yet. Start the conversation.
+                  </p>
+                ) : null}
+
+                {messages.map((message) => {
+                  const isUser = message.role === "user";
+                  return (
                     <div
-                      className={`max-w-[78%] rounded-2xl px-4 py-3 text-sm shadow-sm ${
-                        isUser
-                          ? "border border-[#dbe2f0] bg-white text-[#111827]"
-                          : "bg-[#e9edff] text-[#1f2937]"
-                      }`}
+                      key={message.id}
+                      className={`flex ${isUser ? "justify-end" : "justify-start"}`}
                     >
+                      <div
+                        className={`max-w-[78%] rounded-2xl px-4 py-3 text-sm shadow-sm ${
+                          isUser
+                            ? "border border-[#dbe2f0] bg-white text-[#111827]"
+                            : "bg-[#e9edff] text-[#1f2937]"
+                        }`}
+                      >
+                        <div className="mb-1 flex items-center gap-2 whitespace-nowrap text-[11px] font-semibold text-[#8a94a6]">
+                          {isUser ? <User className="h-3.5 w-3.5" /> : <Bot className="h-3.5 w-3.5" />}
+                          <span>{isUser ? "user" : appName}</span>
+                          <span className="text-[#b6bfce]">|</span>
+                          <span>{message.timeLabel}</span>
+                        </div>
+                        <div className="space-y-3 break-words">
+                          {renderMarkdownBlocks(message.text)}
+                        </div>
+                        {!isUser ? (
+                          <div className="mt-3 flex items-center gap-1 text-[#7b8497]">
+                            <button
+                              type="button"
+                              onClick={() => void copyMessage(message.id, message.text)}
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-lg transition hover:bg-white/65"
+                              aria-label="Copy response"
+                              title="Copy response"
+                            >
+                              {copiedMessageId === message.id ? (
+                                <Check className="h-4 w-4 text-[#16a34a]" />
+                              ) : (
+                                <Copy className="h-4 w-4" />
+                              )}
+                            </button>
+                            <button
+                              type="button"
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-lg transition hover:bg-white/65"
+                              aria-label="Thumbs up"
+                              title="Thumbs up"
+                            >
+                              <ThumbsUp className="h-4 w-4" />
+                            </button>
+                            <button
+                              type="button"
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-lg transition hover:bg-white/65"
+                              aria-label="Thumbs down"
+                              title="Thumbs down"
+                            >
+                              <ThumbsDown className="h-4 w-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void retryLastPrompt()}
+                              disabled={!lastUserPrompt || isSending}
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-lg transition hover:bg-white/65 disabled:cursor-not-allowed disabled:opacity-50"
+                              aria-label="Retry"
+                              title="Retry"
+                            >
+                              <RotateCcw className={`h-4 w-4 ${isSending ? "animate-spin" : ""}`} />
+                            </button>
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {isStreamingReply ? (
+                  <div className="flex justify-start">
+                    <div className="max-w-[78%] rounded-2xl bg-[#e9edff] px-4 py-3 text-sm text-[#1f2937] shadow-sm">
                       <div className="mb-1 flex items-center gap-2 whitespace-nowrap text-[11px] font-semibold text-[#8a94a6]">
-                        {isUser ? <User className="h-3.5 w-3.5" /> : <Bot className="h-3.5 w-3.5" />}
-                        <span>{isUser ? "user" : appName}</span>
+                        <Bot className="h-3.5 w-3.5" />
+                        <span>{appName}</span>
                         <span className="text-[#b6bfce]">|</span>
-                        <span>{message.timeLabel}</span>
+                        <span>{formatTime()}</span>
                       </div>
-                      <div className="space-y-3 break-words">
-                        {renderMarkdownBlocks(message.text)}
-                      </div>
-                      {!isUser ? (
-                        <div className="mt-3 flex items-center gap-1 text-[#7b8497]">
-                          <button
-                            type="button"
-                            onClick={() => void copyMessage(message.id, message.text)}
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg transition hover:bg-white/65"
-                            aria-label="Copy response"
-                            title="Copy response"
-                          >
-                            {copiedMessageId === message.id ? (
-                              <Check className="h-4 w-4 text-[#16a34a]" />
-                            ) : (
-                              <Copy className="h-4 w-4" />
-                            )}
-                          </button>
-                          <button
-                            type="button"
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg transition hover:bg-white/65"
-                            aria-label="Thumbs up"
-                            title="Thumbs up"
-                          >
-                            <ThumbsUp className="h-4 w-4" />
-                          </button>
-                          <button
-                            type="button"
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg transition hover:bg-white/65"
-                            aria-label="Thumbs down"
-                            title="Thumbs down"
-                          >
-                            <ThumbsDown className="h-4 w-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => void retryLastPrompt()}
-                            disabled={!lastUserPrompt || isSending}
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg transition hover:bg-white/65 disabled:cursor-not-allowed disabled:opacity-50"
-                            aria-label="Retry"
-                            title="Retry"
-                          >
-                            <RotateCcw className={`h-4 w-4 ${isSending ? "animate-spin" : ""}`} />
-                          </button>
+
+                      {streamSteps.length > 0 ? (
+                        <div className="mb-3 rounded-xl border border-[#d4dcf6] bg-white/60 px-3 py-2">
+                          <div className="space-y-2">
+                            {streamSteps.map((step, index) => (
+                              <div key={step.id} className="flex gap-2">
+                                <div className="flex w-4 shrink-0 flex-col items-center">
+                                  <span
+                                    className={`inline-flex h-4 w-4 items-center justify-center rounded-full ${
+                                      step.status === "done"
+                                        ? "bg-[#dcfce7] text-[#16a34a]"
+                                        : "bg-[#e0e7ff] text-[#4f49e2]"
+                                    }`}
+                                  >
+                                    {step.status === "done" ? (
+                                      <Check className="h-2.5 w-2.5" />
+                                    ) : (
+                                      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" />
+                                    )}
+                                  </span>
+                                  {index < streamSteps.length - 1 ? (
+                                    <span className="mt-1 h-4 w-px bg-[#c5d0f5]" />
+                                  ) : null}
+                                </div>
+                                <span
+                                  className={`text-xs ${
+                                    step.status === "done"
+                                      ? "text-[#374151]"
+                                      : "font-semibold text-[#1f2937]"
+                                  }`}
+                                >
+                                  {step.label}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       ) : null}
+
+                      <div className="space-y-3 break-words">
+                        {streamingText ? (
+                          renderMarkdownBlocks(streamingText)
+                        ) : (
+                          <p className="text-sm text-[#6b7280]">Thinking...</p>
+                        )}
+                      </div>
                     </div>
                   </div>
-                );
-              })
+                ) : null}
+              </>
             )}
           </div>
 

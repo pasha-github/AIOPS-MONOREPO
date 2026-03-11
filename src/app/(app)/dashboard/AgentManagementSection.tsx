@@ -274,7 +274,7 @@ export default function AgentManagementSection() {
   };
 
   return (
-    <div className="rounded-3xl bg-white p-6 shadow-[0_18px_50px_-38px_rgba(16,24,40,0.5)]">
+    <div className="flex h-full flex-col rounded-3xl bg-white p-6 shadow-[0_18px_50px_-38px_rgba(16,24,40,0.5)]">
       <div className="flex items-start justify-between">
         <div>
           <div className="flex items-center gap-3">
@@ -342,7 +342,7 @@ export default function AgentManagementSection() {
         </div>
       ) : null}
 
-      <div className="mt-6 max-h-[430px] space-y-4 overflow-y-auto pr-2 no-scrollbar">
+      <div className="mt-6 flex-1 space-y-4 overflow-y-auto pr-2 no-scrollbar">
         {isAgentsLoading ? (
           <div className="flex items-center gap-3 rounded-2xl border border-[#eef1f7] bg-white px-5 py-6 text-sm text-[#647087] shadow-[0_10px_30px_-28px_rgba(16,24,40,0.4)]">
             <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-[#ecebff] text-[#5b4cf0]">
