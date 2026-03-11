@@ -645,8 +645,11 @@ export default function AgentChatWorkspace({
   }, []);
 
   const loadSessionMessages = useCallback(
-    async (sessionId: string) => {
-      setIsLoadingMessages(true);
+    async (sessionId: string, options?: { silent?: boolean }) => {
+      const silent = Boolean(options?.silent);
+      if (!silent) {
+        setIsLoadingMessages(true);
+      }
       setMessagesError("");
       try {
         const response = await fetch(getSessionUrl(appName, userId, sessionId), {
@@ -654,8 +657,10 @@ export default function AgentChatWorkspace({
         });
         const payload = (await response.json()) as AdkSession;
         if (!response.ok) {
-          setMessages([]);
-          setMessageMilestones({});
+          if (!silent) {
+            setMessages([]);
+            setMessageMilestones({});
+          }
           setMessagesError("Unable to load session messages.");
           return [] as ChatMessage[];
         }
@@ -664,19 +669,26 @@ export default function AgentChatWorkspace({
         setMessageMilestones(mapped.milestonesByMessageId);
         return mapped.messages;
       } catch {
-        setMessages([]);
-        setMessageMilestones({});
+        if (!silent) {
+          setMessages([]);
+          setMessageMilestones({});
+        }
         setMessagesError("Unable to load session messages.");
         return [] as ChatMessage[];
       } finally {
-        setIsLoadingMessages(false);
+        if (!silent) {
+          setIsLoadingMessages(false);
+        }
       }
     },
     [appName, userId]
   );
 
-  const loadSessions = useCallback(async (preferredSessionId?: string | null) => {
-    setIsLoadingSessions(true);
+  const loadSessions = useCallback(async (options?: { preferredSessionId?: string | null; silent?: boolean }) => {
+    const silent = Boolean(options?.silent);
+    if (!silent) {
+      setIsLoadingSessions(true);
+    }
     setSessionsError("");
     try {
       const response = await fetch(getSessionsUrl(appName, userId), {
@@ -684,10 +696,12 @@ export default function AgentChatWorkspace({
       });
       const payload = (await response.json()) as AdkSession[];
       if (!response.ok || !Array.isArray(payload)) {
-        setSessions([]);
-        setSelectedSessionId(null);
-        setMessages([]);
-        setMessageMilestones({});
+        if (!silent) {
+          setSessions([]);
+          setSelectedSessionId(null);
+          setMessages([]);
+          setMessageMilestones({});
+        }
         setSessionsError("Unable to load sessions.");
         return [] as ChatMessage[];
       }
@@ -695,7 +709,7 @@ export default function AgentChatWorkspace({
       const sorted = sortSessions(payload);
       setSessions(sorted);
 
-      const selectedIdToKeep = preferredSessionId ?? selectedSessionIdRef.current;
+      const selectedIdToKeep = options?.preferredSessionId ?? selectedSessionIdRef.current;
       const nextSessionId =
         sorted.find((item) => item.id === selectedIdToKeep)?.id ??
         sorted[0]?.id ??
@@ -704,22 +718,28 @@ export default function AgentChatWorkspace({
       setIsDraftSession(false);
 
       if (nextSessionId) {
-        return await loadSessionMessages(nextSessionId);
+        return await loadSessionMessages(nextSessionId, { silent });
       } else {
-        setMessages([]);
-        setMessageMilestones({});
+        if (!silent) {
+          setMessages([]);
+          setMessageMilestones({});
+        }
         return [] as ChatMessage[];
       }
     } catch {
-      setSessions([]);
-      setSelectedSessionId(null);
-      setIsDraftSession(false);
-      setMessages([]);
-      setMessageMilestones({});
+      if (!silent) {
+        setSessions([]);
+        setSelectedSessionId(null);
+        setIsDraftSession(false);
+        setMessages([]);
+        setMessageMilestones({});
+      }
       setSessionsError("Unable to load sessions.");
       return [] as ChatMessage[];
     } finally {
-      setIsLoadingSessions(false);
+      if (!silent) {
+        setIsLoadingSessions(false);
+      }
     }
   }, [appName, userId, loadSessionMessages]);
 
@@ -1121,7 +1141,7 @@ export default function AgentChatWorkspace({
           return false;
         }
 
-        await loadSessions(sessionId);
+        await loadSessions({ preferredSessionId: sessionId, silent: true });
         setPendingUserMessage(null);
         return true;
       } catch {
