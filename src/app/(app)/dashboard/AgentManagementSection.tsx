@@ -1,6 +1,6 @@
 "use client";
 
-import { AGENT_API_BASE_URL } from "@/config/agent";
+import { AGENT_API_BASE_URL, LLM_MANAGER_API_BASE_URL } from "@/config/agent";
 import AgentChatWorkspace from "./AgentChatWorkspace";
 import {
   Bot,
@@ -30,7 +30,10 @@ type AgentListApiResponseItem = {
   type?: string | null;
 };
 
-const AGENT_LIST_URL = "https://agent-manager-428716175586.us-central1.run.app/agent/";
+const AGENT_MANAGER_BASE = LLM_MANAGER_API_BASE_URL.endsWith("/")
+  ? LLM_MANAGER_API_BASE_URL.slice(0, -1)
+  : LLM_MANAGER_API_BASE_URL;
+const AGENT_LIST_URL = `${AGENT_MANAGER_BASE}/agent/`;
 
 const mapApiStatusToDashboardStatus = (status: string | null | undefined) =>
   String(status ?? "").toLowerCase() === "active" ? "STARTED" : "STOPPED";
