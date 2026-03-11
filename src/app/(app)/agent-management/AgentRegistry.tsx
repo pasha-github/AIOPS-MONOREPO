@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
-import { AGENT_API_BASE_URL, LLM_MANAGER_API_BASE_URL } from "@/config/agent";
+import { LLM_MANAGER_API_BASE_URL } from "@/config/agent";
 import { formatDateTime, getProviderIconSrc } from "../llm-management/llmHelpers";
 
 type AgentRecord = {
@@ -66,10 +66,7 @@ export default function AgentRegistry({
   const [deleteError, setDeleteError] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
 
-  const deleteBaseUrl = AGENT_API_BASE_URL.endsWith("/")
-    ? AGENT_API_BASE_URL.slice(0, -1)
-    : AGENT_API_BASE_URL;
-  const statusUpdateBaseUrl = LLM_MANAGER_API_BASE_URL.endsWith("/")
+  const agentManagerBaseUrl = LLM_MANAGER_API_BASE_URL.endsWith("/")
     ? LLM_MANAGER_API_BASE_URL.slice(0, -1)
     : LLM_MANAGER_API_BASE_URL;
 
@@ -288,10 +285,13 @@ export default function AgentRegistry({
     setDeleteError("");
 
     try {
-      const agentId = deleteTarget.agentId;
-      const url = `${deleteBaseUrl}/aiops/agent/delete/${encodeURIComponent(
-        agentId
-      )}?agentId=${encodeURIComponent(agentId)}`;
+      const agentId = deleteTarget.agent_id?.trim();
+      if (!agentId) {
+        setDeleteError("Agent ID is missing. Unable to delete agent.");
+        return;
+      }
+
+      const url = `${agentManagerBaseUrl}/agent/${encodeURIComponent(agentId)}`;
       const response = await fetch(url, {
         method: "DELETE",
         headers: { accept: "application/json" },
@@ -304,23 +304,13 @@ export default function AgentRegistry({
         data = null;
       }
 
-      console.log("Agent delete response:", {
-        ok: response.ok,
-        status: response.status,
-        data,
-      });
-
       if (response.ok) {
         setDeleteTarget(null);
         await onDeleteSuccess?.();
         return;
       }
 
-      const message =
-        typeof data === "object" && data && "message" in data
-          ? String((data as { message?: string }).message)
-          : "Unable to delete agent.";
-      setDeleteError(message);
+      setDeleteError(getErrorMessage(data, "Unable to delete agent."));
     } catch {
       setDeleteError("Unable to delete agent.");
     } finally {
@@ -345,7 +335,7 @@ export default function AgentRegistry({
     setStatusUpdateError("");
 
     try {
-      const response = await fetch(`${statusUpdateBaseUrl}/agent/`, {
+      const response = await fetch(`${agentManagerBaseUrl}/agent/`, {
         method: "PATCH",
         headers: {
           accept: "application/json",
@@ -727,12 +717,9 @@ export default function AgentRegistry({
                                   handleToggleAgentEnabled(agent, rowKey, nextStatus);
                                   setOpenActionMenuKey(null);
                                 }}
-                                disabled={updatingStatusRowKey === rowKey}
-                                className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm ${
-                                  updatingStatusRowKey === rowKey
-                                    ? "cursor-not-allowed text-[#94a3b8]"
-                                    : "text-[#334155] hover:bg-[#fff7ed] hover:text-[#c2410c]"
-                                }`}
+                                disabled
+                                title="Temporarily disabled"
+                                className="flex w-full cursor-not-allowed items-center gap-2 bg-[#f8fafc] px-3 py-2 text-left text-sm text-[#94a3b8]"
                               >
                                 <Power className="h-4 w-4" />
                                 {isOnlineStatus(agent.status) ? "Disable" : "Enable"}
@@ -863,12 +850,9 @@ export default function AgentRegistry({
                               handleToggleAgentEnabled(agent, rowKey, nextStatus);
                               setOpenActionMenuKey(null);
                             }}
-                            disabled={updatingStatusRowKey === rowKey}
-                            className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm ${
-                              updatingStatusRowKey === rowKey
-                                ? "cursor-not-allowed text-[#94a3b8]"
-                                : "text-[#334155] hover:bg-[#fff7ed] hover:text-[#c2410c]"
-                            }`}
+                            disabled
+                            title="Temporarily disabled"
+                            className="flex w-full cursor-not-allowed items-center gap-2 bg-[#f8fafc] px-3 py-2 text-left text-sm text-[#94a3b8]"
                           >
                             <Power className="h-4 w-4" />
                             {isOnlineStatus(agent.status) ? "Disable" : "Enable"}
