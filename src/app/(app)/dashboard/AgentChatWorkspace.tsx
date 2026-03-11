@@ -3,11 +3,16 @@
 import { AGENT_ADK_BASE_URL } from "@/config/agent";
 import {
   Bot,
+  Check,
+  Copy,
   MessageSquare,
   Mic,
   MoreHorizontal,
   Plus,
+  RotateCcw,
   Send,
+  ThumbsDown,
+  ThumbsUp,
   Trash2,
   User,
   X,
@@ -435,9 +440,11 @@ export default function AgentChatWorkspace({
   const [sessionsError, setSessionsError] = useState("");
   const [messagesError, setMessagesError] = useState("");
   const [sendError, setSendError] = useState("");
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
 
   const messageListRef = useRef<HTMLDivElement | null>(null);
   const selectedSessionIdRef = useRef<string | null>(null);
+  const copyResetTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     selectedSessionIdRef.current = selectedSessionId;
@@ -461,6 +468,14 @@ export default function AgentChatWorkspace({
     }
     messageListRef.current.scrollTop = messageListRef.current.scrollHeight;
   }, [messages, isSending]);
+
+  useEffect(() => {
+    return () => {
+      if (copyResetTimerRef.current) {
+        window.clearTimeout(copyResetTimerRef.current);
+      }
+    };
+  }, []);
 
   const loadSessionMessages = useCallback(
     async (sessionId: string) => {
@@ -611,57 +626,103 @@ export default function AgentChatWorkspace({
     [appName, userId, sessions, selectedSessionId, loadSessionMessages]
   );
 
+  const sendPrompt = useCallback(
+    async (prompt: string) => {
+      const text = prompt.trim();
+      if (!text || isSending) {
+        return false;
+      }
+
+      setSendError("");
+      setIsSending(true);
+
+      try {
+        let sessionId = selectedSessionId;
+        if (!sessionId) {
+          sessionId = await createSession();
+        }
+        if (!sessionId) {
+          setSendError("No session available. Create a new session first.");
+          return false;
+        }
+
+        const response = await fetch(getRunUrl(), {
+          method: "POST",
+          headers: {
+            accept: "application/json",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            appName,
+            userId,
+            sessionId,
+            streaming: false,
+            newMessage: {
+              role: "user",
+              parts: [{ text }],
+            },
+          }),
+        });
+
+        if (!response.ok) {
+          setSendError("Unable to send message.");
+          return false;
+        }
+
+        await loadSessionMessages(sessionId);
+        await loadSessions(sessionId);
+        return true;
+      } catch {
+        setSendError("Unable to send message.");
+        return false;
+      } finally {
+        setIsSending(false);
+      }
+    },
+    [appName, createSession, isSending, loadSessionMessages, loadSessions, selectedSessionId, userId]
+  );
+
   const sendMessage = useCallback(async () => {
-    const text = draft.trim();
-    if (!text || isSending) {
+    setSendError("");
+    const sent = await sendPrompt(draft);
+    if (sent) {
+      setDraft("");
+    }
+  }, [draft, sendPrompt]);
+
+  const lastUserPrompt = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+      if (messages[i].role === "user") {
+        return messages[i].text;
+      }
+    }
+    return "";
+  }, [messages]);
+
+  const retryLastPrompt = useCallback(async () => {
+    if (!lastUserPrompt || isSending) {
       return;
     }
+    await sendPrompt(lastUserPrompt);
+  }, [isSending, lastUserPrompt, sendPrompt]);
 
-    setSendError("");
-    setIsSending(true);
-
-    try {
-      let sessionId = selectedSessionId;
-      if (!sessionId) {
-        sessionId = await createSession();
-      }
-      if (!sessionId) {
-        setSendError("No session available. Create a new session first.");
-        return;
-      }
-
-      const response = await fetch(getRunUrl(), {
-        method: "POST",
-        headers: {
-          accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          appName,
-          userId,
-          sessionId,
-          streaming: false,
-          newMessage: {
-            role: "user",
-            parts: [{ text }],
-          },
-        }),
-      });
-
-      if (!response.ok) {
-        setSendError("Unable to send message.");
-        return;
-      }
-
-      setDraft("");
-      await loadSessionMessages(sessionId);
-      await loadSessions(sessionId);
-    } catch {
-      setSendError("Unable to send message.");
-    } finally {
-      setIsSending(false);
+  const copyMessage = async (messageId: string, text: string) => {
+    if (!navigator?.clipboard) {
+      return;
     }
-  }, [appName, createSession, draft, isSending, loadSessionMessages, loadSessions, selectedSessionId, userId]);
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedMessageId(messageId);
+      if (copyResetTimerRef.current) {
+        window.clearTimeout(copyResetTimerRef.current);
+      }
+      copyResetTimerRef.current = window.setTimeout(() => {
+        setCopiedMessageId((prev) => (prev === messageId ? null : prev));
+      }, 1400);
+    } catch {
+      // no-op
+    }
+  };
 
   const selectedSessionLabel = useMemo(
     () =>
@@ -845,7 +906,7 @@ export default function AgentChatWorkspace({
                           : "bg-[#e9edff] text-[#1f2937]"
                       }`}
                     >
-                      <div className="mb-1 flex items-center gap-2 text-[11px] font-semibold text-[#8a94a6]">
+                      <div className="mb-1 flex items-center gap-2 whitespace-nowrap text-[11px] font-semibold text-[#8a94a6]">
                         {isUser ? <User className="h-3.5 w-3.5" /> : <Bot className="h-3.5 w-3.5" />}
                         <span>{isUser ? "user" : appName}</span>
                         <span className="text-[#b6bfce]">|</span>
@@ -854,6 +915,49 @@ export default function AgentChatWorkspace({
                       <div className="space-y-3 break-words">
                         {renderMarkdownBlocks(message.text)}
                       </div>
+                      {!isUser ? (
+                        <div className="mt-3 flex items-center gap-1 text-[#7b8497]">
+                          <button
+                            type="button"
+                            onClick={() => void copyMessage(message.id, message.text)}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg transition hover:bg-white/65"
+                            aria-label="Copy response"
+                            title="Copy response"
+                          >
+                            {copiedMessageId === message.id ? (
+                              <Check className="h-4 w-4 text-[#16a34a]" />
+                            ) : (
+                              <Copy className="h-4 w-4" />
+                            )}
+                          </button>
+                          <button
+                            type="button"
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg transition hover:bg-white/65"
+                            aria-label="Thumbs up"
+                            title="Thumbs up"
+                          >
+                            <ThumbsUp className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg transition hover:bg-white/65"
+                            aria-label="Thumbs down"
+                            title="Thumbs down"
+                          >
+                            <ThumbsDown className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void retryLastPrompt()}
+                            disabled={!lastUserPrompt || isSending}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg transition hover:bg-white/65 disabled:cursor-not-allowed disabled:opacity-50"
+                            aria-label="Retry"
+                            title="Retry"
+                          >
+                            <RotateCcw className={`h-4 w-4 ${isSending ? "animate-spin" : ""}`} />
+                          </button>
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                 );
