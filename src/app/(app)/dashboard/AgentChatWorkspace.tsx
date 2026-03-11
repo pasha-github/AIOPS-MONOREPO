@@ -576,6 +576,7 @@ export default function AgentChatWorkspace({
   onClose,
 }: AgentChatWorkspaceProps) {
   const appName = agent.agentId;
+  const assistantDisplayName = agent.name?.trim() || appName;
   const userId = DEFAULT_USER_ID;
 
   const [sessions, setSessions] = useState<AdkSession[]>([]);
@@ -1461,7 +1462,7 @@ export default function AgentChatWorkspace({
                       >
                         <div className="mb-1 flex items-center gap-2 whitespace-nowrap text-[11px] font-semibold text-[#8a94a6]">
                           {isUser ? <User className="h-3.5 w-3.5" /> : <Bot className="h-3.5 w-3.5" />}
-                          <span>{isUser ? "user" : appName}</span>
+                          <span>{isUser ? "user" : assistantDisplayName}</span>
                           <span className="text-[#b6bfce]">|</span>
                           <span>{message.timeLabel}</span>
                         </div>
@@ -1522,7 +1523,7 @@ export default function AgentChatWorkspace({
                     <div className="max-w-[78%] rounded-2xl bg-[#e9edff] px-4 py-3 text-sm text-[#1f2937] shadow-sm">
                       <div className="mb-1 flex items-center gap-2 whitespace-nowrap text-[11px] font-semibold text-[#8a94a6]">
                         <Bot className="h-3.5 w-3.5" />
-                        <span>{appName}</span>
+                        <span>{assistantDisplayName}</span>
                         <span className="text-[#b6bfce]">|</span>
                         <span>{formatTime()}</span>
                       </div>
