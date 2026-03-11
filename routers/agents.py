@@ -5,6 +5,7 @@ from database.models import Agent
 from typing import List, Optional
 from pydantic import BaseModel
 from utils.adk_app import invalidate_cache
+from sqlalchemy.exc import IntegrityError
 
 router = APIRouter(prefix="/agent", tags=["agent"])
 
@@ -35,7 +36,11 @@ class AgentPatch(BaseModel):
 def create_agent(agent: AgentCreate, session: Session = Depends(get_session)):
     db_agent = Agent.model_validate(agent)
     session.add(db_agent)
-    session.commit()
+    try:
+        session.commit()
+    except IntegrityError:
+        session.rollback()
+        raise HTTPException(status_code=409, detail="Agent already exists")
     session.refresh(db_agent)
     return db_agent
 
