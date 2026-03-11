@@ -208,11 +208,6 @@ const formatTime = (timestamp?: number | null) => {
   return new Date(value).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 };
 
-const extractText = (event: AdkEvent) => {
-  const parts = Array.isArray(event.content?.parts) ? event.content.parts : [];
-  return extractVisibleTextFromParts(parts).trim();
-};
-
 const normalizeRole = (event: AdkEvent): ChatMessage["role"] | null => {
   const contentRole = String(event.content?.role ?? "").toLowerCase();
   if (contentRole === "user") {
@@ -234,22 +229,61 @@ const normalizeRole = (event: AdkEvent): ChatMessage["role"] | null => {
 const mapEventsToMessages = (events: AdkEvent[] | null | undefined) => {
   const source = Array.isArray(events) ? events : [];
   const messages: ChatMessage[] = [];
+  const milestonesByMessageId: Record<string, StreamStep[]> = {};
+  let pendingMilestones: StreamStep[] = [];
+  let stepCounter = 0;
+
+  const addPendingMilestone = (label: string) => {
+    const cleanLabel = label.trim();
+    if (!cleanLabel) {
+      return;
+    }
+    stepCounter += 1;
+    pendingMilestones.push({
+      id: `history-step-${stepCounter}`,
+      label: cleanLabel,
+      status: "done",
+    });
+  };
 
   source.forEach((event, index) => {
-    const text = extractText(event);
+    const parts = Array.isArray(event.content?.parts) ? event.content.parts : [];
+    const functionCalls = extractFunctionCallNames(parts);
+    const functionResponses = extractFunctionResponseNames(parts);
+    functionCalls.forEach((toolName) => {
+      addPendingMilestone(`Running ${normalizeToolName(toolName)}`);
+    });
+    functionResponses.forEach((toolName) => {
+      addPendingMilestone(`Received ${normalizeToolName(toolName)} results`);
+    });
+
+    const text = extractVisibleTextFromParts(parts).trim();
     const role = normalizeRole(event);
     if (!text || !role) {
       return;
     }
+
+    const messageId = String(event.id ?? `${role}-${index}`);
     messages.push({
-      id: String(event.id ?? `${role}-${index}`),
+      id: messageId,
       role,
       text,
       timeLabel: formatTime(event.timestamp),
     });
+
+    if (role === "agent" && pendingMilestones.length > 0) {
+      milestonesByMessageId[messageId] = pendingMilestones.map((step) => ({
+        ...step,
+        id: `${messageId}-${step.id}`,
+      }));
+      pendingMilestones = [];
+    }
   });
 
-  return messages;
+  return {
+    messages,
+    milestonesByMessageId,
+  };
 };
 
 const renderMarkdownInline = (text: string, keyPrefix = ""): ReactNode[] => {
@@ -620,14 +654,17 @@ export default function AgentChatWorkspace({
         const payload = (await response.json()) as AdkSession;
         if (!response.ok) {
           setMessages([]);
+          setMessageMilestones({});
           setMessagesError("Unable to load session messages.");
           return [] as ChatMessage[];
         }
         const mapped = mapEventsToMessages(payload.events);
-        setMessages(mapped);
-        return mapped;
+        setMessages(mapped.messages);
+        setMessageMilestones(mapped.milestonesByMessageId);
+        return mapped.messages;
       } catch {
         setMessages([]);
+        setMessageMilestones({});
         setMessagesError("Unable to load session messages.");
         return [] as ChatMessage[];
       } finally {
@@ -649,6 +686,7 @@ export default function AgentChatWorkspace({
         setSessions([]);
         setSelectedSessionId(null);
         setMessages([]);
+        setMessageMilestones({});
         setSessionsError("Unable to load sessions.");
         return [] as ChatMessage[];
       }
@@ -668,6 +706,7 @@ export default function AgentChatWorkspace({
         return await loadSessionMessages(nextSessionId);
       } else {
         setMessages([]);
+        setMessageMilestones({});
         return [] as ChatMessage[];
       }
     } catch {
@@ -675,6 +714,7 @@ export default function AgentChatWorkspace({
       setSelectedSessionId(null);
       setIsDraftSession(false);
       setMessages([]);
+      setMessageMilestones({});
       setSessionsError("Unable to load sessions.");
       return [] as ChatMessage[];
     } finally {
@@ -976,7 +1016,9 @@ export default function AgentChatWorkspace({
         setSessions((prev) => sortSessions([payload, ...prev.filter((item) => item.id !== payload.id)]));
         setSelectedSessionId(payload.id);
         setIsDraftSession(false);
-        setMessages(mapEventsToMessages(payload.events));
+        const mapped = mapEventsToMessages(payload.events);
+        setMessages(mapped.messages);
+        setMessageMilestones(mapped.milestonesByMessageId);
         return payload.id;
       } catch {
         setSessionsError("Unable to create session.");
@@ -991,6 +1033,7 @@ export default function AgentChatWorkspace({
     setIsDraftSession(true);
     setOpenMenuSessionId(null);
     setMessages([]);
+    setMessageMilestones({});
     setPendingUserMessage(null);
     setIsStreamingReply(false);
     resetStreamingText();
@@ -1026,6 +1069,7 @@ export default function AgentChatWorkspace({
             await loadSessionMessages(nextId);
           } else {
             setMessages([]);
+            setMessageMilestones({});
           }
         }
       } catch {
@@ -1076,24 +1120,7 @@ export default function AgentChatWorkspace({
           return false;
         }
 
-        const refreshedMessages = await loadSessions(sessionId);
-        const completedMilestones = streamStepsRef.current.map((step) => ({
-          ...step,
-          status: "done" as const,
-        }));
-
-        if (completedMilestones.length > 0) {
-          const latestAgentMessage = [...refreshedMessages]
-            .reverse()
-            .find((message) => message.role === "agent");
-
-          if (latestAgentMessage) {
-            setMessageMilestones((prev) => ({
-              ...prev,
-              [latestAgentMessage.id]: completedMilestones,
-            }));
-          }
-        }
+        await loadSessions(sessionId);
         setPendingUserMessage(null);
         return true;
       } catch {
