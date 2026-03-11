@@ -634,7 +634,7 @@ export default function AgentChatWorkspace({
 
   const [sessions, setSessions] = useState<AdkSession[]>([]);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
-  const [isDraftSession, setIsDraftSession] = useState(false);
+  const [isDraftSession, setIsDraftSession] = useState(true);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState("");
 
@@ -756,6 +756,7 @@ export default function AgentChatWorkspace({
         if (!silent) {
           setSessions([]);
           setSelectedSessionId(null);
+          setIsDraftSession(true);
           setMessages([]);
           setMessageMilestones({});
           setExpandedMilestones({});
@@ -769,11 +770,9 @@ export default function AgentChatWorkspace({
 
       const selectedIdToKeep = options?.preferredSessionId ?? selectedSessionIdRef.current;
       const nextSessionId =
-        sorted.find((item) => item.id === selectedIdToKeep)?.id ??
-        sorted[0]?.id ??
-        null;
+        sorted.find((item) => item.id === selectedIdToKeep)?.id ?? null;
       setSelectedSessionId(nextSessionId);
-      setIsDraftSession(false);
+      setIsDraftSession(!nextSessionId);
 
       if (nextSessionId) {
         return await loadSessionMessages(nextSessionId, { silent });
@@ -789,7 +788,7 @@ export default function AgentChatWorkspace({
       if (!silent) {
         setSessions([]);
         setSelectedSessionId(null);
-        setIsDraftSession(false);
+        setIsDraftSession(true);
         setMessages([]);
         setMessageMilestones({});
         setExpandedMilestones({});

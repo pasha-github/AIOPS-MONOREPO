@@ -22,12 +22,16 @@ type NavItem = {
   href?: string;
   active?: boolean;
   dot?: boolean;
+  disabled?: boolean;
+  reloadOnNavigate?: boolean;
 };
 
 type NavSection = {
   title: string;
   items: NavItem[];
 };
+
+const ENABLE_CREDENTIALS_MANAGEMENT = false;
 
 const navSections: NavSection[] = [
   {
@@ -100,6 +104,8 @@ const navSections: NavSection[] = [
         icon: <Link2 className="h-5 w-5" />,
         dot: true,
         href: "/connectors",
+        disabled: !ENABLE_CREDENTIALS_MANAGEMENT,
+        reloadOnNavigate: true,
       },
       {
         label: "User management",
@@ -162,35 +168,71 @@ export default function LeftNavbar() {
             </div>
             <div className="space-y-1">
               {section.items.map((item) => {
+                const isDisabled = Boolean(item.disabled);
                 const isActive =
-                  item.href && item.href !== "#"
+                  !isDisabled && item.href && item.href !== "#"
                     ? pathname === item.href ||
                       pathname?.startsWith(`${item.href}/`)
                     : item.active;
+                const baseClasses =
+                  "group/item relative flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-left text-sm font-medium transition";
+                const stateClasses = isDisabled
+                  ? "cursor-not-allowed bg-[#f4f6fb] text-[#9aa3b6]"
+                  : isActive
+                    ? "bg-[#e9edff] text-[#3f35d3]"
+                    : "text-[#677189] hover:bg-[#f3f5ff] hover:text-[#1b1f2a]";
+                const iconClasses = isDisabled
+                  ? "relative flex h-9 w-9 items-center justify-center rounded-xl bg-[#edf1f7] text-[#a6afc1]"
+                  : "relative flex h-9 w-9 items-center justify-center rounded-xl bg-white text-[#566079] shadow-[0_1px_2px_rgba(0,0,0,0.06)] transition group-hover/item:text-[#3f35d3]";
+                const itemContent = (
+                  <>
+                    {isActive ? (
+                      <span className="absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r-full bg-[#4f49e2]" />
+                    ) : null}
+                    <span className={iconClasses}>
+                      {item.icon}
+                      {item.dot ? (
+                        <span
+                          className={`absolute -left-1.5 bottom-0 h-2 w-2 rounded-full ${
+                            isDisabled ? "bg-[#c7cfde]" : "bg-[#f26a1b]"
+                          }`}
+                        />
+                      ) : null}
+                    </span>
+                    <span className="w-0 overflow-hidden opacity-0 transition-all duration-300 group-hover:w-auto group-hover:opacity-100">
+                      {item.label}
+                    </span>
+                  </>
+                );
+
+                if (isDisabled) {
+                  return (
+                    <div
+                      key={item.id}
+                      title={item.label}
+                      aria-disabled="true"
+                      className={`${baseClasses} ${stateClasses}`}
+                    >
+                      {itemContent}
+                    </div>
+                  );
+                }
+
                 return (
                   <Link
                     key={item.id}
                     href={item.href ?? "#"}
                     title={item.label}
                     aria-current={isActive ? "page" : undefined}
-                    className={`group/item relative flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-left text-sm font-medium transition ${
-                      isActive
-                        ? "bg-[#e9edff] text-[#3f35d3]"
-                        : "text-[#677189] hover:bg-[#f3f5ff] hover:text-[#1b1f2a]"
-                    }`}
+                    onClick={(event) => {
+                      if (item.reloadOnNavigate && item.href && item.href !== "#") {
+                        event.preventDefault();
+                        window.location.assign(item.href);
+                      }
+                    }}
+                    className={`${baseClasses} ${stateClasses}`}
                   >
-                    {isActive ? (
-                      <span className="absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r-full bg-[#4f49e2]" />
-                    ) : null}
-                    <span className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-white text-[#566079] shadow-[0_1px_2px_rgba(0,0,0,0.06)] transition group-hover/item:text-[#3f35d3]">
-                      {item.icon}
-                      {item.dot ? (
-                        <span className="absolute -left-1.5 bottom-0 h-2 w-2 rounded-full bg-[#f26a1b]" />
-                      ) : null}
-                    </span>
-                    <span className="w-0 overflow-hidden opacity-0 transition-all duration-300 group-hover:w-auto group-hover:opacity-100">
-                      {item.label}
-                    </span>
+                    {itemContent}
                   </Link>
                 );
               })}
