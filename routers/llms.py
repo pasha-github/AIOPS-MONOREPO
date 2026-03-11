@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from utils.secrets import encrypt_secret
 from utils.adk_app import invalidate_cache
 from datetime import datetime
+from sqlalchemy.exc import IntegrityError
 
 router = APIRouter(prefix="/llms", tags=["llms"])
 
@@ -36,7 +37,11 @@ def create_model(model: ModelCreate, session: Session = Depends(get_session)):
     model_data["api_key"] = encrypt_secret(model.api_key)
     db_model = Model.model_validate(model_data)
     session.add(db_model)
-    session.commit()
+    try:
+        session.commit()
+    except IntegrityError:
+        session.rollback()
+        raise HTTPException(status_code=409, detail="Model already exists")
     session.refresh(db_model)
     return db_model
 
