@@ -692,7 +692,21 @@ export default function AgentChatWorkspace({
 
           <div className="soft-scrollbar min-h-0 flex-1 overflow-y-auto p-3">
             {isLoadingSessions ? (
-              <p className="px-2 py-3 text-sm text-[#6b7280]">Loading sessions...</p>
+              <div className="space-y-2">
+                {Array.from({ length: 6 }).map((_, index) => (
+                  <div
+                    key={`session-skeleton-${index}`}
+                    className="flex items-start gap-2 rounded-xl border border-[#e8ecf4] bg-white px-3 py-3 animate-pulse"
+                  >
+                    <span className="mt-0.5 h-4 w-4 rounded bg-[#edf2f9]" />
+                    <div className="min-w-0 flex-1 space-y-2">
+                      <div className="h-3 w-11/12 rounded bg-[#edf2f9]" />
+                      <div className="h-3 w-7/12 rounded bg-[#edf2f9]" />
+                    </div>
+                    <span className="h-6 w-6 rounded-full bg-[#edf2f9]" />
+                  </div>
+                ))}
+              </div>
             ) : sessions.length === 0 ? (
               <p className="px-2 py-3 text-sm text-[#6b7280]">No sessions yet.</p>
             ) : (
@@ -786,7 +800,32 @@ export default function AgentChatWorkspace({
             className="soft-scrollbar flex-1 space-y-4 overflow-y-auto bg-[#f7f8fc] px-6 py-5"
           >
             {isLoadingMessages ? (
-              <p className="text-sm text-[#6b7280]">Loading conversation...</p>
+              <div className="space-y-4">
+                {Array.from({ length: 4 }).map((_, index) => {
+                  const isUserSkeleton = index % 2 === 1;
+                  return (
+                    <div
+                      key={`message-skeleton-${index}`}
+                      className={`flex ${
+                        isUserSkeleton ? "justify-end" : "justify-start"
+                      }`}
+                    >
+                      <div className="max-w-[78%] rounded-2xl border border-[#dbe2f0] bg-white px-4 py-3 animate-pulse">
+                        <div className="mb-2 flex items-center gap-2">
+                          <span className="h-3 w-3 rounded-full bg-[#edf2f9]" />
+                          <span className="h-3 w-20 rounded bg-[#edf2f9]" />
+                          <span className="h-3 w-14 rounded bg-[#edf2f9]" />
+                        </div>
+                        <div className="space-y-2">
+                          <div className="h-3 w-full rounded bg-[#edf2f9]" />
+                          <div className="h-3 w-5/6 rounded bg-[#edf2f9]" />
+                          <div className="h-3 w-2/3 rounded bg-[#edf2f9]" />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             ) : messages.length === 0 ? (
               <p className="text-sm text-[#6b7280]">
                 No messages yet. Start the conversation.
