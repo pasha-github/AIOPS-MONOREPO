@@ -179,12 +179,6 @@ const extractVisibleTextFromParts = (parts: AdkPart[]) =>
     .map((part) => part.text ?? "")
     .join("");
 
-const extractThoughtTextFromParts = (parts: AdkPart[]) =>
-  parts
-    .filter((part) => typeof part.text === "string" && part.thought)
-    .map((part) => part.text ?? "")
-    .join("");
-
 const extractFunctionCallNames = (parts: AdkPart[]) =>
   parts
     .map((part) => part.functionCall?.name ?? "")
@@ -749,13 +743,7 @@ export default function AgentChatWorkspace({
   const startStreamingState = useCallback(() => {
     streamStepCounterRef.current = 0;
     resetStreamingText();
-    const initialSteps: StreamStep[] = [
-      {
-        id: "stream-step-0",
-        label: "Thinking",
-        status: "running",
-      },
-    ];
+    const initialSteps: StreamStep[] = [];
     streamStepsRef.current = initialSteps;
     setStreamSteps(initialSteps);
     setIsStreamingReply(true);
@@ -854,14 +842,9 @@ export default function AgentChatWorkspace({
     }
 
     const parts = Array.isArray(payload.content?.parts) ? payload.content.parts : [];
-    const thoughtText = extractThoughtTextFromParts(parts);
     const visibleText = extractVisibleTextFromParts(parts);
     const functionCalls = extractFunctionCallNames(parts);
     const functionResponses = extractFunctionResponseNames(parts);
-
-    if (thoughtText.trim()) {
-      addRunningStep("Thinking");
-    }
 
     functionCalls.forEach((toolName) => {
       addRunningStep(`Running ${normalizeToolName(toolName)}`);
@@ -881,7 +864,6 @@ export default function AgentChatWorkspace({
     });
 
     if (visibleText) {
-      addRunningStep("Composing answer");
       const mergedText = mergeStreamingText(streamTargetTextRef.current, visibleText);
       if (payload.partial === false) {
         updateStreamingTargetText(mergedText);
@@ -1206,6 +1188,9 @@ export default function AgentChatWorkspace({
     return [...messages, pendingUserMessage];
   }, [messages, pendingUserMessage]);
 
+  const isInitialSessionView =
+    !isLoadingMessages && !isStreamingReply && visibleMessages.length === 0;
+
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/35 p-4">
       <div className="flex h-[88vh] w-full max-w-7xl overflow-hidden rounded-3xl bg-white shadow-[0_24px_70px_-34px_rgba(15,23,42,0.7)]">
@@ -1330,7 +1315,11 @@ export default function AgentChatWorkspace({
 
           <div
             ref={messageListRef}
-            className="soft-scrollbar flex-1 space-y-4 overflow-y-auto bg-[#f7f8fc] px-6 py-5"
+            className={`soft-scrollbar flex-1 ${
+              isInitialSessionView
+                ? "overflow-hidden bg-[radial-gradient(120%_120%_at_50%_0%,#eef2ff_0%,#f7f8fc_45%,#f7f8fc_100%)] px-8 py-8"
+                : "space-y-4 overflow-y-auto bg-[#f7f8fc] px-6 py-5"
+            }`}
           >
             {isLoadingMessages ? (
               <div className="space-y-4">
@@ -1358,6 +1347,67 @@ export default function AgentChatWorkspace({
                     </div>
                   );
                 })}
+              </div>
+            ) : isInitialSessionView ? (
+              <div className="flex h-full items-center justify-center">
+                <div className="w-full max-w-4xl -translate-y-10">
+                  <h3 className="mb-8 text-center text-4xl font-semibold tracking-tight text-[#111827]">
+                    What&apos;s on the agenda today?
+                  </h3>
+                  <div className="rounded-[2rem] border border-[#dbe2f0] bg-white p-5 shadow-[0_24px_60px_-42px_rgba(16,24,40,0.35)]">
+                    <input
+                      type="text"
+                      value={draft}
+                      onChange={(event) => setDraft(event.target.value)}
+                      onKeyDown={(event) => {
+                        if ((event.nativeEvent as KeyboardEvent).isComposing) {
+                          return;
+                        }
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          void sendMessage();
+                        }
+                      }}
+                      placeholder="Ask anything"
+                      className="w-full bg-transparent text-3xl text-[#111827] outline-none placeholder:text-[#9ca3af]"
+                    />
+                    <div className="mt-5 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-full text-[#6b7280] transition hover:bg-[#f3f4f6]"
+                          aria-label="Add"
+                        >
+                          <Plus className="h-5 w-5" />
+                        </button>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          aria-label="Voice"
+                          title="Voice"
+                          className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#e1e5ef] bg-white text-[#6b7280] transition hover:bg-[#f3f4f6]"
+                        >
+                          <Mic className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void sendMessage()}
+                          disabled={isSending || draft.trim().length === 0}
+                          className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-[#4f49e2] text-white shadow-[0_14px_30px_-18px_rgba(79,73,226,0.7)] transition hover:bg-[#433ccf] disabled:cursor-not-allowed disabled:opacity-45"
+                          aria-label="Send"
+                          title="Send"
+                        >
+                          <Send className="h-5 w-5" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  {sendError ? (
+                    <p className="mt-3 text-center text-xs font-semibold text-[#b91c1c]">{sendError}</p>
+                  ) : null}
+                </div>
               </div>
             ) : (
               <>
@@ -1456,7 +1506,7 @@ export default function AgentChatWorkspace({
                         {streamingText ? (
                           renderMarkdownBlocks(streamingText)
                         ) : (
-                          <p className="text-sm text-[#6b7280]">Thinking...</p>
+                          <p className="text-sm text-[#6b7280]">Processing...</p>
                         )}
                       </div>
                     </div>
@@ -1466,50 +1516,52 @@ export default function AgentChatWorkspace({
             )}
           </div>
 
-          <footer className="border-t border-[#eef1f7] bg-white px-6 py-4">
-            {messagesError ? (
-              <p className="mb-2 text-xs font-semibold text-[#b91c1c]">{messagesError}</p>
-            ) : null}
-            {sendError ? (
-              <p className="mb-2 text-xs font-semibold text-[#b91c1c]">{sendError}</p>
-            ) : null}
+          {!isInitialSessionView ? (
+            <footer className="border-t border-[#eef1f7] bg-white px-6 py-4">
+              {messagesError ? (
+                <p className="mb-2 text-xs font-semibold text-[#b91c1c]">{messagesError}</p>
+              ) : null}
+              {sendError ? (
+                <p className="mb-2 text-xs font-semibold text-[#b91c1c]">{sendError}</p>
+              ) : null}
 
-            <div className="flex items-center gap-3 rounded-2xl border border-[#e5e7eb] bg-[#f7f8fc] px-4 py-3">
-              <input
-                type="text"
-                value={draft}
-                onChange={(event) => setDraft(event.target.value)}
-                onKeyDown={(event) => {
-                  if ((event.nativeEvent as KeyboardEvent).isComposing) {
-                    return;
-                  }
-                  if (event.key === "Enter") {
-                    event.preventDefault();
-                    void sendMessage();
-                  }
-                }}
-                placeholder="Message the agent..."
-                className="flex-1 bg-transparent text-sm text-[#111827] outline-none placeholder:text-[#9ca3af]"
-              />
-              <button
-                type="button"
-                aria-label="Voice"
-                title="Voice"
-                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#e1e5ef] bg-white text-[#6b7280]"
-              >
-                <Mic className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => void sendMessage()}
-                disabled={isSending || draft.trim().length === 0}
-                className="inline-flex items-center gap-2 rounded-xl bg-[#4f49e2] px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {isSending ? "Sending..." : "Send"}
-                <Send className="h-4 w-4" />
-              </button>
-            </div>
-          </footer>
+              <div className="flex items-center gap-3 rounded-2xl border border-[#e5e7eb] bg-[#f7f8fc] px-4 py-3">
+                <input
+                  type="text"
+                  value={draft}
+                  onChange={(event) => setDraft(event.target.value)}
+                  onKeyDown={(event) => {
+                    if ((event.nativeEvent as KeyboardEvent).isComposing) {
+                      return;
+                    }
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      void sendMessage();
+                    }
+                  }}
+                  placeholder="Message the agent..."
+                  className="flex-1 bg-transparent text-sm text-[#111827] outline-none placeholder:text-[#9ca3af]"
+                />
+                <button
+                  type="button"
+                  aria-label="Voice"
+                  title="Voice"
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#e1e5ef] bg-white text-[#6b7280]"
+                >
+                  <Mic className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void sendMessage()}
+                  disabled={isSending || draft.trim().length === 0}
+                  className="inline-flex items-center gap-2 rounded-xl bg-[#4f49e2] px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isSending ? "Sending..." : "Send"}
+                  <Send className="h-4 w-4" />
+                </button>
+              </div>
+            </footer>
+          ) : null}
         </section>
       </div>
     </div>
