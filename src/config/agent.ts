@@ -5,6 +5,8 @@ export const AGENT_WS_HOST = "ws://192.168.18.20";
 export const AGENT_CONNECTORS_BASE_URL = "http://192.168.18.20:9001";
 export const LLM_MANAGER_API_BASE_URL =
   "https://agent-manager-428716175586.us-central1.run.app";
+export const AGENT_ADK_BASE_URL =
+  "https://agent-manager-428716175586.us-central1.run.app/agent-server";
 
 export const LLM_PROVIDER_MODELS = {
   google: [

@@ -1,35 +1,60 @@
 "use client";
 
-import { AGENT_API_BASE_URL, AGENT_HOST, AGENT_ORG_KEY } from "@/config/agent";
+import { AGENT_API_BASE_URL } from "@/config/agent";
+import AgentChatWorkspace from "./AgentChatWorkspace";
 import {
   Bot,
   Eye,
   Filter,
   MessageCircle,
-  Mic,
-  MoreHorizontal,
-  Plus,
-  Send,
-  User,
   X
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type AgentRecord = {
-  agentId: number;
+  agentId: string;
   name: string;
   port: number | null;
   status: string;
   enterprise: string;
   start_time: string | null;
   stop_time: string | null;
+  updated_at: string | null;
 };
 
-type ChatMessage = {
-  id: string;
-  role: "agent" | "user";
-  text: string;
-  time: string;
+type AgentListApiResponseItem = {
+  name?: string | null;
+  agent_id?: string | null;
+  updated_at?: string | null;
+  status?: string | null;
+  type?: string | null;
+};
+
+const AGENT_LIST_URL = "https://agent-manager-428716175586.us-central1.run.app/agent/";
+
+const mapApiStatusToDashboardStatus = (status: string | null | undefined) =>
+  String(status ?? "").toLowerCase() === "active" ? "STARTED" : "STOPPED";
+
+const inferEnterprise = (name: string, type: string | null | undefined) => {
+  const lowered = name.toLowerCase();
+  if (lowered.includes("servicenow")) {
+    return "servicenow";
+  }
+  if (lowered.includes("mule")) {
+    return "mule";
+  }
+  return (type ?? "agent").toLowerCase();
+};
+
+const formatUpdatedAt = (updatedAt: string | null) => {
+  if (!updatedAt) {
+    return "--";
+  }
+  const parsed = new Date(updatedAt);
+  if (Number.isNaN(parsed.getTime())) {
+    return updatedAt;
+  }
+  return parsed.toLocaleString();
 };
 
 export default function AgentManagementSection() {
@@ -50,18 +75,8 @@ export default function AgentManagementSection() {
   const [activeChatAgent, setActiveChatAgent] = useState<AgentRecord | null>(
     null
   );
-  const [activeChatKey, setActiveChatKey] = useState<number | null>(null);
-  const [chatInput, setChatInput] = useState("");
-  const [chatError, setChatError] = useState("");
-  const [sendingChatKey, setSendingChatKey] = useState<number | null>(null);
-  const [chatThreads, setChatThreads] = useState<
-    Record<number, ChatMessage[]>
-  >({});
-  const [expandedMessages, setExpandedMessages] = useState<Record<string, boolean>>({});
-  const [openCopyId, setOpenCopyId] = useState<string | null>(null);
   const agentsRef = useRef<AgentRecord[]>([]);
   const requestIdRef = useRef(0);
-  const chatScrollRef = useRef<HTMLDivElement | null>(null);
 
   const agentApiBase = AGENT_API_BASE_URL.endsWith("/")
     ? AGENT_API_BASE_URL.slice(0, -1)
@@ -97,10 +112,7 @@ export default function AgentManagementSection() {
       }
 
       try {
-        const url = `${agentApiBase}/aiops/agent/list?orgKey=${encodeURIComponent(
-          AGENT_ORG_KEY
-        )}`;
-        const response = await fetch(url, {
+        const response = await fetch(AGENT_LIST_URL, {
           headers: { accept: "application/json" },
           signal: options?.signal,
         });
@@ -115,8 +127,24 @@ export default function AgentManagementSection() {
           return;
         }
 
-        if (response.ok && Array.isArray(data?.agents)) {
-          setAgents(data.agents);
+        if (response.ok && Array.isArray(data)) {
+          const mappedAgents: AgentRecord[] = (data as AgentListApiResponseItem[]).map(
+            (item, index) => {
+              const name = String(item.name ?? "").trim() || `Agent ${index + 1}`;
+              const id = String(item.agent_id ?? "").trim() || `agent_${index + 1}`;
+              return {
+                agentId: id,
+                name,
+                port: null,
+                status: mapApiStatusToDashboardStatus(item.status),
+                enterprise: inferEnterprise(name, item.type),
+                start_time: null,
+                stop_time: null,
+                updated_at: item.updated_at ?? null,
+              };
+            }
+          );
+          setAgents(mappedAgents);
           setAgentsError("");
         } else if (!shouldRefresh) {
           setAgentsError(data?.message || "Unable to load agents.");
@@ -137,7 +165,7 @@ export default function AgentManagementSection() {
         }
       }
     },
-    [agentApiBase]
+    []
   );
 
   useEffect(() => {
@@ -225,7 +253,7 @@ export default function AgentManagementSection() {
         })
       );
       setPendingAction(null);
-    } catch (error) {
+    } catch {
       setUpdateError(`Unable to ${action} ${agent.name}.`);
     } finally {
       setIsUpdating(false);
@@ -237,217 +265,12 @@ export default function AgentManagementSection() {
     setIsFilterOpen(false);
   };
 
-  const formatTime = () =>
-    new Date().toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-
   const openChat = (agent: AgentRecord) => {
-    const chatKey = agent.port ?? null;
     setActiveChatAgent(agent);
-    setActiveChatKey(chatKey);
-    setChatError("");
-    setChatInput("");
-    if (chatKey === null) {
-      setChatError("Agent is not running.");
-      return;
-    }
-    setChatThreads((prev) => {
-      if (prev[chatKey]) {
-        return prev;
-      }
-      return {
-        ...prev,
-        [chatKey]: [
-          {
-            id: `${chatKey}-welcome`,
-            role: "agent",
-            text: "I am Agent and I'm ready to help.",
-            time: formatTime(),
-          },
-        ],
-      };
-    });
   };
 
   const closeChat = () => {
-    setChatThreads({});
     setActiveChatAgent(null);
-    setActiveChatKey(null);
-    setChatInput("");
-    setChatError("");
-    setSendingChatKey(null);
-  };
-
-  const resolveChatEndpoint = (agent: AgentRecord) => {
-    const enterprise = (agent.enterprise ?? "").toLowerCase();
-    if (enterprise.includes("servicenow")) {
-      return "serviceNow";
-    }
-    if (enterprise.includes("mq")) {
-      return "mq";
-    }
-    return "mule";
-  };
-
-  const appendMessage = (chatKey: number, message: ChatMessage) => {
-    setChatThreads((prev) => ({
-      ...prev,
-      [chatKey]: [...(prev[chatKey] ?? []), message],
-    }));
-  };
-
-  const sendMessage = async (overrideMessage?: string) => {
-    if (!activeChatAgent) {
-      return;
-    }
-    if (activeChatKey === null) {
-      setChatError("Agent is not running.");
-      return;
-    }
-    const trimmed = (overrideMessage ?? chatInput).trim();
-    if (!trimmed) {
-      return;
-    }
-    if (!activeChatAgent.port) {
-      setChatError("Agent is not running.");
-      return;
-    }
-
-    const agentId = activeChatAgent.agentId;
-    const chatKey = activeChatKey;
-    const endpoint = resolveChatEndpoint(activeChatAgent);
-    const url = `${AGENT_HOST}:${activeChatAgent.port}/agent/${endpoint}/chat`;
-
-    const userMessage: ChatMessage = {
-      id: `${chatKey}-user-${Date.now()}`,
-      role: "user",
-      text: trimmed,
-      time: formatTime(),
-    };
-    appendMessage(chatKey, userMessage);
-    setChatInput("");
-    setSendingChatKey(chatKey);
-    setChatError("");
-
-    try {
-      const response = await fetch(url, {
-        method: "POST",
-        headers: {
-          accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          message: trimmed,
-          agent_id: String(agentId),
-        }),
-      });
-      const contentType = response.headers.get("content-type") || "";
-      const rawText = await response.text();
-      let data: unknown = rawText;
-      if (contentType.includes("application/json")) {
-        try {
-          data = JSON.parse(rawText);
-        } catch {
-          data = rawText;
-        }
-      }
-      console.log("Agent chat response:", {
-        ok: response.ok,
-        status: response.status,
-        data,
-      });
-
-      const replyText =
-        typeof data === "string"
-          ? data
-          : typeof data === "object" && data !== null && "response" in data
-            ? String((data as { response?: string }).response ?? "")
-            : typeof data === "object" && data !== null && "message" in data
-              ? String((data as { message?: string }).message ?? "")
-              : typeof data === "object"
-                ? JSON.stringify(data)
-                : String(data);
-
-      appendMessage(chatKey, {
-        id: `${chatKey}-agent-${Date.now()}`,
-        role: "agent",
-        text: replyText || "Agent responded.",
-        time: formatTime(),
-      });
-    } catch (error) {
-      appendMessage(chatKey, {
-        id: `${chatKey}-agent-error-${Date.now()}`,
-        role: "agent",
-        text: "Unable to reach agent right now. Please check the agent connection.",
-        time: formatTime(),
-      });
-    } finally {
-      setSendingChatKey((prev) => (prev === chatKey ? null : prev));
-    }
-  };
-
-  const handleSendMessage = () => {
-    void sendMessage();
-  };
-
-  useEffect(() => {
-    if (!activeChatAgent || !chatScrollRef.current) {
-      return;
-    }
-    chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
-  }, [activeChatAgent, chatThreads, sendingChatKey]);
-
-  const activeMessages =
-    activeChatKey !== null ? chatThreads[activeChatKey] ?? [] : [];
-  const lastActivityTime =
-    activeMessages.length > 0
-      ? activeMessages[activeMessages.length - 1].time
-      : "--";
-  const showSuggestions = activeMessages.length <= 1;
-  const isServiceNowAgent = (activeChatAgent?.enterprise ?? "")
-    .toLowerCase()
-    .includes("servicenow");
-  const quickSuggestions = isServiceNowAgent
-    ? ["Show today incidents", "Show all incidents"]
-    : ["Show stopped apps", "List critical alerts", "Summarize recent activity"];
-  const MAX_MESSAGE_PREVIEW = 260;
-  const handleQuickSuggestion = (suggestion: string) => {
-    void sendMessage(suggestion);
-  };
-  const renderMessageText = (text: string) => {
-    const segments: React.ReactNode[] = [];
-    let buffer = "";
-    let bold = false;
-    let keyIndex = 0;
-
-    for (let i = 0; i < text.length; i += 1) {
-      if (text[i] === "*" && text[i + 1] === "*") {
-        if (buffer) {
-          segments.push(
-            bold ? (
-              <strong key={`b-${keyIndex++}`}>{buffer}</strong>
-            ) : (
-              buffer
-            )
-          );
-          buffer = "";
-        }
-        bold = !bold;
-        i += 1;
-        continue;
-      }
-      buffer += text[i];
-    }
-
-    if (buffer) {
-      segments.push(
-        bold ? <strong key={`b-${keyIndex++}`}>{buffer}</strong> : buffer
-      );
-    }
-
-    return segments;
   };
 
   return (
@@ -540,9 +363,7 @@ export default function AgentManagementSection() {
             const isRunning = agent.status?.toUpperCase() === "STARTED";
             const isMule =
               (agent.enterprise ?? "").trim().toLowerCase() === "mule";
-            const runningAt = agent.port
-              ? agent.port.toString()
-              : "Agent Not Started";
+            const updatedAt = formatUpdatedAt(agent.updated_at);
             return (
               <div
                 key={agent.agentId}
@@ -558,7 +379,7 @@ export default function AgentManagementSection() {
                         {agent.name}
                       </p>
                       <p className="text-xs text-[#647087]">
-                        Running at: {runningAt} 
+                        Updated at: {updatedAt}
                       </p>
                     </div>
                   </div>
@@ -716,9 +537,7 @@ export default function AgentManagementSection() {
                     const isRunning = agent.status?.toUpperCase() === "STARTED";
                     const isMule =
                       (agent.enterprise ?? "").trim().toLowerCase() === "mule";
-                    const runningAt = agent.port
-                      ? agent.port.toString()
-                      : "Agent Not Started";
+                    const updatedAt = formatUpdatedAt(agent.updated_at);
                     return (
                       <div
                         key={`modal-${agent.agentId}`}
@@ -734,7 +553,7 @@ export default function AgentManagementSection() {
                                 {agent.name}
                               </p>
                               <p className="text-xs text-[#647087]">
-                                Running at: {runningAt} - v1.0.0
+                                Updated at: {updatedAt} - v1.0.0
                               </p>
                             </div>
                           </div>
@@ -871,274 +690,7 @@ export default function AgentManagementSection() {
       ) : null}
 
       {activeChatAgent ? (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/30 px-6 py-8">
-          <div className="flex h-[80vh] w-full max-w-6xl flex-col overflow-hidden rounded-3xl bg-white shadow-[0_24px_70px_-34px_rgba(15,23,42,0.7)]">
-            <div className="flex items-center justify-between border-b border-[#eef1f7] px-8 py-6">
-              <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#eef2ff] text-[#4f49e2]">
-                  <Bot className="h-6 w-6" />
-                </div>
-                <div>
-                  <h4 className="text-lg font-semibold text-[#111827]">
-                    {activeChatAgent.name}
-                  </h4>
-                  <p className="text-sm text-[#6b7280]">Agent chat</p>
-                  <div className="mt-2 flex items-center gap-2 text-xs text-[#6b7280]">
-                    <span className="h-3 w-3 rounded-full bg-[#16a34a]" />
-                    <span>Online</span>
-                    <span className="text-[#cbd5e1]">&middot;</span>
-                    <span>
-                      Running at: {activeChatAgent.port ?? "Agent Not Started"}
-                    </span>
-                    <span className="text-[#cbd5e1]">&middot;</span>
-                    <span>Last activity: {lastActivityTime}</span>
-                  </div>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={closeChat}
-                className="flex h-9 w-9 items-center justify-center rounded-full border border-[#e5e7eb] text-[#111827]"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            <div className="flex-1 min-h-0 px-8 pb-6 pt-4">
-              <div className="relative h-full min-h-0 overflow-hidden rounded-2xl border border-[#e6eaf3] bg-[#f7f8fc]">
-                <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                  <Bot className="h-56 w-56 text-[#d9def0] opacity-20" />
-                </div>
-                <div
-                  ref={chatScrollRef}
-                  className="soft-scrollbar relative z-10 h-full min-h-0 overflow-y-auto overflow-x-hidden p-5"
-                >
-                  {activeMessages.map((message, index) => {
-                    const isUser = message.role === "user";
-                    const isGrouped =
-                      index > 0 &&
-                      activeMessages[index - 1].role === message.role;
-                    const showAvatar = !isGrouped;
-                    const isError = message.id.includes("agent-error");
-                    const isExpanded = Boolean(expandedMessages[message.id]);
-                    const isLong = message.text.length > MAX_MESSAGE_PREVIEW;
-                    const displayText =
-                      isLong && !isExpanded
-                        ? `${message.text.slice(0, MAX_MESSAGE_PREVIEW)}...`
-                        : message.text;
-
-                    return (
-                      <div
-                        key={message.id}
-                        className={`flex ${
-                          isUser ? "justify-end" : "justify-start"
-                        } ${showAvatar ? "mb-6" : "mb-4"}`}
-                      >
-                        {isUser ? (
-                          <div
-                            className={`flex min-w-0 max-w-[72%] items-start gap-3 ${
-                              showAvatar ? "" : "pr-12"
-                            }`}
-                          >
-                            <div className="rounded-2xl border border-[#e5e7eb] bg-white px-4 py-3 text-sm text-[#111827] shadow-sm">
-                              {showAvatar ? (
-                                <div className="mb-1 flex items-center justify-end gap-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#8a94a6]">
-                                  <span className="normal-case text-[#9aa3b2]">
-                                    {message.time}
-                                  </span>
-                                  <span>You</span>
-                                </div>
-                              ) : null}
-                              <p className="whitespace-pre-wrap break-all text-right">
-                                {displayText}
-                              </p>
-                              {isLong ? (
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    setExpandedMessages((prev) => ({
-                                      ...prev,
-                                      [message.id]: !prev[message.id],
-                                    }))
-                                  }
-                                  className="mt-2 text-xs font-semibold text-[#4f49e2]"
-                                >
-                                  {isExpanded ? "Show less" : "Show more"}
-                                </button>
-                              ) : null}
-                            </div>
-                          {showAvatar ? (
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-[#e5e7eb] bg-white text-[#111827]">
-                              <User className="h-5 w-5" />
-                            </div>
-                          ) : null}
-                          </div>
-                        ) : (
-                          <div
-                            className={`flex min-w-0 max-w-[72%] items-start gap-3 ${
-                              showAvatar ? "" : "pl-12"
-                            }`}
-                          >
-                            {showAvatar ? (
-                              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#eef2ff] text-[#4f49e2]">
-                                <Bot className="h-5 w-5" />
-                              </div>
-                            ) : null}
-                            <div
-                              className={`rounded-2xl px-4 py-3 text-sm shadow-sm ${
-                                isError
-                                  ? "border border-[#fecaca] bg-[#fff5f5] text-[#b91c1c]"
-                                  : "bg-[#edf1f8] text-[#1f2937]"
-                              }`}
-                            >
-                              {showAvatar ? (
-                                <div className="mb-1 flex items-center justify-between gap-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#8a94a6]">
-                                  <span>{activeChatAgent?.name ?? "Agent"}</span>
-                                  <div className="flex items-center gap-2">
-                                    <span className="normal-case text-[#9aa3b2]">
-                                      {message.time}
-                                    </span>
-                                    <div className="relative">
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          setOpenCopyId((prev) =>
-                                            prev === message.id ? null : message.id
-                                          )
-                                        }
-                                        className="flex h-7 w-7 items-center justify-center rounded-full bg-transparent text-[#6b7280] transition hover:text-[#4f49e2]"
-                                        aria-label="More actions"
-                                        title="More actions"
-                                      >
-                                        <MoreHorizontal className="h-4 w-4" />
-                                      </button>
-                                      {openCopyId === message.id ? (
-                                        <div className="absolute right-0 z-20 mt-2 overflow-hidden rounded-md border border-[#e5e7eb] bg-white shadow-[0_12px_24px_-20px_rgba(15,23,42,0.35)]">
-                                          <button
-                                            type="button"
-                                            onClick={() => {
-                                              if (navigator?.clipboard) {
-                                                void navigator.clipboard.writeText(
-                                                  message.text
-                                                );
-                                              }
-                                              setOpenCopyId(null);
-                                            }}
-                                            className="w-full px-4 py-2 text-left text-xs font-semibold uppercase tracking-[0.2em] text-[#374151] hover:bg-[#f3f4f6]"
-                                          >
-                                            Copy
-                                          </button>
-                                        </div>
-                                      ) : null}
-                                    </div>
-                                  </div>
-                                </div>
-                              ) : null}
-                              <p className="whitespace-pre-wrap break-all">
-                                {renderMessageText(displayText)}
-                              </p>
-                              {isLong ? (
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    setExpandedMessages((prev) => ({
-                                      ...prev,
-                                      [message.id]: !prev[message.id],
-                                    }))
-                                  }
-                                  className={`mt-2 text-xs font-semibold ${
-                                    isError
-                                      ? "text-[#b91c1c]"
-                                      : "text-[#4f49e2]"
-                                  }`}
-                                >
-                                  {isExpanded ? "Show less" : "Show more"}
-                                </button>
-                              ) : null}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-
-            <div className="border-t border-[#eef1f7] px-8 py-4">
-              {showSuggestions ? (
-                <div className="mb-3 flex flex-nowrap justify-center gap-2">
-                  {quickSuggestions.map((suggestion) => (
-                    <button
-                      key={suggestion}
-                      type="button"
-                      onClick={() => handleQuickSuggestion(suggestion)}
-                      className="rounded-full border border-[#dbe2f0] bg-white px-3 py-1.5 text-xs font-semibold text-[#4f49e2] shadow-sm transition hover:border-[#bfc7e8]"
-                    >
-                      {suggestion}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-              {sendingChatKey === activeChatKey && activeChatKey !== null ? (
-                <div className="mb-3 flex items-center gap-2 text-xs font-semibold text-[#8a94a6]">
-                  <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-[#a5b4fc]" />
-                  <span>
-                    Agent is typing
-                    <span className="typing-dots">....</span>
-                  </span>
-                </div>
-              ) : null}
-              {chatError ? (
-                <div className="mb-3 rounded-xl border border-[#fecaca] bg-[#fff5f5] px-4 py-2 text-xs font-semibold text-[#b91c1c]">
-                  {chatError}
-                </div>
-              ) : null}
-              <div className="flex items-center gap-3 rounded-2xl border border-[#e5e7eb] bg-[#f7f8fc] px-4 py-3">
-                <button
-                  type="button"
-                  className="flex h-9 w-9 items-center justify-center rounded-full border border-[#e1e5ef] bg-white text-[#4f49e2] shadow-sm"
-                  aria-label="Add"
-                >
-                  <Plus className="h-4 w-4" />
-                </button>
-                <input
-                  type="text"
-                  value={chatInput}
-                  onChange={(event) => setChatInput(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      event.preventDefault();
-                      handleSendMessage();
-                    }
-                  }}
-                  placeholder="Ask something..."
-                  className="flex-1 bg-transparent text-sm text-[#111827] outline-none placeholder:text-[#9ca3af]"
-                />
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    aria-label="Voice"
-                    className="flex h-10 w-10 items-center justify-center rounded-full border border-[#e1e5ef] bg-white text-[#4f49e2] shadow-sm"
-                  >
-                    <Mic className="h-4 w-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleSendMessage}
-                    disabled={
-                      sendingChatKey === activeChatKey && activeChatKey !== null
-                    }
-                    className="flex items-center gap-2 rounded-xl bg-[#4f49e2] px-4 py-2 text-sm font-semibold text-white shadow-[0_12px_24px_-16px_rgba(79,73,226,0.9)] transition hover:bg-[#433ccf] disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    Send
-                    <Send className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <AgentChatWorkspace agent={activeChatAgent} onClose={closeChat} />
       ) : null}
     </div>
   );
