@@ -98,6 +98,42 @@ type StreamStep = {
   status: "running" | "done";
 };
 
+const renderMilestones = (steps: StreamStep[]) => (
+  <div className="mb-3 rounded-xl border border-[#d4dcf6] bg-white/60 px-3 py-2">
+    <div className="space-y-2">
+      {steps.map((step, index) => (
+        <div key={step.id} className="flex gap-2">
+          <div className="flex w-4 shrink-0 flex-col items-center">
+            <span
+              className={`inline-flex h-4 w-4 items-center justify-center rounded-full ${
+                step.status === "done"
+                  ? "bg-[#dcfce7] text-[#16a34a]"
+                  : "bg-[#e0e7ff] text-[#4f49e2]"
+              }`}
+            >
+              {step.status === "done" ? (
+                <Check className="h-2.5 w-2.5" />
+              ) : (
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" />
+              )}
+            </span>
+            {index < steps.length - 1 ? (
+              <span className="mt-1 h-4 w-px bg-[#c5d0f5]" />
+            ) : null}
+          </div>
+          <span
+            className={`text-xs ${
+              step.status === "done" ? "text-[#374151]" : "font-semibold text-[#1f2937]"
+            }`}
+          >
+            {step.label}
+          </span>
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
 const mergeStreamingText = (currentText: string, incomingText: string): string => {
   if (!incomingText) {
     return currentText;
@@ -528,6 +564,8 @@ export default function AgentChatWorkspace({
   const [isStreamingReply, setIsStreamingReply] = useState(false);
   const [streamingText, setStreamingText] = useState("");
   const [streamSteps, setStreamSteps] = useState<StreamStep[]>([]);
+  const [pendingUserMessage, setPendingUserMessage] = useState<ChatMessage | null>(null);
+  const [messageMilestones, setMessageMilestones] = useState<Record<string, StreamStep[]>>({});
 
   const [sessionsError, setSessionsError] = useState("");
   const [messagesError, setMessagesError] = useState("");
@@ -538,6 +576,10 @@ export default function AgentChatWorkspace({
   const selectedSessionIdRef = useRef<string | null>(null);
   const copyResetTimerRef = useRef<number | null>(null);
   const streamStepCounterRef = useRef(0);
+  const streamStepsRef = useRef<StreamStep[]>([]);
+  const streamTargetTextRef = useRef("");
+  const streamRenderedTextRef = useRef("");
+  const streamAnimationFrameRef = useRef<number | null>(null);
 
   useEffect(() => {
     selectedSessionIdRef.current = selectedSessionId;
@@ -560,12 +602,15 @@ export default function AgentChatWorkspace({
       return;
     }
     messageListRef.current.scrollTop = messageListRef.current.scrollHeight;
-  }, [messages, isSending]);
+  }, [messages, pendingUserMessage, streamingText, isSending]);
 
   useEffect(() => {
     return () => {
       if (copyResetTimerRef.current) {
         window.clearTimeout(copyResetTimerRef.current);
+      }
+      if (streamAnimationFrameRef.current) {
+        window.cancelAnimationFrame(streamAnimationFrameRef.current);
       }
     };
   }, []);
@@ -582,12 +627,15 @@ export default function AgentChatWorkspace({
         if (!response.ok) {
           setMessages([]);
           setMessagesError("Unable to load session messages.");
-          return;
+          return [] as ChatMessage[];
         }
-        setMessages(mapEventsToMessages(payload.events));
+        const mapped = mapEventsToMessages(payload.events);
+        setMessages(mapped);
+        return mapped;
       } catch {
         setMessages([]);
         setMessagesError("Unable to load session messages.");
+        return [] as ChatMessage[];
       } finally {
         setIsLoadingMessages(false);
       }
@@ -608,7 +656,7 @@ export default function AgentChatWorkspace({
         setSelectedSessionId(null);
         setMessages([]);
         setSessionsError("Unable to load sessions.");
-        return;
+        return [] as ChatMessage[];
       }
 
       const sorted = sortSessions(payload);
@@ -623,9 +671,10 @@ export default function AgentChatWorkspace({
       setIsDraftSession(false);
 
       if (nextSessionId) {
-        await loadSessionMessages(nextSessionId);
+        return await loadSessionMessages(nextSessionId);
       } else {
         setMessages([]);
+        return [] as ChatMessage[];
       }
     } catch {
       setSessions([]);
@@ -633,23 +682,84 @@ export default function AgentChatWorkspace({
       setIsDraftSession(false);
       setMessages([]);
       setSessionsError("Unable to load sessions.");
+      return [] as ChatMessage[];
     } finally {
       setIsLoadingSessions(false);
     }
   }, [appName, userId, loadSessionMessages]);
 
+  const resetStreamingText = useCallback(() => {
+    if (streamAnimationFrameRef.current) {
+      window.cancelAnimationFrame(streamAnimationFrameRef.current);
+      streamAnimationFrameRef.current = null;
+    }
+    streamTargetTextRef.current = "";
+    streamRenderedTextRef.current = "";
+    setStreamingText("");
+  }, []);
+
+  const animateStreamingText = useCallback(() => {
+    if (streamAnimationFrameRef.current) {
+      return;
+    }
+
+    const tick = () => {
+      const target = streamTargetTextRef.current;
+      const current = streamRenderedTextRef.current;
+      if (current === target) {
+        streamAnimationFrameRef.current = null;
+        return;
+      }
+
+      const remaining = Math.max(0, target.length - current.length);
+      const step = Math.max(12, Math.min(220, Math.ceil(Math.max(target.length, remaining) / 35)));
+      const next = target.slice(0, current.length + step);
+      streamRenderedTextRef.current = next;
+      setStreamingText(next);
+
+      if (next === target) {
+        streamAnimationFrameRef.current = null;
+        return;
+      }
+      streamAnimationFrameRef.current = window.requestAnimationFrame(tick);
+    };
+
+    streamAnimationFrameRef.current = window.requestAnimationFrame(tick);
+  }, []);
+
+  const updateStreamingTargetText = useCallback(
+    (nextText: string, options?: { immediate?: boolean }) => {
+      streamTargetTextRef.current = nextText;
+
+      if (options?.immediate) {
+        if (streamAnimationFrameRef.current) {
+          window.cancelAnimationFrame(streamAnimationFrameRef.current);
+          streamAnimationFrameRef.current = null;
+        }
+        streamRenderedTextRef.current = nextText;
+        setStreamingText(nextText);
+        return;
+      }
+
+      animateStreamingText();
+    },
+    [animateStreamingText]
+  );
+
   const startStreamingState = useCallback(() => {
     streamStepCounterRef.current = 0;
-    setStreamingText("");
-    setStreamSteps([
+    resetStreamingText();
+    const initialSteps: StreamStep[] = [
       {
         id: "stream-step-0",
         label: "Thinking",
         status: "running",
       },
-    ]);
+    ];
+    streamStepsRef.current = initialSteps;
+    setStreamSteps(initialSteps);
     setIsStreamingReply(true);
-  }, []);
+  }, [resetStreamingText]);
 
   const addRunningStep = useCallback((label: string) => {
     const cleanLabel = label.trim();
@@ -660,13 +770,15 @@ export default function AgentChatWorkspace({
     setStreamSteps((prev) => {
       if (prev.length === 0) {
         streamStepCounterRef.current += 1;
-        return [
+        const created = [
           {
             id: `stream-step-${streamStepCounterRef.current}`,
             label: cleanLabel,
             status: "running",
           },
         ];
+        streamStepsRef.current = created;
+        return created;
       }
 
       const next = [...prev];
@@ -690,6 +802,7 @@ export default function AgentChatWorkspace({
         label: cleanLabel,
         status: "running",
       });
+      streamStepsRef.current = next;
       return next;
     });
   }, []);
@@ -704,6 +817,7 @@ export default function AgentChatWorkspace({
       if (next[lastIndex].status === "running") {
         next[lastIndex] = { ...next[lastIndex], status: "done" };
       }
+      streamStepsRef.current = next;
       return next;
     });
   }, []);
@@ -768,18 +882,19 @@ export default function AgentChatWorkspace({
 
     if (visibleText) {
       addRunningStep("Composing answer");
+      const mergedText = mergeStreamingText(streamTargetTextRef.current, visibleText);
       if (payload.partial === false) {
-        setStreamingText(visibleText);
+        updateStreamingTargetText(mergedText);
         completeLastRunningStep();
       } else {
-        setStreamingText((prev) => mergeStreamingText(prev, visibleText));
+        updateStreamingTargetText(mergedText);
       }
     } else if (payload.partial === false && functionCalls.length === 0) {
       completeLastRunningStep();
     }
 
     return true;
-  }, [addRunningStep, completeLastRunningStep]);
+  }, [addRunningStep, completeLastRunningStep, updateStreamingTargetText]);
 
   const runPromptSse = useCallback(async (sessionId: string, prompt: string) => {
     const response = await fetch(getRunSseUrl(), {
@@ -894,8 +1009,10 @@ export default function AgentChatWorkspace({
     setIsDraftSession(true);
     setOpenMenuSessionId(null);
     setMessages([]);
+    setPendingUserMessage(null);
     setIsStreamingReply(false);
-    setStreamingText("");
+    resetStreamingText();
+    streamStepsRef.current = [];
     setStreamSteps([]);
     setMessagesError("");
     setSendError("");
@@ -939,10 +1056,19 @@ export default function AgentChatWorkspace({
   );
 
   const sendPrompt = useCallback(
-    async (prompt: string) => {
+    async (prompt: string, options?: { optimisticUser?: boolean }) => {
       const text = prompt.trim();
       if (!text || isSending) {
         return false;
+      }
+
+      if (options?.optimisticUser) {
+        setPendingUserMessage({
+          id: `pending-user-${Date.now()}`,
+          role: "user",
+          text,
+          timeLabel: formatTime(),
+        });
       }
 
       setSendError("");
@@ -956,6 +1082,7 @@ export default function AgentChatWorkspace({
         }
         if (!sessionId) {
           setSendError("No session available. Create a new session first.");
+          setPendingUserMessage(null);
           return false;
         }
 
@@ -963,18 +1090,39 @@ export default function AgentChatWorkspace({
 
         if (!streamed) {
           setSendError((prev) => prev || "Unable to send message.");
+          setPendingUserMessage(null);
           return false;
         }
 
-        await loadSessions(sessionId);
+        const refreshedMessages = await loadSessions(sessionId);
+        const completedMilestones = streamStepsRef.current.map((step) => ({
+          ...step,
+          status: "done" as const,
+        }));
+
+        if (completedMilestones.length > 0) {
+          const latestAgentMessage = [...refreshedMessages]
+            .reverse()
+            .find((message) => message.role === "agent");
+
+          if (latestAgentMessage) {
+            setMessageMilestones((prev) => ({
+              ...prev,
+              [latestAgentMessage.id]: completedMilestones,
+            }));
+          }
+        }
+        setPendingUserMessage(null);
         return true;
       } catch {
         setSendError("Unable to send message.");
+        setPendingUserMessage(null);
         return false;
       } finally {
         setIsSending(false);
         setIsStreamingReply(false);
-        setStreamingText("");
+        resetStreamingText();
+        streamStepsRef.current = [];
         setStreamSteps([]);
       }
     },
@@ -982,6 +1130,7 @@ export default function AgentChatWorkspace({
       createSession,
       isSending,
       loadSessions,
+      resetStreamingText,
       runPromptSse,
       selectedSessionId,
       startStreamingState,
@@ -990,11 +1139,17 @@ export default function AgentChatWorkspace({
 
   const sendMessage = useCallback(async () => {
     setSendError("");
-    const sent = await sendPrompt(draft);
-    if (sent) {
-      setDraft("");
+    const prompt = draft.trim();
+    if (!prompt || isSending) {
+      return;
     }
-  }, [draft, sendPrompt]);
+
+    setDraft("");
+    const sent = await sendPrompt(prompt, { optimisticUser: true });
+    if (!sent) {
+      setDraft(prompt);
+    }
+  }, [draft, isSending, sendPrompt]);
 
   const lastUserPrompt = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i -= 1) {
@@ -1039,6 +1194,17 @@ export default function AgentChatWorkspace({
           : "No session selected",
     [selectedSessionId, isDraftSession]
   );
+
+  const visibleMessages = useMemo(() => {
+    if (!pendingUserMessage) {
+      return messages;
+    }
+    const lastMessage = messages[messages.length - 1];
+    if (lastMessage?.role === "user" && lastMessage.text === pendingUserMessage.text) {
+      return messages;
+    }
+    return [...messages, pendingUserMessage];
+  }, [messages, pendingUserMessage]);
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/35 p-4">
@@ -1195,14 +1361,15 @@ export default function AgentChatWorkspace({
               </div>
             ) : (
               <>
-                {messages.length === 0 && !isStreamingReply ? (
+                {visibleMessages.length === 0 && !isStreamingReply ? (
                   <p className="text-sm text-[#6b7280]">
                     No messages yet. Start the conversation.
                   </p>
                 ) : null}
 
-                {messages.map((message) => {
+                {visibleMessages.map((message) => {
                   const isUser = message.role === "user";
+                  const milestones = !isUser ? messageMilestones[message.id] ?? [] : [];
                   return (
                     <div
                       key={message.id}
@@ -1221,6 +1388,7 @@ export default function AgentChatWorkspace({
                           <span className="text-[#b6bfce]">|</span>
                           <span>{message.timeLabel}</span>
                         </div>
+                        {!isUser && milestones.length > 0 ? renderMilestones(milestones) : null}
                         <div className="space-y-3 break-words">
                           {renderMarkdownBlocks(message.text)}
                         </div>
@@ -1282,43 +1450,7 @@ export default function AgentChatWorkspace({
                         <span>{formatTime()}</span>
                       </div>
 
-                      {streamSteps.length > 0 ? (
-                        <div className="mb-3 rounded-xl border border-[#d4dcf6] bg-white/60 px-3 py-2">
-                          <div className="space-y-2">
-                            {streamSteps.map((step, index) => (
-                              <div key={step.id} className="flex gap-2">
-                                <div className="flex w-4 shrink-0 flex-col items-center">
-                                  <span
-                                    className={`inline-flex h-4 w-4 items-center justify-center rounded-full ${
-                                      step.status === "done"
-                                        ? "bg-[#dcfce7] text-[#16a34a]"
-                                        : "bg-[#e0e7ff] text-[#4f49e2]"
-                                    }`}
-                                  >
-                                    {step.status === "done" ? (
-                                      <Check className="h-2.5 w-2.5" />
-                                    ) : (
-                                      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" />
-                                    )}
-                                  </span>
-                                  {index < streamSteps.length - 1 ? (
-                                    <span className="mt-1 h-4 w-px bg-[#c5d0f5]" />
-                                  ) : null}
-                                </div>
-                                <span
-                                  className={`text-xs ${
-                                    step.status === "done"
-                                      ? "text-[#374151]"
-                                      : "font-semibold text-[#1f2937]"
-                                  }`}
-                                >
-                                  {step.label}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      ) : null}
+                      {streamSteps.length > 0 ? renderMilestones(streamSteps) : null}
 
                       <div className="space-y-3 break-words">
                         {streamingText ? (
@@ -1348,6 +1480,9 @@ export default function AgentChatWorkspace({
                 value={draft}
                 onChange={(event) => setDraft(event.target.value)}
                 onKeyDown={(event) => {
+                  if ((event.nativeEvent as KeyboardEvent).isComposing) {
+                    return;
+                  }
                   if (event.key === "Enter") {
                     event.preventDefault();
                     void sendMessage();
