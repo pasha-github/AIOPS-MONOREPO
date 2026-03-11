@@ -20,9 +20,16 @@ class AgentCreate(BaseModel):
     isEnabled: bool = True
     sub_agents: List[str] = []
 
-class AgentUpdate(BaseModel):
-    agent_id: str 
-    isEnabled: bool
+class AgentPatch(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    instruction: Optional[str] = None
+    model_id: Optional[str] = None
+    tools: Optional[str] = None
+    mcp_servers: Optional[List[str]] = None
+    connector_config_ids: Optional[List[str]] = None
+    isEnabled: Optional[bool] = None
+    sub_agents: Optional[List[str]] = None
 
 @router.post("/", response_model=Agent)
 def create_agent(agent: AgentCreate, session: Session = Depends(get_session)):
@@ -36,6 +43,23 @@ def create_agent(agent: AgentCreate, session: Session = Depends(get_session)):
 def list_agents(session: Session = Depends(get_session)):
     agents = session.exec(select(Agent)).all()
     return agents
+
+@router.patch("/{agent_id}", response_model=Agent)
+def update_agent(agent_id: str, patch_data: AgentPatch, session: Session = Depends(get_session)):
+    agent = session.get(Agent, agent_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+
+    updates = patch_data.model_dump(exclude_unset=True)
+    for key, value in updates.items():
+        setattr(agent, key, value)
+
+    session.add(agent)
+    session.commit()
+    session.refresh(agent)
+
+    invalidate_cache(agent.agent_id)
+    return agent
 
 @router.delete("/{agent_id}")
 def delete_agent(agent_id: str, session: Session = Depends(get_session)):
@@ -53,22 +77,3 @@ def delete_agent(agent_id: str, session: Session = Depends(get_session)):
         invalidate_cache(agent.agent_id)
         
     return {"ok": True}
-
-@router.patch("/")
-def update_agent(update_data: AgentUpdate, session: Session = Depends(get_session)):
-    # User asked for PATCH /agent/ body {isEnabled}, implies identifying agent somehow.
-    # Using agent_id in body as identifier.
-    agent = session.get(Agent, update_data.agent_id)
-    if not agent:
-        raise HTTPException(status_code=404, detail="Agent not found")
-    
-    agent.isEnabled = update_data.isEnabled
-    session.add(agent)
-    session.commit()
-    session.refresh(agent)
-    
-    # If disabled, remove from cache
-    if not update_data.isEnabled:
-        invalidate_cache(agent.agent_id)
-        
-    return agent
