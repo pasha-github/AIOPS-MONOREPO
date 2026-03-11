@@ -3,6 +3,8 @@
 import { AGENT_ADK_BASE_URL } from "@/config/agent";
 import {
   Bot,
+  ChevronDown,
+  ChevronRight,
   Check,
   Copy,
   MessageSquare,
@@ -96,9 +98,28 @@ type StreamStep = {
   id: string;
   label: string;
   status: "running" | "done";
+  details?: string;
 };
 
-const renderMilestones = (steps: StreamStep[]) => (
+const formatMilestoneDetails = (value: unknown) => {
+  if (value === undefined || value === null) {
+    return "";
+  }
+  if (typeof value === "string") {
+    return value;
+  }
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
+};
+
+const renderMilestones = (
+  steps: StreamStep[],
+  expandedState: Record<string, boolean>,
+  onToggle: (stepId: string) => void
+) => (
   <div className="mb-3 rounded-xl border border-[#d4dcf6] bg-white/60 px-3 py-2">
     <div className="space-y-2">
       {steps.map((step, index) => (
@@ -121,13 +142,36 @@ const renderMilestones = (steps: StreamStep[]) => (
               <span className="mt-1 h-4 w-px bg-[#c5d0f5]" />
             ) : null}
           </div>
-          <span
-            className={`text-xs ${
-              step.status === "done" ? "text-[#374151]" : "font-semibold text-[#1f2937]"
-            }`}
-          >
-            {step.label}
-          </span>
+          <div className="min-w-0 flex-1">
+            <button
+              type="button"
+              onClick={() => onToggle(step.id)}
+              disabled={!step.details}
+              className={`flex w-full items-center justify-between gap-2 text-left ${
+                step.details ? "cursor-pointer" : "cursor-default"
+              }`}
+            >
+              <span
+                className={`text-xs ${
+                  step.status === "done" ? "text-[#374151]" : "font-semibold text-[#1f2937]"
+                }`}
+              >
+                {step.label}
+              </span>
+              {step.details ? (
+                expandedState[step.id] ? (
+                  <ChevronDown className="h-3.5 w-3.5 shrink-0 text-[#64748b]" />
+                ) : (
+                  <ChevronRight className="h-3.5 w-3.5 shrink-0 text-[#64748b]" />
+                )
+              ) : null}
+            </button>
+            {step.details && expandedState[step.id] ? (
+              <pre className="mt-2 max-h-56 overflow-auto rounded-lg border border-[#dbe2f0] bg-white/80 p-2 text-[11px] leading-5 text-[#334155]">
+                {step.details}
+              </pre>
+            ) : null}
+          </div>
         </div>
       ))}
     </div>
@@ -179,15 +223,15 @@ const extractVisibleTextFromParts = (parts: AdkPart[]) =>
     .map((part) => part.text ?? "")
     .join("");
 
-const extractFunctionCallNames = (parts: AdkPart[]) =>
+const extractFunctionCalls = (parts: AdkPart[]) =>
   parts
-    .map((part) => part.functionCall?.name ?? "")
-    .filter((name): name is string => Boolean(name));
+    .map((part) => part.functionCall)
+    .filter((call): call is AdkFunctionCall => Boolean(call?.name));
 
-const extractFunctionResponseNames = (parts: AdkPart[]) =>
+const extractFunctionResponses = (parts: AdkPart[]) =>
   parts
-    .map((part) => part.functionResponse?.name ?? "")
-    .filter((name): name is string => Boolean(name));
+    .map((part) => part.functionResponse)
+    .filter((response): response is AdkFunctionResponse => Boolean(response?.name));
 
 const summarizeStreamError = (errorText: string) => {
   const compact = errorText.replace(/\s+/g, " ").trim();
@@ -233,7 +277,7 @@ const mapEventsToMessages = (events: AdkEvent[] | null | undefined) => {
   let pendingMilestones: StreamStep[] = [];
   let stepCounter = 0;
 
-  const addPendingMilestone = (label: string) => {
+  const addPendingMilestone = (label: string, details?: unknown) => {
     const cleanLabel = label.trim();
     if (!cleanLabel) {
       return;
@@ -243,18 +287,27 @@ const mapEventsToMessages = (events: AdkEvent[] | null | undefined) => {
       id: `history-step-${stepCounter}`,
       label: cleanLabel,
       status: "done",
+      details: formatMilestoneDetails(details),
     });
   };
 
   source.forEach((event, index) => {
     const parts = Array.isArray(event.content?.parts) ? event.content.parts : [];
-    const functionCalls = extractFunctionCallNames(parts);
-    const functionResponses = extractFunctionResponseNames(parts);
-    functionCalls.forEach((toolName) => {
-      addPendingMilestone(`Running ${normalizeToolName(toolName)}`);
+    const functionCalls = extractFunctionCalls(parts);
+    const functionResponses = extractFunctionResponses(parts);
+    functionCalls.forEach((toolCall) => {
+      const toolName = String(toolCall.name ?? "");
+      addPendingMilestone(`Running ${normalizeToolName(toolName)}`, {
+        tool: toolName,
+        args: toolCall.args ?? {},
+      });
     });
-    functionResponses.forEach((toolName) => {
-      addPendingMilestone(`Received ${normalizeToolName(toolName)} results`);
+    functionResponses.forEach((toolResponse) => {
+      const toolName = String(toolResponse.name ?? "");
+      addPendingMilestone(`Received ${normalizeToolName(toolName)} results`, {
+        tool: toolName,
+        response: toolResponse.response ?? {},
+      });
     });
 
     const text = extractVisibleTextFromParts(parts).trim();
@@ -595,6 +648,7 @@ export default function AgentChatWorkspace({
   const [streamSteps, setStreamSteps] = useState<StreamStep[]>([]);
   const [pendingUserMessage, setPendingUserMessage] = useState<ChatMessage | null>(null);
   const [messageMilestones, setMessageMilestones] = useState<Record<string, StreamStep[]>>({});
+  const [expandedMilestones, setExpandedMilestones] = useState<Record<string, boolean>>({});
 
   const [sessionsError, setSessionsError] = useState("");
   const [messagesError, setMessagesError] = useState("");
@@ -660,6 +714,7 @@ export default function AgentChatWorkspace({
           if (!silent) {
             setMessages([]);
             setMessageMilestones({});
+            setExpandedMilestones({});
           }
           setMessagesError("Unable to load session messages.");
           return [] as ChatMessage[];
@@ -667,11 +722,13 @@ export default function AgentChatWorkspace({
         const mapped = mapEventsToMessages(payload.events);
         setMessages(mapped.messages);
         setMessageMilestones(mapped.milestonesByMessageId);
+        setExpandedMilestones({});
         return mapped.messages;
       } catch {
         if (!silent) {
           setMessages([]);
           setMessageMilestones({});
+          setExpandedMilestones({});
         }
         setMessagesError("Unable to load session messages.");
         return [] as ChatMessage[];
@@ -701,6 +758,7 @@ export default function AgentChatWorkspace({
           setSelectedSessionId(null);
           setMessages([]);
           setMessageMilestones({});
+          setExpandedMilestones({});
         }
         setSessionsError("Unable to load sessions.");
         return [] as ChatMessage[];
@@ -723,6 +781,7 @@ export default function AgentChatWorkspace({
         if (!silent) {
           setMessages([]);
           setMessageMilestones({});
+          setExpandedMilestones({});
         }
         return [] as ChatMessage[];
       }
@@ -733,6 +792,7 @@ export default function AgentChatWorkspace({
         setIsDraftSession(false);
         setMessages([]);
         setMessageMilestones({});
+        setExpandedMilestones({});
       }
       setSessionsError("Unable to load sessions.");
       return [] as ChatMessage[];
@@ -810,11 +870,12 @@ export default function AgentChatWorkspace({
     setIsStreamingReply(true);
   }, [resetStreamingText]);
 
-  const addRunningStep = useCallback((label: string) => {
+  const addRunningStep = useCallback((label: string, details?: unknown) => {
     const cleanLabel = label.trim();
     if (!cleanLabel) {
       return;
     }
+    const formattedDetails = formatMilestoneDetails(details);
 
     setStreamSteps((prev) => {
       if (prev.length === 0) {
@@ -824,6 +885,7 @@ export default function AgentChatWorkspace({
             id: `stream-step-${streamStepCounterRef.current}`,
             label: cleanLabel,
             status: "running",
+            details: formattedDetails,
           },
         ];
         streamStepsRef.current = created;
@@ -835,8 +897,14 @@ export default function AgentChatWorkspace({
       const lastStep = next[lastIndex];
 
       if (lastStep.label === cleanLabel) {
+        const mergedStep =
+          formattedDetails && !lastStep.details
+            ? { ...lastStep, details: formattedDetails }
+            : lastStep;
         if (lastStep.status === "done") {
-          next[lastIndex] = { ...lastStep, status: "running" };
+          next[lastIndex] = { ...mergedStep, status: "running" };
+        } else if (mergedStep !== lastStep) {
+          next[lastIndex] = mergedStep;
         }
         return next;
       }
@@ -850,6 +918,7 @@ export default function AgentChatWorkspace({
         id: `stream-step-${streamStepCounterRef.current}`,
         label: cleanLabel,
         status: "running",
+        details: formattedDetails,
       });
       streamStepsRef.current = next;
       return next;
@@ -869,6 +938,13 @@ export default function AgentChatWorkspace({
       streamStepsRef.current = next;
       return next;
     });
+  }, []);
+
+  const toggleMilestoneExpansion = useCallback((stepId: string) => {
+    setExpandedMilestones((prev) => ({
+      ...prev,
+      [stepId]: !prev[stepId],
+    }));
   }, []);
 
   const processSseFrame = useCallback((frame: string): boolean => {
@@ -896,7 +972,7 @@ export default function AgentChatWorkspace({
     }
 
     if (payload.error) {
-      addRunningStep("Request failed");
+      addRunningStep("Request failed", { error: payload.error });
       completeLastRunningStep();
       setSendError(summarizeStreamError(payload.error));
       return false;
@@ -904,11 +980,15 @@ export default function AgentChatWorkspace({
 
     const parts = Array.isArray(payload.content?.parts) ? payload.content.parts : [];
     const visibleText = extractVisibleTextFromParts(parts);
-    const functionCalls = extractFunctionCallNames(parts);
-    const functionResponses = extractFunctionResponseNames(parts);
+    const functionCalls = extractFunctionCalls(parts);
+    const functionResponses = extractFunctionResponses(parts);
 
-    functionCalls.forEach((toolName) => {
-      addRunningStep(`Running ${normalizeToolName(toolName)}`);
+    functionCalls.forEach((toolCall) => {
+      const toolName = String(toolCall.name ?? "");
+      addRunningStep(`Running ${normalizeToolName(toolName)}`, {
+        tool: toolName,
+        args: toolCall.args ?? {},
+      });
     });
 
     const confirmations = payload.actions?.requestedToolConfirmations;
@@ -920,8 +1000,12 @@ export default function AgentChatWorkspace({
       addRunningStep("Awaiting tool confirmation");
     }
 
-    functionResponses.forEach((toolName) => {
-      addRunningStep(`Received ${normalizeToolName(toolName)} results`);
+    functionResponses.forEach((toolResponse) => {
+      const toolName = String(toolResponse.name ?? "");
+      addRunningStep(`Received ${normalizeToolName(toolName)} results`, {
+        tool: toolName,
+        response: toolResponse.response ?? {},
+      });
     });
 
     if (visibleText) {
@@ -1040,6 +1124,7 @@ export default function AgentChatWorkspace({
         const mapped = mapEventsToMessages(payload.events);
         setMessages(mapped.messages);
         setMessageMilestones(mapped.milestonesByMessageId);
+        setExpandedMilestones({});
         return payload.id;
       } catch {
         setSessionsError("Unable to create session.");
@@ -1055,6 +1140,7 @@ export default function AgentChatWorkspace({
     setOpenMenuSessionId(null);
     setMessages([]);
     setMessageMilestones({});
+    setExpandedMilestones({});
     setPendingUserMessage(null);
     setIsStreamingReply(false);
     resetStreamingText();
@@ -1486,7 +1572,13 @@ export default function AgentChatWorkspace({
                           <span className="text-[#b6bfce]">|</span>
                           <span>{message.timeLabel}</span>
                         </div>
-                        {!isUser && milestones.length > 0 ? renderMilestones(milestones) : null}
+                        {!isUser && milestones.length > 0
+                          ? renderMilestones(
+                              milestones,
+                              expandedMilestones,
+                              toggleMilestoneExpansion
+                            )
+                          : null}
                         <div className="space-y-3 break-words">
                           {renderMarkdownBlocks(message.text)}
                         </div>
@@ -1548,7 +1640,13 @@ export default function AgentChatWorkspace({
                         <span>{formatTime()}</span>
                       </div>
 
-                      {streamSteps.length > 0 ? renderMilestones(streamSteps) : null}
+                      {streamSteps.length > 0
+                        ? renderMilestones(
+                            streamSteps,
+                            expandedMilestones,
+                            toggleMilestoneExpansion
+                          )
+                        : null}
 
                       <div className="space-y-3 break-words">
                         {streamingText ? (
