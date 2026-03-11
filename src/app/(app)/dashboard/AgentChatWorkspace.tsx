@@ -1567,7 +1567,7 @@ export default function AgentChatWorkspace({
                       void sendMessage();
                     }
                   }}
-                  placeholder="Message the agent..."
+                  placeholder="Ask Anything"
                   className="flex-1 bg-transparent text-sm text-[#111827] outline-none placeholder:text-[#9ca3af]"
                 />
                 <button
