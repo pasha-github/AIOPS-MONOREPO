@@ -819,7 +819,7 @@ export default function AgentChatWorkspace({
     setStreamSteps((prev) => {
       if (prev.length === 0) {
         streamStepCounterRef.current += 1;
-        const created = [
+        const created: StreamStep[] = [
           {
             id: `stream-step-${streamStepCounterRef.current}`,
             label: cleanLabel,
