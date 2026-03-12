@@ -10,7 +10,8 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
-import { LLM_MANAGER_API_BASE_URL } from "@/config/agent";
+import { trimTrailingSlash } from "@/config/agent";
+import { useRuntimeConfig } from "@/config/runtime-config";
 import { formatDateTime, getProviderIconSrc } from "../llm-management/llmHelpers";
 
 type AgentRecord = {
@@ -47,6 +48,7 @@ export default function AgentRegistry({
   onDeleteSuccess,
   onStatusUpdateSuccess,
 }: AgentRegistryProps) {
+  const { llmManagerApiBaseUrl } = useRuntimeConfig();
   const [filter, setFilter] = useState<"all" | "online" | "offline">("all");
   const [sortKey, setSortKey] = useState<SortKey>("updated_at");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
@@ -66,9 +68,7 @@ export default function AgentRegistry({
   const [deleteError, setDeleteError] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
 
-  const agentManagerBaseUrl = LLM_MANAGER_API_BASE_URL.endsWith("/")
-    ? LLM_MANAGER_API_BASE_URL.slice(0, -1)
-    : LLM_MANAGER_API_BASE_URL;
+  const agentManagerBaseUrl = trimTrailingSlash(llmManagerApiBaseUrl);
 
   const getErrorMessage = (payload: unknown, fallback: string) => {
     if (

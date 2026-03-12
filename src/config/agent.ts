@@ -4,27 +4,18 @@ export const AGENT_HOST = "http://192.168.18.20";
 export const AGENT_WS_HOST = "ws://192.168.18.20";
 export const AGENT_CONNECTORS_BASE_URL = "http://192.168.18.20:9001";
 
-const getRequiredEnvValue = (
-  value: string | undefined,
-  key: "NEXT_PUBLIC_LLM_MANAGER_API_BASE_URL" | "NEXT_PUBLIC_AGENT_ADK_BASE_URL",
-) => {
-  if (!value) {
-    throw new Error(`Missing required environment variable: ${key}`);
-  }
-
-  return value;
+export type RuntimeConfig = {
+  llmManagerApiBaseUrl: string;
+  agentAdkBaseUrl: string;
 };
 
-export const LLM_MANAGER_API_BASE_URL =
-  getRequiredEnvValue(
-    process.env.NEXT_PUBLIC_LLM_MANAGER_API_BASE_URL,
-    "NEXT_PUBLIC_LLM_MANAGER_API_BASE_URL",
-  );
-export const AGENT_ADK_BASE_URL =
-  getRequiredEnvValue(
-    process.env.NEXT_PUBLIC_AGENT_ADK_BASE_URL,
-    "NEXT_PUBLIC_AGENT_ADK_BASE_URL",
-  );
+export const getServerRuntimeConfig = (): RuntimeConfig => ({
+  llmManagerApiBaseUrl: process.env.NEXT_PUBLIC_LLM_MANAGER_API_BASE_URL ?? "",
+  agentAdkBaseUrl: process.env.NEXT_PUBLIC_AGENT_ADK_BASE_URL ?? "",
+});
+
+export const trimTrailingSlash = (value: string) =>
+  value.endsWith("/") ? value.slice(0, -1) : value;
 
 export const LLM_PROVIDER_MODELS = {
   google: [

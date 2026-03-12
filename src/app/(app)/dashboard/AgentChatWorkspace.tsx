@@ -1,6 +1,7 @@
 "use client";
 
-import { AGENT_ADK_BASE_URL } from "@/config/agent";
+import { trimTrailingSlash } from "@/config/agent";
+import { useRuntimeConfig } from "@/config/runtime-config";
 import {
   Bot,
   ChevronDown,
@@ -80,19 +81,19 @@ type ChatMessage = {
 
 const DEFAULT_USER_ID = "user";
 
-const ADK_BASE_URL = AGENT_ADK_BASE_URL.endsWith("/")
-  ? AGENT_ADK_BASE_URL.slice(0, -1)
-  : AGENT_ADK_BASE_URL;
-
-const getSessionsUrl = (appName: string, userId: string) =>
-  `${ADK_BASE_URL}/apps/${encodeURIComponent(appName)}/users/${encodeURIComponent(
+const getSessionsUrl = (adkBaseUrl: string, appName: string, userId: string) =>
+  `${adkBaseUrl}/apps/${encodeURIComponent(appName)}/users/${encodeURIComponent(
     userId
   )}/sessions`;
 
-const getSessionUrl = (appName: string, userId: string, sessionId: string) =>
-  `${getSessionsUrl(appName, userId)}/${encodeURIComponent(sessionId)}`;
+const getSessionUrl = (
+  adkBaseUrl: string,
+  appName: string,
+  userId: string,
+  sessionId: string
+) => `${getSessionsUrl(adkBaseUrl, appName, userId)}/${encodeURIComponent(sessionId)}`;
 
-const getRunSseUrl = () => `${ADK_BASE_URL}/run_sse`;
+const getRunSseUrl = (adkBaseUrl: string) => `${adkBaseUrl}/run_sse`;
 
 type StreamStep = {
   id: string;
@@ -628,6 +629,8 @@ export default function AgentChatWorkspace({
   agent,
   onClose,
 }: AgentChatWorkspaceProps) {
+  const { agentAdkBaseUrl } = useRuntimeConfig();
+  const adkBaseUrl = trimTrailingSlash(agentAdkBaseUrl);
   const appName = agent.agentId;
   const assistantDisplayName = agent.name?.trim() || appName;
   const userId = DEFAULT_USER_ID;
@@ -706,7 +709,7 @@ export default function AgentChatWorkspace({
       }
       setMessagesError("");
       try {
-        const response = await fetch(getSessionUrl(appName, userId, sessionId), {
+        const response = await fetch(getSessionUrl(adkBaseUrl, appName, userId, sessionId), {
           headers: { accept: "application/json" },
         });
         const payload = (await response.json()) as AdkSession;
@@ -748,7 +751,7 @@ export default function AgentChatWorkspace({
     }
     setSessionsError("");
     try {
-      const response = await fetch(getSessionsUrl(appName, userId), {
+      const response = await fetch(getSessionsUrl(adkBaseUrl, appName, userId), {
         headers: { accept: "application/json" },
       });
       const payload = (await response.json()) as AdkSession[];
@@ -1023,7 +1026,7 @@ export default function AgentChatWorkspace({
   }, [addRunningStep, completeLastRunningStep, updateStreamingTargetText]);
 
   const runPromptSse = useCallback(async (sessionId: string, prompt: string) => {
-    const response = await fetch(getRunSseUrl(), {
+    const response = await fetch(getRunSseUrl(adkBaseUrl), {
       method: "POST",
       headers: {
         accept: "text/event-stream",
@@ -1103,7 +1106,7 @@ export default function AgentChatWorkspace({
     async () => {
       setSessionsError("");
       try {
-        const response = await fetch(getSessionsUrl(appName, userId), {
+        const response = await fetch(getSessionsUrl(adkBaseUrl, appName, userId), {
           method: "POST",
           headers: {
             accept: "application/json",
@@ -1155,7 +1158,7 @@ export default function AgentChatWorkspace({
       setDeletingSessionId(sessionId);
       setSessionsError("");
       try {
-        const response = await fetch(getSessionUrl(appName, userId, sessionId), {
+        const response = await fetch(getSessionUrl(adkBaseUrl, appName, userId, sessionId), {
           method: "DELETE",
           headers: { accept: "application/json" },
         });

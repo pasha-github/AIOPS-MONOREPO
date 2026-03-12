@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { LLM_MANAGER_API_BASE_URL } from "@/config/agent";
+import { trimTrailingSlash } from "@/config/agent";
+import { useRuntimeConfig } from "@/config/runtime-config";
 import LLMOverviewSection from "./LLMOverviewSection";
 import LLMTableSection from "./LLMTableSection";
 import CreateLlmModal, { type CreateLlmPayload } from "./createllm";
@@ -12,13 +13,11 @@ import {
   type LLMRecord,
 } from "./llmHelpers";
 
-const LLM_API_BASE = LLM_MANAGER_API_BASE_URL.endsWith("/")
-  ? LLM_MANAGER_API_BASE_URL.slice(0, -1)
-  : LLM_MANAGER_API_BASE_URL;
-const LLM_LIST_URL = `${LLM_API_BASE}/llms/`;
-const LLM_CREATE_URL = `${LLM_API_BASE}/llms/`;
-
 export default function LLMManagementPage() {
+  const { llmManagerApiBaseUrl } = useRuntimeConfig();
+  const llmApiBase = trimTrailingSlash(llmManagerApiBaseUrl);
+  const llmListUrl = `${llmApiBase}/llms/`;
+  const llmCreateUrl = `${llmApiBase}/llms/`;
   const [llms, setLlms] = useState<LLMRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -47,7 +46,7 @@ export default function LLMManagementPage() {
       }
 
       try {
-        const response = await fetch(LLM_LIST_URL, {
+        const response = await fetch(llmListUrl, {
           headers: { accept: "application/json" },
           signal: options?.signal,
         });
@@ -84,7 +83,7 @@ export default function LLMManagementPage() {
         }
       }
     },
-    []
+    [llmListUrl]
   );
 
   useEffect(() => {
@@ -124,7 +123,7 @@ export default function LLMManagementPage() {
     payload: CreateLlmPayload
   ): Promise<ActionResult> => {
     try {
-      const response = await fetch(LLM_CREATE_URL, {
+      const response = await fetch(llmCreateUrl, {
         method: "POST",
         headers: {
           accept: "application/json",
@@ -156,7 +155,7 @@ export default function LLMManagementPage() {
   const handleDeleteModel = async (modelId: string): Promise<ActionResult> => {
     try {
       const response = await fetch(
-        `${LLM_API_BASE}/llms/${encodeURIComponent(modelId)}`,
+        `${llmApiBase}/llms/${encodeURIComponent(modelId)}`,
         {
           method: "DELETE",
           headers: { accept: "application/json" },

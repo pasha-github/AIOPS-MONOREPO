@@ -1,12 +1,15 @@
-﻿/** @type {import('next').NextConfig} */
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+/** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-
-  // ⬇️ This is the important part
-  output: 'export',
-  trailingSlash: true,
-
-  // If you use <Image> from 'next/image', add this too:
+  output: "standalone",
+  turbopack: {
+    root: __dirname,
+  },
   images: {
     unoptimized: true,
   },

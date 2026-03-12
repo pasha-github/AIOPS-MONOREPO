@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { ChevronDown, Loader2, Plus, Trash2, X } from "lucide-react";
-import { LLM_MANAGER_API_BASE_URL } from "@/config/agent";
+import { trimTrailingSlash } from "@/config/agent";
+import { useRuntimeConfig } from "@/config/runtime-config";
 import { getProviderIconSrc } from "../llm-management/llmHelpers";
 
 type CreateNewAgentProps = {
@@ -30,12 +31,6 @@ type ModelSelectProps = {
   loading?: boolean;
   onChange: (value: string) => void;
 };
-
-const AGENT_MANAGER_API_BASE = LLM_MANAGER_API_BASE_URL.endsWith("/")
-  ? LLM_MANAGER_API_BASE_URL.slice(0, -1)
-  : LLM_MANAGER_API_BASE_URL;
-const LLM_LIST_URL = `${AGENT_MANAGER_API_BASE}/llms/`;
-const AGENT_CREATE_URL = `${AGENT_MANAGER_API_BASE}/agent/`;
 
 const toSnakeCase = (value: string) =>
   value
@@ -184,6 +179,10 @@ function ModelSelect({
 }
 
 export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps) {
+  const { llmManagerApiBaseUrl } = useRuntimeConfig();
+  const agentManagerApiBase = trimTrailingSlash(llmManagerApiBaseUrl);
+  const llmListUrl = `${agentManagerApiBase}/llms/`;
+  const agentCreateUrl = `${agentManagerApiBase}/agent/`;
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [agentName, setAgentName] = useState("");
   const [description, setDescription] = useState("");
@@ -229,7 +228,7 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
       setIsModelsLoading(true);
       setModelsLoadError("");
       try {
-        const response = await fetch(LLM_LIST_URL, {
+        const response = await fetch(llmListUrl, {
           headers: { accept: "application/json" },
           signal: controller.signal,
         });
@@ -372,7 +371,7 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
     };
 
     try {
-      const response = await fetch(AGENT_CREATE_URL, {
+      const response = await fetch(agentCreateUrl, {
         method: "POST",
         headers: {
           accept: "application/json",

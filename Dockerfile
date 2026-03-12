@@ -4,19 +4,22 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 
-# COPY .env .env
-
-ARG NEXT_PUBLIC_LLM_MANAGER_API_BASE_URL 
-ARG NEXT_PUBLIC_AGENT_ADK_BASE_URL 
- 
-ENV NEXT_PUBLIC_LLM_MANAGER_API_BASE_URL=$NEXT_PUBLIC_LLM_MANAGER_API_BASE_URL 
-ENV NEXT_PUBLIC_AGENT_ADK_BASE_URL=$NEXT_PUBLIC_AGENT_ADK_BASE_URL
 COPY . .
 RUN npm run build
 
-FROM nginxinc/nginx-unprivileged:stable-alpine AS runner
-WORKDIR /usr/share/nginx/html
+FROM node:20-alpine AS runner
+WORKDIR /app
 
-COPY --from=builder /app/out ./
+ENV NODE_ENV=production
 
-EXPOSE 8080
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/public ./public
+COPY docker/entrypoint.sh /entrypoint.sh
+
+RUN chmod +x /entrypoint.sh
+
+EXPOSE 3000
+
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["node", "server.js"]

@@ -1,6 +1,7 @@
 "use client";
 
-import { LLM_MANAGER_API_BASE_URL } from "@/config/agent";
+import { trimTrailingSlash } from "@/config/agent";
+import { useRuntimeConfig } from "@/config/runtime-config";
 import AgentChatWorkspace from "./AgentChatWorkspace";
 import {
   Bot,
@@ -30,11 +31,6 @@ type AgentListApiResponseItem = {
   type?: string | null;
 };
 
-const AGENT_MANAGER_BASE = LLM_MANAGER_API_BASE_URL.endsWith("/")
-  ? LLM_MANAGER_API_BASE_URL.slice(0, -1)
-  : LLM_MANAGER_API_BASE_URL;
-const AGENT_LIST_URL = `${AGENT_MANAGER_BASE}/agent/`;
-
 const mapApiStatusToDashboardStatus = (status: string | null | undefined) =>
   String(status ?? "").toLowerCase() === "active" ? "STARTED" : "STOPPED";
 
@@ -61,6 +57,8 @@ const formatUpdatedAt = (updatedAt: string | null) => {
 };
 
 export default function AgentManagementSection() {
+  const { llmManagerApiBaseUrl } = useRuntimeConfig();
+  const agentListUrl = `${trimTrailingSlash(llmManagerApiBaseUrl)}/agent/`;
   const [agents, setAgents] = useState<AgentRecord[]>([]);
   const [isAgentsLoading, setIsAgentsLoading] = useState(true);
   const [agentsError, setAgentsError] = useState("");
@@ -123,7 +121,7 @@ export default function AgentManagementSection() {
       }
 
       try {
-        const response = await fetch(AGENT_LIST_URL, {
+        const response = await fetch(agentListUrl, {
           headers: { accept: "application/json" },
           signal: options?.signal,
         });
@@ -176,7 +174,7 @@ export default function AgentManagementSection() {
         }
       }
     },
-    []
+    [agentListUrl]
   );
 
   useEffect(() => {

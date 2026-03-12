@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { getServerRuntimeConfig } from "@/config/agent";
+import { RuntimeConfigProvider } from "@/config/runtime-config";
 import "./globals.css";
+
+export const dynamic = "force-dynamic";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -22,12 +26,16 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const runtimeConfig = getServerRuntimeConfig();
+
   return (
     <html lang="en">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {children}
+        <RuntimeConfigProvider config={runtimeConfig}>
+          {children}
+        </RuntimeConfigProvider>
       </body>
     </html>
   );

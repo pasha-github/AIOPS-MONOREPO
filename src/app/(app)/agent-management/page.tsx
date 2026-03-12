@@ -5,7 +5,8 @@ import { RefreshCw } from "lucide-react";
 import AgentRegistry from "./AgentRegistry";
 import AgentStats from "./AgentStats";
 import CreateNewAgent from "./createnewagent";
-import { LLM_MANAGER_API_BASE_URL } from "@/config/agent";
+import { trimTrailingSlash } from "@/config/agent";
+import { useRuntimeConfig } from "@/config/runtime-config";
 
 type AgentRecord = {
   agentId: number;
@@ -24,12 +25,6 @@ type AgentRecord = {
   created_at: string | null;
   updated_at: string | null;
 };
-
-const AGENT_MANAGER_API_BASE = LLM_MANAGER_API_BASE_URL.endsWith("/")
-  ? LLM_MANAGER_API_BASE_URL.slice(0, -1)
-  : LLM_MANAGER_API_BASE_URL;
-const AGENT_LIST_URL = `${AGENT_MANAGER_API_BASE}/agent/`;
-const LLM_LIST_URL = `${AGENT_MANAGER_API_BASE}/llms/`;
 
 const isOnlineStatus = (statusValue: string | null | undefined) => {
   const normalized = statusValue?.trim().toLowerCase() ?? "";
@@ -61,6 +56,10 @@ const getLoadErrorMessage = (payload: unknown, fallback: string) => {
 };
 
 export default function AgentManagementPage() {
+  const { llmManagerApiBaseUrl } = useRuntimeConfig();
+  const agentManagerApiBase = trimTrailingSlash(llmManagerApiBaseUrl);
+  const agentListUrl = `${agentManagerApiBase}/agent/`;
+  const llmListUrl = `${agentManagerApiBase}/llms/`;
   const [agents, setAgents] = useState<AgentRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -87,11 +86,11 @@ export default function AgentManagementPage() {
 
       try {
         const [agentResponse, llmResponse] = await Promise.all([
-          fetch(AGENT_LIST_URL, {
+          fetch(agentListUrl, {
             headers: { accept: "application/json" },
             signal: options?.signal,
           }),
-          fetch(LLM_LIST_URL, {
+          fetch(llmListUrl, {
             headers: { accept: "application/json" },
             signal: options?.signal,
           }),
@@ -210,7 +209,7 @@ export default function AgentManagementPage() {
         }
       }
     },
-    []
+    [agentListUrl, llmListUrl]
   );
 
   useEffect(() => {
