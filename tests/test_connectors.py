@@ -1,36 +1,9 @@
 from fastapi.testclient import TestClient
-from sqlmodel import Session, SQLModel, create_engine
-from sqlmodel.pool import StaticPool
 import pytest
 from pathlib import Path
 
-from main import app
-from database.database import get_session
 from database.models import ConnectorConfig
-from utils.helper import CONNECTORS_DIR, cached_connector_info, resolve_connector_tools
-
-
-@pytest.fixture(name="session")
-def session_fixture():
-    engine = create_engine(
-        "sqlite://",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
-    SQLModel.metadata.create_all(engine)
-    with Session(engine) as session:
-        yield session
-
-
-@pytest.fixture(name="client")
-def client_fixture(session: Session):
-    def get_session_override():
-        return session
-
-    app.dependency_overrides[get_session] = get_session_override
-    client = TestClient(app)
-    yield client
-    app.dependency_overrides.clear()
+from utils.helper import cached_connector_info, resolve_connector_tools
 
 
 def test_list_connectors_success(client: TestClient):
@@ -147,17 +120,15 @@ def test_get_connector_config_list_after_multiple_create(client: TestClient):
     assert names == {"Config One", "Config Two"}
 
 
-def test_create_connector_config_path_body_mismatch_current_behavior(client: TestClient):
+def test_create_connector_config_path_body_mismatch_returns_400(client: TestClient):
     payload = {
         "connector_id": "servicenow_connector",
         "name": "Mismatch Config",
         "config": [{"name": "x", "value": "1"}],
     }
     response = client.post("/connectors/example_connector/config", json=payload)
-    # Current route uses body model directly; it does not enforce path/body equality.
-    assert response.status_code == 200
-    data = response.json()
-    assert data["connector_id"] == "servicenow_connector"
+    assert response.status_code == 400
+    assert response.json()["detail"] == "connector_id in URL and body must match"
 
 
 def test_create_connector_config_missing_required_field_422(client: TestClient):

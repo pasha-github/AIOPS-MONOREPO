@@ -1,33 +1,5 @@
 from fastapi.testclient import TestClient
-from sqlmodel import Session, SQLModel, create_engine
-from sqlmodel.pool import StaticPool
 import pytest
-
-from main import app
-from database.database import get_session
-
-
-@pytest.fixture(name="session")
-def session_fixture():
-    engine = create_engine(
-        "sqlite://",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
-    SQLModel.metadata.create_all(engine)
-    with Session(engine) as session:
-        yield session
-
-
-@pytest.fixture(name="client")
-def client_fixture(session: Session):
-    def get_session_override():
-        return session
-
-    app.dependency_overrides[get_session] = get_session_override
-    client = TestClient(app)
-    yield client
-    app.dependency_overrides.clear()
 
 
 def _create_model(client: TestClient, model_id: str = "gemini-pro"):
@@ -69,6 +41,7 @@ def test_create_agent(client: TestClient):
             "provider": "google",
             "name": "gemini-1.5-pro",
             "api_key": "test-key",
+            "description": "model",
         },
     )
 
@@ -97,6 +70,7 @@ def test_list_agents(client: TestClient):
             "provider": "google",
             "name": "gemini",
             "api_key": "k",
+            "description": "model",
         },
     )
     client.post(
@@ -120,7 +94,7 @@ def test_list_agents(client: TestClient):
 def test_delete_agent_success(client: TestClient):
     client.post(
         "/llms/",
-        json={"model_id": "m1", "provider": "p", "name": "n", "api_key": "k"},
+        json={"model_id": "m1", "provider": "p", "name": "n", "api_key": "k", "description": "model"},
     )
     client.post(
         "/agent/",
@@ -156,6 +130,7 @@ def test_update_agent_name_only(client: TestClient):
             "provider": "google",
             "name": "gemini-1.5-pro",
             "api_key": "test-key",
+            "description": "model",
         },
     )
     client.post(
@@ -234,6 +209,14 @@ def test_update_agent_model_id_only(client: TestClient):
     response = client.patch("/agent/a1", json={"model_id": "gemini-flash"})
     assert response.status_code == 200
     assert response.json()["model_id"] == "gemini-flash"
+
+
+def test_update_agent_invalid_model_id_returns_400(client: TestClient):
+    _create_model(client, model_id="gemini-pro")
+    _create_agent(client, model_id="gemini-pro")
+    response = client.patch("/agent/a1", json={"model_id": "does-not-exist"})
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Invalid model_id"
 
 
 def test_update_agent_status_only(client: TestClient):
@@ -365,7 +348,7 @@ def test_delete_agent_invalidates_cache(client: TestClient, monkeypatch: pytest.
     assert called["value"] == "a1"
 
 
-def test_create_agent_with_invalid_model_id_current_behavior(client: TestClient):
+def test_create_agent_with_invalid_model_id_returns_400(client: TestClient):
     response = client.post(
         "/agent/",
         json={
@@ -377,8 +360,8 @@ def test_create_agent_with_invalid_model_id_current_behavior(client: TestClient)
             "isEnabled": True,
         },
     )
-    # Current SQLite test setup may allow this if FK enforcement is disabled.
-    assert response.status_code == 200
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Invalid model_id"
 
 
 def test_update_agent_invalid_isenabled_type_422(client: TestClient):

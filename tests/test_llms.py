@@ -1,34 +1,6 @@
 from fastapi.testclient import TestClient
-from sqlmodel import Session, SQLModel, create_engine
-from sqlmodel.pool import StaticPool
-import pytest
-
-from main import app
-from database.database import get_session
+from sqlmodel import Session
 from database.models import Model
-
-
-@pytest.fixture(name="session")
-def session_fixture():
-    engine = create_engine(
-        "sqlite://",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
-    SQLModel.metadata.create_all(engine)
-    with Session(engine) as session:
-        yield session
-
-
-@pytest.fixture(name="client")
-def client_fixture(session: Session):
-    def get_session_override():
-        return session
-
-    app.dependency_overrides[get_session] = get_session_override
-    client = TestClient(app)
-    yield client
-    app.dependency_overrides.clear()
 
 
 def test_create_model(client: TestClient):
@@ -163,6 +135,54 @@ def test_update_model_not_found_404(client: TestClient):
     )
     assert response.status_code == 404
     assert response.json()["detail"] == "Model not found"
+
+
+def test_update_model_empty_name_returns_400(client: TestClient):
+    client.post(
+        "/llms/",
+        json={
+            "model_id": "gemini-pro",
+            "provider": "google",
+            "name": "gemini-1.5-pro",
+            "api_key": "test-key",
+            "description": "desc",
+        },
+    )
+    response = client.patch("/llms/gemini-pro", json={"name": "   "})
+    assert response.status_code == 400
+    assert response.json()["detail"] == "name cannot be empty"
+
+
+def test_update_model_empty_description_returns_400(client: TestClient):
+    client.post(
+        "/llms/",
+        json={
+            "model_id": "gemini-pro",
+            "provider": "google",
+            "name": "gemini-1.5-pro",
+            "api_key": "test-key",
+            "description": "desc",
+        },
+    )
+    response = client.patch("/llms/gemini-pro", json={"description": "   "})
+    assert response.status_code == 400
+    assert response.json()["detail"] == "description cannot be empty"
+
+
+def test_update_model_empty_api_key_returns_400(client: TestClient):
+    client.post(
+        "/llms/",
+        json={
+            "model_id": "gemini-pro",
+            "provider": "google",
+            "name": "gemini-1.5-pro",
+            "api_key": "test-key",
+            "description": "desc",
+        },
+    )
+    response = client.patch("/llms/gemini-pro", json={"api_key": "   "})
+    assert response.status_code == 400
+    assert response.json()["detail"] == "api_key cannot be empty"
 
 
 def test_delete_model_success(client: TestClient):
@@ -302,7 +322,7 @@ def test_update_model_api_key_stored_encrypted(client: TestClient, session: Sess
     assert stored_model.api_key != "new-key"
 
 
-def test_delete_model_used_by_agent_behavior_current(client: TestClient):
+def test_delete_model_used_by_agent_returns_conflict(client: TestClient):
     client.post(
         "/llms/",
         json={
@@ -325,7 +345,8 @@ def test_delete_model_used_by_agent_behavior_current(client: TestClient):
         },
     )
 
-    # Current behavior: model delete succeeds even when referenced by an agent.
     response = client.delete("/llms/gemini-pro")
-    assert response.status_code == 200
-    assert response.json() == {"ok": True}
+    assert response.status_code == 409
+    detail = response.json()["detail"]
+    assert detail["message"] == "Model is in use by agents"
+    assert detail["agent_ids"] == ["agent-using-model"]
