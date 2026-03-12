@@ -11,5 +11,6 @@ pnpm-debug.log*
 .env.test.local
 .env.production.local
 coverage
+.env
 .DS_Store
 *.tsbuildinfo
