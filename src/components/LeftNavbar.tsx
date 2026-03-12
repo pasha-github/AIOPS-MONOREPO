@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import type { ReactElement } from "react";
 import {
   Bot,
   Cloud,
@@ -18,7 +19,7 @@ import {
 type NavItem = {
   id: string;
   label: string;
-  icon: JSX.Element;
+  icon: ReactElement;
   href?: string;
   active?: boolean;
   dot?: boolean;
