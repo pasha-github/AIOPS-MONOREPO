@@ -1,11 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 from database.database import get_session
-from database.models import Agent
+from database.models import Agent, Model
 from typing import List, Optional
 from pydantic import BaseModel
 from utils.adk_app import invalidate_cache
-from sqlalchemy.exc import IntegrityError
 
 router = APIRouter(prefix="/agent", tags=["agent"])
 
@@ -34,13 +33,15 @@ class AgentPatch(BaseModel):
 
 @router.post("/", response_model=Agent)
 def create_agent(agent: AgentCreate, session: Session = Depends(get_session)):
+    if session.get(Agent, agent.agent_id):
+        raise HTTPException(status_code=409, detail="Agent already exists")
+
+    if not session.get(Model, agent.model_id):
+        raise HTTPException(status_code=400, detail="Invalid model_id")
+
     db_agent = Agent.model_validate(agent)
     session.add(db_agent)
-    try:
-        session.commit()
-    except IntegrityError:
-        session.rollback()
-        raise HTTPException(status_code=409, detail="Agent already exists")
+    session.commit()
     session.refresh(db_agent)
     return db_agent
 
@@ -56,6 +57,10 @@ def update_agent(agent_id: str, patch_data: AgentPatch, session: Session = Depen
         raise HTTPException(status_code=404, detail="Agent not found")
 
     updates = patch_data.model_dump(exclude_unset=True)
+    if "model_id" in updates:
+        if updates["model_id"] is None or not session.get(Model, updates["model_id"]):
+            raise HTTPException(status_code=400, detail="Invalid model_id")
+
     for key, value in updates.items():
         setattr(agent, key, value)
 
