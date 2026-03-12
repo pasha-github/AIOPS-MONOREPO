@@ -7,7 +7,6 @@ from pydantic import BaseModel
 from utils.secrets import encrypt_secret
 from utils.adk_app import invalidate_cache
 from datetime import datetime
-from sqlalchemy.exc import IntegrityError
 
 router = APIRouter(prefix="/llms", tags=["llms"])
 
@@ -33,15 +32,14 @@ class ModelUpdate(BaseModel):
 
 @router.post("/", response_model=ModelRead)
 def create_model(model: ModelCreate, session: Session = Depends(get_session)):
+    if session.get(Model, model.model_id):
+        raise HTTPException(status_code=409, detail="Model already exists")
+
     model_data = model.model_dump()
     model_data["api_key"] = encrypt_secret(model.api_key)
     db_model = Model.model_validate(model_data)
     session.add(db_model)
-    try:
-        session.commit()
-    except IntegrityError:
-        session.rollback()
-        raise HTTPException(status_code=409, detail="Model already exists")
+    session.commit()
     session.refresh(db_model)
     return db_model
 
@@ -58,10 +56,16 @@ def update_model(model_id: str, model_update: ModelUpdate, session: Session = De
 
     update_data = model_update.model_dump(exclude_unset=True)
     if "name" in update_data:
+        if update_data["name"] is None or not update_data["name"].strip():
+            raise HTTPException(status_code=400, detail="name cannot be empty")
         model.name = update_data["name"]
     if "description" in update_data:
+        if isinstance(update_data["description"], str) and not update_data["description"].strip():
+            raise HTTPException(status_code=400, detail="description cannot be empty")
         model.description = update_data["description"]
-    if "api_key" in update_data and update_data["api_key"] is not None:
+    if "api_key" in update_data:
+        if update_data["api_key"] is None or not update_data["api_key"].strip():
+            raise HTTPException(status_code=400, detail="api_key cannot be empty")
         model.api_key = encrypt_secret(update_data["api_key"])
 
     session.add(model)
@@ -81,6 +85,19 @@ def delete_model(model_id: str, session: Session = Depends(get_session)):
     model = session.get(Model, model_id)
     if not model:
         raise HTTPException(status_code=404, detail="Model not found")
+
+    linked_agents = session.exec(
+        select(Agent.agent_id).where(Agent.model_id == model_id)
+    ).all()
+    if linked_agents:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": "Model is in use by agents",
+                "agent_ids": sorted(linked_agents),
+            },
+        )
+
     session.delete(model)
     session.commit()
     return {"ok": True}
