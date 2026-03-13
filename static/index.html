@@ -265,6 +265,64 @@
                     </div>
                     <button type="submit">Add Agent</button>
                 </form>
+
+                <h3 style="margin-top: 24px;">Update Agent</h3>
+                <form id="update-agent-form">
+                    <div class="form-group">
+                        <label>Select Agent</label>
+                        <select id="agent-update-select" required>
+                            <option value="">Loading agents...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>New Name</label>
+                        <input type="text" id="agent-update-name" placeholder="Leave blank to keep current value">
+                    </div>
+                    <div class="form-group">
+                        <label>New Description</label>
+                        <input type="text" id="agent-update-description" placeholder="Leave blank to keep current value">
+                    </div>
+                    <div class="form-group">
+                        <label>New Instructions</label>
+                        <textarea id="agent-update-instruction" rows="3" placeholder="Leave blank to keep current value"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>New Model</label>
+                        <select id="agent-update-model-select">
+                            <option value="">-- Keep current model --</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Status</label>
+                        <select id="agent-update-status">
+                            <option value="">-- Keep current status --</option>
+                            <option value="true">Enable</option>
+                            <option value="false">Disable</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>New MCP Server URLs (comma-separated)</label>
+                        <input type="text" id="agent-update-mcp-sse"
+                            placeholder="Leave blank to keep current value">
+                    </div>
+                    <div class="form-group">
+                        <label>New Connector Configs <small>(hold Ctrl/Cmd to select multiple)</small></label>
+                        <select id="agent-update-connector-configs" multiple>
+                            <option disabled>Loading connector configs...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>New Sub Agents <small>(hold Ctrl/Cmd to select multiple)</small></label>
+                        <select id="agent-update-sub-agents" multiple>
+                            <option disabled>Loading agents...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>New Custom Tools (Python Code)</label>
+                        <textarea id="agent-update-tools" rows="5" placeholder="Leave blank to keep current value"></textarea>
+                    </div>
+                    <button type="submit">Update Agent</button>
+                </form>
             </div>
         </div>
 
@@ -353,10 +411,12 @@
             const listEl = document.getElementById('model-list');
             const selectEl = document.getElementById('agent-model-select');
             const updateSelectEl = document.getElementById('model-update-select');
+            const agentUpdateModelSelectEl = document.getElementById('agent-update-model-select');
 
             listEl.innerHTML = '';
             selectEl.innerHTML = '';
             updateSelectEl.innerHTML = '<option value="">-- Select a model --</option>';
+            agentUpdateModelSelectEl.innerHTML = '<option value="">-- Keep current model --</option>';
 
             models.forEach(m => {
                 const div = document.createElement('div');
@@ -377,6 +437,11 @@
                 updateOpt.value = m.model_id;
                 updateOpt.textContent = `${m.name} (${m.model_id})`;
                 updateSelectEl.appendChild(updateOpt);
+
+                const agentUpdateOpt = document.createElement('option');
+                agentUpdateOpt.value = m.model_id;
+                agentUpdateOpt.textContent = `${m.name} (${m.model_id})`;
+                agentUpdateModelSelectEl.appendChild(agentUpdateOpt);
             });
         }
 
@@ -455,9 +520,13 @@
             const agents = await res.json();
             const listEl = document.getElementById('agent-list');
             const chatSelectEl = document.getElementById('chat-agent-select');
+            const agentUpdateSelectEl = document.getElementById('agent-update-select');
+            const updateSubAgentSelectEl = document.getElementById('agent-update-sub-agents');
 
             listEl.innerHTML = '';
             chatSelectEl.innerHTML = '';
+            agentUpdateSelectEl.innerHTML = '<option value="">-- Select an agent --</option>';
+            updateSubAgentSelectEl.innerHTML = '';
 
             // Rebuild sub-agents select in the add-agent form
             const subAgentSelectEl = document.getElementById('agent-sub-agents');
@@ -497,6 +566,16 @@
                 subOpt.value = a.agent_id;
                 subOpt.textContent = a.name;
                 subAgentSelectEl.appendChild(subOpt);
+
+                const updateSubOpt = document.createElement('option');
+                updateSubOpt.value = a.agent_id;
+                updateSubOpt.textContent = a.name;
+                updateSubAgentSelectEl.appendChild(updateSubOpt);
+
+                const updateOpt = document.createElement('option');
+                updateOpt.value = a.agent_id;
+                updateOpt.textContent = `${a.name} (${a.agent_id})`;
+                agentUpdateSelectEl.appendChild(updateOpt);
             });
         }
 
@@ -537,6 +616,77 @@
             document.getElementById('connector-details-doc').textContent = '';
         }
 
+        async function updateAgent(e) {
+            e.preventDefault();
+
+            const agentId = document.getElementById('agent-update-select').value;
+            const name = document.getElementById('agent-update-name').value;
+            const description = document.getElementById('agent-update-description').value;
+            const instruction = document.getElementById('agent-update-instruction').value;
+            const modelId = document.getElementById('agent-update-model-select').value;
+            const statusValue = document.getElementById('agent-update-status').value;
+            const toolsCode = document.getElementById('agent-update-tools').value;
+            const mcpInput = document.getElementById('agent-update-mcp-sse').value;
+            const mcpServersList = mcpInput ? mcpInput.split(',').map(url => url.trim()).filter(url => url.length > 0) : [];
+            const connectorSelect = document.getElementById('agent-update-connector-configs');
+            const connectorConfigIds = Array.from(connectorSelect.selectedOptions).map(o => o.value);
+            const subAgentSelect = document.getElementById('agent-update-sub-agents');
+            const subAgentIds = Array.from(subAgentSelect.selectedOptions).map(o => o.value);
+            const data = {};
+
+            if (!agentId) {
+                alert('Please select an agent.');
+                return;
+            }
+
+            if (name.trim() !== '') {
+                data.name = name;
+            }
+            if (description.trim() !== '') {
+                data.description = description;
+            }
+            if (instruction.trim() !== '') {
+                data.instruction = instruction;
+            }
+            if (modelId !== '') {
+                data.model_id = modelId;
+            }
+            if (statusValue !== '') {
+                data.isEnabled = statusValue === 'true';
+            }
+            if (toolsCode.trim() !== '') {
+                data.tools = toolsCode;
+            }
+            if (mcpServersList.length > 0) {
+                data.mcp_servers = mcpServersList;
+            }
+            if (connectorConfigIds.length > 0) {
+                data.connector_config_ids = connectorConfigIds;
+            }
+            if (subAgentIds.length > 0) {
+                data.sub_agents = subAgentIds;
+            }
+
+            if (Object.keys(data).length === 0) {
+                alert('Enter at least one value to update.');
+                return;
+            }
+
+            const res = await fetch(`${API_BASE}/agent/${agentId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            if (!res.ok) {
+                alert('Failed to update agent: ' + await res.text());
+                return;
+            }
+
+            e.target.reset();
+            loadAgents();
+        }
+
 
         async function deleteAgent(id) {
             if (confirm('Delete this agent?')) {
@@ -546,10 +696,10 @@
         }
 
         async function toggleAgent(id, status) {
-            await fetch(`${API_BASE}/agent/`, {
+            await fetch(`${API_BASE}/agent/${id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ agent_id: id, isEnabled: status })
+                body: JSON.stringify({ isEnabled: status })
             });
             loadAgents();
         }
@@ -699,9 +849,11 @@
             const filterConnectorId = document.getElementById('connector-config-filter').value;
             const listEl = document.getElementById('connector-config-list');
             const agentSelect = document.getElementById('agent-connector-configs');
+            const updateAgentSelect = document.getElementById('agent-update-connector-configs');
 
             listEl.innerHTML = 'Loading...';
             agentSelect.innerHTML = '';
+            updateAgentSelect.innerHTML = '';
 
             // Fetch connectors list to iterate through all if no filter
             const connectorsRes = await fetch(`${API_BASE}/connectors/`);
@@ -734,6 +886,11 @@
                     opt.value = cfg.connector_config_id;
                     opt.textContent = `${cfg.name} (${connector.name})`;
                     agentSelect.appendChild(opt);
+
+                    const updateOpt = document.createElement('option');
+                    updateOpt.value = cfg.connector_config_id;
+                    updateOpt.textContent = `${cfg.name} (${connector.name})`;
+                    updateAgentSelect.appendChild(updateOpt);
                 });
             }
 
@@ -845,6 +1002,7 @@
         document.getElementById('add-model-form').addEventListener('submit', addModel);
         document.getElementById('update-model-form').addEventListener('submit', updateModel);
         document.getElementById('add-agent-form').addEventListener('submit', addAgent);
+        document.getElementById('update-agent-form').addEventListener('submit', updateAgent);
         document.getElementById('send-msg-btn').addEventListener('click', sendMessage);
         document.getElementById('add-connector-config-form').addEventListener('submit', addConnectorConfig);
         document.getElementById('connector-select').addEventListener('change', onConnectorSelected);
