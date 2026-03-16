@@ -3,7 +3,7 @@ from google.adk.tools.mcp_tool import McpToolset
 from google.adk.tools.agent_tool import AgentTool
 from google.adk.tools.mcp_tool.mcp_session_manager import SseConnectionParams, StreamableHTTPConnectionParams
 from google.adk.cli.utils.base_agent_loader import BaseAgentLoader
-from google.adk.agents import LlmAgent
+from google.adk.agents import LlmAgent, LoopAgent
 from google.adk.models.lite_llm import LiteLlm
 from sqlmodel import select
 from database.database import get_session, engine
@@ -131,29 +131,40 @@ class DatabaseAgentLoader(BaseAgentLoader):
                         logger.error(f"Error loading sub agent config '{sub_agent_id}' for agent {agent_name}: {e}")
 
 
-            # Create LlmAgent
             print(tools_list)
             tools_list.extend(sub_agents)
+
             if model_config.provider.lower() == "google":
-                agent = LlmAgent(
-                    model=model_config.name, # Using google's default
-                    name=agent_config.agent_id,
+                model = model_config.name
+            else:
+                model = LiteLlm(model=f"{model_config.provider}/{model_config.name}")
+
+            # Create LlmAgent
+            if agent_config.type.lower() == "automation":
+                automation_agent = LlmAgent(
+                    model=model,
+                    name="core_automation_agent",
                     description=agent_config.description,
                     instruction=agent_config.instruction,
                     tools=tools_list,
                     sub_agents=[],
                 )
-                
+                agent = LoopAgent(
+                    name=agent_config.agent_id,
+                    description='Agent for looping automation agents',
+                    sub_agents=[automation_agent],
+                    max_iterations=3,
+                )
+                print(agent)    
             else:
                 agent = LlmAgent(
-                    model=LiteLlm(model=f"{model_config.provider}/{model_config.name}"), # Passing model name to LiteLLM
+                    model=model,
                     name=agent_config.agent_id,
                     description=agent_config.description,
                     instruction=agent_config.instruction,
                     tools=tools_list,
                     sub_agents=[],
                 )
-
             # Store in cache
             cache.set_agent(agent_name, agent)
             
