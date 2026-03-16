@@ -58,6 +58,16 @@ def get_connector_config(connector_id: str, session: Session = Depends(get_sessi
 
 @router.post("/{connector_id}/config")
 def set_connector_config(connector_id: str, connector_config: ConnectorConfigCreate, session: Session = Depends(get_session)) -> ConnectorConfig:
+    if connector_id != connector_config.connector_id:
+        raise HTTPException(status_code=400, detail="connector_id in URL and body must match")
+
+    if connector_id in {"__init__", "base_connector"}:
+        raise HTTPException(status_code=404, detail="Connector not found")
+
+    connector_file = os.path.join("connectors", f"{connector_id}.py")
+    if not os.path.exists(connector_file):
+        raise HTTPException(status_code=404, detail="Connector not found")
+
     db = ConnectorConfig.model_validate(connector_config)
     session.add(db)
     session.commit()
