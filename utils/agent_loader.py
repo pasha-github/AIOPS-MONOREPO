@@ -8,6 +8,7 @@ from google.adk.models.lite_llm import LiteLlm
 from sqlmodel import select
 from database.database import get_session, engine
 from database.models import Agent, Model, ConnectorConfig
+from google.adk.tools.tool_context import ToolContext
 from utils.cache import cache
 from sqlmodel import Session
 from utils.helper import resolve_connector_tools
@@ -141,21 +142,30 @@ class DatabaseAgentLoader(BaseAgentLoader):
 
             # Create LlmAgent
             if agent_config.type.lower() == "automation":
-                automation_agent = LlmAgent(
+                # --- Tool Definition ---
+                def exit_loop(tool_context: ToolContext):
+                    """Call this function ONLY when the tasks are completed and no further changes are needed, signaling the iterative process should end."""
+                    print(f"  [Tool Call] exit_loop triggered by {tool_context.agent_name}")
+                    tool_context.actions.escalate = True
+                    tool_context.actions.skip_summarization = True
+                    # Return empty dict as tools should typically return JSON-serializable output
+                    return {}
+                    
+                core_automation_agent = LlmAgent(
                     model=model,
                     name="core_automation_agent",
                     description=agent_config.description,
                     instruction=agent_config.instruction,
-                    tools=tools_list,
+                    tools=[exit_loop] + tools_list,
                     sub_agents=[],
                 )
                 agent = LoopAgent(
                     name=agent_config.agent_id,
                     description='Agent for looping automation agents',
-                    sub_agents=[automation_agent],
+                    sub_agents=[core_automation_agent],
                     max_iterations=3,
                 )
-                print(agent)    
+                
             else:
                 agent = LlmAgent(
                     model=model,
