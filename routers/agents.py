@@ -19,6 +19,7 @@ class AgentCreate(BaseModel):
     connector_config_ids: List[str] = []
     isEnabled: bool = True
     sub_agents: List[str] = []
+    type: Optional[str] = "agent"
 
 class AgentPatch(BaseModel):
     name: Optional[str] = None

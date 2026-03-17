@@ -203,11 +203,13 @@
                     </div>
                     <div class="form-group">
                         <label>New Description</label>
-                        <input type="text" id="model-update-description" placeholder="Leave blank to keep current value">
+                        <input type="text" id="model-update-description"
+                            placeholder="Leave blank to keep current value">
                     </div>
                     <div class="form-group">
                         <label>New API Key</label>
-                        <input type="password" id="model-update-api-key" placeholder="Leave blank to keep current value">
+                        <input type="password" id="model-update-api-key"
+                            placeholder="Leave blank to keep current value">
                     </div>
                     <button type="submit">Update Model</button>
                 </form>
@@ -231,6 +233,13 @@
                     <div class="form-group">
                         <label>Description</label>
                         <input type="text" id="agent-desc" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Type of Agent</label>
+                        <select id="agent-type" required>
+                            <option value="agent">Agent</option>
+                            <option value="automation">Automation</option>
+                        </select>
                     </div>
                     <div class="form-group">
                         <label>Instructions</label>
@@ -280,11 +289,13 @@
                     </div>
                     <div class="form-group">
                         <label>New Description</label>
-                        <input type="text" id="agent-update-description" placeholder="Leave blank to keep current value">
+                        <input type="text" id="agent-update-description"
+                            placeholder="Leave blank to keep current value">
                     </div>
                     <div class="form-group">
                         <label>New Instructions</label>
-                        <textarea id="agent-update-instruction" rows="3" placeholder="Leave blank to keep current value"></textarea>
+                        <textarea id="agent-update-instruction" rows="3"
+                            placeholder="Leave blank to keep current value"></textarea>
                     </div>
                     <div class="form-group">
                         <label>New Model</label>
@@ -302,8 +313,7 @@
                     </div>
                     <div class="form-group">
                         <label>New MCP Server URLs (comma-separated)</label>
-                        <input type="text" id="agent-update-mcp-sse"
-                            placeholder="Leave blank to keep current value">
+                        <input type="text" id="agent-update-mcp-sse" placeholder="Leave blank to keep current value">
                     </div>
                     <div class="form-group">
                         <label>New Connector Configs <small>(hold Ctrl/Cmd to select multiple)</small></label>
@@ -319,7 +329,8 @@
                     </div>
                     <div class="form-group">
                         <label>New Custom Tools (Python Code)</label>
-                        <textarea id="agent-update-tools" rows="5" placeholder="Leave blank to keep current value"></textarea>
+                        <textarea id="agent-update-tools" rows="5"
+                            placeholder="Leave blank to keep current value"></textarea>
                     </div>
                     <button type="submit">Update Agent</button>
                 </form>
@@ -543,7 +554,7 @@
                     ? `<br><small>Sub-agents: ${(a.sub_agents || []).length} attached</small>`
                     : '';
                 div.innerHTML = `
-                    <strong>${a.name}</strong> (${a.model_id})<br>
+                    <strong>${a.name}</strong> (${a.type ? a.type : 'agent'} | ${a.model_id})<br>
                     ${a.description}<br>
                     <small>Status: ${a.isEnabled ? 'Enabled' : 'Disabled'}</small>${connectorBadges}${subAgentBadge}
                     <div style="margin-top:5px;">
@@ -597,6 +608,7 @@
                 agent_id: document.getElementById('agent-id').value,
                 name: document.getElementById('agent-name').value,
                 description: document.getElementById('agent-desc').value,
+                type: document.getElementById('agent-type').value,
                 instruction: document.getElementById('agent-instr').value,
                 model_id: document.getElementById('agent-model-select').value,
                 tools: toolsCode ? toolsCode : null,

@@ -72,6 +72,7 @@ def _agent_cfg(**kwargs):
         "connector_config_ids": [],
         "sub_agents": [],
         "isEnabled": True,
+        "type": "agent",
     }
     defaults.update(kwargs)
     return SimpleNamespace(**defaults)
