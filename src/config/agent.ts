@@ -25,6 +25,14 @@ export const LLM_PROVIDER_MODELS = {
     "gemini-2.5-flash",
     "gemini-2.5-pro",
   ],
+  openAI: [
+    "gpt-5.4",
+    "gpt-5.3",
+    "gpt-5.2",
+    "gpt-5.1",
+    "gpt-5-mini",
+    "gpt-5-nano"
+  ],
   anthropic: [
     "claude-haiku-4-5-20251001",
     "claude-sonnet-4-6",
