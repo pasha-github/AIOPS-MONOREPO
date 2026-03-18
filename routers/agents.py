@@ -8,7 +8,8 @@ from typing import List, Optional, Dict, Any
 import httpx
 from uuid import UUID
 from pydantic import BaseModel
-from utils.adk_app import invalidate_cache
+from google.genai import types
+from utils.adk_app import invalidate_cache, adk_web_server_instance
 
 router = APIRouter(prefix="/agent", tags=["agent"])
 TEMPLATES_FILE = Path(__file__).resolve().parent.parent / "static" / "agent_templates.json"
@@ -157,30 +158,29 @@ def delete_webhook(agent_id: str, webhook_id: UUID, session: Session = Depends(g
 
 async def invoke_agent_session(agent_id: str, prompt: str):
     user_id = "user"
-    session_url = f"http://localhost:8000/agent-server/apps/{agent_id}/users/{user_id}/sessions"
-    run_url = f"http://localhost:8000/agent-server/run"
     
-    async with httpx.AsyncClient() as client:
-        session_res = await client.post(session_url)
-        session_res.raise_for_status()
-        session_data = session_res.json()
-        session_id = session_data["id"]
+    session_res = await adk_web_server_instance.session_service.create_session(
+        app_name=agent_id, user_id=user_id
+    )
+    
+    session_id = session_res.id
         
-        run_payload = {
-            "appName": agent_id,
-            "userId": user_id,
-            "sessionId": session_id,
-            "newMessage": {
-                "role": "user",
-                "parts": [{"text": prompt}]
-            },
-            "streaming": False,
-            "stateDelta": None
-        }
-            
-        run_res = await client.post(run_url, json=run_payload, timeout=60.0)
-        run_res.raise_for_status()
-        return run_res.json()
+    runner = await adk_web_server_instance.get_runner_async(agent_id)
+    events = []
+    try:
+            async for event in runner.run_async(
+                user_id=user_id,
+                session_id=session_id,
+                new_message=types.Content(
+                    role="user",
+                    parts=[types.Part(text=prompt)]
+                )
+            ):
+                events.append(event)
+    except Exception as e:
+        print(e)
+        
+    return events
 
 
 @router.post("/{agent_id}/webhook/invoke/{webhook_id}")
