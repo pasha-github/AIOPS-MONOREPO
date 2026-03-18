@@ -64,3 +64,31 @@ def test_session_summary_callback_skips_when_user_text_missing(monkeypatch: pyte
     callback(callback_context, request)
     assert called["value"] is False
     assert FIRST_MESSAGE_SUMMARY_KEY not in callback_context.state
+
+
+def test_session_summary_callback_falls_back_when_model_returns_none_content(monkeypatch: pytest.MonkeyPatch):
+    callback = make_session_summary_callback("openai/gpt-4o-mini")
+    callback_context = SimpleNamespace(state={})
+    request = _request_with_text("Investigate queue backlog in production")
+
+    fake_response = SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=None))])
+    monkeypatch.setattr("utils.session_summary.litellm.completion", lambda **kwargs: fake_response)
+
+    result = callback(callback_context, request)
+    assert result is None
+    assert callback_context.state[FIRST_MESSAGE_SUMMARY_KEY] == "Investigate queue backlog in production"
+
+
+def test_session_summary_callback_falls_back_when_completion_raises(monkeypatch: pytest.MonkeyPatch):
+    callback = make_session_summary_callback("openai/gpt-4o-mini")
+    callback_context = SimpleNamespace(state={})
+    request = _request_with_text("Investigate queue backlog in production")
+
+    def fake_completion(**kwargs):
+        raise RuntimeError("provider failure")
+
+    monkeypatch.setattr("utils.session_summary.litellm.completion", fake_completion)
+
+    result = callback(callback_context, request)
+    assert result is None
+    assert callback_context.state[FIRST_MESSAGE_SUMMARY_KEY] == "Investigate queue backlog in production"
