@@ -62,6 +62,14 @@ def test_create_agent(client: TestClient):
     assert data["agent_id"] == "test-agent"
 
 
+def test_list_agent_templates(client: TestClient):
+    response = client.get("/agent/templates")
+    assert response.status_code == 200
+    data = response.json()
+    template_ids = {template["template_id"] for template in data}
+    assert template_ids == {"mq-agent", "servicenow-agent", "datadog-agent"}
+
+
 def test_list_agents(client: TestClient):
     client.post(
         "/llms/",
