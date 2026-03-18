@@ -49,13 +49,14 @@ def make_session_summary_callback(model: str):
                     {
                         "role": "system",
                         "content": (
-                            "Summarize the user's first message in one short sentence "
-                            "that captures the main point or request. Be concise and focus on the key information."
+                            "Summarize the first message in one concise sentence capturing the main intent or request. "
+                            "Write the summary as a direct statement, not referring to “the user” or describing the act of asking. "
+                            "Do not include explanations or extra details."
                         ),
                     },
                     {"role": "user", "content": user_text},
                 ],
-                max_tokens=60,
+                max_tokens=30,
                 temperature=0.0,
             )
         except Exception as exc:
