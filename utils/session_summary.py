@@ -86,6 +86,16 @@ def make_session_summary_callback(model: str):
                 max_tokens=60,
                 temperature=0.0,
             )
+            logger.info(
+                "Session summary raw response: agent=%s summarizer_model=%s response=%r",
+                agent_name,
+                summarizer_model,
+                response,
+            )
+            print(
+                f"[session_summary] raw_response agent={agent_name} "
+                f"model={summarizer_model} response={response!r}"
+            )
             content = response.choices[0].message.content
             summary = content.strip() if isinstance(content, str) else ""
             logger.info(
