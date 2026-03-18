@@ -83,7 +83,7 @@ def make_session_summary_callback(model: str):
                     },
                     {"role": "user", "content": user_text},
                 ],
-                max_tokens=30,
+                max_tokens=60,
                 temperature=0.0,
             )
             content = response.choices[0].message.content
