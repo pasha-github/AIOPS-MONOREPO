@@ -11,9 +11,12 @@ from fastapi.responses import FileResponse
 from utils.constants import WEB
 from utils.adk_app import ADK_APP
 
+from utils.scheduler import start_scheduler
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     create_db_and_tables()
+    start_scheduler()
     yield
 
 app = FastAPI(lifespan=lifespan)
