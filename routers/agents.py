@@ -1,3 +1,5 @@
+import json
+from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 from database.database import get_session
@@ -7,6 +9,7 @@ from pydantic import BaseModel
 from utils.adk_app import invalidate_cache
 
 router = APIRouter(prefix="/agent", tags=["agent"])
+TEMPLATES_FILE = Path(__file__).resolve().parent.parent / "static" / "agent_templates.json"
 
 class AgentCreate(BaseModel):
     agent_id: str
@@ -30,6 +33,18 @@ class AgentPatch(BaseModel):
     connector_config_ids: Optional[List[str]] = None
     isEnabled: Optional[bool] = None
     sub_agents: Optional[List[str]] = None
+
+class AgentTemplate(BaseModel):
+    template_id: str
+    name: str
+    description: str
+    instruction: str
+
+@router.get("/templates", response_model=List[AgentTemplate])
+def list_agent_templates():
+    with TEMPLATES_FILE.open("r", encoding="utf-8") as templates_file:
+        templates = json.load(templates_file)
+    return templates
 
 @router.post("/", response_model=Agent)
 def create_agent(agent: AgentCreate, session: Session = Depends(get_session)):
