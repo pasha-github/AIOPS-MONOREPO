@@ -51,6 +51,7 @@ def make_session_summary_callback(model: str):
         callback_context: CallbackContext,
         llm_request: LlmRequest,
     ) -> Optional[LlmResponse]:
+        agent_name = getattr(callback_context, "agent_name", "unknown")
         if callback_context.state.get(FIRST_MESSAGE_SUMMARY_KEY):
             return None
 
@@ -58,7 +59,19 @@ def make_session_summary_callback(model: str):
         if not user_text:
             return None
 
+        user_text_preview = _fallback_summary(user_text)
         summary = ""
+
+        logger.info(
+            "Session summary request: agent=%s summarizer_model=%s user_text=%r",
+            agent_name,
+            summarizer_model,
+            user_text_preview,
+        )
+        print(
+            f"[session_summary] request agent={agent_name} "
+            f"model={summarizer_model} user_text={user_text_preview!r}"
+        )
 
         try:
             response = litellm.completion(
@@ -75,14 +88,54 @@ def make_session_summary_callback(model: str):
             )
             content = response.choices[0].message.content
             summary = content.strip() if isinstance(content, str) else ""
+            logger.info(
+                "Session summary response: agent=%s summarizer_model=%s content_type=%s content=%r",
+                agent_name,
+                summarizer_model,
+                type(content).__name__,
+                content,
+            )
+            print(
+                f"[session_summary] response agent={agent_name} "
+                f"model={summarizer_model} content_type={type(content).__name__} content={content!r}"
+            )
         except Exception as exc:
-            logger.warning("Failed to generate first message summary: %s", exc)
+            logger.warning(
+                "Failed to generate first message summary: agent=%s summarizer_model=%s error=%s",
+                agent_name,
+                summarizer_model,
+                exc,
+            )
+            print(
+                f"[session_summary] error agent={agent_name} "
+                f"model={summarizer_model} error={exc!r}"
+            )
  
         if not summary:
+            logger.warning(
+                "Session summary fallback used: agent=%s summarizer_model=%s fallback=%r",
+                agent_name,
+                summarizer_model,
+                user_text_preview,
+            )
+            print(
+                f"[session_summary] fallback agent={agent_name} "
+                f"model={summarizer_model} fallback={user_text_preview!r}"
+            )
             summary = _fallback_summary(user_text)
 
         if summary:
             callback_context.state[FIRST_MESSAGE_SUMMARY_KEY] = summary
+            logger.info(
+                "Session summary stored: agent=%s summarizer_model=%s summary=%r",
+                agent_name,
+                summarizer_model,
+                summary,
+            )
+            print(
+                f"[session_summary] stored agent={agent_name} "
+                f"model={summarizer_model} summary={summary!r}"
+            )
 
         return None
 
