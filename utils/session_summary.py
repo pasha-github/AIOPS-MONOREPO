@@ -83,7 +83,7 @@ def make_session_summary_callback(model: str):
                     },
                     {"role": "user", "content": user_text},
                 ],
-                max_tokens=60,
+                max_tokens=120,
                 temperature=0.0,
             )
             logger.info(
