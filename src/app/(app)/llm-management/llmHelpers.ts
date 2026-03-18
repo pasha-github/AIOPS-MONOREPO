@@ -97,7 +97,7 @@ export const getProviderIconSrc = (
   providerValue: string | number | boolean | null | undefined
 ) => {
   const normalized = formatCellValue(providerValue).toLowerCase();
-  const supportedProviders = ["google", "anthropic", "groq", "bedrock"];
+  const supportedProviders = ["google", "openai", "anthropic", "groq", "bedrock"];
   return supportedProviders.includes(normalized) ? `/img/${normalized}.webp` : null;
 };
 

@@ -25,7 +25,7 @@ export const LLM_PROVIDER_MODELS = {
     "gemini-2.5-flash",
     "gemini-2.5-pro",
   ],
-  openAI: [
+  openai: [
     "gpt-5.4",
     "gpt-5.3",
     "gpt-5.2",
@@ -52,4 +52,5 @@ export const LLM_PROVIDER_MODELS = {
 
 export type LlmProviderKey = keyof typeof LLM_PROVIDER_MODELS;
 
-export const getProviderIconPath = (provider: string) => `/img/${provider}.webp`;
+export const getProviderIconPath = (provider: string) =>
+  `/img/${provider}.webp`;
