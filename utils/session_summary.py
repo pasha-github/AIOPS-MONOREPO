@@ -9,6 +9,7 @@ from google.adk.models import LlmRequest, LlmResponse
 
 logger = logging.getLogger(__name__)
 FIRST_MESSAGE_SUMMARY_KEY = "first_message_summary"
+FALLBACK_SUMMARY_MAX_LENGTH = 120
 
 
 def _extract_user_text(llm_request: LlmRequest) -> str:
@@ -28,6 +29,21 @@ def _extract_user_text(llm_request: LlmRequest) -> str:
     return " ".join(part for part in text_parts if part).strip()
 
 
+def _fallback_summary(user_text: str) -> str:
+    normalized = " ".join(user_text.split()).strip()
+    if not normalized:
+        return ""
+
+    if len(normalized) <= FALLBACK_SUMMARY_MAX_LENGTH:
+        return normalized
+
+    cutoff = normalized.rfind(" ", 0, FALLBACK_SUMMARY_MAX_LENGTH)
+    if cutoff == -1:
+        cutoff = FALLBACK_SUMMARY_MAX_LENGTH
+
+    return normalized[:cutoff].rstrip() + "..."
+
+
 def make_session_summary_callback(model: str):
     summarizer_model = os.getenv("SUMMARIZER_MODEL") or model
 
@@ -41,6 +57,8 @@ def make_session_summary_callback(model: str):
         user_text = _extract_user_text(llm_request)
         if not user_text:
             return None
+
+        summary = ""
 
         try:
             response = litellm.completion(
@@ -59,11 +77,14 @@ def make_session_summary_callback(model: str):
                 max_tokens=30,
                 temperature=0.0,
             )
+            content = response.choices[0].message.content
+            summary = content.strip() if isinstance(content, str) else ""
         except Exception as exc:
             logger.warning("Failed to generate first message summary: %s", exc)
-            return None
+ 
+        if not summary:
+            summary = _fallback_summary(user_text)
 
-        summary = response.choices[0].message.content.strip()
         if summary:
             callback_context.state[FIRST_MESSAGE_SUMMARY_KEY] = summary
 
