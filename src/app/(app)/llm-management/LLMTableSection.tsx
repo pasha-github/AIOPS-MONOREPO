@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
-import { Bot, ChevronDown, Loader2, Search, Trash2, X } from "lucide-react";
+import { Bot, ChevronDown, Loader2, Pencil, Search, Trash2, X } from "lucide-react";
 import {
   formatCellValue,
   formatDateTime,
@@ -11,6 +11,9 @@ import {
   type ActionResult,
   type LLMRecord,
 } from "./llmHelpers";
+import UpdateLlm from "./updatellm";
+import { useRuntimeConfig } from "@/config/runtime-config";
+import { trimTrailingSlash } from "@/config/agent";
 
 const SORTABLE_HEADERS = ["provider", "created_at", "name"] as const;
 type SortableHeader = (typeof SORTABLE_HEADERS)[number];
@@ -43,8 +46,10 @@ export default function LLMTableSection({
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
   const columnMenuRef = useRef<HTMLDivElement | null>(null);
+  const [updateTarget, setUpdateTarget] = useState<any | null>(null);
   const getHeaderLabel = (header: string) =>
     header === "name" ? "Model Name" : formatHeaderLabel(header);
+ 
 
   const tableHeaders = useMemo(() => {
     const headerSet = new Set<string>();
@@ -183,9 +188,8 @@ export default function LLMTableSection({
 
         <div className="flex flex-wrap items-center gap-3">
           <div
-            className={`flex items-center gap-2 rounded-xl bg-[#eef2ff] px-4 py-2 text-sm text-[#4f49e2] transition-all duration-200 ${
-              isSearchFocused ? "w-72" : "w-52"
-            }`}
+            className={`flex items-center gap-2 rounded-xl bg-[#eef2ff] px-4 py-2 text-sm text-[#4f49e2] transition-all duration-200 ${isSearchFocused ? "w-72" : "w-52"
+              }`}
           >
             <Search className="h-4 w-4" />
             <input
@@ -216,11 +220,10 @@ export default function LLMTableSection({
                     return (
                       <label
                         key={header}
-                        className={`flex items-center gap-2 rounded-lg px-2 py-2 text-sm ${
-                          isOnlyVisible
-                            ? "cursor-not-allowed text-[#9ca3af]"
-                            : "cursor-pointer text-[#111827] hover:bg-[#f3f4f6]"
-                        }`}
+                        className={`flex items-center gap-2 rounded-lg px-2 py-2 text-sm ${isOnlyVisible
+                          ? "cursor-not-allowed text-[#9ca3af]"
+                          : "cursor-pointer text-[#111827] hover:bg-[#f3f4f6]"
+                          }`}
                       >
                         <input
                           type="checkbox"
@@ -344,11 +347,10 @@ export default function LLMTableSection({
                   >
                     {getHeaderLabel(header)}
                     <ChevronDown
-                      className={`h-3.5 w-3.5 transition ${
-                        isActiveSort
-                          ? `${sortDirection === "asc" ? "rotate-180" : ""} text-[#4f49e2]`
-                          : "text-[#a3aed0]"
-                      }`}
+                      className={`h-3.5 w-3.5 transition ${isActiveSort
+                        ? `${sortDirection === "asc" ? "rotate-180" : ""} text-[#4f49e2]`
+                        : "text-[#a3aed0]"
+                        }`}
                     />
                   </button>
                 );
@@ -408,15 +410,15 @@ export default function LLMTableSection({
                       if (header === "created_at") {
                         const rawValue = formatCellValue(item[header]);
                         const formattedDate = formatDateTime(item[header]);
-                          return (
-                            <span
-                              key={`${header}-${index}`}
-                              className={`${headerIndex === 0 ? "font-semibold text-[#1c2330]" : "text-[#2b3341]"} px-3 break-words whitespace-normal`}
-                              title={`${formattedDate}${rawValue !== "-" ? ` (${rawValue})` : ""}`}
-                            >
-                              {formattedDate}
-                            </span>
-                          );
+                        return (
+                          <span
+                            key={`${header}-${index}`}
+                            className={`${headerIndex === 0 ? "font-semibold text-[#1c2330]" : "text-[#2b3341]"} px-3 break-words whitespace-normal`}
+                            title={`${formattedDate}${rawValue !== "-" ? ` (${rawValue})` : ""}`}
+                          >
+                            {formattedDate}
+                          </span>
+                        );
                       }
 
                       if (header === "description") {
@@ -431,17 +433,29 @@ export default function LLMTableSection({
                         );
                       }
 
-                        return (
-                          <span
-                            key={`${header}-${index}`}
-                            className={`${headerIndex === 0 ? "font-semibold text-[#1c2330]" : "text-[#2b3341]"} px-3 break-words whitespace-normal`}
-                            title={formatCellValue(item[header])}
-                          >
-                            {formatCellValue(item[header])}
+                      return (
+                        <span
+                          key={`${header}-${index}`}
+                          className={`${headerIndex === 0 ? "font-semibold text-[#1c2330]" : "text-[#2b3341]"} px-3 break-words whitespace-normal`}
+                          title={formatCellValue(item[header])}
+                        >
+                          {formatCellValue(item[header])}
                         </span>
                       );
                     })}
-                    <div className="flex justify-end px-3">
+                    <div className="flex justify-end gap-2 px-3">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setUpdateTarget(item);
+
+                        }}
+                        className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#e0f2fe] text-[#0284c7] transition hover:bg-[#bae6fd] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0284c7]/40"
+                        aria-label={`Update ${modelId}`}
+                        title={`Update ${modelId}`}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </button>
                       <button
                         type="button"
                         onClick={() => {
@@ -515,11 +529,10 @@ export default function LLMTableSection({
                 type="button"
                 onClick={handleConfirmDelete}
                 disabled={isDeleting}
-                className={`inline-flex items-center gap-2 rounded-xl px-5 py-2 text-sm font-semibold text-white shadow-[0_10px_24px_-18px_rgba(239,68,68,0.8)] ${
-                  isDeleting
-                    ? "cursor-not-allowed bg-[#fca5a5]"
-                    : "bg-[#ef4444] hover:bg-[#dc2626]"
-                }`}
+                className={`inline-flex items-center gap-2 rounded-xl px-5 py-2 text-sm font-semibold text-white shadow-[0_10px_24px_-18px_rgba(239,68,68,0.8)] ${isDeleting
+                  ? "cursor-not-allowed bg-[#fca5a5]"
+                  : "bg-[#ef4444] hover:bg-[#dc2626]"
+                  }`}
               >
                 {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                 {isDeleting ? "Deleting..." : "Delete"}
@@ -528,6 +541,12 @@ export default function LLMTableSection({
           </div>
         </div>
       ) : null}
+      {updateTarget && (
+        <UpdateLlm
+          llm={updateTarget}
+          onClose={() => setUpdateTarget(null)}
+        />
+      )}
     </section>
   );
 }

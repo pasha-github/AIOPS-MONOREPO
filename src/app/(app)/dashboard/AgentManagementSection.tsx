@@ -126,11 +126,11 @@ export default function AgentManagementSection() {
           signal: options?.signal,
         });
         const data = await response.json();
-        console.log("Dashboard agent list response:", {
-          ok: response.ok,
-          status: response.status,
-          data,
-        });
+        // console.log("Dashboard agent list response:", {
+        //   ok: response.ok,
+        //   status: response.status,
+        //   data,
+        // });
 
         if (requestId !== requestIdRef.current) {
           return;

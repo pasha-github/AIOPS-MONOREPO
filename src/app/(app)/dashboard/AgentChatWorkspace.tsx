@@ -70,6 +70,11 @@ type AdkSession = {
   userId?: string | null;
   events?: AdkEvent[] | null;
   lastUpdateTime?: number | null;
+  state?: SessionState | null;
+};
+
+type SessionState = {
+  first_message_summary?: string;
 };
 
 type ChatMessage = {
@@ -1388,7 +1393,7 @@ export default function AgentChatWorkspace({
                       >
                         <MessageSquare className="mt-0.5 h-4 w-4 shrink-0 text-[#4f49e2]" />
                         <span className="line-clamp-2 text-xs font-semibold text-[#1f2937]">
-                          {session.id}
+                          {session.state?.first_message_summary || session.id}
                         </span>
                       </button>
                       <div className="relative" data-session-menu="true">

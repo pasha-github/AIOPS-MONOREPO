@@ -100,11 +100,11 @@ export default function AgentManagementPage() {
           llmResponse.json(),
         ]);
 
-        console.log("Agent list response:", {
-          ok: agentResponse.ok,
-          status: agentResponse.status,
-          data: agentPayload,
-        });
+        // console.log("Agent list response:", {
+        //   ok: agentResponse.ok,
+        //   status: agentResponse.status,
+        //   data: agentPayload,
+        // });
 
         if (requestId !== requestIdRef.current) {
           return;
