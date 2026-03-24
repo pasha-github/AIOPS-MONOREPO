@@ -30,6 +30,10 @@ export default function ConnectorsPage() {
               onChange={(event) => setSearchValue(event.target.value)}
               onFocus={() => setIsSearchFocused(true)}
               onBlur={() => setIsSearchFocused(false)}
+              name="connector_search"
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck={false}
               placeholder="Search credentials.."
               className="w-full bg-transparent text-sm text-[#4f49e2] placeholder:text-[#4f49e2] focus:outline-none"
             />

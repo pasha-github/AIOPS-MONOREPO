@@ -1,9 +1,10 @@
 "use client";
 
-import { ChevronRight, Link2, Plug } from "lucide-react";
+import { ChevronRight, Eye, Link2, Plug, Settings2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { trimTrailingSlash } from "@/config/agent";
 import { useRuntimeConfig } from "@/config/runtime-config";
+import SetConnectorConfig from "./SetConnectorConfig";
 import ViewConnector from "./ViewConnector";
 
 type ConnectorItem = {
@@ -27,6 +28,7 @@ export default function DisplayConnectors({ searchTerm }: DisplayConnectorsProps
     null
   );
   const [isViewOpen, setIsViewOpen] = useState(false);
+  const [isSetConfigOpen, setIsSetConfigOpen] = useState(false);
   const connectorsApiBase = trimTrailingSlash(llmManagerApiBaseUrl);
 
   const connectorsUrl = useMemo(
@@ -87,9 +89,25 @@ export default function DisplayConnectors({ searchTerm }: DisplayConnectorsProps
 
   if (loadError) {
     return (
-      <div className="mt-6 rounded-2xl border border-[#fee2e2] bg-[#fff5f5] px-5 py-8 text-sm text-[#b91c1c]">
-        {loadError}
-      </div>
+      <>
+        <div className="mt-6 rounded-2xl border border-[#fee2e2] bg-[#fff5f5] px-5 py-8 text-sm text-[#b91c1c]">
+          {loadError}
+        </div>
+        <ViewConnector
+          isOpen={isViewOpen}
+          connectorId={selectedConnector?.id ?? null}
+          connectorName={selectedConnector?.name ?? null}
+          connectorsApiBase={connectorsApiBase}
+          onClose={() => setIsViewOpen(false)}
+        />
+        <SetConnectorConfig
+          isOpen={isSetConfigOpen}
+          connectorId={selectedConnector?.id ?? null}
+          connectorName={selectedConnector?.name ?? null}
+          connectorsApiBase={connectorsApiBase}
+          onClose={() => setIsSetConfigOpen(false)}
+        />
+      </>
     );
   }
 
@@ -104,59 +122,99 @@ export default function DisplayConnectors({ searchTerm }: DisplayConnectorsProps
 
   if (visibleConnectors.length === 0) {
     return (
-      <div className="mt-6 rounded-2xl border border-[#e6eaf3] bg-white px-6 py-10 text-center">
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#eef2ff] text-[#4f49e2]">
-          <Link2 className="h-6 w-6" />
+      <>
+        <div className="mt-6 rounded-2xl border border-[#e6eaf3] bg-white px-6 py-10 text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#eef2ff] text-[#4f49e2]">
+            <Link2 className="h-6 w-6" />
+          </div>
+          <p className="mt-4 text-base font-semibold text-[#111827]">
+            No connectors found
+          </p>
         </div>
-        <p className="mt-4 text-base font-semibold text-[#111827]">
-          No connectors found
-        </p>
-      </div>
+        <ViewConnector
+          isOpen={isViewOpen}
+          connectorId={selectedConnector?.id ?? null}
+          connectorName={selectedConnector?.name ?? null}
+          connectorsApiBase={connectorsApiBase}
+          onClose={() => setIsViewOpen(false)}
+        />
+        <SetConnectorConfig
+          isOpen={isSetConfigOpen}
+          connectorId={selectedConnector?.id ?? null}
+          connectorName={selectedConnector?.name ?? null}
+          connectorsApiBase={connectorsApiBase}
+          onClose={() => setIsSetConfigOpen(false)}
+        />
+      </>
     );
   }
 
   return (
-    <div className="mt-6 grid gap-6 lg:grid-cols-3">
-      {visibleConnectors.map((connector) => (
-        <div
-          key={connector.id}
-          className="rounded-2xl bg-white p-5 shadow-[0_12px_30px_-24px_rgba(16,24,40,0.35)] ring-1 ring-[#eef1f7]"
-        >
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex-1">
-              <div className="flex items-center gap-3">
-                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#eef2ff] text-[#4f49e2]">
-                  <Plug className="h-4 w-4" />
-                </span>
-                <p className="text-xl font-semibold text-[#111827]">
-                  {connector.name}
-                </p>
+    <>
+      <div className="mt-6 grid gap-6 lg:grid-cols-3">
+        {visibleConnectors.map((connector) => (
+          <div
+            key={connector.id}
+            className="rounded-2xl bg-white p-5 shadow-[0_12px_30px_-24px_rgba(16,24,40,0.35)] ring-1 ring-[#eef1f7]"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#eef2ff] text-[#4f49e2]">
+                    <Plug className="h-4 w-4" />
+                  </span>
+                  <p className="text-xl font-semibold text-[#111827]">
+                    {connector.name}
+                  </p>
+                </div>
               </div>
+              <img
+                src={getLogoSrc(connector.id)}
+                alt={`${connector.name} logo`}
+                className="h-12 w-24 object-contain"
+                loading="lazy"
+              />
             </div>
-            <img
-              src={getLogoSrc(connector.id)}
-              alt={`${connector.name} logo`}
-              className="h-12 w-24 object-contain"
-              loading="lazy"
-            />
+            <div className="mt-6 flex flex-nowrap justify-end gap-2 overflow-x-auto">
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedConnector(connector);
+                  setIsSetConfigOpen(true);
+                }}
+                className="inline-flex items-center gap-2 rounded-lg border border-[#cbd2ff] px-3 py-2 text-sm font-semibold text-[#4f49e2] shadow-[0_6px_16px_-12px_rgba(79,73,226,0.8)] transition-all duration-150 hover:bg-[#eef2ff] active:translate-y-px active:scale-[0.97] active:shadow-none"
+                aria-label={`Set config for ${connector.name}`}
+                title={`Set config for ${connector.name}`}
+              >
+                <Settings2 className="h-4 w-4" />
+                Set Config
+              </button>
+              <button
+                type="button"
+                className="inline-flex items-center gap-2 rounded-lg border border-[#cbd2ff] px-3 py-2 text-sm font-semibold text-[#4f49e2] shadow-[0_6px_16px_-12px_rgba(79,73,226,0.8)] transition-all duration-150 hover:bg-[#eef2ff] active:translate-y-px active:scale-[0.97] active:shadow-none"
+                aria-label={`Show config for ${connector.name}`}
+                title={`Show config for ${connector.name}`}
+              >
+                <Eye className="h-4 w-4" />
+                Show Config
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedConnector(connector);
+                  setIsViewOpen(true);
+                }}
+                className="inline-flex items-center gap-2 rounded-lg border border-[#cbd2ff] px-3 py-2 text-sm font-semibold text-[#4f49e2] shadow-[0_6px_16px_-12px_rgba(79,73,226,0.8)] transition-all duration-150 hover:bg-[#eef2ff] active:translate-y-px active:scale-[0.97] active:shadow-none"
+                aria-label={`View details about ${connector.name}`}
+                title={`View details about ${connector.name}`}
+              >
+                View Details
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
           </div>
-          <div className="mt-6 flex justify-end">
-            <button
-              type="button"
-              onClick={() => {
-                setSelectedConnector(connector);
-                setIsViewOpen(true);
-              }}
-              className="inline-flex items-center gap-2 rounded-lg border border-[#cbd2ff] px-3 py-2 text-sm font-semibold text-[#4f49e2] transition hover:bg-[#eef2ff]"
-              aria-label={`View more about ${connector.name}`}
-              title={`View more about ${connector.name}`}
-            >
-              View more
-              <ChevronRight className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
-      ))}
+        ))}
+      </div>
       <ViewConnector
         isOpen={isViewOpen}
         connectorId={selectedConnector?.id ?? null}
@@ -164,6 +222,14 @@ export default function DisplayConnectors({ searchTerm }: DisplayConnectorsProps
         connectorsApiBase={connectorsApiBase}
         onClose={() => setIsViewOpen(false)}
       />
-    </div>
+      <SetConnectorConfig
+        key={`set-config-${selectedConnector?.id ?? "none"}`}
+        isOpen={isSetConfigOpen}
+        connectorId={selectedConnector?.id ?? null}
+        connectorName={selectedConnector?.name ?? null}
+        connectorsApiBase={connectorsApiBase}
+        onClose={() => setIsSetConfigOpen(false)}
+      />
+    </>
   );
 }
