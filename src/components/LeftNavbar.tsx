@@ -32,7 +32,7 @@ type NavSection = {
   items: NavItem[];
 };
 
-const ENABLE_CREDENTIALS_MANAGEMENT = false;
+const ENABLE_CREDENTIALS_MANAGEMENT = true;
 
 const navSections: NavSection[] = [
   {
@@ -100,7 +100,7 @@ const navSections: NavSection[] = [
     title: "Operations",
     items: [
       {
-        label: "Credentials management",
+        label: "Connectors",
         id: "operations-connectors",
         icon: <Link2 className="h-5 w-5" />,
         dot: true,
