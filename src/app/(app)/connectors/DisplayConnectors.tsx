@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { trimTrailingSlash } from "@/config/agent";
 import { useRuntimeConfig } from "@/config/runtime-config";
 import SetConnectorConfig from "./SetConnectorConfig";
+import ShowConnectorConfig from "./ShowConnectorConfig";
 import ViewConnector from "./ViewConnector";
 
 type ConnectorItem = {
@@ -29,6 +30,7 @@ export default function DisplayConnectors({ searchTerm }: DisplayConnectorsProps
   );
   const [isViewOpen, setIsViewOpen] = useState(false);
   const [isSetConfigOpen, setIsSetConfigOpen] = useState(false);
+  const [isShowConfigOpen, setIsShowConfigOpen] = useState(false);
   const connectorsApiBase = trimTrailingSlash(llmManagerApiBaseUrl);
 
   const connectorsUrl = useMemo(
@@ -107,6 +109,13 @@ export default function DisplayConnectors({ searchTerm }: DisplayConnectorsProps
           connectorsApiBase={connectorsApiBase}
           onClose={() => setIsSetConfigOpen(false)}
         />
+        <ShowConnectorConfig
+          isOpen={isShowConfigOpen}
+          connectorId={selectedConnector?.id ?? null}
+          connectorName={selectedConnector?.name ?? null}
+          connectorsApiBase={connectorsApiBase}
+          onClose={() => setIsShowConfigOpen(false)}
+        />
       </>
     );
   }
@@ -144,6 +153,13 @@ export default function DisplayConnectors({ searchTerm }: DisplayConnectorsProps
           connectorName={selectedConnector?.name ?? null}
           connectorsApiBase={connectorsApiBase}
           onClose={() => setIsSetConfigOpen(false)}
+        />
+        <ShowConnectorConfig
+          isOpen={isShowConfigOpen}
+          connectorId={selectedConnector?.id ?? null}
+          connectorName={selectedConnector?.name ?? null}
+          connectorsApiBase={connectorsApiBase}
+          onClose={() => setIsShowConfigOpen(false)}
         />
       </>
     );
@@ -191,6 +207,10 @@ export default function DisplayConnectors({ searchTerm }: DisplayConnectorsProps
               </button>
               <button
                 type="button"
+                onClick={() => {
+                  setSelectedConnector(connector);
+                  setIsShowConfigOpen(true);
+                }}
                 className="inline-flex items-center gap-2 rounded-lg border border-[#cbd2ff] px-3 py-2 text-sm font-semibold text-[#4f49e2] shadow-[0_6px_16px_-12px_rgba(79,73,226,0.8)] transition-all duration-150 hover:bg-[#eef2ff] active:translate-y-px active:scale-[0.97] active:shadow-none"
                 aria-label={`Show config for ${connector.name}`}
                 title={`Show config for ${connector.name}`}
@@ -229,6 +249,14 @@ export default function DisplayConnectors({ searchTerm }: DisplayConnectorsProps
         connectorName={selectedConnector?.name ?? null}
         connectorsApiBase={connectorsApiBase}
         onClose={() => setIsSetConfigOpen(false)}
+      />
+      <ShowConnectorConfig
+        key={`show-config-${selectedConnector?.id ?? "none"}`}
+        isOpen={isShowConfigOpen}
+        connectorId={selectedConnector?.id ?? null}
+        connectorName={selectedConnector?.name ?? null}
+        connectorsApiBase={connectorsApiBase}
+        onClose={() => setIsShowConfigOpen(false)}
       />
     </>
   );
