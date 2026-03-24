@@ -1,6 +1,6 @@
 "use client";
 
-import { Plug, Plus, Search } from "lucide-react";
+import { Plug, Search } from "lucide-react";
 import { useState } from "react";
 import DisplayConnectors from "./DisplayConnectors";
 
@@ -38,16 +38,6 @@ export default function ConnectorsPage() {
               className="w-full bg-transparent text-sm text-[#4f49e2] placeholder:text-[#4f49e2] focus:outline-none"
             />
           </div>
-        </div>
-        <div className="ml-auto">
-          <button
-            type="button"
-            className="inline-flex cursor-default items-center gap-2 rounded-xl bg-[#4f49e2] px-5 py-3 text-sm font-semibold text-white shadow-[0_12px_24px_-16px_rgba(79,73,226,0.65)]"
-            aria-label="Create connector"
-          >
-            <Plus className="h-4 w-4" />
-            Create
-          </button>
         </div>
       </div>
       <DisplayConnectors searchTerm={searchValue} />
