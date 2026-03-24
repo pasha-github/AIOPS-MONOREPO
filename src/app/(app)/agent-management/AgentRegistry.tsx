@@ -3,6 +3,7 @@
 import {
   Bot,
   ChevronDown,
+  Pencil,
   Power,
   Search,
   Trash2,
@@ -13,6 +14,7 @@ import Image from "next/image";
 import { trimTrailingSlash } from "@/config/agent";
 import { useRuntimeConfig } from "@/config/runtime-config";
 import { formatDateTime, getProviderIconSrc } from "../llm-management/llmHelpers";
+import UpdateAgent from "./updateagent";
 
 type AgentRecord = {
   agentId: number;
@@ -67,6 +69,8 @@ export default function AgentRegistry({
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [selectedAgent, setSelectedAgent] = useState<AgentRecord | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const agentManagerBaseUrl = trimTrailingSlash(llmManagerApiBaseUrl);
 
@@ -373,6 +377,11 @@ export default function AgentRegistry({
     } finally {
       setUpdatingStatusRowKey(null);
     }
+  };
+
+  const handleUpdateClick = (agent: AgentRecord) => {
+    setSelectedAgent(agent);
+    setIsModalOpen(true);
   };
 
   return (
@@ -736,6 +745,17 @@ export default function AgentRegistry({
                                 <Trash2 className="h-4 w-4" />
                                 Delete
                               </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  handleUpdateClick(agent);
+                                  setOpenActionMenuKey(null);
+                                }}
+                                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[#2563eb] hover:bg-[#eff6ff]"
+                              >
+                                <Pencil className="h-4 w-4" />
+                                Update
+                              </button>
                             </div>
                           ) : null}
                         </div>
@@ -984,6 +1004,14 @@ export default function AgentRegistry({
           </div>
         </div>
       ) : null}
+      {selectedAgent && (
+        <UpdateAgent
+          agent={selectedAgent}
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          onUpdateSuccess={onStatusUpdateSuccess}
+        />
+      )}
     </section>
   );
 }
