@@ -25,6 +25,7 @@ type ModelTemplate = {
   name: string;
   description?: string;
   instruction?: string;
+  model_id?: string;
 };
 
 const toSnakeCase = (value: string) =>
@@ -216,6 +217,8 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
   const [success, setSuccess] = useState("");
   const [modelTemplates, setModelTemplates] = useState<ModelTemplate[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
+  const [isTemplatesLoading, setIsTemplatesLoading] = useState(false);
+  const [templatesLoadError, setTemplatesLoadError] = useState("");
   const [isToastVisible, setIsToastVisible] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
 
@@ -260,14 +263,39 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
       } finally { setIsModelsLoading(false); }
     })();
     return () => ctrl.abort();
-  }, [isModalOpen]);
+  }, [base, isModalOpen]);
 
   /* load templates */
   useEffect(() => {
     if (!isModalOpen) return;
-    fetch(`${base}/agent/templates/`, { headers: { accept: "application/json" } })
-      .then((r) => r.json()).then((d) => setModelTemplates(Array.isArray(d) ? d : [])).catch(() => {});
-  }, [isModalOpen]);
+    const ctrl = new AbortController();
+    (async () => {
+      setIsTemplatesLoading(true);
+      setTemplatesLoadError("");
+      try {
+        const res = await fetch(`${base}/agent/templates`, {
+          headers: { accept: "application/json" },
+          signal: ctrl.signal,
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok || !Array.isArray(data)) {
+          setModelTemplates([]);
+          setTemplatesLoadError(getErrorMessage(data, "Unable to load templates."));
+          return;
+        }
+        setModelTemplates(data);
+      } catch (error: unknown) {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          return;
+        }
+        setModelTemplates([]);
+        setTemplatesLoadError("Unable to load templates.");
+      } finally {
+        setIsTemplatesLoading(false);
+      }
+    })();
+    return () => ctrl.abort();
+  }, [base, isModalOpen]);
 
   /* apply template */
   useEffect(() => {
@@ -277,7 +305,7 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
     setAgentName(t.name || "");
     setDescription(t.description || "");
     setInstruction(t.instruction || "");
-    setModelId(t.template_id || "");
+    setModelId(t.model_id?.trim() || "");
   }, [selectedTemplateId, modelTemplates]);
 
   const resetForm = () => {
@@ -356,22 +384,38 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
               </div>
 
               {/* Template picker */}
-              {modelTemplates.length > 0 && (
-                <div className="relative flex items-center">
-                  <LayoutTemplate size={14} className="absolute left-2.5 text-indigo-400 pointer-events-none" />
-                  <select
-                    value={selectedTemplateId}
-                    onChange={(e) => setSelectedTemplateId(e.target.value)}
-                    className="appearance-none rounded-lg border border-indigo-200 bg-indigo-50 pl-8 pr-7 py-1.5 text-xs font-medium text-indigo-700 outline-none transition hover:border-indigo-300 focus:ring-2 focus:ring-indigo-500/10"
-                  >
-                    <option value="">Use a template</option>
-                    {modelTemplates.map((t) => (
-                      <option key={t.template_id} value={t.template_id}>{t.name}</option>
-                    ))}
-                  </select>
-                  <ChevronDown size={12} className="absolute right-2 text-indigo-400 pointer-events-none" />
-                </div>
-              )}
+              <div className="relative flex items-center">
+                <LayoutTemplate size={14} className="pointer-events-none absolute left-2.5 text-indigo-400" />
+                <select
+                  value={selectedTemplateId}
+                  onChange={(e) => setSelectedTemplateId(e.target.value)}
+                  disabled={isTemplatesLoading || modelTemplates.length === 0}
+                  title={templatesLoadError || undefined}
+                  className={`appearance-none rounded-lg pl-8 pr-7 py-1.5 text-xs font-medium outline-none transition focus:ring-2 focus:ring-indigo-500/10 ${
+                    templatesLoadError
+                      ? "cursor-not-allowed border border-red-200 bg-red-50 text-red-500"
+                      : isTemplatesLoading || modelTemplates.length === 0
+                        ? "cursor-not-allowed border border-indigo-100 bg-indigo-50 text-indigo-300"
+                        : "border border-indigo-200 bg-indigo-50 text-indigo-700 hover:border-indigo-300"
+                  }`}
+                >
+                  <option value="">
+                    {isTemplatesLoading
+                      ? "Loading templates..."
+                      : templatesLoadError
+                        ? "Templates unavailable"
+                        : modelTemplates.length === 0
+                          ? "No templates available"
+                          : "Use a template"}
+                  </option>
+                  {modelTemplates.map((t) => (
+                    <option key={t.template_id} value={t.template_id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown size={12} className="pointer-events-none absolute right-2 text-indigo-400" />
+              </div>
 
               <button
                 onClick={closeModal}
