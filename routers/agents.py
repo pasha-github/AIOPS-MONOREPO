@@ -197,7 +197,7 @@ async def invoke_webhook(agent_id: str, webhook_id: UUID, session: Session = Dep
 
 # --- Jobs ---
 @router.post("/{agent_id}/jobs", response_model=JobResponse)
-def create_job(agent_id: str, job: JobCreate, session: Session = Depends(get_session)):
+async def create_job(agent_id: str, job: JobCreate, session: Session = Depends(get_session)):
     agent = session.get(Agent, agent_id)
     if not agent or agent.type != "automation":
         raise HTTPException(status_code=400, detail="Agent not found or not an automation agent")
@@ -215,14 +215,7 @@ def create_job(agent_id: str, job: JobCreate, session: Session = Depends(get_ses
     session.refresh(db_job)
     
     from utils.scheduler import reload_jobs
-    import asyncio
-    
-    # Reload jobs in the background safely using the current event loop
-    try:
-        loop = asyncio.get_running_loop()
-        loop.create_task(reload_jobs())
-    except RuntimeError:
-        pass # Loop not running or testing
+    await reload_jobs()
         
     return db_job
 
@@ -232,19 +225,33 @@ def list_jobs(agent_id: str, session: Session = Depends(get_session)):
     return jobs
 
 @router.delete("/{agent_id}/jobs/{job_id}")
-def delete_job(agent_id: str, job_id: UUID, session: Session = Depends(get_session)):
+async def delete_job(agent_id: str, job_id: UUID, session: Session = Depends(get_session)):
+    from utils.cache import cache
+    from utils.scheduler import scheduler
+
     job = session.get(Job, job_id)
     if not job or job.agent_id != agent_id:
         raise HTTPException(status_code=404, detail="Job not found")
+    print("BEFORE DELETE")
+    print(
+        f"[DeleteJob] agent_id={agent_id} job_id={job_id} "
+        f"agent_cached={cache.get_agent(agent_id) is not None} "
+        f"cache_keys={list(cache._cache.keys())} "
+        f"scheduler_job_present={scheduler.get_job(str(job_id)) is not None if scheduler.running else False} "
+        f"scheduler_job_ids={[job.id for job in scheduler.get_jobs()] if scheduler.running else []}"
+    )
     session.delete(job)
     session.commit()
     
     from utils.scheduler import reload_jobs
-    import asyncio
-    try:
-        loop = asyncio.get_running_loop()
-        loop.create_task(reload_jobs())
-    except RuntimeError:
-        pass
+    await reload_jobs()
+    print("AFTER DELETE")
+    print(
+        f"[DeleteJob] agent_id={agent_id} job_id={job_id} "
+        f"agent_cached={cache.get_agent(agent_id) is not None} "
+        f"cache_keys={list(cache._cache.keys())} "
+        f"scheduler_job_present={scheduler.get_job(str(job_id)) is not None if scheduler.running else False} "
+        f"scheduler_job_ids={[job.id for job in scheduler.get_jobs()] if scheduler.running else []}"
+    )
         
     return {"ok": True}
