@@ -4,6 +4,7 @@ import { ChevronRight, Link2, Plug } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { trimTrailingSlash } from "@/config/agent";
 import { useRuntimeConfig } from "@/config/runtime-config";
+import ViewConnector from "./ViewConnector";
 
 type ConnectorItem = {
   id: string;
@@ -22,6 +23,10 @@ export default function DisplayConnectors({ searchTerm }: DisplayConnectorsProps
   const [connectors, setConnectors] = useState<ConnectorItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+  const [selectedConnector, setSelectedConnector] = useState<ConnectorItem | null>(
+    null
+  );
+  const [isViewOpen, setIsViewOpen] = useState(false);
   const connectorsApiBase = trimTrailingSlash(llmManagerApiBaseUrl);
 
   const connectorsUrl = useMemo(
@@ -138,6 +143,10 @@ export default function DisplayConnectors({ searchTerm }: DisplayConnectorsProps
           <div className="mt-6 flex justify-end">
             <button
               type="button"
+              onClick={() => {
+                setSelectedConnector(connector);
+                setIsViewOpen(true);
+              }}
               className="inline-flex items-center gap-2 rounded-lg border border-[#cbd2ff] px-3 py-2 text-sm font-semibold text-[#4f49e2] transition hover:bg-[#eef2ff]"
               aria-label={`View more about ${connector.name}`}
               title={`View more about ${connector.name}`}
@@ -148,6 +157,13 @@ export default function DisplayConnectors({ searchTerm }: DisplayConnectorsProps
           </div>
         </div>
       ))}
+      <ViewConnector
+        isOpen={isViewOpen}
+        connectorId={selectedConnector?.id ?? null}
+        connectorName={selectedConnector?.name ?? null}
+        connectorsApiBase={connectorsApiBase}
+        onClose={() => setIsViewOpen(false)}
+      />
     </div>
   );
 }
