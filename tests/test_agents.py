@@ -413,3 +413,78 @@ def test_update_agent_allows_duplicate_sub_agents_current_behavior(client: TestC
     response = client.patch("/agent/a1", json={"sub_agents": ["child-dup", "child-dup"]})
     assert response.status_code == 200
     assert response.json()["sub_agents"] == ["child-dup", "child-dup"]
+
+def _create_automation_agent(client: TestClient, agent_id: str = "a-auto", model_id: str = "gemini-pro"):
+    return client.post(
+        "/agent/",
+        json={
+            "agent_id": agent_id,
+            "name": "Auto Agent",
+            "description": "desc",
+            "instruction": "instr",
+            "model_id": model_id,
+            "isEnabled": True,
+            "type": "automation"
+        },
+    )
+
+def test_create_webhook(client: TestClient):
+    _create_model(client)
+    _create_automation_agent(client)
+    res = client.post("/agent/a-auto/webhooks", json={"prompt": "hello"})
+    assert res.status_code == 200
+    assert "webhook_id" in res.json()
+
+def test_create_webhook_invalid_agent_type(client: TestClient):
+    _create_model(client)
+    _create_agent(client, agent_id="a-normal") # type=agent by default
+    res = client.post("/agent/a-normal/webhooks", json={"prompt": "hello"})
+    assert res.status_code == 400
+
+def test_list_and_delete_webhooks(client: TestClient):
+    _create_model(client)
+    _create_automation_agent(client)
+    res = client.post("/agent/a-auto/webhooks", json={"prompt": "hello"})
+    wh_id = res.json()["webhook_id"]
+    
+    list_res = client.get("/agent/a-auto/webhook")
+    assert len(list_res.json()) == 1
+    
+    del_res = client.delete(f"/agent/a-auto/webhook/{wh_id}")
+    assert del_res.status_code == 200
+    
+    list_res = client.get("/agent/a-auto/webhook")
+    assert len(list_res.json()) == 0
+
+def test_create_job(client: TestClient):
+    _create_model(client)
+    _create_automation_agent(client)
+    res = client.post("/agent/a-auto/jobs", json={
+        "prompt": "job hello",
+        "cron_expression": "*/5 * * * *"
+    })
+    assert res.status_code == 200
+    assert "job_id" in res.json()
+
+def test_create_job_missing_schedule(client: TestClient):
+    _create_model(client)
+    _create_automation_agent(client)
+    res = client.post("/agent/a-auto/jobs", json={
+        "prompt": "job hello"
+    })
+    assert res.status_code == 400
+
+def test_list_and_delete_jobs(client: TestClient):
+    _create_model(client)
+    _create_automation_agent(client)
+    res = client.post("/agent/a-auto/jobs", json={
+        "prompt": "job hello",
+        "interval_seconds": 60
+    })
+    j_id = res.json()["job_id"]
+    
+    list_res = client.get("/agent/a-auto/jobs")
+    assert len(list_res.json()) == 1
+    
+    del_res = client.delete(f"/agent/a-auto/jobs/{j_id}")
+    assert del_res.status_code == 200

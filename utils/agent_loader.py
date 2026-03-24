@@ -3,11 +3,12 @@ from google.adk.tools.mcp_tool import McpToolset
 from google.adk.tools.agent_tool import AgentTool
 from google.adk.tools.mcp_tool.mcp_session_manager import SseConnectionParams, StreamableHTTPConnectionParams
 from google.adk.cli.utils.base_agent_loader import BaseAgentLoader
-from google.adk.agents import LlmAgent
+from google.adk.agents import LlmAgent, LoopAgent
 from google.adk.models.lite_llm import LiteLlm
 from sqlmodel import select
 from database.database import get_session, engine
 from database.models import Agent, Model, ConnectorConfig
+from google.adk.tools.tool_context import ToolContext
 from utils.cache import cache
 from sqlmodel import Session
 from utils.helper import resolve_connector_tools
@@ -138,26 +139,48 @@ class DatabaseAgentLoader(BaseAgentLoader):
                         logger.error(f"Error loading sub agent config '{sub_agent_id}' for agent {agent_name}: {e}")
 
 
-            # Create LlmAgent
             print(tools_list)
             tools_list.extend(sub_agents)
+            
             summary_callback = make_session_summary_callback(
                 _build_summarizer_model(model_config.provider, model_config.name)
             )
+            
             if model_config.provider.lower() == "google":
-                agent = LlmAgent(
-                    model=model_config.name, # Using google's default
-                    name=agent_config.agent_id,
+                model = model_config.name
+            else:
+                model = LiteLlm(model=f"{model_config.provider}/{model_config.name}")
+
+            # Create LlmAgent
+            if agent_config.type.lower() == "automation":
+                # --- Tool Definition ---
+                def exit_loop(tool_context: ToolContext):
+                    """Call this function ONLY when the tasks are completed and no further changes are needed, signaling the iterative process should end."""
+                    print(f"  [Tool Call] exit_loop triggered by {tool_context.agent_name}")
+                    tool_context.actions.escalate = True
+                    tool_context.actions.skip_summarization = True
+                    # Return empty dict as tools should typically return JSON-serializable output
+                    return {}
+                    
+                core_automation_agent = LlmAgent(
+                    model=model,
+                    name="core_automation_agent",
                     description=agent_config.description,
                     instruction=agent_config.instruction,
-                    tools=tools_list,
+                    tools=[exit_loop] + tools_list,
                     sub_agents=[],
                     before_model_callback=summary_callback,
+                )
+                agent = LoopAgent(
+                    name=agent_config.agent_id,
+                    description='Agent for looping automation agents',
+                    sub_agents=[core_automation_agent],
+                    max_iterations=3,
                 )
                 
             else:
                 agent = LlmAgent(
-                    model=LiteLlm(model=f"{model_config.provider}/{model_config.name}"), # Passing model name to LiteLLM
+                    model=model,
                     name=agent_config.agent_id,
                     description=agent_config.description,
                     instruction=agent_config.instruction,
@@ -165,7 +188,6 @@ class DatabaseAgentLoader(BaseAgentLoader):
                     sub_agents=[],
                     before_model_callback=summary_callback,
                 )
-
             # Store in cache
             cache.set_agent(agent_name, agent)
             

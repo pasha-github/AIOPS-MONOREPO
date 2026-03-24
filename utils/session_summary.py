@@ -80,7 +80,7 @@ def make_session_summary_callback(model: str):
                     {
                         "role": "system",
                          "content": (
-                            "Summarize the first message in one concise sentence capturing the main intent or request. "
+                            "Summarize the first message in one concise sentence in just 3-6 words capturing the main intent or request. "
                             "Write the summary as a direct statement, not referring to “the user” or describing the act of asking. "
                             "Do not include explanations or extra details."
                         ),

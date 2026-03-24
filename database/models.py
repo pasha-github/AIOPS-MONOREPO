@@ -1,4 +1,4 @@
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Any
 from sqlmodel import Field, SQLModel, Column, JSON
 import json
 from datetime import datetime
@@ -43,4 +43,19 @@ class ConnectorConfig(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
     connector_id: str
-    
+
+class Webhook(SQLModel, table=True):
+    webhook_id: UUID = Field(default_factory=uuid4, primary_key=True)
+    agent_id: str = Field(foreign_key="agent.agent_id")
+    prompt: str
+    created_at: datetime = Field(default_factory=datetime.now)
+    updated_at: datetime = Field(default_factory=datetime.now)
+
+class Job(SQLModel, table=True):
+    job_id: UUID = Field(default_factory=uuid4, primary_key=True)
+    agent_id: str = Field(foreign_key="agent.agent_id")
+    prompt: str
+    cron_expression: Optional[str] = None
+    interval_seconds: Optional[int] = None
+    created_at: datetime = Field(default_factory=datetime.now)
+    updated_at: datetime = Field(default_factory=datetime.now)
