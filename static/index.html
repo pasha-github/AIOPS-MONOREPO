@@ -203,11 +203,13 @@
                     </div>
                     <div class="form-group">
                         <label>New Description</label>
-                        <input type="text" id="model-update-description" placeholder="Leave blank to keep current value">
+                        <input type="text" id="model-update-description"
+                            placeholder="Leave blank to keep current value">
                     </div>
                     <div class="form-group">
                         <label>New API Key</label>
-                        <input type="password" id="model-update-api-key" placeholder="Leave blank to keep current value">
+                        <input type="password" id="model-update-api-key"
+                            placeholder="Leave blank to keep current value">
                     </div>
                     <button type="submit">Update Model</button>
                 </form>
@@ -237,6 +239,13 @@
                     <div class="form-group">
                         <label>Description</label>
                         <input type="text" id="agent-desc" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Type of Agent</label>
+                        <select id="agent-type" required>
+                            <option value="agent">Agent</option>
+                            <option value="automation">Automation</option>
+                        </select>
                     </div>
                     <div class="form-group">
                         <label>Instructions</label>
@@ -286,11 +295,13 @@
                     </div>
                     <div class="form-group">
                         <label>New Description</label>
-                        <input type="text" id="agent-update-description" placeholder="Leave blank to keep current value">
+                        <input type="text" id="agent-update-description"
+                            placeholder="Leave blank to keep current value">
                     </div>
                     <div class="form-group">
                         <label>New Instructions</label>
-                        <textarea id="agent-update-instruction" rows="3" placeholder="Leave blank to keep current value"></textarea>
+                        <textarea id="agent-update-instruction" rows="3"
+                            placeholder="Leave blank to keep current value"></textarea>
                     </div>
                     <div class="form-group">
                         <label>New Model</label>
@@ -308,8 +319,7 @@
                     </div>
                     <div class="form-group">
                         <label>New MCP Server URLs (comma-separated)</label>
-                        <input type="text" id="agent-update-mcp-sse"
-                            placeholder="Leave blank to keep current value">
+                        <input type="text" id="agent-update-mcp-sse" placeholder="Leave blank to keep current value">
                     </div>
                     <div class="form-group">
                         <label>New Connector Configs <small>(hold Ctrl/Cmd to select multiple)</small></label>
@@ -325,10 +335,60 @@
                     </div>
                     <div class="form-group">
                         <label>New Custom Tools (Python Code)</label>
-                        <textarea id="agent-update-tools" rows="5" placeholder="Leave blank to keep current value"></textarea>
+                        <textarea id="agent-update-tools" rows="5"
+                            placeholder="Leave blank to keep current value"></textarea>
                     </div>
                     <button type="submit">Update Agent</button>
                 </form>
+            </div>
+        </div>
+
+        <!-- Webhooks & Jobs Section -->
+        <div class="section" id="automation-section">
+            <h2>Webhooks & Jobs (Automation Agents)</h2>
+            <div class="form-group">
+                <label>Select Automation Agent</label>
+                <select id="automation-agent-select" onchange="loadAutomations()">
+                    <option value="">Loading automation agents...</option>
+                </select>
+            </div>
+
+            <div id="automations-content" style="display: none;">
+                <div class="grid">
+                    <div>
+                        <h3>Webhooks</h3>
+                        <div id="webhook-list">Select an agent to view webhooks.</div>
+                        <h4 style="margin-top:20px;">Create Webhook</h4>
+                        <form id="add-webhook-form" onsubmit="addWebhook(event)">
+                            <div class="form-group">
+                                <label>Prompt Payload (JSON)</label>
+                                <textarea id="webhook-prompt" rows="3" required placeholder='prompt'></textarea>
+                            </div>
+                            <button type="submit">Create Webhook</button>
+                        </form>
+                    </div>
+
+                    <div>
+                        <h3>Jobs</h3>
+                        <div id="job-list">Select an agent to view jobs.</div>
+                        <h4 style="margin-top:20px;">Create Job</h4>
+                        <form id="add-job-form" onsubmit="addJob(event)">
+                            <div class="form-group">
+                                <label>Prompt Payload (JSON)</label>
+                                <textarea id="job-prompt" rows="3" required placeholder='prompt'></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label>Cron Expression (optional)</label>
+                                <input type="text" id="job-cron" placeholder="*/5 * * * *">
+                            </div>
+                            <div class="form-group">
+                                <label>Interval Seconds (optional)</label>
+                                <input type="number" id="job-interval" placeholder="60">
+                            </div>
+                            <button type="submit">Create Job</button>
+                        </form>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -563,6 +623,9 @@
             agentUpdateSelectEl.innerHTML = '<option value="">-- Select an agent --</option>';
             updateSubAgentSelectEl.innerHTML = '';
 
+            const autoAgentSelectEl = document.getElementById('automation-agent-select');
+            if (autoAgentSelectEl) autoAgentSelectEl.innerHTML = '<option value="">-- Select automation agent --</option>';
+
             // Rebuild sub-agents select in the add-agent form
             const subAgentSelectEl = document.getElementById('agent-sub-agents');
             subAgentSelectEl.innerHTML = '';
@@ -578,7 +641,7 @@
                     ? `<br><small>Sub-agents: ${(a.sub_agents || []).length} attached</small>`
                     : '';
                 div.innerHTML = `
-                    <strong>${a.name}</strong> (${a.model_id})<br>
+                    <strong>${a.name}</strong> (${a.type ? a.type : 'agent'} | ${a.model_id})<br>
                     ${a.description}<br>
                     <small>Status: ${a.isEnabled ? 'Enabled' : 'Disabled'}</small>${connectorBadges}${subAgentBadge}
                     <div style="margin-top:5px;">
@@ -594,6 +657,13 @@
                     opt.value = a.agent_id;
                     opt.textContent = a.name;
                     chatSelectEl.appendChild(opt);
+                }
+
+                if (a.isEnabled && a.type === 'automation' && autoAgentSelectEl) {
+                    const autoOpt = document.createElement('option');
+                    autoOpt.value = a.agent_id;
+                    autoOpt.textContent = a.name;
+                    autoAgentSelectEl.appendChild(autoOpt);
                 }
 
                 // Populate sub-agent select (all agents are candidates)
@@ -632,6 +702,7 @@
                 agent_id: document.getElementById('agent-id').value,
                 name: document.getElementById('agent-name').value,
                 description: document.getElementById('agent-desc').value,
+                type: document.getElementById('agent-type').value,
                 instruction: document.getElementById('agent-instr').value,
                 model_id: document.getElementById('agent-model-select').value,
                 tools: toolsCode ? toolsCode : null,
@@ -737,6 +808,114 @@
                 body: JSON.stringify({ isEnabled: status })
             });
             loadAgents();
+        }
+
+        // ─── Automations (Webhooks & Jobs) ────────────────────────────────────
+        async function loadAutomations() {
+            const agentId = document.getElementById('automation-agent-select').value;
+            const contentDiv = document.getElementById('automations-content');
+            if (!agentId) {
+                contentDiv.style.display = 'none';
+                return;
+            }
+            contentDiv.style.display = 'block';
+
+            // Load Webhooks
+            const whRes = await fetch(`${API_BASE}/agent/${agentId}/webhook`);
+            const webhooks = await whRes.json();
+            const whListEl = document.getElementById('webhook-list');
+            whListEl.innerHTML = '';
+            if (webhooks.length === 0) whListEl.innerHTML = '<em>No webhooks for this agent.</em>';
+            webhooks.forEach(w => {
+                const div = document.createElement('div');
+                div.className = 'card';
+                
+                // Construct full URL (handle relative and absolute API_BASE)
+                const baseUrl = API_BASE.startsWith('http') ? API_BASE : window.location.origin + API_BASE;
+                const invokeUrl = `${baseUrl}/agent/${agentId}/webhook/invoke/${w.webhook_id}`;
+                
+                div.innerHTML = `
+                    <small>ID: ${w.webhook_id}</small><br>
+                    <strong>URL:</strong> <a href="${invokeUrl}" target="_blank" style="word-break: break-all; font-size: 0.8em; color: var(--accent-color);">${invokeUrl}</a><br>
+                    <strong>Prompt:</strong> <code>${w.prompt}</code><br>
+                    <button class="delete" onclick="deleteWebhook('${agentId}', '${w.webhook_id}')" style="margin-top:5px;">Delete</button>
+                    <button onclick="invokeWebhook('${agentId}', '${w.webhook_id}')" style="margin-top:5px;">Invoke</button>
+                `;
+                whListEl.appendChild(div);
+            });
+
+            // Load Jobs
+            const jobRes = await fetch(`${API_BASE}/agent/${agentId}/jobs`);
+            const jobs = await jobRes.json();
+            const jobListEl = document.getElementById('job-list');
+            jobListEl.innerHTML = '';
+            if (jobs.length === 0) jobListEl.innerHTML = '<em>No jobs for this agent.</em>';
+            jobs.forEach(j => {
+                const div = document.createElement('div');
+                div.className = 'card';
+                div.innerHTML = `
+                    <small>ID: ${j.job_id}</small><br>
+                    <strong>Prompt:</strong> <code>${j.prompt}</code><br>
+                    <strong>Cron:</strong> ${j.cron_expression || 'N/A'} | <strong>Interval (s):</strong> ${j.interval_seconds || 'N/A'}<br>
+                    <button class="delete" onclick="deleteJob('${agentId}', '${j.job_id}')" style="margin-top:5px;">Delete</button>
+                `;
+                jobListEl.appendChild(div);
+            });
+        }
+
+        async function addWebhook(e) {
+            e.preventDefault();
+            const agentId = document.getElementById('automation-agent-select').value;
+            const promptVal = document.getElementById('webhook-prompt').value;
+            if (!promptVal) { alert("Prompt is required"); return; }
+            await fetch(`${API_BASE}/agent/${agentId}/webhooks`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prompt: promptVal })
+            });
+            document.getElementById('webhook-prompt').value = '';
+            loadAutomations();
+        }
+
+        async function deleteWebhook(agentId, webhookId) {
+            if (confirm('Delete webhook?')) {
+                await fetch(`${API_BASE}/agent/${agentId}/webhook/${webhookId}`, { method: 'DELETE' });
+                loadAutomations();
+            }
+        }
+
+        async function invokeWebhook(agentId, webhookId) {
+            alert('Invokation request sent. Keep an eye on the server logs for the output.');
+            await fetch(`${API_BASE}/agent/${agentId}/webhook/invoke/${webhookId}`, { method: 'POST' });
+        }
+
+        async function addJob(e) {
+            e.preventDefault();
+            const agentId = document.getElementById('automation-agent-select').value;
+            const cronVal = document.getElementById('job-cron').value.trim();
+            const intVal = document.getElementById('job-interval').value.trim();
+            const promptVal = document.getElementById('job-prompt').value;
+            if (!promptVal) { alert("Prompt is required"); return; }
+            await fetch(`${API_BASE}/agent/${agentId}/jobs`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    prompt: promptVal,
+                    cron_expression: cronVal || null,
+                    interval_seconds: intVal ? parseInt(intVal) : null
+                })
+            });
+            document.getElementById('job-prompt').value = '';
+            document.getElementById('job-cron').value = '';
+            document.getElementById('job-interval').value = '';
+            loadAutomations();
+        }
+
+        async function deleteJob(agentId, jobId) {
+            if (confirm('Delete job?')) {
+                await fetch(`${API_BASE}/agent/${agentId}/jobs/${jobId}`, { method: 'DELETE' });
+                loadAutomations();
+            }
         }
 
         // ─── Connectors ───────────────────────────────────────────────────────
