@@ -3,16 +3,10 @@
 import { Plus, Plug, Search } from "lucide-react";
 import { useState } from "react";
 import DisplayConnectors from "./DisplayConnectors";
-import { STATIC_CONNECTORS, type ConnectorItem } from "./staticData";
 
 export default function ConnectorsPage() {
-  const [connectors, setConnectors] = useState<ConnectorItem[]>(STATIC_CONNECTORS);
   const [searchValue, setSearchValue] = useState("");
   const [isSearchFocused, setIsSearchFocused] = useState(false);
-
-  const handleConnectorDeleted = (connectorId: number) => {
-    setConnectors((prev) => prev.filter((item) => item.id !== connectorId));
-  };
 
   return (
     <section className="min-h-[calc(100vh-160px)] rounded-3xl bg-white p-6 shadow-[0_18px_50px_-38px_rgba(16,24,40,0.5)]">
@@ -52,11 +46,7 @@ export default function ConnectorsPage() {
           </button>
         </div>
       </div>
-      <DisplayConnectors
-        connectors={connectors}
-        searchTerm={searchValue}
-        onDeleteConnector={handleConnectorDeleted}
-      />
+      <DisplayConnectors searchTerm={searchValue} />
     </section>
   );
 }
