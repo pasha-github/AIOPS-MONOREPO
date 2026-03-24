@@ -219,7 +219,9 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
   const [isToastVisible, setIsToastVisible] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
 
+  // agentId is still computed and sent to the backend — just not shown in the UI
   const agentId = useMemo(() => toSnakeCase(agentName), [agentName]);
+
   const isFormValid =
     normalizeString(agentName).length > 0 &&
     agentId.length > 0 &&
@@ -302,7 +304,7 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
         method: "POST",
         headers: { accept: "application/json", "Content-Type": "application/json" },
         body: JSON.stringify({
-          agent_id: agentId,
+          agent_id: agentId,  // still sent to backend
           name: normalizeString(agentName),
           description: normalizeString(description),
           instruction: normalizeString(instruction),
@@ -386,27 +388,16 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
               {/* ── Identity ── */}
               <SectionLabel>Identity</SectionLabel>
 
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Agent Name" required hint="Human-readable display name for this agent">
-                  <input
-                    type="text"
-                    value={agentName}
-                    onChange={(e) => setAgentName(e.target.value)}
-                    placeholder="e.g. Support Bot"
-                    className={inputClass}
-                  />
-                </Field>
-
-                <Field label="Agent ID" hint="Auto-generated in snake_case from the name">
-                  <input
-                    type="text"
-                    value={agentId}
-                    readOnly
-                    placeholder="support_bot"
-                    className="w-full rounded-lg border border-dashed border-gray-200 bg-gray-100 px-3 py-2.5 text-sm text-gray-400 outline-none cursor-default"
-                  />
-                </Field>
-              </div>
+              {/* Agent Name only — Agent ID is hidden from UI but still sent to the backend */}
+              <Field label="Agent Name" required hint="Human-readable display name for this agent">
+                <input
+                  type="text"
+                  value={agentName}
+                  onChange={(e) => setAgentName(e.target.value)}
+                  placeholder="e.g. Support Bot"
+                  className={inputClass}
+                />
+              </Field>
 
               {/* ── Behaviour ── */}
               <SectionLabel>Behaviour</SectionLabel>
