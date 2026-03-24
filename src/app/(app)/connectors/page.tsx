@@ -1,6 +1,6 @@
 "use client";
 
-import { Plus, Plug, Search } from "lucide-react";
+import { Plug, Plus, Search } from "lucide-react";
 import { useState } from "react";
 import DisplayConnectors from "./DisplayConnectors";
 
@@ -34,7 +34,7 @@ export default function ConnectorsPage() {
               autoComplete="off"
               autoCorrect="off"
               spellCheck={false}
-              placeholder="Search credentials.."
+              placeholder="Search connectors.."
               className="w-full bg-transparent text-sm text-[#4f49e2] placeholder:text-[#4f49e2] focus:outline-none"
             />
           </div>
