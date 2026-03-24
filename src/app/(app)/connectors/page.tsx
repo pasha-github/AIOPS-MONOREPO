@@ -1,14 +1,18 @@
 "use client";
 
-import { Plug, Search } from "lucide-react";
+import { Plus, Plug, Search } from "lucide-react";
 import { useState } from "react";
-import CreateConnectorButton from "./CreateConnectorButton";
 import DisplayConnectors from "./DisplayConnectors";
+import { STATIC_CONNECTORS, type ConnectorItem } from "./staticData";
 
 export default function ConnectorsPage() {
-  const [refreshKey, setRefreshKey] = useState(0);
+  const [connectors, setConnectors] = useState<ConnectorItem[]>(STATIC_CONNECTORS);
   const [searchValue, setSearchValue] = useState("");
   const [isSearchFocused, setIsSearchFocused] = useState(false);
+
+  const handleConnectorDeleted = (connectorId: number) => {
+    setConnectors((prev) => prev.filter((item) => item.id !== connectorId));
+  };
 
   return (
     <section className="min-h-[calc(100vh-160px)] rounded-3xl bg-white p-6 shadow-[0_18px_50px_-38px_rgba(16,24,40,0.5)]">
@@ -17,7 +21,7 @@ export default function ConnectorsPage() {
           <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#eef2ff] text-[#4f49e2]">
             <Plug className="h-5 w-5" />
           </span>
-          Credentials management
+          Connectors
         </h2>
         <div className="flex flex-1 justify-center">
           <div
@@ -38,20 +42,20 @@ export default function ConnectorsPage() {
           </div>
         </div>
         <div className="ml-auto">
-          <CreateConnectorButton
-            onCreated={() => setRefreshKey((prev) => prev + 1)}
-          />
+          <button
+            type="button"
+            className="inline-flex cursor-default items-center gap-2 rounded-xl bg-[#4f49e2] px-5 py-3 text-sm font-semibold text-white shadow-[0_12px_24px_-16px_rgba(79,73,226,0.65)]"
+            aria-label="Create connector"
+          >
+            <Plus className="h-4 w-4" />
+            Create
+          </button>
         </div>
       </div>
-      <CreateConnectorButton
-        onCreated={() => setRefreshKey((prev) => prev + 1)}
-        renderTrigger={({ open }) => (
-          <DisplayConnectors
-            refreshKey={refreshKey}
-            searchTerm={searchValue}
-            onAddConnector={open}
-          />
-        )}
+      <DisplayConnectors
+        connectors={connectors}
+        searchTerm={searchValue}
+        onDeleteConnector={handleConnectorDeleted}
       />
     </section>
   );

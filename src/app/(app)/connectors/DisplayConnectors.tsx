@@ -1,31 +1,8 @@
 "use client";
 
 import { Link2, Pencil, Plug, Trash2, X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  AGENT_API_BASE_URL,
-  AGENT_CONNECTORS_BASE_URL,
-  AGENT_ORG_KEY,
-} from "@/config/agent";
-
-type ConnectorItem = {
-  id: number;
-  connector_type: string;
-  provider_code: string;
-  is_active: "Y" | "N" | string;
-  created_at: string;
-  updated_at: string;
-};
-
-type AgentRecord = {
-  agentId: number;
-  name: string;
-  port: number | null;
-  status: string;
-  enterprise: string;
-  start_time: string | null;
-  stop_time: string | null;
-};
+import { useState } from "react";
+import { type ConnectorItem } from "./staticData";
 
 const providerLogoMap: Record<string, string> = {
   ServiceNow: "/img/ServiceNow.png",
@@ -59,125 +36,17 @@ const formatDateTime = (value: string) => {
 };
 
 type DisplayConnectorsProps = {
-  refreshKey?: number;
+  connectors: ConnectorItem[];
   searchTerm?: string;
-  onAddConnector?: () => void;
+  onDeleteConnector?: (connectorId: number) => void;
 };
 
 export default function DisplayConnectors({
-  refreshKey,
+  connectors,
   searchTerm,
-  onAddConnector,
+  onDeleteConnector,
 }: DisplayConnectorsProps) {
-  const [connectors, setConnectors] = useState<ConnectorItem[]>([]);
-  const [agents, setAgents] = useState<AgentRecord[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [loadError, setLoadError] = useState("");
-  const [deletingId, setDeletingId] = useState<number | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ConnectorItem | null>(null);
-
-  const connectorsUrl = useMemo(
-    () => `${AGENT_CONNECTORS_BASE_URL}/aiops/connectors`,
-    []
-  );
-  const agentListUrl = useMemo(() => {
-    const base = AGENT_API_BASE_URL.endsWith("/")
-      ? AGENT_API_BASE_URL.slice(0, -1)
-      : AGENT_API_BASE_URL;
-    return `${base}/aiops/agent/list?orgKey=${encodeURIComponent(
-      AGENT_ORG_KEY
-    )}`;
-  }, []);
-
-  const loadConnectors = useCallback(
-    async (signal?: AbortSignal) => {
-      setIsLoading(true);
-      setLoadError("");
-      try {
-        const response = await fetch(connectorsUrl, {
-          method: "GET",
-          headers: {
-            accept: "application/json",
-            "X-Organization-Key": AGENT_ORG_KEY,
-          },
-          signal,
-        });
-        const data = await response.json();
-        if (response.ok && Array.isArray(data?.connectors)) {
-          setConnectors(data.connectors as ConnectorItem[]);
-        } else {
-          setConnectors([]);
-          setLoadError("Unable to load connectors.");
-        }
-      } catch (error) {
-        if (error instanceof DOMException && error.name === "AbortError") {
-          return;
-        }
-        setConnectors([]);
-        setLoadError("Unable to load connectors.");
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [connectorsUrl]
-  );
-
-  const loadAgents = useCallback(
-    async (signal?: AbortSignal) => {
-      try {
-        const response = await fetch(agentListUrl, {
-          headers: { accept: "application/json" },
-          signal,
-        });
-        const data = await response.json();
-        if (response.ok && Array.isArray(data?.agents)) {
-          setAgents(data.agents as AgentRecord[]);
-        } else {
-          setAgents([]);
-        }
-      } catch (error) {
-        if (error instanceof DOMException && error.name === "AbortError") {
-          return;
-        }
-        setAgents([]);
-      }
-    },
-    [agentListUrl]
-  );
-
-  useEffect(() => {
-    const controller = new AbortController();
-    const signal = controller.signal;
-
-    const loadAll = async () => {
-      await Promise.all([loadConnectors(signal), loadAgents(signal)]);
-    };
-
-    loadAll();
-
-    return () => {
-      controller.abort();
-    };
-  }, [loadAgents, loadConnectors, refreshKey]);
-
-  if (isLoading) {
-    return (
-      <div className="mt-6 flex min-h-[180px] items-center justify-center rounded-2xl border border-[#eef1f7] bg-white px-6 py-10 text-sm text-[#647087]">
-        <div className="flex items-center gap-3 rounded-full border border-[#e3e7f2] bg-[#f8fafc] px-5 py-3 text-sm font-semibold text-[#4f49e2] shadow-[0_12px_24px_-18px_rgba(15,23,42,0.25)]">
-          <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#cbd2ff] border-t-[#5b4cf0]" />
-          Loading connectors...
-        </div>
-      </div>
-    );
-  }
-
-  if (loadError) {
-    return (
-      <div className="mt-6 rounded-2xl border border-[#fee2e2] bg-[#fff5f5] px-5 py-8 text-sm text-[#b91c1c]">
-        {loadError}
-      </div>
-    );
-  }
 
   if (connectors.length === 0) {
     return (
@@ -229,12 +98,6 @@ export default function DisplayConnectors({
         const created = formatDateTime(connector.created_at);
         const updated = formatDateTime(connector.updated_at);
         const logoSrc = providerLogoMap[connector.provider_code] ?? "";
-        const isAgentExists = agents.some(
-          (agent) =>
-            agent.enterprise?.trim().toLowerCase() ===
-              connector.provider_code.trim().toLowerCase()
-        );
-        const isDeleteDisabled = isAgentExists || deletingId === connector.id;
         const activeClass = isActive
           ? "bg-[#158a00] text-white"
           : "bg-[#e8f5e1] text-[#158a00] border border-[#cfe9c1]";
@@ -298,24 +161,10 @@ export default function DisplayConnectors({
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    if (isDeleteDisabled) {
-                      return;
-                    }
-                    setDeleteTarget(connector);
-                  }}
-                  disabled={isDeleteDisabled}
-                  className={`inline-flex h-9 w-9 items-center justify-center rounded-lg border transition ${
-                    isDeleteDisabled
-                      ? "cursor-not-allowed border-[#e5e7eb] text-[#9ca3af]"
-                      : "border-[#fecaca] text-[#ef4444] hover:bg-[#fee2e2]"
-                  }`}
+                  onClick={() => setDeleteTarget(connector)}
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#fecaca] text-[#ef4444] transition hover:bg-[#fee2e2]"
                   aria-label={`Delete ${connector.provider_code} connector`}
-                  title={
-                    isAgentExists
-                      ? "Delete the agent before deleting this connector."
-                      : "Delete connector"
-                  }
+                  title="Delete connector"
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>
@@ -327,7 +176,6 @@ export default function DisplayConnectors({
       {showAddCard ? (
         <button
           type="button"
-          onClick={onAddConnector}
           className="rounded-2xl border border-dashed border-[#d6dcea] bg-[#f8fafc] p-6 text-center text-sm text-[#6b7280] transition hover:border-[#c7d2fe] hover:bg-[#f3f6ff]"
         >
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#eef2ff] text-[#4f49e2]">
@@ -367,7 +215,7 @@ export default function DisplayConnectors({
                 ?
               </p>
               <p className="mt-3 text-xs text-[#9b1c1c]">
-                This action can’t be undone.
+                This action cannot be undone.
               </p>
             </div>
             <div className="flex items-center justify-end gap-3 border-t border-[#eef1f7] px-6 py-4">
@@ -380,44 +228,16 @@ export default function DisplayConnectors({
               </button>
               <button
                 type="button"
-                onClick={async () => {
+                onClick={() => {
                   if (!deleteTarget) {
                     return;
                   }
-                  setDeletingId(deleteTarget.id);
-                  try {
-                    const url = `${AGENT_CONNECTORS_BASE_URL}/aiops/connectors/${deleteTarget.id}/delete?orgKey=${encodeURIComponent(
-                      AGENT_ORG_KEY
-                    )}`;
-                    const response = await fetch(url, {
-                      method: "POST",
-                      headers: {
-                        accept: "application/json",
-                        "X-Organization-Key": AGENT_ORG_KEY,
-                      },
-                    });
-                    const data = await response.json().catch(() => null);
-                    if (response.ok && data?.deleted) {
-                      await loadConnectors();
-                      await loadAgents();
-                      setDeleteTarget(null);
-                    } else {
-                      setLoadError("Unable to delete connector.");
-                    }
-                  } catch (error) {
-                    setLoadError("Unable to delete connector.");
-                  } finally {
-                    setDeletingId(null);
-                  }
+                  onDeleteConnector?.(deleteTarget.id);
+                  setDeleteTarget(null);
                 }}
-                disabled={deletingId === deleteTarget.id}
-                className={`rounded-xl px-5 py-2 text-sm font-semibold text-white shadow-[0_10px_24px_-18px_rgba(239,68,68,0.8)] ${
-                  deletingId === deleteTarget.id
-                    ? "cursor-not-allowed bg-[#fca5a5]"
-                    : "bg-[#ef4444] hover:bg-[#dc2626]"
-                }`}
+                className="rounded-xl bg-[#ef4444] px-5 py-2 text-sm font-semibold text-white shadow-[0_10px_24px_-18px_rgba(239,68,68,0.8)] hover:bg-[#dc2626]"
               >
-                {deletingId === deleteTarget.id ? "Deleting..." : "Delete"}
+                Delete
               </button>
             </div>
           </div>
