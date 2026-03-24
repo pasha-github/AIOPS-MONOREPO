@@ -106,6 +106,7 @@ export default function UpdateAgent({
     const [error, setError] = useState("");
     const [success, setSuccess] = useState("");
 
+    // agentId is still computed and sent to the backend — just not shown in the UI
     const agentId = useMemo(() => toSnakeCase(form.agentName), [form.agentName]);
 
     const isFormValid =
@@ -167,7 +168,7 @@ export default function UpdateAgent({
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    agent_id: agent.agent_id,
+                    agent_id: agent.agent_id, // still sent to backend
                     name: normalizeString(form.agentName),
                     description: normalizeString(form.description),
                     instruction: normalizeString(form.instruction),
@@ -195,7 +196,7 @@ export default function UpdateAgent({
                 onClose();
                 onUpdateSuccess?.();
             }, 1500);
-            
+
         } catch {
             setError("Something went wrong. Please check your connection and try again.");
         } finally {
@@ -240,25 +241,15 @@ export default function UpdateAgent({
                     {/* ── Identity ── */}
                     <SectionLabel>Identity</SectionLabel>
 
-                    <div className="grid grid-cols-2 gap-3">
-                        <Field label="Agent Name" required hint="Human-readable display name">
-                            <input
-                                className={inputClass}
-                                value={form.agentName}
-                                onChange={(e) => updateField("agentName", e.target.value)}
-                                placeholder="e.g. Support Bot"
-                            />
-                        </Field>
-
-                        <Field label="Agent ID" hint="Auto-generated from name">
-                            <input
-                                className={readonlyInputClass}
-                                value={agentId}
-                                readOnly
-                                placeholder="auto_generated_id"
-                            />
-                        </Field>
-                    </div>
+                    {/* Agent Name only — Agent ID hidden from UI but still sent to backend */}
+                    <Field label="Agent Name" required hint="Human-readable display name">
+                        <input
+                            className={inputClass}
+                            value={form.agentName}
+                            onChange={(e) => updateField("agentName", e.target.value)}
+                            placeholder="e.g. Support Bot"
+                        />
+                    </Field>
 
                     <Field
                         label="Description"
@@ -389,7 +380,6 @@ export default function UpdateAgent({
 
                     {/* ── Feedback messages ── */}
 
-                    {/* Error */}
                     {error && (
                         <div className="flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                             <svg
@@ -410,7 +400,6 @@ export default function UpdateAgent({
                         </div>
                     )}
 
-                    {/* Success */}
                     {success && (
                         <div className="flex items-start gap-2.5 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
                             <svg
@@ -436,7 +425,6 @@ export default function UpdateAgent({
 
                 {/* Footer */}
                 <div className="flex shrink-0 items-center justify-between border-t border-gray-100 px-6 py-4">
-                    {/* Left hint */}
                     <p className="text-xs text-gray-400">
                         {!isFormValid && !success
                             ? <>Fields marked <span className="text-red-400">*</span> are required</>
