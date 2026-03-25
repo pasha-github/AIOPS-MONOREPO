@@ -77,7 +77,8 @@ export default function AgentRegistry({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [jobsTarget, setJobsTarget] = useState<AgentRecord | null>(null);
   const [webhookTarget, setWebhookTarget] = useState<AgentRecord | null>(null);
-  const [expandedInstructions, setExpandedInstructions] = useState<Record<string, boolean>>({});
+  const [instructionDialogTarget, setInstructionDialogTarget] =
+    useState<{ title: string; content: string } | null>(null);
 
   const agentManagerBaseUrl = trimTrailingSlash(llmManagerApiBaseUrl);
 
@@ -243,49 +244,12 @@ export default function AgentRegistry({
     return `${content.slice(0, 180).trimEnd()}...`;
   };
 
-  const renderInstructionMarkdown = (value: string | null | undefined) => {
-    const content = value?.trim();
-    if (!content) {
-      return <span className="text-[#64748b]">-</span>;
+  const openInstructionDialog = (title: string, content: string | null | undefined) => {
+    const trimmed = content?.trim();
+    if (!trimmed) {
+      return;
     }
-
-    const lines = content.split(/\r?\n/);
-    return (
-      <div className="space-y-1">
-        {lines.map((line, index) => {
-          const trimmedLine = line.trim();
-          if (!trimmedLine) {
-            return <div key={`instruction-line-${index}`} className="h-2" />;
-          }
-          if (trimmedLine.startsWith("##")) {
-            const heading = trimmedLine.replace(/^##+\s*/, "");
-            return (
-              <p
-                key={`instruction-line-${index}`}
-                className="font-semibold leading-snug text-[#0f172a]"
-              >
-                {heading}
-              </p>
-            );
-          }
-          return (
-            <p
-              key={`instruction-line-${index}`}
-              className="break-words whitespace-normal leading-snug text-[#2b3341]"
-            >
-              {trimmedLine}
-            </p>
-          );
-        })}
-      </div>
-    );
-  };
-
-  const toggleInstructionExpanded = (rowKey: string) => {
-    setExpandedInstructions((previous) => ({
-      ...previous,
-      [rowKey]: !previous[rowKey],
-    }));
+    setInstructionDialogTarget({ title, content: trimmed });
   };
 
   const splitDateTime = (formattedValue: string) => {
@@ -730,20 +694,21 @@ export default function AgentRegistry({
                       </div>
                       <div className="flex h-full items-start px-3">
                         <div className="space-y-1">
-                          {expandedInstructions[rowKey]
-                            ? renderInstructionMarkdown(agent.instruction)
-                            : (
-                              <p className="break-words whitespace-normal leading-snug text-[#2b3341]">
-                                {getInstructionPreview(agent.instruction) || "-"}
-                              </p>
-                            )}
+                          <p className="break-words whitespace-normal leading-snug text-[#2b3341]">
+                            {getInstructionPreview(agent.instruction) || "-"}
+                          </p>
                           {agent.instruction && agent.instruction.trim().length > 180 ? (
                             <button
                               type="button"
-                              onClick={() => toggleInstructionExpanded(rowKey)}
+                              onClick={() =>
+                                openInstructionDialog(
+                                  `${agent.name} instructions`,
+                                  agent.instruction
+                                )
+                              }
                               className="text-xs font-semibold text-[#4f49e2] transition hover:text-[#4338ca]"
                             >
-                              {expandedInstructions[rowKey] ? "See less" : "See more"}
+                              See more
                             </button>
                           ) : null}
                         </div>
@@ -946,20 +911,21 @@ export default function AgentRegistry({
                         Instructions
                       </p>
                       <div className="mt-1 space-y-1">
-                        {expandedInstructions[rowKey]
-                          ? renderInstructionMarkdown(agent.instruction)
-                          : (
-                            <p className="break-words whitespace-normal leading-snug text-[#2b3341]">
-                              {getInstructionPreview(agent.instruction) || "-"}
-                            </p>
-                          )}
+                        <p className="break-words whitespace-normal leading-snug text-[#2b3341]">
+                          {getInstructionPreview(agent.instruction) || "-"}
+                        </p>
                         {agent.instruction && agent.instruction.trim().length > 180 ? (
                           <button
                             type="button"
-                            onClick={() => toggleInstructionExpanded(rowKey)}
+                            onClick={() =>
+                              openInstructionDialog(
+                                `${agent.name} instructions`,
+                                agent.instruction
+                              )
+                            }
                             className="text-xs font-semibold text-[#4f49e2] transition hover:text-[#4338ca]"
                           >
-                            {expandedInstructions[rowKey] ? "See less" : "See more"}
+                            See more
                           </button>
                         ) : null}
                       </div>
@@ -1171,6 +1137,62 @@ export default function AgentRegistry({
           agent={webhookTarget}
           onClose={() => setWebhookTarget(null)}
         />
+      ) : null}
+
+      {instructionDialogTarget ? (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/25 px-4 py-8 backdrop-blur-md">
+          <div className="w-full max-w-3xl overflow-hidden rounded-3xl bg-white shadow-[0_24px_70px_-36px_rgba(15,23,42,0.65)]">
+            <div className="flex items-center justify-between border-b border-[#eef1f7] px-6 py-4">
+              <div>
+                <h4 className="text-lg font-semibold text-[#111827]">
+                  {instructionDialogTarget.title}
+                </h4>
+                <p className="mt-1 text-sm text-[#6b7280]">
+                  Full instruction text
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setInstructionDialogTarget(null)}
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-[#e5e7eb] text-[#475569] transition hover:bg-[#f8fafc]"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="max-h-[70vh] overflow-y-auto px-6 py-5">
+              <div className="rounded-2xl border border-[#eef1f7] bg-[#fbfcfe] p-5">
+                <div className="space-y-2 text-sm leading-7 text-[#2b3341]">
+                  {instructionDialogTarget.content
+                    .split(/\r?\n/)
+                    .map((line, index) => {
+                      const trimmedLine = line.trim();
+                      if (!trimmedLine) {
+                        return <div key={`instruction-dialog-empty-${index}`} className="h-2" />;
+                      }
+                      if (trimmedLine.startsWith("##")) {
+                        return (
+                          <p
+                            key={`instruction-dialog-heading-${index}`}
+                            className="text-base font-semibold leading-snug text-[#0f172a]"
+                          >
+                            {trimmedLine.replace(/^##+\s*/, "")}
+                          </p>
+                        );
+                      }
+                      return (
+                        <p
+                          key={`instruction-dialog-line-${index}`}
+                          className="break-words whitespace-normal"
+                        >
+                          {trimmedLine}
+                        </p>
+                      );
+                    })}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       ) : null}
     </section>
   );
