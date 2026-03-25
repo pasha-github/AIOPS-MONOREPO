@@ -3,9 +3,11 @@
 import {
   Bot,
   ChevronDown,
+  BriefcaseBusiness,
   Pencil,
   Power,
   Search,
+  Webhook,
   Trash2,
   X,
 } from "lucide-react";
@@ -14,6 +16,8 @@ import Image from "next/image";
 import { trimTrailingSlash } from "@/config/agent";
 import { useRuntimeConfig } from "@/config/runtime-config";
 import { formatDateTime, getProviderIconSrc } from "../llm-management/llmHelpers";
+import JobsAgentManagement from "./JobsAgentManagement";
+import WebhookAgentManagement from "./WebhookAgentManagement";
 import UpdateAgent from "./updateagent";
 
 type AgentRecord = {
@@ -21,6 +25,7 @@ type AgentRecord = {
   name: string;
   port: number | null;
   status: string;
+  type: string;
   enterprise: string;
   start_time: string | null;
   stop_time: string | null;
@@ -42,7 +47,6 @@ type AgentRegistryProps = {
 };
 
 type SortKey = "name" | "created_at" | "updated_at" | "status";
-
 export default function AgentRegistry({
   agents,
   isLoading,
@@ -71,6 +75,10 @@ export default function AgentRegistry({
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedAgent, setSelectedAgent] = useState<AgentRecord | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [jobsTarget, setJobsTarget] = useState<AgentRecord | null>(null);
+  const [webhookTarget, setWebhookTarget] = useState<AgentRecord | null>(null);
+  const [instructionDialogTarget, setInstructionDialogTarget] =
+    useState<{ title: string; content: string } | null>(null);
 
   const agentManagerBaseUrl = trimTrailingSlash(llmManagerApiBaseUrl);
 
@@ -226,6 +234,22 @@ export default function AgentRegistry({
         {content}
       </span>
     );
+  };
+
+  const getInstructionPreview = (value: string | null | undefined) => {
+    const content = value?.trim() || "";
+    if (content.length <= 180) {
+      return content;
+    }
+    return `${content.slice(0, 180).trimEnd()}...`;
+  };
+
+  const openInstructionDialog = (title: string, content: string | null | undefined) => {
+    const trimmed = content?.trim();
+    if (!trimmed) {
+      return;
+    }
+    setInstructionDialogTarget({ title, content: trimmed });
   };
 
   const splitDateTime = (formattedValue: string) => {
@@ -384,6 +408,9 @@ export default function AgentRegistry({
     setIsModalOpen(true);
   };
 
+  const isAutomationAgent = (agent: AgentRecord) =>
+    agent.type.trim().toLowerCase() === "automation";
+
   return (
     <section className="rounded-3xl bg-white p-6 shadow-[0_18px_50px_-38px_rgba(16,24,40,0.5)]">
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -457,7 +484,7 @@ export default function AgentRegistry({
         </div>
       ) : null}
 
-      <div className="mt-5 overflow-x-hidden overflow-y-visible rounded-2xl border border-[#eef1f7]">
+      <div className="mt-5 overflow-visible rounded-2xl border border-[#eef1f7]">
         {isLoading ? (
           <div className="bg-white">
             <div className="hidden grid-cols-[1.1fr_1.2fr_1.5fr_1.4fr_0.9fr_0.9fr_0.8fr_0.9fr] bg-[#eaf0f8] px-4 py-3 text-xs font-semibold uppercase tracking-[0.08em] text-[#0f172a] md:grid">
@@ -666,7 +693,25 @@ export default function AgentRegistry({
                         </span>
                       </div>
                       <div className="flex h-full items-start px-3">
-                        {renderWrappedText(agent.instruction)}
+                        <div className="space-y-1">
+                          <p className="break-words whitespace-normal leading-snug text-[#2b3341]">
+                            {getInstructionPreview(agent.instruction) || "-"}
+                          </p>
+                          {agent.instruction && agent.instruction.trim().length > 180 ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                openInstructionDialog(
+                                  `${agent.name} instructions`,
+                                  agent.instruction
+                                )
+                              }
+                              className="text-xs font-semibold text-[#4f49e2] transition hover:text-[#4338ca]"
+                            >
+                              See more
+                            </button>
+                          ) : null}
+                        </div>
                       </div>
                       <div className="flex h-full min-w-0 flex-col items-start justify-center px-3 text-left text-[#334155]" title={agent.created_at || "-"}>
                         <span className="block leading-tight">
@@ -756,6 +801,33 @@ export default function AgentRegistry({
                                 <Pencil className="h-4 w-4" />
                                 Update
                               </button>
+                              {isAutomationAgent(agent) ? (
+                                <>
+                                  <div className="my-1 border-t border-[#eef1f7]" />
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setJobsTarget(agent);
+                                      setOpenActionMenuKey(null);
+                                    }}
+                                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[#2563eb] hover:bg-[#eff6ff]"
+                                  >
+                                    <BriefcaseBusiness className="h-4 w-4" />
+                                    Jobs
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setWebhookTarget(agent);
+                                      setOpenActionMenuKey(null);
+                                    }}
+                                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[#2563eb] hover:bg-[#eff6ff]"
+                                  >
+                                    <Webhook className="h-4 w-4" />
+                                    Webhook
+                                  </button>
+                                </>
+                              ) : null}
                             </div>
                           ) : null}
                         </div>
@@ -838,8 +910,24 @@ export default function AgentRegistry({
                       <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[#64748b]">
                         Instructions
                       </p>
-                      <div className="mt-1">
-                        {renderWrappedText(agent.instruction)}
+                      <div className="mt-1 space-y-1">
+                        <p className="break-words whitespace-normal leading-snug text-[#2b3341]">
+                          {getInstructionPreview(agent.instruction) || "-"}
+                        </p>
+                        {agent.instruction && agent.instruction.trim().length > 180 ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              openInstructionDialog(
+                                `${agent.name} instructions`,
+                                agent.instruction
+                              )
+                            }
+                            className="text-xs font-semibold text-[#4f49e2] transition hover:text-[#4338ca]"
+                          >
+                            See more
+                          </button>
+                        ) : null}
                       </div>
                     </div>
                     <div className="relative" data-action-menu="true">
@@ -889,6 +977,30 @@ export default function AgentRegistry({
                             <Trash2 className="h-4 w-4" />
                             Delete
                           </button>
+                          {isAutomationAgent(agent) ? (
+                            <>
+                              <div className="my-1 border-t border-[#eef1f7]" />
+                              <button
+                                type="button"
+                                onClick={() => setOpenActionMenuKey(null)}
+                                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[#2563eb] hover:bg-[#eff6ff]"
+                              >
+                                <BriefcaseBusiness className="h-4 w-4" />
+                                Jobs
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setWebhookTarget(agent);
+                                  setOpenActionMenuKey(null);
+                                }}
+                                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[#2563eb] hover:bg-[#eff6ff]"
+                              >
+                                <Webhook className="h-4 w-4" />
+                                Webhook
+                              </button>
+                            </>
+                          ) : null}
                         </div>
                       ) : null}
                     </div>
@@ -1012,6 +1124,76 @@ export default function AgentRegistry({
           onUpdateSuccess={onStatusUpdateSuccess}
         />
       )}
+
+      {jobsTarget ? (
+        <JobsAgentManagement
+          agent={jobsTarget}
+          onClose={() => setJobsTarget(null)}
+        />
+      ) : null}
+
+      {webhookTarget ? (
+        <WebhookAgentManagement
+          agent={webhookTarget}
+          onClose={() => setWebhookTarget(null)}
+        />
+      ) : null}
+
+      {instructionDialogTarget ? (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/25 px-4 py-8 backdrop-blur-md">
+          <div className="w-full max-w-3xl overflow-hidden rounded-3xl bg-white shadow-[0_24px_70px_-36px_rgba(15,23,42,0.65)]">
+            <div className="flex items-center justify-between border-b border-[#eef1f7] px-6 py-4">
+              <div>
+                <h4 className="text-lg font-semibold text-[#111827]">
+                  {instructionDialogTarget.title}
+                </h4>
+                <p className="mt-1 text-sm text-[#6b7280]">
+                  Full instruction text
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setInstructionDialogTarget(null)}
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-[#e5e7eb] text-[#475569] transition hover:bg-[#f8fafc]"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="max-h-[70vh] overflow-y-auto px-6 py-5">
+              <div className="rounded-2xl border border-[#eef1f7] bg-[#fbfcfe] p-5">
+                <div className="space-y-2 text-sm leading-7 text-[#2b3341]">
+                  {instructionDialogTarget.content
+                    .split(/\r?\n/)
+                    .map((line, index) => {
+                      const trimmedLine = line.trim();
+                      if (!trimmedLine) {
+                        return <div key={`instruction-dialog-empty-${index}`} className="h-2" />;
+                      }
+                      if (trimmedLine.startsWith("##")) {
+                        return (
+                          <p
+                            key={`instruction-dialog-heading-${index}`}
+                            className="text-base font-semibold leading-snug text-[#0f172a]"
+                          >
+                            {trimmedLine.replace(/^##+\s*/, "")}
+                          </p>
+                        );
+                      }
+                      return (
+                        <p
+                          key={`instruction-dialog-line-${index}`}
+                          className="break-words whitespace-normal"
+                        >
+                          {trimmedLine}
+                        </p>
+                      );
+                    })}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }
