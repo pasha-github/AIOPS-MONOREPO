@@ -164,7 +164,6 @@ def register_handlers(app: App, config: Config) -> None:
             ) or (ctx.activity.conversation.id or "").strip()
 
             async def send_progress_event(event_label: str) -> None:
-                await send_optional_typing(ctx, app)
                 nonlocal status_activity
                 status_text = f"Agent status: {event_label}"
                 if status_activity is None:
@@ -216,7 +215,6 @@ def register_handlers(app: App, config: Config) -> None:
                 )
             return
 
-        await send_optional_typing(ctx, app)
         if status_activity is None:
             await send_with_retry(
                 ctx,
