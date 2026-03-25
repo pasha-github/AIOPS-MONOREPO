@@ -77,6 +77,7 @@ export default function AgentRegistry({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [jobsTarget, setJobsTarget] = useState<AgentRecord | null>(null);
   const [webhookTarget, setWebhookTarget] = useState<AgentRecord | null>(null);
+  const [expandedInstructions, setExpandedInstructions] = useState<Record<string, boolean>>({});
 
   const agentManagerBaseUrl = trimTrailingSlash(llmManagerApiBaseUrl);
 
@@ -232,6 +233,59 @@ export default function AgentRegistry({
         {content}
       </span>
     );
+  };
+
+  const getInstructionPreview = (value: string | null | undefined) => {
+    const content = value?.trim() || "";
+    if (content.length <= 180) {
+      return content;
+    }
+    return `${content.slice(0, 180).trimEnd()}...`;
+  };
+
+  const renderInstructionMarkdown = (value: string | null | undefined) => {
+    const content = value?.trim();
+    if (!content) {
+      return <span className="text-[#64748b]">-</span>;
+    }
+
+    const lines = content.split(/\r?\n/);
+    return (
+      <div className="space-y-1">
+        {lines.map((line, index) => {
+          const trimmedLine = line.trim();
+          if (!trimmedLine) {
+            return <div key={`instruction-line-${index}`} className="h-2" />;
+          }
+          if (trimmedLine.startsWith("##")) {
+            const heading = trimmedLine.replace(/^##+\s*/, "");
+            return (
+              <p
+                key={`instruction-line-${index}`}
+                className="font-semibold leading-snug text-[#0f172a]"
+              >
+                {heading}
+              </p>
+            );
+          }
+          return (
+            <p
+              key={`instruction-line-${index}`}
+              className="break-words whitespace-normal leading-snug text-[#2b3341]"
+            >
+              {trimmedLine}
+            </p>
+          );
+        })}
+      </div>
+    );
+  };
+
+  const toggleInstructionExpanded = (rowKey: string) => {
+    setExpandedInstructions((previous) => ({
+      ...previous,
+      [rowKey]: !previous[rowKey],
+    }));
   };
 
   const splitDateTime = (formattedValue: string) => {
@@ -675,7 +729,24 @@ export default function AgentRegistry({
                         </span>
                       </div>
                       <div className="flex h-full items-start px-3">
-                        {renderWrappedText(agent.instruction)}
+                        <div className="space-y-1">
+                          {expandedInstructions[rowKey]
+                            ? renderInstructionMarkdown(agent.instruction)
+                            : (
+                              <p className="break-words whitespace-normal leading-snug text-[#2b3341]">
+                                {getInstructionPreview(agent.instruction) || "-"}
+                              </p>
+                            )}
+                          {agent.instruction && agent.instruction.trim().length > 180 ? (
+                            <button
+                              type="button"
+                              onClick={() => toggleInstructionExpanded(rowKey)}
+                              className="text-xs font-semibold text-[#4f49e2] transition hover:text-[#4338ca]"
+                            >
+                              {expandedInstructions[rowKey] ? "See less" : "See more"}
+                            </button>
+                          ) : null}
+                        </div>
                       </div>
                       <div className="flex h-full min-w-0 flex-col items-start justify-center px-3 text-left text-[#334155]" title={agent.created_at || "-"}>
                         <span className="block leading-tight">
@@ -874,8 +945,23 @@ export default function AgentRegistry({
                       <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[#64748b]">
                         Instructions
                       </p>
-                      <div className="mt-1">
-                        {renderWrappedText(agent.instruction)}
+                      <div className="mt-1 space-y-1">
+                        {expandedInstructions[rowKey]
+                          ? renderInstructionMarkdown(agent.instruction)
+                          : (
+                            <p className="break-words whitespace-normal leading-snug text-[#2b3341]">
+                              {getInstructionPreview(agent.instruction) || "-"}
+                            </p>
+                          )}
+                        {agent.instruction && agent.instruction.trim().length > 180 ? (
+                          <button
+                            type="button"
+                            onClick={() => toggleInstructionExpanded(rowKey)}
+                            className="text-xs font-semibold text-[#4f49e2] transition hover:text-[#4338ca]"
+                          >
+                            {expandedInstructions[rowKey] ? "See less" : "See more"}
+                          </button>
+                        ) : null}
                       </div>
                     </div>
                     <div className="relative" data-action-menu="true">
