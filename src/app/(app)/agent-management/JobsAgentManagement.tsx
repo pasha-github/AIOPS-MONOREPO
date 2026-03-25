@@ -1,9 +1,9 @@
 "use client";
 
-import { Plus, Trash2, X } from "lucide-react";
-import { useEffect, useState } from "react";
 import { trimTrailingSlash } from "@/config/agent";
 import { useRuntimeConfig } from "@/config/runtime-config";
+import { Plus, Trash2, X } from "lucide-react";
+import { useEffect, useState } from "react";
 
 type AgentRecord = {
   agent_id: string | null;
@@ -489,7 +489,7 @@ export default function JobsAgentManagement({
                           : "bg-[#4f49e2] hover:bg-[#4338ca]"
                       }`}
                     >
-                      <Plus className="h-4 w-4" />
+                    
                       {isCreatingJob ? "Creating..." : "Create Job"}
                     </button>
                   </div>
