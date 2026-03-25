@@ -137,8 +137,11 @@ export default function AgentManagementSection() {
         }
 
         if (response.ok && Array.isArray(data)) {
-          const mappedAgents: AgentRecord[] = (data as AgentListApiResponseItem[]).map(
-            (item, index) => {
+          const mappedAgents: AgentRecord[] = (data as AgentListApiResponseItem[])
+            .filter(
+              (item) => String(item.type ?? "").trim().toLowerCase() !== "automation"
+            )
+            .map((item, index) => {
               const name = String(item.name ?? "").trim() || `Agent ${index + 1}`;
               const id = String(item.agent_id ?? "").trim() || `agent_${index + 1}`;
               return {
@@ -151,8 +154,7 @@ export default function AgentManagementSection() {
                 stop_time: null,
                 updated_at: item.updated_at ?? null,
               };
-            }
-          );
+            });
           setAgents(mappedAgents);
           setAgentsError("");
         } else if (!shouldRefresh) {
