@@ -10,8 +10,6 @@ type AgentRecord = {
   name: string;
 };
 
-type WebhookTab = "create" | "list";
-
 type WebhookRecord = {
   webhook_id: string;
   prompt: string;
@@ -45,7 +43,6 @@ export default function WebhookAgentManagement({
 }: WebhookAgentManagementProps) {
   const { llmManagerApiBaseUrl } = useRuntimeConfig();
   const agentManagerBaseUrl = trimTrailingSlash(llmManagerApiBaseUrl);
-  const [webhookTab, setWebhookTab] = useState<WebhookTab>("create");
   const [webhookPrompt, setWebhookPrompt] = useState("");
   const [webhooks, setWebhooks] = useState<WebhookRecord[]>([]);
   const [isWebhooksLoading, setIsWebhooksLoading] = useState(false);
@@ -64,10 +61,6 @@ export default function WebhookAgentManagement({
   const agentId = agent.agent_id?.trim() ?? "";
 
   useEffect(() => {
-    if (webhookTab !== "list") {
-      return;
-    }
-
     const controller = new AbortController();
     const loadWebhooks = async () => {
       const agentId = agent.agent_id?.trim();
@@ -122,7 +115,7 @@ export default function WebhookAgentManagement({
 
     void loadWebhooks();
     return () => controller.abort();
-  }, [agentManagerBaseUrl, agent.agent_id, webhookTab]);
+  }, [agentManagerBaseUrl, agent.agent_id]);
 
   const handleCreateWebhook = async () => {
     if (isCreatingWebhook) {
@@ -170,7 +163,39 @@ export default function WebhookAgentManagement({
       }
 
       setWebhookPrompt("");
-      setWebhookTab("list");
+      void (async () => {
+        setIsWebhooksLoading(true);
+        setWebhooksError("");
+        try {
+          const response = await fetch(
+            `${agentManagerBaseUrl}/agent/${encodeURIComponent(agentId)}/webhook`,
+            { headers: { accept: "application/json" } }
+          );
+          const data = await response.json();
+          if (response.ok && Array.isArray(data)) {
+            setWebhooks(
+              data
+                .map((item) => {
+                  if (!item || typeof item !== "object" || Array.isArray(item)) {
+                    return null;
+                  }
+                  const record = item as Record<string, unknown>;
+                  const webhookId =
+                    typeof record.webhook_id === "string" ? record.webhook_id.trim() : "";
+                  const prompt =
+                    typeof record.prompt === "string" ? record.prompt.trim() : "";
+                  if (!webhookId) {
+                    return null;
+                  }
+                  return { webhook_id: webhookId, prompt };
+                })
+                .filter((item): item is WebhookRecord => item !== null)
+            );
+          }
+        } finally {
+          setIsWebhooksLoading(false);
+        }
+      })();
     } catch {
       setWebhookCreateError("Unable to create webhook.");
     } finally {
@@ -246,83 +271,22 @@ export default function WebhookAgentManagement({
             </button>
           </div>
 
-          <div className="border-b border-[#eef1f7] px-6 pt-4">
-            <div className="inline-flex rounded-2xl bg-[#eef2ff] p-1">
-              <button
-                type="button"
-                onClick={() => setWebhookTab("list")}
-                className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
-                  webhookTab === "list"
-                    ? "bg-white text-[#4f49e2] shadow-[0_8px_20px_-14px_rgba(79,73,226,0.65)] ring-1 ring-[#dbe3ff]"
-                    : "text-[#64748b] hover:text-[#334155]"
-                }`}
-              >
-                List of Webhooks
-              </button>
-              <button
-                type="button"
-                onClick={() => setWebhookTab("create")}
-                className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
-                  webhookTab === "create"
-                    ? "bg-white text-[#4f49e2] shadow-[0_8px_20px_-14px_rgba(79,73,226,0.65)] ring-1 ring-[#dbe3ff]"
-                    : "text-[#64748b] hover:text-[#334155]"
-                }`}
-              >
-                Create Webhook
-              </button>
-            </div>
-          </div>
-
           <div className="max-h-[70vh] overflow-y-auto px-6 py-5">
-            {webhookTab === "create" ? (
+            <div className="grid gap-5 lg:grid-cols-[1.15fr_0.85fr]">
               <div className="space-y-4">
-                <div>
-                  <label className="mb-2 block text-sm font-semibold text-[#111827]">
-                    Prompt
-                  </label>
-                  <p className="mb-2 text-xs text-[#64748b]">
-                    This prompt will be sent in the webhook payload body.
-                  </p>
-                  <textarea
-                    value={webhookPrompt}
-                    onChange={(event) => setWebhookPrompt(event.target.value)}
-                    rows={5}
-                    placeholder="Enter webhook prompt"
-                    className="min-h-[180px] w-full rounded-2xl border border-[#dbe3f0] bg-[#fbfcfe] px-4 py-3 text-sm text-[#111827] outline-none transition placeholder:text-[#9ca3af] focus:border-[#4f49e2] focus:bg-white focus:shadow-[0_0_0_4px_rgba(79,73,226,0.08)]"
-                  />
-                </div>
-                {webhookCreateError ? (
-                  <p className="text-sm text-[#dc2626]">{webhookCreateError}</p>
-                ) : null}
-                <div className="flex items-center justify-end gap-3">
-                  <button
-                    type="button"
-                    onClick={closeModal}
-                    className="rounded-xl border border-[#e5e7eb] px-5 py-2 text-sm font-semibold text-[#374151] transition hover:bg-[#f8fafc]"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleCreateWebhook}
-                    disabled={isCreatingWebhook}
-                    className={`rounded-xl px-5 py-2 text-sm font-semibold text-white shadow-[0_10px_24px_-18px_rgba(79,73,226,0.8)] transition ${
-                      isCreatingWebhook
-                        ? "cursor-not-allowed bg-[#a5b4fc]"
-                        : "bg-[#4f49e2] hover:bg-[#4338ca]"
-                    }`}
-                  >
-                    {isCreatingWebhook ? "Creating..." : "Create Webhook"}
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {webhooksError ? (
-                  <div className="rounded-2xl border border-[#fee2e2] bg-[#fff5f5] px-4 py-3 text-sm text-[#b91c1c]">
-                    {webhooksError}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h5 className="text-sm font-semibold text-[#111827]">Webhooks</h5>
+                    <p className="text-xs text-[#64748b]">Create and review webhooks for this agent.</p>
                   </div>
-                ) : null}
+                  <button
+                    type="button"
+                    onClick={() => void 0}
+                    className="rounded-xl border border-[#e5e7eb] px-3 py-2 text-xs font-semibold text-[#374151]"
+                  >
+                    List of Webhooks
+                  </button>
+                </div>
                 <div className="overflow-hidden rounded-2xl border border-[#eef1f7]">
                   <div className="grid grid-cols-[1.1fr_2fr_0.65fr] bg-[#eaf0f8] px-4 py-3 text-xs font-semibold uppercase tracking-[0.08em] text-[#0f172a]">
                     <span>Webhook ID</span>
@@ -389,7 +353,60 @@ export default function WebhookAgentManagement({
                   )}
                 </div>
               </div>
-            )}
+
+              <div className="rounded-2xl border border-[#eef1f7] bg-[#fbfcfe] p-5">
+                <div className="mb-4">
+                  <h5 className="text-sm font-semibold text-[#111827]">Create Webhook</h5>
+                  <p className="mt-1 text-xs text-[#64748b]">
+                    Submit a prompt to create a new webhook for this agent.
+                  </p>
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm font-semibold text-[#111827]">
+                    Prompt
+                  </label>
+                  <p className="mb-2 text-xs text-[#64748b]">
+                    This prompt will be sent in the webhook payload body.
+                  </p>
+                  <textarea
+                    value={webhookPrompt}
+                    onChange={(event) => setWebhookPrompt(event.target.value)}
+                    rows={5}
+                    placeholder="Enter webhook prompt"
+                    className="min-h-[180px] w-full rounded-2xl border border-[#dbe3f0] bg-[#fbfcfe] px-4 py-3 text-sm text-[#111827] outline-none transition placeholder:text-[#9ca3af] focus:border-[#4f49e2] focus:bg-white focus:shadow-[0_0_0_4px_rgba(79,73,226,0.08)]"
+                  />
+                </div>
+                {webhookCreateError ? (
+                  <p className="text-sm text-[#dc2626]">{webhookCreateError}</p>
+                ) : null}
+                <div className="flex items-center justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={closeModal}
+                    className="rounded-xl border border-[#e5e7eb] px-5 py-2 text-sm font-semibold text-[#374151] transition hover:bg-[#f8fafc]"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCreateWebhook}
+                    disabled={isCreatingWebhook}
+                    className={`rounded-xl px-5 py-2 text-sm font-semibold text-white shadow-[0_10px_24px_-18px_rgba(79,73,226,0.8)] transition ${
+                      isCreatingWebhook
+                        ? "cursor-not-allowed bg-[#a5b4fc]"
+                        : "bg-[#4f49e2] hover:bg-[#4338ca]"
+                    }`}
+                  >
+                    {isCreatingWebhook ? "Creating..." : "Create Webhook"}
+                  </button>
+                </div>
+              </div>
+              {webhooksError ? (
+                <div className="mt-4 rounded-2xl border border-[#fee2e2] bg-[#fff5f5] px-4 py-3 text-sm text-[#b91c1c]">
+                  {webhooksError}
+                </div>
+              ) : null}
+            </div>
           </div>
         </div>
       </div>
