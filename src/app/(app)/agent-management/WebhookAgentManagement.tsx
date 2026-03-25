@@ -54,10 +54,6 @@ export default function WebhookAgentManagement({
   const [isDeletingWebhook, setIsDeletingWebhook] = useState(false);
   const [webhookDeleteError, setWebhookDeleteError] = useState("");
 
-  const closeModal = () => {
-    onClose();
-  };
-
   const agentId = agent.agent_id?.trim() ?? "";
 
   useEffect(() => {
@@ -262,9 +258,9 @@ export default function WebhookAgentManagement({
                 </p>
               ) : null}
             </div>
-            <button
+              <button
               type="button"
-              onClick={closeModal}
+              onClick={onClose}
               className="flex h-9 w-9 items-center justify-center rounded-full border border-[#e5e7eb] text-[#475569] transition hover:bg-[#f8fafc]"
             >
               <X className="h-4 w-4" />
@@ -382,7 +378,7 @@ export default function WebhookAgentManagement({
                 <div className="flex items-center justify-end gap-3">
                   <button
                     type="button"
-                    onClick={closeModal}
+                    onClick={onClose}
                     className="rounded-xl border border-[#e5e7eb] px-5 py-2 text-sm font-semibold text-[#374151] transition hover:bg-[#f8fafc]"
                   >
                     Cancel

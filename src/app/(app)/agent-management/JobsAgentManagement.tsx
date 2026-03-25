@@ -3,7 +3,7 @@
 import { trimTrailingSlash } from "@/config/agent";
 import { useRuntimeConfig } from "@/config/runtime-config";
 import { Plus, Trash2, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 type AgentRecord = {
   agent_id: string | null;
@@ -62,73 +62,72 @@ export default function JobsAgentManagement({
 
   const agentId = agent.agent_id?.trim() ?? "";
 
-  useEffect(() => {
-    const controller = new AbortController();
-    const loadJobs = async () => {
-      if (!agentId) {
-        setJobsError("Agent ID is missing. Unable to load jobs.");
+  const loadJobs = useCallback(async (signal?: AbortSignal) => {
+    if (!agentId) {
+      setJobsError("Agent ID is missing. Unable to load jobs.");
+      return;
+    }
+
+    setIsJobsLoading(true);
+    setJobsError("");
+
+    try {
+      const response = await fetch(
+        `${agentManagerBaseUrl}/agent/${encodeURIComponent(agentId)}/jobs`,
+        {
+          headers: { accept: "application/json" },
+          signal,
+        }
+      );
+      const data = await response.json();
+      if (!response.ok || !Array.isArray(data)) {
+        setJobsError(getErrorMessage(data, "Unable to load jobs."));
         return;
       }
 
-      setIsJobsLoading(true);
-      setJobsError("");
-
-      try {
-        const response = await fetch(
-          `${agentManagerBaseUrl}/agent/${encodeURIComponent(agentId)}/jobs`,
-          {
-            headers: { accept: "application/json" },
-            signal: controller.signal,
-          }
-        );
-        const data = await response.json();
-        if (!response.ok || !Array.isArray(data)) {
-          setJobsError(getErrorMessage(data, "Unable to load jobs."));
-          return;
-        }
-
-        setJobs(
-          data
-            .map((item) => {
-              if (!item || typeof item !== "object" || Array.isArray(item)) {
-                return null;
-              }
-              const record = item as Record<string, unknown>;
-              const jobId = typeof record.job_id === "string" ? record.job_id.trim() : "";
-              const agentIdValue =
-                typeof record.agent_id === "string" ? record.agent_id.trim() : "";
-              const prompt = typeof record.prompt === "string" ? record.prompt.trim() : "";
-              const cron = typeof record.cron_expression === "string" ? record.cron_expression.trim() : "";
-              const interval =
-                typeof record.interval_seconds === "number"
-                  ? record.interval_seconds
-                  : Number(record.interval_seconds);
-              if (!jobId) {
-                return null;
-              }
-              return {
-                job_id: jobId,
-                agent_id: agentIdValue,
-                prompt,
-                cron_expression: cron,
-                interval_seconds: Number.isFinite(interval) ? interval : 0,
-              };
-            })
-            .filter((item): item is JobRecord => item !== null)
-        );
-      } catch (error) {
-        if (error instanceof DOMException && error.name === "AbortError") {
-          return;
-        }
-        setJobsError("Unable to load jobs.");
-      } finally {
-        setIsJobsLoading(false);
+      setJobs(
+        data
+          .map((item) => {
+            if (!item || typeof item !== "object" || Array.isArray(item)) {
+              return null;
+            }
+            const record = item as Record<string, unknown>;
+            const jobId = typeof record.job_id === "string" ? record.job_id.trim() : "";
+            const prompt = typeof record.prompt === "string" ? record.prompt.trim() : "";
+            const cron =
+              typeof record.cron_expression === "string" ? record.cron_expression.trim() : "";
+            const interval =
+              typeof record.interval_seconds === "number"
+                ? record.interval_seconds
+                : Number(record.interval_seconds);
+            if (!jobId) {
+              return null;
+            }
+            return {
+              job_id: jobId,
+              agent_id: typeof record.agent_id === "string" ? record.agent_id.trim() : "",
+              prompt,
+              cron_expression: cron,
+              interval_seconds: Number.isFinite(interval) ? interval : 0,
+            };
+          })
+          .filter((item): item is JobRecord => item !== null)
+      );
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        return;
       }
-    };
-
-    void loadJobs();
-    return () => controller.abort();
+      setJobsError("Unable to load jobs.");
+    } finally {
+      setIsJobsLoading(false);
+    }
   }, [agentId, agentManagerBaseUrl]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void loadJobs(controller.signal);
+    return () => controller.abort();
+  }, [loadJobs]);
 
   const handleCreateJob = async () => {
     if (isCreatingJob) {
@@ -193,55 +192,7 @@ export default function JobsAgentManagement({
       setJobPrompt("");
       setCronExpression("");
       setIntervalSeconds("");
-      setIsJobsLoading(true);
-      setJobsError("");
-      try {
-        const response = await fetch(
-          `${agentManagerBaseUrl}/agent/${encodeURIComponent(agentId)}/jobs`,
-          {
-            headers: { accept: "application/json" },
-          }
-        );
-        const data = await response.json();
-        if (response.ok && Array.isArray(data)) {
-          setJobs(
-            data
-              .map((item) => {
-                if (!item || typeof item !== "object" || Array.isArray(item)) {
-                  return null;
-                }
-                const record = item as Record<string, unknown>;
-                const jobId =
-                  typeof record.job_id === "string" ? record.job_id.trim() : "";
-                const agentIdValue =
-                  typeof record.agent_id === "string" ? record.agent_id.trim() : "";
-                const prompt =
-                  typeof record.prompt === "string" ? record.prompt.trim() : "";
-                const cron =
-                  typeof record.cron_expression === "string"
-                    ? record.cron_expression.trim()
-                    : "";
-                const interval =
-                  typeof record.interval_seconds === "number"
-                    ? record.interval_seconds
-                    : Number(record.interval_seconds);
-                if (!jobId) {
-                  return null;
-                }
-                return {
-                  job_id: jobId,
-                  agent_id: agentIdValue,
-                  prompt,
-                  cron_expression: cron,
-                  interval_seconds: Number.isFinite(interval) ? interval : 0,
-                };
-              })
-              .filter((item): item is JobRecord => item !== null)
-          );
-        }
-      } finally {
-        setIsJobsLoading(false);
-      }
+      await loadJobs();
     } catch {
       setJobCreateError("Unable to create job.");
     } finally {
