@@ -227,9 +227,7 @@ def register_handlers(app: App, config: Config) -> None:
             await send_with_retry(
                 ctx,
                 app,
-                MessageActivityInput(text=agent_response.text).with_id(
-                    status_activity.id
-                ),
-                label="agent response update",
+                agent_response.text,
+                label="agent response",
                 required=True,
             )
