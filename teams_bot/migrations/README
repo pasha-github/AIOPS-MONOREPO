@@ -1,0 +1,5 @@
+Use Alembic to manage schema changes.
+
+Common commands:
+- alembic upgrade head
+- alembic revision --autogenerate -m "message"
