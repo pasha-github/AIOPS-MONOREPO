@@ -11,7 +11,7 @@ import {
   type ActionResult,
   type LLMRecord,
 } from "./llmHelpers";
-import UpdateLlm from "./updatellm";
+import UpdateLlm, { type LlmRecord } from "./updatellm";
 
 const SORTABLE_HEADERS = ["provider", "created_at", "name"] as const;
 type SortableHeader = (typeof SORTABLE_HEADERS)[number];
@@ -44,7 +44,7 @@ export default function LLMTableSection({
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
   const columnMenuRef = useRef<HTMLDivElement | null>(null);
-  const [updateTarget, setUpdateTarget] = useState<LLMRecord | null>(null);
+  const [updateTarget, setUpdateTarget] = useState<LlmRecord | null>(null);
   const isUpdateModalOpen = updateTarget !== null;
   const getHeaderLabel = (header: string) =>
     header === "name" ? "Model Name" : formatHeaderLabel(header);
@@ -459,9 +459,19 @@ export default function LLMTableSection({
                       <button
                         type="button"
                         onClick={() => {
+                          const nextUpdateTarget: LlmRecord = {
+                            model_id: String(item.model_id ?? ""),
+                            provider: String(item.provider ?? ""),
+                            name: String(item.name ?? ""),
+                            description: String(item.description ?? ""),
+                            api_key:
+                              item.api_key === null || item.api_key === undefined
+                                ? undefined
+                                : String(item.api_key),
+                          };
                           setSearchValue("");
                           requestAnimationFrame(() => setSearchValue(""));
-                          setUpdateTarget(item);
+                          setUpdateTarget(nextUpdateTarget);
 
                         }}
                         className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#e0f2fe] text-[#0284c7] transition hover:bg-[#bae6fd] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0284c7]/40"
