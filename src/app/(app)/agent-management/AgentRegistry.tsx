@@ -466,7 +466,7 @@ export default function AgentRegistry({
         </div>
       ) : null}
 
-      <div className="mt-5 overflow-x-hidden overflow-y-visible rounded-2xl border border-[#eef1f7]">
+      <div className="mt-5 overflow-visible rounded-2xl border border-[#eef1f7]">
         {isLoading ? (
           <div className="bg-white">
             <div className="hidden grid-cols-[1.1fr_1.2fr_1.5fr_1.4fr_0.9fr_0.9fr_0.8fr_0.9fr] bg-[#eaf0f8] px-4 py-3 text-xs font-semibold uppercase tracking-[0.08em] text-[#0f172a] md:grid">
