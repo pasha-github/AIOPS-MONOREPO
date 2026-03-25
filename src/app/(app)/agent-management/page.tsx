@@ -13,6 +13,7 @@ type AgentRecord = {
   name: string;
   port: number | null;
   status: string;
+  type: string;
   enterprise: string;
   start_time: string | null;
   stop_time: string | null;
@@ -169,6 +170,7 @@ export default function AgentManagementPage() {
             name: getStringOrNull(record.name) ?? "Untitled Agent",
             port: typeof record.port === "number" ? record.port : null,
             status,
+            type,
             enterprise: type,
             start_time: getStringOrNull(record.start_time),
             stop_time: getStringOrNull(record.stop_time),

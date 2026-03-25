@@ -3,9 +3,11 @@
 import {
   Bot,
   ChevronDown,
+  BriefcaseBusiness,
   Pencil,
   Power,
   Search,
+  Webhook,
   Trash2,
   X,
 } from "lucide-react";
@@ -21,6 +23,7 @@ type AgentRecord = {
   name: string;
   port: number | null;
   status: string;
+  type: string;
   enterprise: string;
   start_time: string | null;
   stop_time: string | null;
@@ -383,6 +386,9 @@ export default function AgentRegistry({
     setSelectedAgent(agent);
     setIsModalOpen(true);
   };
+
+  const isAutomationAgent = (agent: AgentRecord) =>
+    agent.type.trim().toLowerCase() === "automation";
 
   return (
     <section className="rounded-3xl bg-white p-6 shadow-[0_18px_50px_-38px_rgba(16,24,40,0.5)]">
@@ -756,6 +762,27 @@ export default function AgentRegistry({
                                 <Pencil className="h-4 w-4" />
                                 Update
                               </button>
+                              {isAutomationAgent(agent) ? (
+                                <>
+                                  <div className="my-1 border-t border-[#eef1f7]" />
+                                  <button
+                                    type="button"
+                                    onClick={() => setOpenActionMenuKey(null)}
+                                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[#2563eb] hover:bg-[#eff6ff]"
+                                  >
+                                    <BriefcaseBusiness className="h-4 w-4" />
+                                    Jobs
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setOpenActionMenuKey(null)}
+                                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[#2563eb] hover:bg-[#eff6ff]"
+                                  >
+                                    <Webhook className="h-4 w-4" />
+                                    Webhook
+                                  </button>
+                                </>
+                              ) : null}
                             </div>
                           ) : null}
                         </div>
@@ -889,6 +916,27 @@ export default function AgentRegistry({
                             <Trash2 className="h-4 w-4" />
                             Delete
                           </button>
+                          {isAutomationAgent(agent) ? (
+                            <>
+                              <div className="my-1 border-t border-[#eef1f7]" />
+                              <button
+                                type="button"
+                                onClick={() => setOpenActionMenuKey(null)}
+                                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[#2563eb] hover:bg-[#eff6ff]"
+                              >
+                                <BriefcaseBusiness className="h-4 w-4" />
+                                Jobs
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setOpenActionMenuKey(null)}
+                                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[#2563eb] hover:bg-[#eff6ff]"
+                              >
+                                <Webhook className="h-4 w-4" />
+                                Webhook
+                              </button>
+                            </>
+                          ) : null}
                         </div>
                       ) : null}
                     </div>
