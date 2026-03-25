@@ -12,8 +12,6 @@ import {
   type LLMRecord,
 } from "./llmHelpers";
 import UpdateLlm from "./updatellm";
-import { useRuntimeConfig } from "@/config/runtime-config";
-import { trimTrailingSlash } from "@/config/agent";
 
 const SORTABLE_HEADERS = ["provider", "created_at", "name"] as const;
 type SortableHeader = (typeof SORTABLE_HEADERS)[number];
@@ -46,7 +44,8 @@ export default function LLMTableSection({
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
   const columnMenuRef = useRef<HTMLDivElement | null>(null);
-  const [updateTarget, setUpdateTarget] = useState<any | null>(null);
+  const [updateTarget, setUpdateTarget] = useState<LLMRecord | null>(null);
+  const isUpdateModalOpen = updateTarget !== null;
   const getHeaderLabel = (header: string) =>
     header === "name" ? "Model Name" : formatHeaderLabel(header);
  
@@ -195,8 +194,21 @@ export default function LLMTableSection({
             <input
               type="text"
               value={searchValue}
-              onChange={(event) => setSearchValue(event.target.value)}
+              onChange={(event) => {
+                if (isUpdateModalOpen) {
+                  return;
+                }
+                setSearchValue(event.target.value);
+              }}
               placeholder="Search Models.."
+              name="llm_model_search"
+              autoComplete="new-password"
+              autoCorrect="off"
+              autoCapitalize="none"
+              spellCheck={false}
+              data-form-type="other"
+              data-lpignore="true"
+              readOnly={isUpdateModalOpen}
               onFocus={() => setIsSearchFocused(true)}
               onBlur={() => setIsSearchFocused(false)}
               className="w-full bg-transparent text-sm text-[#4f49e2] placeholder:text-[#4f49e2] focus:outline-none"
@@ -447,6 +459,8 @@ export default function LLMTableSection({
                       <button
                         type="button"
                         onClick={() => {
+                          setSearchValue("");
+                          requestAnimationFrame(() => setSearchValue(""));
                           setUpdateTarget(item);
 
                         }}
@@ -544,7 +558,11 @@ export default function LLMTableSection({
       {updateTarget && (
         <UpdateLlm
           llm={updateTarget}
-          onClose={() => setUpdateTarget(null)}
+          onClose={() => {
+            setUpdateTarget(null);
+            setSearchValue("");
+            requestAnimationFrame(() => setSearchValue(""));
+          }}
         />
       )}
     </section>
