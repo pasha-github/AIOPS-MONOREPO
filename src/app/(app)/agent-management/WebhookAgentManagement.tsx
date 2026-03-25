@@ -43,6 +43,8 @@ export default function WebhookAgentManagement({
 }: WebhookAgentManagementProps) {
   const { llmManagerApiBaseUrl } = useRuntimeConfig();
   const agentManagerBaseUrl = trimTrailingSlash(llmManagerApiBaseUrl);
+  const buildWebhookUrl = (webhookId: string) =>
+    `${agentManagerBaseUrl}/agent/${encodeURIComponent(agentId)}/webhook/${encodeURIComponent(webhookId)}`;
   const [webhookPrompt, setWebhookPrompt] = useState("");
   const [webhooks, setWebhooks] = useState<WebhookRecord[]>([]);
   const [isWebhooksLoading, setIsWebhooksLoading] = useState(false);
@@ -209,7 +211,7 @@ export default function WebhookAgentManagement({
 
     try {
       const response = await fetch(
-        `${agentManagerBaseUrl}/agent/${encodeURIComponent(webhookDeleteTarget.agentId)}/webhook/${encodeURIComponent(webhookDeleteTarget.webhookId)}`,
+        buildWebhookUrl(webhookDeleteTarget.webhookId),
         {
           method: "DELETE",
           headers: { accept: "application/json" },
@@ -242,7 +244,7 @@ export default function WebhookAgentManagement({
   return (
     <>
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 px-4 py-8 backdrop-blur-md">
-        <div className="w-full max-w-4xl overflow-hidden rounded-[28px] bg-white shadow-[0_24px_70px_-36px_rgba(15,23,42,0.65)]">
+        <div className="w-full max-w-6xl overflow-hidden rounded-[28px] bg-white shadow-[0_24px_70px_-36px_rgba(15,23,42,0.65)]">
           <div className="flex items-start justify-between border-b border-[#eef1f7] px-6 py-4">
             <div className="space-y-1">
               <div className="flex items-center gap-3">
@@ -264,7 +266,7 @@ export default function WebhookAgentManagement({
           </div>
 
           <div className="max-h-[70vh] overflow-y-auto px-6 py-5">
-            <div className="grid gap-5 lg:grid-cols-[1.15fr_0.85fr]">
+            <div className="grid gap-5 lg:grid-cols-[1.35fr_1fr]">
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
@@ -280,69 +282,71 @@ export default function WebhookAgentManagement({
                   </button>
                 </div>
                 <div className="overflow-hidden rounded-2xl border border-[#eef1f7]">
-                  <div className="grid grid-cols-[1.1fr_2fr_0.65fr] bg-[#eaf0f8] px-4 py-3 text-xs font-semibold uppercase tracking-[0.08em] text-[#0f172a]">
-                    <span>Webhook ID</span>
+                  <div className="grid grid-cols-[1.45fr_1.55fr_0.55fr] gap-x-6 bg-[#eaf0f8] px-4 py-3 text-xs font-semibold uppercase tracking-[0.08em] text-[#0f172a]">
+                    <span>URL</span>
                     <span>Prompt</span>
                     <span className="text-right">Action</span>
                   </div>
-                  {isWebhooksLoading ? (
-                    <div className="divide-y divide-[#eef1f7] bg-white">
+                  <div className="max-h-[280px] overflow-y-auto">
+                    {isWebhooksLoading ? (
+                      <div className="divide-y divide-[#eef1f7] bg-white">
                       {Array.from({ length: 3 }).map((_, index) => (
                         <div
                           key={`webhook-skeleton-${index}`}
-                          className="grid animate-pulse grid-cols-[1.1fr_2fr_0.65fr] px-4 py-4"
+                          className="grid animate-pulse grid-cols-[1.45fr_1.55fr_0.55fr] gap-x-6 px-4 py-4"
                         >
                           <span className="mr-4 h-4 rounded bg-[#edf2f9]" />
                           <span className="h-4 rounded bg-[#edf2f9]" />
                           <span className="ml-auto h-8 w-8 rounded-xl bg-[#edf2f9]" />
                         </div>
                       ))}
-                    </div>
-                  ) : webhooks.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center gap-2 bg-white px-4 py-10 text-center">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#eef2ff] text-[#4f49e2]">
-                        <Trash2 className="h-5 w-5 rotate-45" />
                       </div>
-                      <p className="text-sm font-semibold text-[#111827]">
-                        No webhooks found
-                      </p>
-                      <p className="max-w-sm text-sm text-[#6b7280]">
-                        Create the first webhook to start capturing prompts for this agent.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="divide-y divide-[#eef1f7] bg-white">
-                      {webhooks.map((webhook) => (
-                        <div
-                          key={webhook.webhook_id}
-                          className="grid grid-cols-[1.1fr_2fr_0.65fr] px-4 py-4 text-sm text-[#2b3341]"
-                        >
-                          <div className="font-semibold text-[#0f172a]">
-                            {webhook.webhook_id}
-                          </div>
-                          <div className="break-words whitespace-normal leading-snug text-[#334155]">
-                            {webhook.prompt}
-                          </div>
-                          <div className="flex justify-end">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setWebhookDeleteTarget({
-                                  agentId: agent.agent_id?.trim() ?? "",
-                                  webhookId: webhook.webhook_id,
-                                })
-                              }
-                              className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[#f3c7c7] text-[#ef4444] transition hover:bg-[#fff1f2] hover:shadow-[0_10px_18px_-14px_rgba(239,68,68,0.45)]"
-                              aria-label={`Delete webhook ${webhook.webhook_id}`}
-                              title="Delete"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </div>
+                    ) : webhooks.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center gap-2 bg-white px-4 py-10 text-center">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#eef2ff] text-[#4f49e2]">
+                          <Trash2 className="h-5 w-5 rotate-45" />
                         </div>
-                      ))}
-                    </div>
-                  )}
+                        <p className="text-sm font-semibold text-[#111827]">
+                          No webhooks found
+                        </p>
+                        <p className="max-w-sm text-sm text-[#6b7280]">
+                          Create the first webhook to start capturing prompts for this agent.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-[#eef1f7] bg-white">
+                        {webhooks.map((webhook) => (
+                          <div
+                            key={webhook.webhook_id}
+                            className="grid grid-cols-[1.45fr_1.55fr_0.55fr] gap-x-6 px-4 py-4 text-sm text-[#2b3341]"
+                          >
+                            <div className="break-all whitespace-normal pr-4 font-semibold leading-snug text-[#0f172a]">
+                              {buildWebhookUrl(webhook.webhook_id)}
+                            </div>
+                            <div className="break-words whitespace-normal pl-2 leading-snug text-[#334155]">
+                              {webhook.prompt}
+                            </div>
+                            <div className="flex justify-end">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setWebhookDeleteTarget({
+                                    agentId: agent.agent_id?.trim() ?? "",
+                                    webhookId: webhook.webhook_id,
+                                  })
+                                }
+                                className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[#f3c7c7] text-[#ef4444] transition hover:bg-[#fff1f2] hover:shadow-[0_10px_18px_-14px_rgba(239,68,68,0.45)]"
+                                aria-label={`Delete webhook ${webhook.webhook_id}`}
+                                title="Delete"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -427,9 +431,9 @@ export default function WebhookAgentManagement({
                 Are you sure you want to delete this webhook?
               </p>
               <p className="mt-3 text-sm text-[#374151]">
-                <span className="font-semibold text-[#0f172a]">Webhook ID:</span>{" "}
+                <span className="font-semibold text-[#0f172a]">URL:</span>{" "}
                 <span className="rounded-md bg-[#fee2e2] px-2 py-0.5 font-semibold text-[#b91c1c]">
-                  {webhookDeleteTarget.webhookId}
+                  {buildWebhookUrl(webhookDeleteTarget.webhookId)}
                 </span>
               </p>
               <p className="mt-3 text-xs text-[#9b1c1c]">

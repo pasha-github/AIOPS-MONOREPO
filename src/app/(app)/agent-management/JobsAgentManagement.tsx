@@ -289,8 +289,7 @@ export default function JobsAgentManagement({
                   </span>
                 </div>
                 <div className="overflow-hidden rounded-2xl border border-[#eef1f7]">
-                  <div className="grid grid-cols-[1.1fr_1.8fr_1.1fr_0.9fr_0.6fr] bg-[#eaf0f8] px-4 py-3 text-xs font-semibold uppercase tracking-[0.08em] text-[#0f172a]">
-                    <span>Job ID</span>
+                  <div className="grid grid-cols-[1.5fr_1.5fr_1fr_0.6fr] bg-[#eaf0f8] px-4 py-3 text-xs font-semibold uppercase tracking-[0.08em] text-[#0f172a]">
                     <span>Prompt</span>
                     <span>Cron expression</span>
                     <span>Intervals</span>
@@ -301,9 +300,9 @@ export default function JobsAgentManagement({
                       {Array.from({ length: 3 }).map((_, index) => (
                         <div
                           key={`job-skeleton-${index}`}
-                          className="grid animate-pulse grid-cols-[1.1fr_1.8fr_1.1fr_0.9fr_0.6fr] px-4 py-4"
+                          className="grid animate-pulse grid-cols-[1.5fr_1.5fr_1fr_0.6fr] px-4 py-4"
                         >
-                          {Array.from({ length: 4 }).map((__, cellIndex) => (
+                          {Array.from({ length: 3 }).map((__, cellIndex) => (
                             <span
                               key={`job-skeleton-cell-${index}-${cellIndex}`}
                               className="mr-4 h-4 rounded bg-[#edf2f9]"
@@ -330,9 +329,8 @@ export default function JobsAgentManagement({
                       {jobs.map((job) => (
                         <div
                           key={job.job_id}
-                          className="grid grid-cols-[1.1fr_1.8fr_1.1fr_0.9fr_0.6fr] px-4 py-4 text-sm text-[#2b3341]"
+                          className="grid grid-cols-[1.5fr_1.5fr_1fr_0.6fr] px-4 py-4 text-sm text-[#2b3341]"
                         >
-                          <div className="font-semibold text-[#0f172a]">{job.job_id}</div>
                           <div className="break-words whitespace-normal leading-snug text-[#334155]">
                             {job.prompt}
                           </div>
