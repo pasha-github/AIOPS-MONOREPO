@@ -1,9 +1,9 @@
 "use client";
 
-import { Trash2, X } from "lucide-react";
-import { useEffect, useState } from "react";
 import { trimTrailingSlash } from "@/config/agent";
 import { useRuntimeConfig } from "@/config/runtime-config";
+import { Trash2, X } from "lucide-react";
+import { useEffect, useState } from "react";
 
 type AgentRecord = {
   agent_id: string | null;
@@ -252,11 +252,7 @@ export default function WebhookAgentManagement({
                 </span>
               </div>
               <p className="text-sm text-[#6b7280]">{agent.name}</p>
-              {agentId ? (
-                <p className="text-xs text-[#94a3b8]">
-                  Agent ID: <span className="font-medium text-[#64748b]">{agentId}</span>
-                </p>
-              ) : null}
+              
             </div>
               <button
               type="button"

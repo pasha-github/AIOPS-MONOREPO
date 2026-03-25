@@ -265,11 +265,7 @@ export default function JobsAgentManagement({
                 </span>
               </div>
               <p className="text-sm text-[#6b7280]">{agent.name}</p>
-              {agentId ? (
-                <p className="text-xs text-[#94a3b8]">
-                  Agent ID: <span className="font-medium text-[#64748b]">{agentId}</span>
-                </p>
-              ) : null}
+              
             </div>
             <button
               type="button"
