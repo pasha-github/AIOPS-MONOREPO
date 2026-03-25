@@ -16,6 +16,7 @@ import Image from "next/image";
 import { trimTrailingSlash } from "@/config/agent";
 import { useRuntimeConfig } from "@/config/runtime-config";
 import { formatDateTime, getProviderIconSrc } from "../llm-management/llmHelpers";
+import JobsAgentManagement from "./JobsAgentManagement";
 import WebhookAgentManagement from "./WebhookAgentManagement";
 import UpdateAgent from "./updateagent";
 
@@ -74,6 +75,7 @@ export default function AgentRegistry({
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedAgent, setSelectedAgent] = useState<AgentRecord | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [jobsTarget, setJobsTarget] = useState<AgentRecord | null>(null);
   const [webhookTarget, setWebhookTarget] = useState<AgentRecord | null>(null);
 
   const agentManagerBaseUrl = trimTrailingSlash(llmManagerApiBaseUrl);
@@ -768,7 +770,10 @@ export default function AgentRegistry({
                                   <div className="my-1 border-t border-[#eef1f7]" />
                                   <button
                                     type="button"
-                                    onClick={() => setOpenActionMenuKey(null)}
+                                    onClick={() => {
+                                      setJobsTarget(agent);
+                                      setOpenActionMenuKey(null);
+                                    }}
                                     className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[#2563eb] hover:bg-[#eff6ff]"
                                   >
                                     <BriefcaseBusiness className="h-4 w-4" />
@@ -1067,6 +1072,13 @@ export default function AgentRegistry({
           onUpdateSuccess={onStatusUpdateSuccess}
         />
       )}
+
+      {jobsTarget ? (
+        <JobsAgentManagement
+          agent={jobsTarget}
+          onClose={() => setJobsTarget(null)}
+        />
+      ) : null}
 
       {webhookTarget ? (
         <WebhookAgentManagement
