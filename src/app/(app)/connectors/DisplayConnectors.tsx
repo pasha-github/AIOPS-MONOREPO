@@ -202,7 +202,7 @@ export default function DisplayConnectors({ searchTerm }: DisplayConnectorsProps
                 loading="lazy"
               />
             </div>
-            <div className="mt-6 flex flex-nowrap justify-end gap-2 overflow-x-auto">
+            <div className="mt-6 grid grid-cols-3 gap-2">
               <button
                 type="button"
                 onClick={() => {
@@ -210,7 +210,7 @@ export default function DisplayConnectors({ searchTerm }: DisplayConnectorsProps
                   setIsSetConfigOpen(true);
                 }}
                 disabled={showCardShimmer}
-                className="inline-flex items-center gap-2 rounded-lg bg-[#4f49e2] px-3 py-2 text-sm font-semibold text-white shadow-[0_10px_22px_-14px_rgba(79,73,226,0.85)] transition-all duration-150 hover:bg-[#3f39d6] active:translate-y-px active:scale-[0.97] active:shadow-none"
+                className="inline-flex w-full items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-[#4f49e2] px-3 py-2 text-sm font-semibold text-white shadow-[0_10px_22px_-14px_rgba(79,73,226,0.85)] transition-all duration-150 hover:bg-[#3f39d6] active:translate-y-px active:scale-[0.97] active:shadow-none"
                 aria-label={`Set config for ${connector.name}`}
                 title={`Set config for ${connector.name}`}
               >
@@ -224,7 +224,7 @@ export default function DisplayConnectors({ searchTerm }: DisplayConnectorsProps
                   setIsShowConfigOpen(true);
                 }}
                 disabled={showCardShimmer}
-                className="inline-flex items-center gap-2 rounded-lg border border-[#cbd2ff] px-3 py-2 text-sm font-semibold text-[#4f49e2] shadow-[0_6px_16px_-12px_rgba(79,73,226,0.8)] transition-all duration-150 hover:bg-[#eef2ff] active:translate-y-px active:scale-[0.97] active:shadow-none"
+                className="inline-flex w-full items-center justify-center gap-2 whitespace-nowrap rounded-lg border border-[#cbd2ff] px-3 py-2 text-sm font-semibold text-[#4f49e2] shadow-[0_6px_16px_-12px_rgba(79,73,226,0.8)] transition-all duration-150 hover:bg-[#eef2ff] active:translate-y-px active:scale-[0.97] active:shadow-none"
                 aria-label={`Show config for ${connector.name}`}
                 title={`Show config for ${connector.name}`}
               >
@@ -238,7 +238,7 @@ export default function DisplayConnectors({ searchTerm }: DisplayConnectorsProps
                   setIsViewOpen(true);
                 }}
                 disabled={showCardShimmer}
-                className="inline-flex items-center gap-2 rounded-lg border border-[#cbd2ff] px-3 py-2 text-sm font-semibold text-[#4f49e2] shadow-[0_6px_16px_-12px_rgba(79,73,226,0.8)] transition-all duration-150 hover:bg-[#eef2ff] active:translate-y-px active:scale-[0.97] active:shadow-none"
+                className="inline-flex w-full items-center justify-center gap-2 whitespace-nowrap rounded-lg border border-[#cbd2ff] px-3 py-2 text-sm font-semibold text-[#4f49e2] shadow-[0_6px_16px_-12px_rgba(79,73,226,0.8)] transition-all duration-150 hover:bg-[#eef2ff] active:translate-y-px active:scale-[0.97] active:shadow-none"
                 aria-label={`View details about ${connector.name}`}
                 title={`View details about ${connector.name}`}
               >
