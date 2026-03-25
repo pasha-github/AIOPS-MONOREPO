@@ -359,7 +359,7 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
       <button
         type="button"
         onClick={openModal}
-        className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-600/25 transition hover:bg-indigo-700 active:scale-95"
+        className="inline-flex items-center gap-2 rounded-xl bg-[#4f49e2] px-5 py-3 text-sm font-semibold text-white shadow-[0_12px_24px_-14px_rgba(79,73,226,0.6)] transition hover:bg-[#3f39d6] active:scale-95"
       >
         <Plus size={16} />
         Create New Agent

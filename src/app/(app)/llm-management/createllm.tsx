@@ -1,14 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import Image from "next/image";
-import { ChevronDown, Eye, EyeOff, Loader2, X } from "lucide-react";
-import type { ActionResult } from "./llmHelpers";
 import {
   getProviderIconPath,
   LLM_PROVIDER_MODELS,
   type LlmProviderKey,
 } from "@/config/agent";
+import { ChevronDown, Eye, EyeOff, Loader2, X } from "lucide-react";
+import Image from "next/image";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { ActionResult } from "./llmHelpers";
 
 type SelectOption = { value: string; label: string; iconSrc?: string };
 type ProviderKey = LlmProviderKey;
@@ -310,7 +310,7 @@ export default function CreateLlmModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[75] flex items-center justify-center bg-black/30 px-4 py-8">
+    <div className="fixed inset-0 z-[75] flex items-center justify-center bg-black/40 px-4 py-8 backdrop-blur-sm">
       <div
         ref={createModalRef}
         role="dialog"
@@ -352,7 +352,7 @@ export default function CreateLlmModal({
                 }}
               />
               <p className="mt-2 min-h-[36px] text-xs text-[#8b95ad]">
-                Choose source first.
+                Choose provider first.
               </p>
             </div>
 

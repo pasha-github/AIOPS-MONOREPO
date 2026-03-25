@@ -65,7 +65,7 @@ export default function DisplayConnectors({ searchTerm }: DisplayConnectorsProps
     return () => controller.abort();
   }, [connectorsUrl]);
 
-  if (isLoading) {
+  if (isLoading && connectors.length === 0) {
     return (
       <div className="mt-6 grid gap-6 lg:grid-cols-3">
         {Array.from({ length: 3 }).map((_, index) => (
@@ -128,6 +128,7 @@ export default function DisplayConnectors({ searchTerm }: DisplayConnectorsProps
         return id.includes(normalizedSearch) || name.includes(normalizedSearch);
       })
     : connectors;
+  const showCardShimmer = isLoading && connectors.length > 0;
 
   if (visibleConnectors.length === 0) {
     return (
@@ -169,10 +170,20 @@ export default function DisplayConnectors({ searchTerm }: DisplayConnectorsProps
     <>
       <div className="mt-6 grid gap-6 lg:grid-cols-3">
         {visibleConnectors.map((connector) => (
+          (() => {
+            const isSelected = selectedConnector?.id === connector.id;
+            return (
           <div
             key={connector.id}
-            className="rounded-2xl bg-white p-5 shadow-[0_12px_30px_-24px_rgba(16,24,40,0.35)] ring-1 ring-[#eef1f7]"
+            className={`relative rounded-2xl bg-white p-5 transition-all duration-200 ${
+              isSelected
+                ? "shadow-[0_22px_40px_-28px_rgba(79,73,226,0.65)] ring-2 ring-[#cbd2ff]"
+                : "shadow-[0_12px_30px_-24px_rgba(16,24,40,0.35)] ring-1 ring-[#eef1f7] hover:shadow-[0_20px_34px_-24px_rgba(79,73,226,0.45)] hover:ring-[#d7defe]"
+            }`}
           >
+            {showCardShimmer ? (
+              <div className="pointer-events-none absolute inset-0 animate-pulse bg-[#ffffff]/70" />
+            ) : null}
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1">
                 <div className="flex items-center gap-3">
@@ -191,14 +202,15 @@ export default function DisplayConnectors({ searchTerm }: DisplayConnectorsProps
                 loading="lazy"
               />
             </div>
-            <div className="mt-6 flex flex-nowrap justify-end gap-2 overflow-x-auto">
+            <div className="mt-6 grid grid-cols-3 gap-2">
               <button
                 type="button"
                 onClick={() => {
                   setSelectedConnector(connector);
                   setIsSetConfigOpen(true);
                 }}
-                className="inline-flex items-center gap-2 rounded-lg border border-[#cbd2ff] px-3 py-2 text-sm font-semibold text-[#4f49e2] shadow-[0_6px_16px_-12px_rgba(79,73,226,0.8)] transition-all duration-150 hover:bg-[#eef2ff] active:translate-y-px active:scale-[0.97] active:shadow-none"
+                disabled={showCardShimmer}
+                className="inline-flex w-full items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-[#4f49e2] px-3 py-2 text-sm font-semibold text-white shadow-[0_10px_22px_-14px_rgba(79,73,226,0.85)] transition-all duration-150 hover:bg-[#3f39d6] active:translate-y-px active:scale-[0.97] active:shadow-none"
                 aria-label={`Set config for ${connector.name}`}
                 title={`Set config for ${connector.name}`}
               >
@@ -211,7 +223,8 @@ export default function DisplayConnectors({ searchTerm }: DisplayConnectorsProps
                   setSelectedConnector(connector);
                   setIsShowConfigOpen(true);
                 }}
-                className="inline-flex items-center gap-2 rounded-lg border border-[#cbd2ff] px-3 py-2 text-sm font-semibold text-[#4f49e2] shadow-[0_6px_16px_-12px_rgba(79,73,226,0.8)] transition-all duration-150 hover:bg-[#eef2ff] active:translate-y-px active:scale-[0.97] active:shadow-none"
+                disabled={showCardShimmer}
+                className="inline-flex w-full items-center justify-center gap-2 whitespace-nowrap rounded-lg border border-[#cbd2ff] px-3 py-2 text-sm font-semibold text-[#4f49e2] shadow-[0_6px_16px_-12px_rgba(79,73,226,0.8)] transition-all duration-150 hover:bg-[#eef2ff] active:translate-y-px active:scale-[0.97] active:shadow-none"
                 aria-label={`Show config for ${connector.name}`}
                 title={`Show config for ${connector.name}`}
               >
@@ -224,7 +237,8 @@ export default function DisplayConnectors({ searchTerm }: DisplayConnectorsProps
                   setSelectedConnector(connector);
                   setIsViewOpen(true);
                 }}
-                className="inline-flex items-center gap-2 rounded-lg border border-[#cbd2ff] px-3 py-2 text-sm font-semibold text-[#4f49e2] shadow-[0_6px_16px_-12px_rgba(79,73,226,0.8)] transition-all duration-150 hover:bg-[#eef2ff] active:translate-y-px active:scale-[0.97] active:shadow-none"
+                disabled={showCardShimmer}
+                className="inline-flex w-full items-center justify-center gap-2 whitespace-nowrap rounded-lg border border-[#cbd2ff] px-3 py-2 text-sm font-semibold text-[#4f49e2] shadow-[0_6px_16px_-12px_rgba(79,73,226,0.8)] transition-all duration-150 hover:bg-[#eef2ff] active:translate-y-px active:scale-[0.97] active:shadow-none"
                 aria-label={`View details about ${connector.name}`}
                 title={`View details about ${connector.name}`}
               >
@@ -233,6 +247,8 @@ export default function DisplayConnectors({ searchTerm }: DisplayConnectorsProps
               </button>
             </div>
           </div>
+            );
+          })()
         ))}
       </div>
       <ViewConnector

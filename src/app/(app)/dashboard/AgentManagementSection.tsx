@@ -287,11 +287,28 @@ export default function AgentManagementSection() {
         style={agentListMaxHeight ? { maxHeight: `${agentListMaxHeight}px` } : undefined}
       >
         {isAgentsLoading ? (
-          <div className="flex items-center gap-3 rounded-2xl border border-[#eef1f7] bg-white px-5 py-6 text-sm text-[#647087] shadow-[0_10px_30px_-28px_rgba(16,24,40,0.4)]">
-            <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-[#ecebff] text-[#5b4cf0]">
-              <Bot className="h-4 w-4" />
-            </span>
-            Loading agents...
+          <div className="space-y-4">
+            {Array.from({ length: 2 }).map((_, index) => (
+              <div
+                key={`agent-skeleton-${index}`}
+                className="animate-pulse rounded-2xl border border-[#eef1f7] bg-white px-5 py-4 shadow-[0_10px_30px_-28px_rgba(16,24,40,0.4)]"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className="h-10 w-10 rounded-2xl bg-[#edf2f9]" />
+                    <div className="space-y-2">
+                      <span className="block h-4 w-32 rounded bg-[#edf2f9]" />
+                      <span className="block h-3 w-44 rounded bg-[#edf2f9]" />
+                    </div>
+                  </div>
+                  <span className="h-5 w-24 rounded bg-[#edf2f9]" />
+                </div>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <span className="h-10 rounded-xl bg-[#edf2f9]" />
+                  <span className="h-10 rounded-xl bg-[#edf2f9]" />
+                </div>
+              </div>
+            ))}
           </div>
         ) : agentsError ? (
           <div className="rounded-2xl border border-[#fee2e2] bg-[#fff5f5] px-5 py-6 text-sm text-[#b91c1c] shadow-[0_10px_30px_-28px_rgba(16,24,40,0.4)]">
@@ -459,8 +476,28 @@ export default function AgentManagementSection() {
               ) : null}
 
               {isAgentsLoading ? (
-                <div className="rounded-2xl border border-[#eef1f7] bg-white px-5 py-6 text-sm text-[#647087] shadow-[0_10px_30px_-28px_rgba(16,24,40,0.4)]">
-                  Loading agents...
+                <div className="grid gap-4 md:grid-cols-2">
+                  {Array.from({ length: 4 }).map((_, index) => (
+                    <div
+                      key={`agent-modal-skeleton-${index}`}
+                      className="animate-pulse rounded-2xl border border-[#eef1f7] bg-white px-5 py-4 shadow-[0_10px_30px_-28px_rgba(16,24,40,0.4)]"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <span className="h-10 w-10 rounded-2xl bg-[#edf2f9]" />
+                          <div className="space-y-2">
+                            <span className="block h-4 w-36 rounded bg-[#edf2f9]" />
+                            <span className="block h-3 w-48 rounded bg-[#edf2f9]" />
+                          </div>
+                        </div>
+                        <span className="h-5 w-24 rounded bg-[#edf2f9]" />
+                      </div>
+                      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                        <span className="h-10 rounded-xl bg-[#edf2f9]" />
+                        <span className="h-10 rounded-xl bg-[#edf2f9]" />
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ) : agentsError ? (
                 <div className="rounded-2xl border border-[#fee2e2] bg-[#fff5f5] px-5 py-6 text-sm text-[#b91c1c] shadow-[0_10px_30px_-28px_rgba(16,24,40,0.4)]">
