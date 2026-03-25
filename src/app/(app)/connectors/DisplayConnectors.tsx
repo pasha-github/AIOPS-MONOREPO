@@ -169,9 +169,16 @@ export default function DisplayConnectors({ searchTerm }: DisplayConnectorsProps
     <>
       <div className="mt-6 grid gap-6 lg:grid-cols-3">
         {visibleConnectors.map((connector) => (
+          (() => {
+            const isSelected = selectedConnector?.id === connector.id;
+            return (
           <div
             key={connector.id}
-            className="rounded-2xl bg-white p-5 shadow-[0_12px_30px_-24px_rgba(16,24,40,0.35)] ring-1 ring-[#eef1f7]"
+            className={`rounded-2xl bg-white p-5 transition-all duration-200 ${
+              isSelected
+                ? "shadow-[0_22px_40px_-28px_rgba(79,73,226,0.65)] ring-2 ring-[#cbd2ff]"
+                : "shadow-[0_12px_30px_-24px_rgba(16,24,40,0.35)] ring-1 ring-[#eef1f7] hover:shadow-[0_20px_34px_-24px_rgba(79,73,226,0.45)] hover:ring-[#d7defe]"
+            }`}
           >
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1">
@@ -233,6 +240,8 @@ export default function DisplayConnectors({ searchTerm }: DisplayConnectorsProps
               </button>
             </div>
           </div>
+            );
+          })()
         ))}
       </div>
       <ViewConnector
