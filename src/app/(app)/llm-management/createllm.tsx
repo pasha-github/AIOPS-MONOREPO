@@ -310,7 +310,7 @@ export default function CreateLlmModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[75] flex items-center justify-center bg-black/30 px-4 py-8">
+    <div className="fixed inset-0 z-[75] flex items-center justify-center bg-black/40 px-4 py-8 backdrop-blur-sm">
       <div
         ref={createModalRef}
         role="dialog"
