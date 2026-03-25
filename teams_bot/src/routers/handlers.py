@@ -162,10 +162,12 @@ def register_handlers(app: App, config: Config) -> None:
             session_id = normalize_conversation_id(
                 ctx.activity.conversation.id, scope
             ) or (ctx.activity.conversation.id or "").strip()
+            status_lines: list[str] = []
 
             async def send_progress_event(event_label: str) -> None:
                 nonlocal status_activity
-                status_text = f"Agent status: {event_label}"
+                status_lines.append(f"- {event_label}")
+                status_text = "Agent status:\n" + "\n".join(status_lines)
                 if status_activity is None:
                     status_activity = await send_with_retry(
                         ctx,
