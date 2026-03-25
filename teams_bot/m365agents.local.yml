@@ -8,7 +8,7 @@ provision:
   - uses: teamsApp/create
     with:
       # app name
-      name: AlertTesting${{APP_NAME_SUFFIX}}
+      name: RC Enterprise AIOps${{APP_NAME_SUFFIX}}
     # Write the information of created resources into environment file for
     # the specified environment variable(s).
     writeToEnvironmentFile: 
@@ -18,7 +18,7 @@ provision:
   - uses: aadApp/create
     with:
       # The Microsoft Entra application's display name
-      name: AlertTesting${{APP_NAME_SUFFIX}}
+      name: RC Enterprise AIOps${{APP_NAME_SUFFIX}}
       generateClientSecret: true
       generateServicePrincipal: true
       signInAudience: AzureADMultipleOrgs
@@ -34,7 +34,7 @@ provision:
   - uses: botFramework/create
     with:
       botId: ${{BOT_ID}}
-      name: AlertTesting
+      name: RC Enterprise AIOps
       messagingEndpoint: ${{BOT_ENDPOINT}}/api/messages
       description: ""
       channels:
