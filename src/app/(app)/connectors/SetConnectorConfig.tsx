@@ -174,7 +174,7 @@ export default function SetConnectorConfig({
 
   if (schema.length === 0) {
     return (
-      <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/35 px-4 py-8">
+      <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/35 px-4 py-8 backdrop-blur-sm">
         <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-[0_20px_60px_-35px_rgba(15,23,42,0.65)]">
           <div className="flex items-center justify-between bg-[#4f49e2] px-6 py-4 text-white">
             <div className="flex items-center gap-3">
@@ -201,7 +201,7 @@ export default function SetConnectorConfig({
   }
 
   return (
-    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/35 px-4 py-8">
+    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/35 px-4 py-8 backdrop-blur-sm">
       <div className="flex w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-[0_20px_60px_-35px_rgba(15,23,42,0.65)]">
         <div className="flex items-center justify-between bg-[#4f49e2] px-6 py-4 text-white">
           <div className="flex items-center gap-3">

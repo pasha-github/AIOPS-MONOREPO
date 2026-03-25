@@ -106,7 +106,7 @@ export default function ShowConnectorConfig({
   }
 
   return (
-    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/35 px-4 py-8">
+    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/35 px-4 py-8 backdrop-blur-sm">
       <div className="flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-[0_20px_60px_-35px_rgba(15,23,42,0.65)]">
         <div className="flex items-center justify-between bg-[#4f49e2] px-6 py-4 text-white">
           <div className="flex items-center gap-3">
