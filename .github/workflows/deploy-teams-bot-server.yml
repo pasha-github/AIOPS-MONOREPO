@@ -65,7 +65,6 @@ jobs:
             --image=${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE }}:${{ github.sha }} \
             --region=${{ env.REGION }} \
             --project=${{ env.PROJECT_ID }} \
-            --port=${{ secrets.PORT }} \
             --min-instances=0 \
             --max-instances=1 \
             --allow-unauthenticated \
