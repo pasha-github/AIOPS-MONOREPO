@@ -5,7 +5,7 @@ from microsoft.teams.api import MessageActivity, MessageActivityInput, TypingAct
 from microsoft.teams.apps import ActivityContext, App
 
 from services.agent_client import fetch_agent_reply
-from services.email_mapping import onboard_personal_chat
+from services.email_mapping import collect_candidate_emails, onboard_personal_chat
 from services.subscriptions import (
     delete_subscription,
     detect_scope,
@@ -17,6 +17,9 @@ from utils.helpers import normalize_conversation_id
 EMPTY_TEXT_MESSAGE = "Please send a text message."
 MISSING_AGENT_CONFIG_MESSAGE = (
     "Agent chat is not configured. Set AGENT_ADK_BASE_URL and AGENT_APP_NAME in environment."
+)
+MISSING_USER_EMAIL_MESSAGE = (
+    "I could not determine a stable identity from Teams, so I cannot start the agent session."
 )
 AGENT_UNAVAILABLE_MESSAGE = "I could not reach the configured agent service right now."
 TRANSIENT_SEND_STATUS_CODES = {502, 503, 504}
@@ -162,10 +165,24 @@ def register_handlers(app: App, config: Config) -> None:
             session_id = normalize_conversation_id(
                 ctx.activity.conversation.id, scope
             ) or (ctx.activity.conversation.id or "").strip()
+            candidate_emails = await collect_candidate_emails(ctx)
+            fallback_user_id = str(getattr(ctx.activity.from_, "id", "") or "").strip()
+            if not candidate_emails and not fallback_user_id:
+                await send_with_retry(
+                    ctx,
+                    app,
+                    MISSING_USER_EMAIL_MESSAGE,
+                    label="missing-user-email warning",
+                    required=True,
+                )
+                return
+            adk_user_id = candidate_emails[0] if candidate_emails else fallback_user_id
+            status_lines: list[str] = []
 
             async def send_progress_event(event_label: str) -> None:
                 nonlocal status_activity
-                status_text = f"Agent status: {event_label}"
+                status_lines.append(f"- {event_label}")
+                status_text = "Agent status:\n" + "\n".join(status_lines)
                 if status_activity is None:
                     status_activity = await send_with_retry(
                         ctx,
@@ -188,7 +205,7 @@ def register_handlers(app: App, config: Config) -> None:
             agent_response = await fetch_agent_reply(
                 adk_base_url=config.AGENT_ADK_BASE_URL,
                 app_name=config.AGENT_APP_NAME,
-                user_id=config.AGENT_ADK_USER_ID,
+                user_id=adk_user_id,
                 session_id=session_id,
                 message=user_text,
                 on_event=send_progress_event,

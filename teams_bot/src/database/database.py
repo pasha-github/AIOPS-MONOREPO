@@ -108,13 +108,15 @@ def init_db() -> None:
     alembic_config = AlembicConfig(str(alembic_ini_path))
     alembic_config.set_main_option("prepend_sys_path", str(project_root / "src"))
     alembic_config.set_main_option("script_location", str(migrations_path))
-    alembic_config.set_main_option("sqlalchemy.url", DATABASE_URL)
 
-    # Bootstrap existing databases created before Alembic by stamping head.
-    existing_tables = set(inspect(engine).get_table_names())
-    has_version_table = "alembic_version" in existing_tables
-    has_core_tables = {"subscriptions", "email_subscriptions"}.issubset(existing_tables)
-    if not has_version_table and has_core_tables:
-        command.stamp(alembic_config, "head")
+    with engine.begin() as connection:
+        alembic_config.attributes["connection"] = connection
 
-    command.upgrade(alembic_config, "head")
+        # Bootstrap existing databases created before Alembic by stamping head.
+        existing_tables = set(inspect(connection).get_table_names())
+        has_version_table = "alembic_version" in existing_tables
+        has_core_tables = {"subscriptions", "email_subscriptions"}.issubset(existing_tables)
+        if not has_version_table and has_core_tables:
+            command.stamp(alembic_config, "head")
+
+        command.upgrade(alembic_config, "head")
