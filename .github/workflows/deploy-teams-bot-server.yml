@@ -70,7 +70,6 @@ jobs:
             --max-instances=1 \
             --allow-unauthenticated \
             --set-env-vars="\
-              PORT=${{ secrets.PORT }},\
               CLIENT_ID=${{ secrets.CLIENT_ID }},\
               CLIENT_SECRET=${{ secrets.CLIENT_SECRET }},\
               TENANT_ID=${{ secrets.TENANT_ID }},\
