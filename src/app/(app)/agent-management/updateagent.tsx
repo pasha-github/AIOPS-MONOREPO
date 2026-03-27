@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { X, Bot } from "lucide-react";
 import { trimTrailingSlash } from "@/config/agent";
 import { useRuntimeConfig } from "@/config/runtime-config";
 import { getProviderIconSrc } from "../llm-management/llmHelpers";
+import type { AgentRecord } from "./types";
 
 type UpdateAgentProps = {
-    agent: any;
+    agent: AgentRecord | null;
     isOpen: boolean;
     onClose: () => void;
     onUpdateSuccess?: () => void;
@@ -20,32 +21,39 @@ type ModelOption = {
     iconSrc: string | null;
 };
 
-const toSnakeCase = (value: string) =>
-    value
-        .trim()
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "_")
-        .replace(/^_+|_+$/g, "");
+type UpdateAgentForm = {
+    agentName: string;
+    description: string;
+    instruction: string;
+    modelId: string;
+    tools: string;
+    mcpServers: string;
+    connectorConfigIds: string;
+    subAgents: string;
+    isEnabled: boolean;
+};
 
 const normalizeString = (value: string) => value.trim();
+const normalizeListInput = (value: string) =>
+    value
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean);
 
 const getErrorMessage = (payload: unknown, fallback: string) => {
     if (
         payload &&
         typeof payload === "object" &&
         "message" in payload &&
-        typeof (payload as any).message === "string"
+        typeof (payload as { message?: unknown }).message === "string"
     ) {
-        return String((payload as any).message);
+        return String((payload as { message: string }).message);
     }
     return fallback;
 };
 
 const inputClass =
     "w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-900 placeholder-gray-400 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/10";
-
-const readonlyInputClass =
-    "w-full rounded-lg border border-dashed border-gray-200 bg-gray-100 px-3 py-2.5 text-sm text-gray-400 outline-none cursor-default";
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
     return (
@@ -89,7 +97,7 @@ export default function UpdateAgent({
     const { llmManagerApiBaseUrl } = useRuntimeConfig();
     const base = trimTrailingSlash(llmManagerApiBaseUrl);
 
-    const [form, setForm] = useState({
+    const [form, setForm] = useState<UpdateAgentForm>({
         agentName: "",
         description: "",
         instruction: "",
@@ -105,14 +113,17 @@ export default function UpdateAgent({
     const [isUpdating, setIsUpdating] = useState(false);
     const [error, setError] = useState("");
     const [success, setSuccess] = useState("");
+    const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+    const feedbackRef = useRef<HTMLDivElement | null>(null);
 
     // agentId is still computed and sent to the backend — just not shown in the UI
-    const agentId = useMemo(() => toSnakeCase(form.agentName), [form.agentName]);
-
     const isFormValid =
         form.agentName && form.description && form.instruction && form.modelId;
 
-    const updateField = (key: string, value: any) =>
+    const updateField = <K extends keyof UpdateAgentForm>(
+        key: K,
+        value: UpdateAgentForm[K]
+    ) =>
         setForm((prev) => ({ ...prev, [key]: value }));
 
     useEffect(() => {
@@ -156,7 +167,25 @@ export default function UpdateAgent({
             }
         };
         load();
-    }, [isOpen]);
+    }, [base, isOpen]);
+
+    useEffect(() => {
+        if ((!error && !success) || !scrollContainerRef.current || !feedbackRef.current) {
+            return;
+        }
+
+        const container = scrollContainerRef.current;
+        const feedback = feedbackRef.current;
+        const targetTop = Math.max(
+            0,
+            feedback.offsetTop - container.clientHeight + feedback.clientHeight + 24
+        );
+
+        container.scrollTo({
+            top: targetTop,
+            behavior: "smooth",
+        });
+    }, [error, success]);
 
     const handleUpdate = async () => {
         if (!isFormValid) return;
@@ -236,7 +265,10 @@ export default function UpdateAgent({
                 </div>
 
                 {/* Scrollable body */}
-                <div className="flex flex-col gap-4 overflow-y-auto px-6 py-5">
+                <div
+                    ref={scrollContainerRef}
+                    className="flex flex-col gap-4 overflow-y-auto px-6 py-5"
+                >
 
                     {/* ── Identity ── */}
                     <SectionLabel>Identity</SectionLabel>
@@ -381,7 +413,10 @@ export default function UpdateAgent({
                     {/* ── Feedback messages ── */}
 
                     {error && (
-                        <div className="flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                        <div
+                            ref={feedbackRef}
+                            className="flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+                        >
                             <svg
                                 className="mt-0.5 h-4 w-4 shrink-0 text-red-500"
                                 viewBox="0 0 20 20"
@@ -401,7 +436,10 @@ export default function UpdateAgent({
                     )}
 
                     {success && (
-                        <div className="flex items-start gap-2.5 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+                        <div
+                            ref={feedbackRef}
+                            className="flex items-start gap-2.5 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700"
+                        >
                             <svg
                                 className="mt-0.5 h-4 w-4 shrink-0 text-green-500"
                                 viewBox="0 0 20 20"
