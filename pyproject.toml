@@ -40,3 +40,10 @@ line-ending = "auto"
 
 [tool.ruff.lint.isort]
 known-first-party = ["routers", "database", "utils", "connectors", "main"]
+
+[tool.pyright]
+pythonVersion = "3.12"  # your python version
+pythonPlatform = "Linux"
+typeCheckingMode = "basic"  # "basic" | "standard" | "strict"
+
+# TODO: Will be changed to standard
