@@ -2,7 +2,7 @@ import os
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlmodel import SQLModel, Session, create_engine
+from sqlmodel import Session, SQLModel, create_engine
 from sqlmodel.pool import StaticPool
 
 from database.database import get_session
@@ -11,10 +11,7 @@ from main import app
 
 @pytest.fixture(name="session")
 def session_fixture():
-    db_url = (
-        os.getenv("TEST_MAIN_DATABASE_URL")
-        or "sqlite:///./test.db"
-    )
+    db_url = os.getenv("TEST_MAIN_DATABASE_URL") or "sqlite:///./test.db"
     print(f"[tests] Running on DB: {db_url}")
     is_sqlite = db_url.startswith("sqlite")
 

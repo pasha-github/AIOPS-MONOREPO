@@ -2,7 +2,11 @@ from types import SimpleNamespace
 
 import pytest
 
-from utils.session_summary import FIRST_MESSAGE_SUMMARY_KEY, _extract_user_text, make_session_summary_callback
+from utils.session_summary import (
+    FIRST_MESSAGE_SUMMARY_KEY,
+    _extract_user_text,
+    make_session_summary_callback,
+)
 
 
 def _request_with_text(*texts: str):
@@ -21,18 +25,31 @@ def test_session_summary_callback_sets_summary_once(monkeypatch: pytest.MonkeyPa
     request = _request_with_text("Investigate queue backlog in production")
 
     fake_response = SimpleNamespace(
-        choices=[SimpleNamespace(message=SimpleNamespace(content="Production MQ backlog investigation"))]
+        choices=[
+            SimpleNamespace(
+                message=SimpleNamespace(content="Production MQ backlog investigation")
+            )
+        ]
     )
-    monkeypatch.setattr("utils.session_summary.litellm.completion", lambda **kwargs: fake_response)
+    monkeypatch.setattr(
+        "utils.session_summary.litellm.completion", lambda **kwargs: fake_response
+    )
 
     result = callback(callback_context, request)
     assert result is None
-    assert callback_context.state[FIRST_MESSAGE_SUMMARY_KEY] == "Production MQ backlog investigation"
+    assert (
+        callback_context.state[FIRST_MESSAGE_SUMMARY_KEY]
+        == "Production MQ backlog investigation"
+    )
 
 
-def test_session_summary_callback_skips_when_summary_already_exists(monkeypatch: pytest.MonkeyPatch):
+def test_session_summary_callback_skips_when_summary_already_exists(
+    monkeypatch: pytest.MonkeyPatch,
+):
     callback = make_session_summary_callback("openai/gpt-4o-mini")
-    callback_context = SimpleNamespace(state={FIRST_MESSAGE_SUMMARY_KEY: "Existing summary"})
+    callback_context = SimpleNamespace(
+        state={FIRST_MESSAGE_SUMMARY_KEY: "Existing summary"}
+    )
     request = _request_with_text("Another message")
 
     called = {"value": False}
@@ -48,10 +65,16 @@ def test_session_summary_callback_skips_when_summary_already_exists(monkeypatch:
     assert callback_context.state[FIRST_MESSAGE_SUMMARY_KEY] == "Existing summary"
 
 
-def test_session_summary_callback_skips_when_user_text_missing(monkeypatch: pytest.MonkeyPatch):
+def test_session_summary_callback_skips_when_user_text_missing(
+    monkeypatch: pytest.MonkeyPatch,
+):
     callback = make_session_summary_callback("openai/gpt-4o-mini")
     callback_context = SimpleNamespace(state={})
-    request = SimpleNamespace(contents=[SimpleNamespace(role="model", parts=[SimpleNamespace(text="ignored")])])
+    request = SimpleNamespace(
+        contents=[
+            SimpleNamespace(role="model", parts=[SimpleNamespace(text="ignored")])
+        ]
+    )
 
     called = {"value": False}
 
@@ -66,20 +89,31 @@ def test_session_summary_callback_skips_when_user_text_missing(monkeypatch: pyte
     assert FIRST_MESSAGE_SUMMARY_KEY not in callback_context.state
 
 
-def test_session_summary_callback_falls_back_when_model_returns_none_content(monkeypatch: pytest.MonkeyPatch):
+def test_session_summary_callback_falls_back_when_model_returns_none_content(
+    monkeypatch: pytest.MonkeyPatch,
+):
     callback = make_session_summary_callback("openai/gpt-4o-mini")
     callback_context = SimpleNamespace(state={})
     request = _request_with_text("Investigate queue backlog in production")
 
-    fake_response = SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=None))])
-    monkeypatch.setattr("utils.session_summary.litellm.completion", lambda **kwargs: fake_response)
+    fake_response = SimpleNamespace(
+        choices=[SimpleNamespace(message=SimpleNamespace(content=None))]
+    )
+    monkeypatch.setattr(
+        "utils.session_summary.litellm.completion", lambda **kwargs: fake_response
+    )
 
     result = callback(callback_context, request)
     assert result is None
-    assert callback_context.state[FIRST_MESSAGE_SUMMARY_KEY] == "Investigate queue backlog in production"
+    assert (
+        callback_context.state[FIRST_MESSAGE_SUMMARY_KEY]
+        == "Investigate queue backlog in production"
+    )
 
 
-def test_session_summary_callback_falls_back_when_completion_raises(monkeypatch: pytest.MonkeyPatch):
+def test_session_summary_callback_falls_back_when_completion_raises(
+    monkeypatch: pytest.MonkeyPatch,
+):
     callback = make_session_summary_callback("openai/gpt-4o-mini")
     callback_context = SimpleNamespace(state={})
     request = _request_with_text("Investigate queue backlog in production")
@@ -91,4 +125,7 @@ def test_session_summary_callback_falls_back_when_completion_raises(monkeypatch:
 
     result = callback(callback_context, request)
     assert result is None
-    assert callback_context.state[FIRST_MESSAGE_SUMMARY_KEY] == "Investigate queue backlog in production"
+    assert (
+        callback_context.state[FIRST_MESSAGE_SUMMARY_KEY]
+        == "Investigate queue backlog in production"
+    )

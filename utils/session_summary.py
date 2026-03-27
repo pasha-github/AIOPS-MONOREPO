@@ -1,11 +1,9 @@
 import logging
 import os
-from typing import Optional
 
 import litellm
 from google.adk.agents.callback_context import CallbackContext
 from google.adk.models import LlmRequest, LlmResponse
-
 
 logger = logging.getLogger(__name__)
 FIRST_MESSAGE_SUMMARY_KEY = "first_message_summary"
@@ -50,7 +48,7 @@ def make_session_summary_callback(model: str):
     def callback(
         callback_context: CallbackContext,
         llm_request: LlmRequest,
-    ) -> Optional[LlmResponse]:
+    ) -> LlmResponse | None:
         agent_name = getattr(callback_context, "agent_name", "unknown")
         if callback_context.state.get(FIRST_MESSAGE_SUMMARY_KEY):
             return None
@@ -69,8 +67,7 @@ def make_session_summary_callback(model: str):
             user_text_preview,
         )
         print(
-            f"[session_summary] request agent={agent_name} "
-            f"model={summarizer_model} user_text={user_text_preview!r}"
+            f"[session_summary] request agent={agent_name} model={summarizer_model} user_text={user_text_preview!r}"
         )
 
         try:
@@ -79,7 +76,7 @@ def make_session_summary_callback(model: str):
                 messages=[
                     {
                         "role": "system",
-                         "content": (
+                        "content": (
                             "Summarize the first message in one concise sentence in just 3-6 words capturing the main intent or request. "
                             "Write the summary as a direct statement, not referring to “the user” or describing the act of asking. "
                             "Do not include explanations or extra details."
@@ -96,8 +93,7 @@ def make_session_summary_callback(model: str):
                 response,
             )
             print(
-                f"[session_summary] raw_response agent={agent_name} "
-                f"model={summarizer_model} response={response!r}"
+                f"[session_summary] raw_response agent={agent_name} model={summarizer_model} response={response!r}"
             )
             content = response.choices[0].message.content
             summary = content.strip() if isinstance(content, str) else ""
@@ -120,10 +116,9 @@ def make_session_summary_callback(model: str):
                 exc,
             )
             print(
-                f"[session_summary] error agent={agent_name} "
-                f"model={summarizer_model} error={exc!r}"
+                f"[session_summary] error agent={agent_name} model={summarizer_model} error={exc!r}"
             )
- 
+
         if not summary:
             logger.warning(
                 "Session summary fallback used: agent=%s summarizer_model=%s fallback=%r",
@@ -132,8 +127,7 @@ def make_session_summary_callback(model: str):
                 user_text_preview,
             )
             print(
-                f"[session_summary] fallback agent={agent_name} "
-                f"model={summarizer_model} fallback={user_text_preview!r}"
+                f"[session_summary] fallback agent={agent_name} model={summarizer_model} fallback={user_text_preview!r}"
             )
             summary = _fallback_summary(user_text)
 
@@ -146,8 +140,7 @@ def make_session_summary_callback(model: str):
                 summary,
             )
             print(
-                f"[session_summary] stored agent={agent_name} "
-                f"model={summarizer_model} summary={summary!r}"
+                f"[session_summary] stored agent={agent_name} model={summarizer_model} summary={summary!r}"
             )
 
         return None

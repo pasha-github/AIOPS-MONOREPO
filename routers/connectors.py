@@ -1,21 +1,25 @@
-from fastapi import APIRouter, Depends
 import os
-from typing import List, Dict, Any
-from fastapi import HTTPException
-from utils.helper import cached_connector_info
+from typing import Any
+
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlmodel import Session, select
+
 from database.database import get_session
 from database.models import ConnectorConfig
-from pydantic import BaseModel
+from utils.helper import cached_connector_info
+
 
 class ConnectorConfigCreate(BaseModel):
     connector_id: str
     name: str
-    config: List[Dict[str, Any]]
+    config: list[dict[str, Any]]
+
 
 router = APIRouter(prefix="/connectors", tags=["connectors"])
 
-@router.get("/", response_model=List[Dict[str, str]])
+
+@router.get("/", response_model=list[dict[str, str]])
 def list_connectors():
     connectors = []
     connectors_dir = "connectors"
@@ -26,15 +30,12 @@ def list_connectors():
             if filename.endswith("_connector.py"):
                 # Take prefix before _connector.py and making it capital case
                 name = filename.split("_connector.py")[0].replace("_", " ").title()
-                connectors.append({
-                    "id": filename.strip(".py"),
-                    "name": name
-                })
+                connectors.append({"id": filename.strip(".py"), "name": name})
     return connectors
 
 
 @router.get("/{connector_id}")
-def get_connector_details(connector_id: str) -> Dict[str, Any]:
+def get_connector_details(connector_id: str) -> dict[str, Any]:
     # Block reserved files
     if connector_id in ["__init__", "base_connector"]:
         raise HTTPException(status_code=404, detail="Connector not found")
@@ -45,21 +46,32 @@ def get_connector_details(connector_id: str) -> Dict[str, Any]:
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="Connector not found")
 
-    with open(file_path, "r", encoding="utf-8") as f:
+    with open(file_path, encoding="utf-8") as f:
         source = f.read()
 
     return cached_connector_info(source, os.path.getmtime(file_path))
 
 
 @router.get("/{connector_id}/config")
-def get_connector_config(connector_id: str, session: Session = Depends(get_session)) -> List[ConnectorConfig]:
-    db_connector_config = session.exec(select(ConnectorConfig).where(ConnectorConfig.connector_id == connector_id)).all()
+def get_connector_config(
+    connector_id: str, session: Session = Depends(get_session)
+) -> list[ConnectorConfig]:
+    db_connector_config = session.exec(
+        select(ConnectorConfig).where(ConnectorConfig.connector_id == connector_id)
+    ).all()
     return db_connector_config
 
+
 @router.post("/{connector_id}/config")
-def set_connector_config(connector_id: str, connector_config: ConnectorConfigCreate, session: Session = Depends(get_session)) -> ConnectorConfig:
+def set_connector_config(
+    connector_id: str,
+    connector_config: ConnectorConfigCreate,
+    session: Session = Depends(get_session),
+) -> ConnectorConfig:
     if connector_id != connector_config.connector_id:
-        raise HTTPException(status_code=400, detail="connector_id in URL and body must match")
+        raise HTTPException(
+            status_code=400, detail="connector_id in URL and body must match"
+        )
 
     if connector_id in {"__init__", "base_connector"}:
         raise HTTPException(status_code=404, detail="Connector not found")
@@ -73,8 +85,3 @@ def set_connector_config(connector_id: str, connector_config: ConnectorConfigCre
     session.commit()
     session.refresh(db)
     return db
-
-
-
-
-

@@ -5,10 +5,11 @@ Enables querying and filtering logs from Datadog, supporting
 service-level filtering via a standardized TR1-app service tag convention.
 """
 
-from typing import Any, Dict, List, Optional
-from datetime import datetime, timezone, timedelta
-from google.adk.tools.tool_context import ToolContext
+from datetime import datetime, timedelta, timezone
+from typing import Any
+
 from base_connector import BaseConnector, connector_tool
+from google.adk.tools.tool_context import ToolContext
 
 
 class DatadogConnector(BaseConnector):
@@ -31,6 +32,7 @@ class DatadogConnector(BaseConnector):
         self.app_key = DD_APP_KEY
         site = DD_SITE.removeprefix("https://").removeprefix("http://").rstrip("/")
         self.base_url = f"https://api.{site}"
+
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
@@ -39,9 +41,9 @@ class DatadogConnector(BaseConnector):
         self,
         endpoint: str,
         method: str = "GET",
-        params: Optional[Dict[str, Any]] = None,
-        data: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        params: dict[str, Any] | None = None,
+        data: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """Centralised request helper with auth and error handling."""
         url = f"{self.base_url}{endpoint}"
         headers = {
@@ -85,9 +87,9 @@ class DatadogConnector(BaseConnector):
 
     def _build_query(
         self,
-        app_name: Optional[str],
-        log_level: Optional[str],
-        extra_query: Optional[str],
+        app_name: str | None,
+        log_level: str | None,
+        extra_query: str | None,
     ) -> str:
         """
         Builds a Datadog log search query string.
@@ -97,7 +99,7 @@ class DatadogConnector(BaseConnector):
 
         Additional filters (log_level, free-text) are ANDed together.
         """
-        parts: List[str] = []
+        parts: list[str] = []
 
         # Service tag following TR1-app convention
         if app_name:
@@ -120,15 +122,15 @@ class DatadogConnector(BaseConnector):
     @connector_tool
     def fetch_logs(
         self,
-        app_name: Optional[str] = None,
-        log_level: Optional[str] = None,
-        extra_query: Optional[str] = None,
+        app_name: str | None = None,
+        log_level: str | None = None,
+        extra_query: str | None = None,
         from_minutes_ago: int = 15,
         to_minutes_ago: int = 0,
         limit: int = 50,
         sort: str = "-timestamp",
-        tool_context: Optional[ToolContext] = None,
-    ) -> Dict[str, Any]:
+        tool_context: ToolContext | None = None,
+    ) -> dict[str, Any]:
         """Fetches logs from Datadog with optional filters for app, log level, and custom query.
 
         Use this tool whenever the user wants to retrieve, search, or inspect application logs

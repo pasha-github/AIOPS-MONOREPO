@@ -1,12 +1,11 @@
-from functools import lru_cache
 import ast
 import importlib.util
 import inspect
 import os
 import sys
-from typing import List, Dict
-from database.models import ConnectorConfig
+from functools import lru_cache
 
+from database.models import ConnectorConfig
 
 CONNECTORS_DIR = os.path.join(os.path.dirname(__file__), "..", "connectors")
 
@@ -30,13 +29,10 @@ def resolve_connector_tools(connector_config: ConnectorConfig):
     config = connector_config.config
 
     # --- 1. Locate the connector module file ---
-    module_path = os.path.abspath(
-        os.path.join(CONNECTORS_DIR, f"{connector_id}.py")
-    )
+    module_path = os.path.abspath(os.path.join(CONNECTORS_DIR, f"{connector_id}.py"))
     if not os.path.isfile(module_path):
         raise FileNotFoundError(
-            f"Connector '{connector_id}' not found. "
-            f"Expected file: {module_path}"
+            f"Connector '{connector_id}' not found. Expected file: {module_path}"
         )
 
     # --- 2. Dynamically import the module ---
@@ -54,14 +50,16 @@ def resolve_connector_tools(connector_config: ConnectorConfig):
 
     connector_class = None
     for _, obj in inspect.getmembers(module, inspect.isclass):
-        if issubclass(obj, BaseConnector) and obj is not BaseConnector and obj.__module__ == connector_id:
+        if (
+            issubclass(obj, BaseConnector)
+            and obj is not BaseConnector
+            and obj.__module__ == connector_id
+        ):
             connector_class = obj
             break
 
     if connector_class is None:
-        raise ValueError(
-            f"No BaseConnector subclass found in '{connector_id}.py'."
-        )
+        raise ValueError(f"No BaseConnector subclass found in '{connector_id}.py'.")
 
     # --- 4. Convert config list → kwargs dict and instantiate ---
     # config format: [{"name": "API_KEY", "value": "abc123"}, ...]
@@ -69,7 +67,6 @@ def resolve_connector_tools(connector_config: ConnectorConfig):
     connector = connector_class(**kwargs)
 
     return connector.get_tools()
-
 
 
 @lru_cache(maxsize=128)
@@ -83,15 +80,14 @@ def cached_connector_info(source: str, mtime: float):
     # -----------------------------
     module_doc = ast.get_docstring(tree) or ""
 
-    tools: List[Dict[str, str]] = []
-    config_vars: List[str] = []
+    tools: list[dict[str, str]] = []
+    config_vars: list[str] = []
 
     # -----------------------------
     # Find connector class
     # -----------------------------
     for node in tree.body:
         if isinstance(node, ast.ClassDef):
-
             # Ensure class inherits from BaseConnector
             is_connector = any(
                 (isinstance(base, ast.Name) and base.id == "BaseConnector")
@@ -106,7 +102,6 @@ def cached_connector_info(source: str, mtime: float):
             # Inspect methods inside the class
             # -----------------------------------
             for item in node.body:
-
                 if not isinstance(item, ast.FunctionDef):
                     continue
 
@@ -122,10 +117,7 @@ def cached_connector_info(source: str, mtime: float):
                     for index, arg in enumerate(args):
                         is_required = index < first_default_index
 
-                        config_vars.append({
-                            "name": arg.arg,
-                            "required": is_required
-                        })
+                        config_vars.append({"name": arg.arg, "required": is_required})
 
                 # -------- TOOLS --------
                 else:
@@ -134,7 +126,10 @@ def cached_connector_info(source: str, mtime: float):
                     for dec in item.decorator_list:
                         if isinstance(dec, ast.Name) and dec.id == "connector_tool":
                             has_decorator = True
-                        elif isinstance(dec, ast.Attribute) and dec.attr == "connector_tool":
+                        elif (
+                            isinstance(dec, ast.Attribute)
+                            and dec.attr == "connector_tool"
+                        ):
                             has_decorator = True
 
                     if not has_decorator:
@@ -154,13 +149,10 @@ def cached_connector_info(source: str, mtime: float):
 
                     cleaned_doc = "\n".join(cleaned_lines).strip()
 
-                    tools.append({
-                        "name": item.name,
-                        "documentation": cleaned_doc
-                    })
+                    tools.append({"name": item.name, "documentation": cleaned_doc})
 
     return {
         "documentation": module_doc.strip(),
         "tools": tools,
-        "config_variables": config_vars
+        "config_variables": config_vars,
     }

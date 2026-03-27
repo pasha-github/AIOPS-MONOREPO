@@ -5,10 +5,11 @@ Provides a connector for interacting with the ServiceNow API.
 Supports Incidents, Change Requests, and the Knowledge Base.
 """
 
-from typing import Any, Dict, Optional
-import base64
-from google.adk.tools.tool_context import ToolContext
+from typing import Any
+
 from base_connector import BaseConnector, connector_tool
+from google.adk.tools.tool_context import ToolContext
+
 
 class ServiceNowConnector(BaseConnector):
     """
@@ -32,45 +33,61 @@ class ServiceNowConnector(BaseConnector):
         SERVICENOW_USERNAME: str,
         SERVICENOW_PASSWORD: str,
         SERVICENOW_AUTH_TYPE: str = "basic",
-        prefix: str = ""
+        prefix: str = "",
     ):
         super().__init__(prefix=prefix)
-        self.instance_url = SERVICENOW_INSTANCE_URL.rstrip('/')
+        self.instance_url = SERVICENOW_INSTANCE_URL.rstrip("/")
         self.username = SERVICENOW_USERNAME
         self.password = SERVICENOW_PASSWORD
         self.auth_type = SERVICENOW_AUTH_TYPE
-        
+
         # Verify valid auth type
         if self.auth_type.lower() != "basic":
-            raise ValueError("Currently, only 'basic' authentication is supported for the ServiceNow connector.")
+            raise ValueError(
+                "Currently, only 'basic' authentication is supported for the ServiceNow connector."
+            )
 
-    def _make_request(self, endpoint: str, method: str = "GET", params: Optional[Dict[str, Any]] = None, data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def _make_request(
+        self,
+        endpoint: str,
+        method: str = "GET",
+        params: dict[str, Any] | None = None,
+        data: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """Helper method to make API requests and handle common authentication errors."""
         url = f"{self.instance_url}{endpoint}"
-        
-        headers = {
-            "Accept": "application/json",
-            "Content-Type": "application/json"
-        }
-        
+
+        headers = {"Accept": "application/json", "Content-Type": "application/json"}
+
         response = self.call_api(
             url=url,
             method=method,
             headers=headers,
             params=params,
             data=data,
-            basic_auth=(self.username, self.password)
+            basic_auth=(self.username, self.password),
         )
-        
+
         # Handle Auth token/credential expiration
         if response.status_code == 401:
-            return {"status": "error", "code": 401, "message": "Authentication failed. Basic auth credentials may be invalid or expired. Please check SERVICENOW_USERNAME and SERVICENOW_PASSWORD."}
-            
+            return {
+                "status": "error",
+                "code": 401,
+                "message": "Authentication failed. Basic auth credentials may be invalid or expired. Please check SERVICENOW_USERNAME and SERVICENOW_PASSWORD.",
+            }
+
         if response.status_code >= 400:
-             return {"status": "error", "code": response.status_code, "message": response.text}
-             
+            return {
+                "status": "error",
+                "code": response.status_code,
+                "message": response.text,
+            }
+
         try:
-            return {"status": "success", "data": response.json().get('result', response.json())}
+            return {
+                "status": "success",
+                "data": response.json().get("result", response.json()),
+            }
         except ValueError:
             # Not JSON
             return {"status": "success", "data": response.text}
@@ -80,7 +97,9 @@ class ServiceNowConnector(BaseConnector):
     # ------------------------------------------------------------------ #
 
     @connector_tool
-    def list_incidents(self, query: str = "", limit: int = 10, tool_context: Optional[ToolContext] = None) -> Dict[str, Any]:
+    def list_incidents(
+        self, query: str = "", limit: int = 10, tool_context: ToolContext | None = None
+    ) -> dict[str, Any]:
         """Lists incidents from ServiceNow, optionally filtered by a query.
 
         Args:
@@ -93,11 +112,21 @@ class ServiceNowConnector(BaseConnector):
         params = {"sysparm_limit": limit}
         if query:
             params["sysparm_query"] = query
-            
-        return self._make_request("/api/now/table/incident", method="GET", params=params)
+
+        return self._make_request(
+            "/api/now/table/incident", method="GET", params=params
+        )
 
     @connector_tool
-    def create_incident(self, short_description: str, description: str = "", caller_id: str = "", urgency: str = "3", impact: str = "3", tool_context: Optional[ToolContext] = None) -> Dict[str, Any]:
+    def create_incident(
+        self,
+        short_description: str,
+        description: str = "",
+        caller_id: str = "",
+        urgency: str = "3",
+        impact: str = "3",
+        tool_context: ToolContext | None = None,
+    ) -> dict[str, Any]:
         """Creates a new incident in ServiceNow.
 
         Args:
@@ -115,15 +144,20 @@ class ServiceNowConnector(BaseConnector):
             "description": description,
             "caller_id": caller_id,
             "urgency": urgency,
-            "impact": impact
+            "impact": impact,
         }
         # Remove empty string arguments to rely on SN defaults if not provided
         data = {k: v for k, v in data.items() if v != ""}
-        
+
         return self._make_request("/api/now/table/incident", method="POST", data=data)
 
     @connector_tool
-    def update_incident(self, sys_id: str, updates: Dict[str, Any], tool_context: Optional[ToolContext] = None) -> Dict[str, Any]:
+    def update_incident(
+        self,
+        sys_id: str,
+        updates: dict[str, Any],
+        tool_context: ToolContext | None = None,
+    ) -> dict[str, Any]:
         """Updates an existing incident in ServiceNow.
 
         Args:
@@ -133,10 +167,18 @@ class ServiceNowConnector(BaseConnector):
         Returns:
             A dict containing the details of the updated incident.
         """
-        return self._make_request(f"/api/now/table/incident/{sys_id}", method="PATCH", data=updates)
+        return self._make_request(
+            f"/api/now/table/incident/{sys_id}", method="PATCH", data=updates
+        )
 
     @connector_tool
-    def resolve_incident(self, sys_id: str, close_notes: str, close_code: str = "Solved (Permanently)", tool_context: Optional[ToolContext] = None) -> Dict[str, Any]:
+    def resolve_incident(
+        self,
+        sys_id: str,
+        close_notes: str,
+        close_code: str = "Solved (Permanently)",
+        tool_context: ToolContext | None = None,
+    ) -> dict[str, Any]:
         """Resolves an incident in ServiceNow.
 
         Args:
@@ -148,19 +190,19 @@ class ServiceNowConnector(BaseConnector):
             A dict containing the details of the resolved incident.
         """
         # State 6 usually corresponds to 'Resolved' in default ServiceNow instances
-        data = {
-            "state": "6",
-            "close_notes": close_notes,
-            "close_code": close_code
-        }
-        return self._make_request(f"/api/now/table/incident/{sys_id}", method="PATCH", data=data)
+        data = {"state": "6", "close_notes": close_notes, "close_code": close_code}
+        return self._make_request(
+            f"/api/now/table/incident/{sys_id}", method="PATCH", data=data
+        )
 
     # ------------------------------------------------------------------ #
     #  Change Requests                                                   #
     # ------------------------------------------------------------------ #
 
     @connector_tool
-    def list_change_requests(self, query: str = "", limit: int = 10, tool_context: Optional[ToolContext] = None) -> Dict[str, Any]:
+    def list_change_requests(
+        self, query: str = "", limit: int = 10, tool_context: ToolContext | None = None
+    ) -> dict[str, Any]:
         """Lists change requests from ServiceNow, optionally filtered by a query.
 
         Args:
@@ -173,11 +215,19 @@ class ServiceNowConnector(BaseConnector):
         params = {"sysparm_limit": limit}
         if query:
             params["sysparm_query"] = query
-            
-        return self._make_request("/api/now/table/change_request", method="GET", params=params)
+
+        return self._make_request(
+            "/api/now/table/change_request", method="GET", params=params
+        )
 
     @connector_tool
-    def create_change_request(self, short_description: str, description: str = "", type: str = "normal", tool_context: Optional[ToolContext] = None) -> Dict[str, Any]:
+    def create_change_request(
+        self,
+        short_description: str,
+        description: str = "",
+        type: str = "normal",
+        tool_context: ToolContext | None = None,
+    ) -> dict[str, Any]:
         """Creates a new change request in ServiceNow.
 
         Args:
@@ -191,14 +241,21 @@ class ServiceNowConnector(BaseConnector):
         data = {
             "short_description": short_description,
             "description": description,
-            "type": type
+            "type": type,
         }
         data = {k: v for k, v in data.items() if v != ""}
-        
-        return self._make_request("/api/now/table/change_request", method="POST", data=data)
+
+        return self._make_request(
+            "/api/now/table/change_request", method="POST", data=data
+        )
 
     @connector_tool
-    def update_change_request(self, sys_id: str, updates: Dict[str, Any], tool_context: Optional[ToolContext] = None) -> Dict[str, Any]:
+    def update_change_request(
+        self,
+        sys_id: str,
+        updates: dict[str, Any],
+        tool_context: ToolContext | None = None,
+    ) -> dict[str, Any]:
         """Updates an existing change request in ServiceNow.
 
         Args:
@@ -208,14 +265,18 @@ class ServiceNowConnector(BaseConnector):
         Returns:
             A dict containing the details of the updated change request.
         """
-        return self._make_request(f"/api/now/table/change_request/{sys_id}", method="PATCH", data=updates)
+        return self._make_request(
+            f"/api/now/table/change_request/{sys_id}", method="PATCH", data=updates
+        )
 
     # ------------------------------------------------------------------ #
     #  Knowledge Base                                                    #
     # ------------------------------------------------------------------ #
 
     @connector_tool
-    def list_knowledge_bases(self, tool_context: Optional[ToolContext] = None) -> Dict[str, Any]:
+    def list_knowledge_bases(
+        self, tool_context: ToolContext | None = None
+    ) -> dict[str, Any]:
         """Lists available knowledge bases in ServiceNow.
 
         Returns:
@@ -224,7 +285,9 @@ class ServiceNowConnector(BaseConnector):
         return self._make_request("/api/now/table/kb_knowledge_base", method="GET")
 
     @connector_tool
-    def list_kb_articles(self, query: str = "", limit: int = 10, tool_context: Optional[ToolContext] = None) -> Dict[str, Any]:
+    def list_kb_articles(
+        self, query: str = "", limit: int = 10, tool_context: ToolContext | None = None
+    ) -> dict[str, Any]:
         """Lists knowledge base articles from ServiceNow, optionally filtered by a query.
 
         Args:
@@ -237,5 +300,7 @@ class ServiceNowConnector(BaseConnector):
         params = {"sysparm_limit": limit}
         if query:
             params["sysparm_query"] = query
-            
-        return self._make_request("/api/now/table/kb_knowledge", method="GET", params=params)
+
+        return self._make_request(
+            "/api/now/table/kb_knowledge", method="GET", params=params
+        )

@@ -1,6 +1,6 @@
 import os
-from cryptography.fernet import Fernet, InvalidToken
 
+from cryptography.fernet import Fernet, InvalidToken
 
 ENCRYPTION_KEY_ENV = "ENCRYPTION_KEY"
 

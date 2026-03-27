@@ -1,5 +1,3 @@
-import types
-
 from utils.adk_app import invalidate_cache
 from utils.cache import cache
 
@@ -13,7 +11,9 @@ def test_invalidate_cache_noop_when_agent_not_cached(monkeypatch):
     def fake_invalidate_runner_cache(app_name: str):
         called["value"] = True
 
-    monkeypatch.setattr("utils.adk_app._invalidate_runner_cache", fake_invalidate_runner_cache)
+    monkeypatch.setattr(
+        "utils.adk_app._invalidate_runner_cache", fake_invalidate_runner_cache
+    )
 
     invalidate_cache("missing-agent")
     assert called["value"] is False
@@ -27,7 +27,9 @@ def test_invalidate_cache_removes_agent_and_marks_runner_cleanup(monkeypatch):
     def fake_invalidate_runner_cache(app_name: str):
         called["app_name"] = app_name
 
-    monkeypatch.setattr("utils.adk_app._invalidate_runner_cache", fake_invalidate_runner_cache)
+    monkeypatch.setattr(
+        "utils.adk_app._invalidate_runner_cache", fake_invalidate_runner_cache
+    )
 
     invalidate_cache("agent-1")
 

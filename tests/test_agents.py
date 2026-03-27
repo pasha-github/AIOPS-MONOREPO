@@ -1,5 +1,5 @@
-from fastapi.testclient import TestClient
 import pytest
+from fastapi.testclient import TestClient
 
 
 def _create_model(client: TestClient, model_id: str = "gemini-pro"):
@@ -15,7 +15,9 @@ def _create_model(client: TestClient, model_id: str = "gemini-pro"):
     )
 
 
-def _create_agent(client: TestClient, agent_id: str = "a1", model_id: str = "gemini-pro"):
+def _create_agent(
+    client: TestClient, agent_id: str = "a1", model_id: str = "gemini-pro"
+):
     return client.post(
         "/agent/",
         json={
@@ -102,7 +104,13 @@ def test_list_agents(client: TestClient):
 def test_delete_agent_success(client: TestClient):
     client.post(
         "/llms/",
-        json={"model_id": "m1", "provider": "p", "name": "n", "api_key": "k", "description": "model"},
+        json={
+            "model_id": "m1",
+            "provider": "p",
+            "name": "n",
+            "api_key": "k",
+            "description": "model",
+        },
     )
     client.post(
         "/agent/",
@@ -238,7 +246,9 @@ def test_update_agent_status_only(client: TestClient):
 def test_update_agent_tools_only(client: TestClient):
     _create_model(client)
     _create_agent(client)
-    response = client.patch("/agent/a1", json={"tools": "def ping():\n    return 'pong'"})
+    response = client.patch(
+        "/agent/a1", json={"tools": "def ping():\n    return 'pong'"}
+    )
     assert response.status_code == 200
     assert "ping" in response.json()["tools"]
 
@@ -246,7 +256,9 @@ def test_update_agent_tools_only(client: TestClient):
 def test_update_agent_mcp_servers_only(client: TestClient):
     _create_model(client)
     _create_agent(client)
-    response = client.patch("/agent/a1", json={"mcp_servers": ["http://localhost:9000/sse"]})
+    response = client.patch(
+        "/agent/a1", json={"mcp_servers": ["http://localhost:9000/sse"]}
+    )
     assert response.status_code == 200
     assert response.json()["mcp_servers"] == ["http://localhost:9000/sse"]
 
@@ -254,7 +266,9 @@ def test_update_agent_mcp_servers_only(client: TestClient):
 def test_update_agent_connector_config_ids_only(client: TestClient):
     _create_model(client)
     _create_agent(client)
-    response = client.patch("/agent/a1", json={"connector_config_ids": ["cfg-2", "cfg-3"]})
+    response = client.patch(
+        "/agent/a1", json={"connector_config_ids": ["cfg-2", "cfg-3"]}
+    )
     assert response.status_code == 200
     assert response.json()["connector_config_ids"] == ["cfg-2", "cfg-3"]
 
@@ -324,7 +338,9 @@ def test_update_agent_overwrites_list_fields(client: TestClient):
     assert data["sub_agents"] == ["child-new"]
 
 
-def test_update_agent_invalidates_cache(client: TestClient, monkeypatch: pytest.MonkeyPatch):
+def test_update_agent_invalidates_cache(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+):
     _create_model(client)
     _create_agent(client)
 
@@ -340,7 +356,9 @@ def test_update_agent_invalidates_cache(client: TestClient, monkeypatch: pytest.
     assert called["value"] == "a1"
 
 
-def test_delete_agent_invalidates_cache(client: TestClient, monkeypatch: pytest.MonkeyPatch):
+def test_delete_agent_invalidates_cache(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+):
     _create_model(client)
     _create_agent(client)
 
@@ -384,7 +402,9 @@ def test_update_agent_invalid_mcp_servers_type_422(client: TestClient):
     _create_model(client)
     _create_agent(client)
 
-    response = client.patch("/agent/a1", json={"mcp_servers": "http://localhost:8000/sse"})
+    response = client.patch(
+        "/agent/a1", json={"mcp_servers": "http://localhost:8000/sse"}
+    )
     assert response.status_code == 422
 
 
@@ -410,11 +430,16 @@ def test_update_agent_allows_duplicate_sub_agents_current_behavior(client: TestC
     _create_model(client)
     _create_agent(client)
 
-    response = client.patch("/agent/a1", json={"sub_agents": ["child-dup", "child-dup"]})
+    response = client.patch(
+        "/agent/a1", json={"sub_agents": ["child-dup", "child-dup"]}
+    )
     assert response.status_code == 200
     assert response.json()["sub_agents"] == ["child-dup", "child-dup"]
 
-def _create_automation_agent(client: TestClient, agent_id: str = "a-auto", model_id: str = "gemini-pro"):
+
+def _create_automation_agent(
+    client: TestClient, agent_id: str = "a-auto", model_id: str = "gemini-pro"
+):
     return client.post(
         "/agent/",
         json={
@@ -424,9 +449,10 @@ def _create_automation_agent(client: TestClient, agent_id: str = "a-auto", model
             "instruction": "instr",
             "model_id": model_id,
             "isEnabled": True,
-            "type": "automation"
+            "type": "automation",
         },
     )
+
 
 def test_create_webhook(client: TestClient):
     _create_model(client)
@@ -435,34 +461,37 @@ def test_create_webhook(client: TestClient):
     assert res.status_code == 200
     assert "webhook_id" in res.json()
 
+
 def test_create_webhook_invalid_agent_type(client: TestClient):
     _create_model(client)
-    _create_agent(client, agent_id="a-normal") # type=agent by default
+    _create_agent(client, agent_id="a-normal")  # type=agent by default
     res = client.post("/agent/a-normal/webhooks", json={"prompt": "hello"})
     assert res.status_code == 400
+
 
 def test_list_and_delete_webhooks(client: TestClient):
     _create_model(client)
     _create_automation_agent(client)
     res = client.post("/agent/a-auto/webhooks", json={"prompt": "hello"})
     wh_id = res.json()["webhook_id"]
-    
+
     list_res = client.get("/agent/a-auto/webhook")
     assert len(list_res.json()) == 1
-    
+
     del_res = client.delete(f"/agent/a-auto/webhook/{wh_id}")
     assert del_res.status_code == 200
-    
+
     list_res = client.get("/agent/a-auto/webhook")
     assert len(list_res.json()) == 0
+
 
 def test_create_job(client: TestClient):
     _create_model(client)
     _create_automation_agent(client)
-    res = client.post("/agent/a-auto/jobs", json={
-        "prompt": "job hello",
-        "cron_expression": "*/5 * * * *"
-    })
+    res = client.post(
+        "/agent/a-auto/jobs",
+        json={"prompt": "job hello", "cron_expression": "*/5 * * * *"},
+    )
     assert res.status_code == 200
     assert "job_id" in res.json()
 
@@ -470,35 +499,34 @@ def test_create_job(client: TestClient):
 def test_create_job_invalid_cron_returns_400(client: TestClient):
     _create_model(client)
     _create_automation_agent(client)
-    res = client.post("/agent/a-auto/jobs", json={
-        "prompt": "job hello",
-        "cron_expression": "/5 * * * *"
-    })
+    res = client.post(
+        "/agent/a-auto/jobs",
+        json={"prompt": "job hello", "cron_expression": "/5 * * * *"},
+    )
     assert res.status_code == 400
     assert "Invalid cron_expression" in res.json()["detail"]
 
     list_res = client.get("/agent/a-auto/jobs")
     assert list_res.json() == []
 
+
 def test_create_job_missing_schedule(client: TestClient):
     _create_model(client)
     _create_automation_agent(client)
-    res = client.post("/agent/a-auto/jobs", json={
-        "prompt": "job hello"
-    })
+    res = client.post("/agent/a-auto/jobs", json={"prompt": "job hello"})
     assert res.status_code == 400
+
 
 def test_list_and_delete_jobs(client: TestClient):
     _create_model(client)
     _create_automation_agent(client)
-    res = client.post("/agent/a-auto/jobs", json={
-        "prompt": "job hello",
-        "interval_seconds": 60
-    })
+    res = client.post(
+        "/agent/a-auto/jobs", json={"prompt": "job hello", "interval_seconds": 60}
+    )
     j_id = res.json()["job_id"]
-    
+
     list_res = client.get("/agent/a-auto/jobs")
     assert len(list_res.json()) == 1
-    
+
     del_res = client.delete(f"/agent/a-auto/jobs/{j_id}")
     assert del_res.status_code == 200
