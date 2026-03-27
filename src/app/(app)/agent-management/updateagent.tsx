@@ -21,6 +21,18 @@ type ModelOption = {
     iconSrc: string | null;
 };
 
+type UpdateAgentForm = {
+    agentName: string;
+    description: string;
+    instruction: string;
+    modelId: string;
+    tools: string;
+    mcpServers: string;
+    connectorConfigIds: string;
+    subAgents: string;
+    isEnabled: boolean;
+};
+
 const toSnakeCase = (value: string) =>
     value
         .trim()
@@ -263,7 +275,7 @@ export default function UpdateAgent({
     const { llmManagerApiBaseUrl } = useRuntimeConfig();
     const base = trimTrailingSlash(llmManagerApiBaseUrl);
 
-    const [form, setForm] = useState({
+    const [form, setForm] = useState<UpdateAgentForm>({
         agentName: "",
         description: "",
         instruction: "",
@@ -287,7 +299,10 @@ export default function UpdateAgent({
     const isFormValid =
         form.agentName && form.description && form.instruction && form.modelId;
 
-    const updateField = (key: string, value: any) =>
+    const updateField = <K extends keyof UpdateAgentForm>(
+        key: K,
+        value: UpdateAgentForm[K]
+    ) =>
         setForm((prev) => ({ ...prev, [key]: value }));
 
     const updateList = (
@@ -316,6 +331,8 @@ export default function UpdateAgent({
             tools: Array.isArray(agent.tools)
                 ? agent.tools.join(", ")
                 : agent.tools || "",
+            mcpServers: (agent.mcp_servers || []).join(", "),
+            connectorConfigIds: (agent.connector_config_ids || []).join(", "),
             subAgents: (agent.sub_agents || []).join(", "),
             isEnabled: agent.isEnabled ?? true,
         });
