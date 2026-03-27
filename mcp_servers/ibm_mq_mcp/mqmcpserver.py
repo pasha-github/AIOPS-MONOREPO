@@ -12,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import logging
 import httpx
 import json
 import os
@@ -31,6 +30,8 @@ load_dotenv()
 URL_BASE = os.getenv("URL_BASE", "")
 USER_NAME = os.getenv("USER_NAME", "")
 PASSWORD = os.getenv("PASSWORD", "")
+LOGS_URL = os.getenv("LOGS_URL", "")
+SSH_URL = os.getenv("SSH_URL", "")
 
 @mcp.tool()
 async def dspmq() -> str:
@@ -107,6 +108,91 @@ def prettify_runmqsc(payload: str) -> str:
             prettifiedOutput += x['text'][0] + "\n---\n"   
     
     return prettifiedOutput    
+
+@mcp.tool()
+async def get_mq_logs() -> str:
+    """This tool returns IBM MQ error logs and reports any detected MQ issues such as channel failures or connectivity errors."""
+    if not LOGS_URL:
+        return "LOGS_URL is not configured."
+
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.get(LOGS_URL, timeout=30.0)
+            response.raise_for_status()
+            return prettify_mq_logs(response.json())
+        except Exception as err:
+            print(err)
+            return "Failed to fetch MQ logs."
+
+
+def prettify_mq_logs(payload: Any) -> str:
+    if not isinstance(payload, dict):
+        return json.dumps(payload, indent=2)
+
+    prettified_output = "\n---\n"
+    prettified_output += "status = " + str(payload.get("status", "UNKNOWN")) + "\n"
+    prettified_output += "message = " + str(payload.get("message", "")) + "\n"
+
+    errors = payload.get("errors", [])
+    if errors:
+        prettified_output += "detected_issues =\n"
+        for error in errors:
+            if isinstance(error, str):
+                prettified_output += error + "\n"
+            else:
+                prettified_output += json.dumps(error, ensure_ascii=True) + "\n"
+    else:
+        prettified_output += "detected_issues = none\n"
+
+    prettified_output += "---\n"
+    return prettified_output
+
+
+@mcp.tool()
+async def run_commands_ssh(command: str) -> str:
+    """This tool is connected with an endpoint which sshs into the server where QManagers are running. Only run those commands which are mentioned in the system instructions.
+
+    Args:
+        command: The command string passed by the agent at runtime.
+    """
+    if not SSH_URL:
+        return "SSH_URL is not configured."
+
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.post(
+                SSH_URL,
+                json={"command": command},
+                timeout=60.0,
+            )
+            response.raise_for_status()
+            return prettify_ssh_response(response.json())
+        except Exception as err:
+            print(err)
+            return "Failed to run SSH command."
+
+
+def prettify_ssh_response(payload: Any) -> str:
+    if not isinstance(payload, dict):
+        return json.dumps(payload, indent=2)
+
+    prettified_output = "\n---\n"
+
+    output = payload.get("output", "")
+    error = payload.get("error", "")
+
+    if output:
+        prettified_output += "output =\n" + str(output).rstrip() + "\n"
+    else:
+        prettified_output += "output =\n<empty>\n"
+
+    if error:
+        prettified_output += "---\nerror =\n" + str(error).rstrip() + "\n"
+    else:
+        prettified_output += "---\nerror =\n<empty>\n"
+
+    prettified_output += "---\n"
+    return prettified_output
 
 if __name__ == "__main__":
     mcp.run(transport='streamable-http')

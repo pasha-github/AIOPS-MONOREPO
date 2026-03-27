@@ -3,10 +3,12 @@
 MCP (Model Context Protocol) is an open standard that allows LLMs and AI agents to discover and interact with external services such as databases, REST APIs, files, and other resources.
 You can read up on the details of MCP [here](https://modelcontextprotocol.io/introduction).
 
-This repo contains a simple MCP server, written in Python, that exposes a subset of the [MQ Administrative REST API](https://www.ibm.com/docs/en/ibm-mq/9.4.x?topic=administering-administration-using-rest-api) as two MCP tools:
+This repo contains a simple MCP server, written in Python, that exposes a subset of the [MQ Administrative REST API](https://www.ibm.com/docs/en/ibm-mq/9.4.x?topic=administering-administration-using-rest-api) and a pair of IBM MQ support endpoints as four MCP tools:
 
-- dsqmq: lists any queue managers that are local to the mqweb server, and whether they are running or not
+- dspmq: lists any queue managers that are local to the mqweb server, and whether they are running or not
 - runmqsc: runs any MQSC command against a specific queue manager. This makes use of the [plain text MQSC API](https://www.ibm.com/docs/en/ibm-mq/9.4.x?topic=adminactionqmgrqmgrnamemqsc-post-plain-text-mqsc-command) 
+- get_mq_logs: fetches MQ log status and any detected MQ issues such as channel failures or connectivity problems
+- run_commands_ssh: sends a user-supplied command to the configured SSH endpoint. Command restrictions are expected to be enforced by the calling agent instructions
 
 You can use this MCP server with any LLM which has an MCP client in it, for example [IBM Bob](https://www.ibm.com/products/bob), to allow that LLM to interact with, and potentially configure, your queue managers. 
 
@@ -23,10 +25,11 @@ This example was created based on these [instructions](https://modelcontextproto
 - Clone this repo into a working directory, e.g. **C:\work**
 - Change into the mq-mcp-server directory: **cd mq-mcp-server**
 - Install dependencies: **uv add "mcp[cli]" httpx**
-- Open **mqmcpserver.py** in your editor of choice and change:
-    - URL_BASE to point to the base URL of your mqweb server
-    - USER_NAME and PASSWORD to the username and password of the user you want to run MQSC commands as. Bear in mind that if the user is a member of the MQWebAdmin or MQWebUser roles then requests to the MQ MCP server will be able to change your MQ configuration, so you might only want to use these roles in a test environment
-- Save your changes
+- Configure the environment variables in **.env**
+    - URL_BASE: base URL of your mqweb server
+    - USER_NAME and PASSWORD: credentials for the MQ Administrative REST API. Bear in mind that if the user is a member of the MQWebAdmin or MQWebUser roles then requests to the MQ MCP server will be able to change your MQ configuration, so you might only want to use these roles in a test environment
+    - LOGS_URL: endpoint used by **get_mq_logs**
+    - SSH_URL: endpoint used by **run_commands_ssh**
 - Start the MQ MCP server by running: **uv run mqmcpserver.py**
 
 By default the MQ MCP server will be listening on http://127.0.0.1:8000/mcp using the streamable HTTP protocol. You can adjust the host name and port number, or use a different protocol using the information provided [here](https://github.com/jlowin/fastmcp#running-your-server).
