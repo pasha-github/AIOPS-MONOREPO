@@ -307,14 +307,6 @@ export default function UpdateLlmModal({
                     <SectionLabel>Model Identity</SectionLabel>
 
                     {/* Model ID — read-only badge */}
-                    <div className="flex items-center gap-3 rounded-lg border border-dashed border-gray-200 bg-gray-50 px-3 py-2.5">
-                        <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">Model ID</span>
-                        <span className="rounded-md bg-gray-100 px-2 py-0.5 font-mono text-xs text-gray-600">
-                            {llm.model_id}
-                        </span>
-                        <span className="ml-auto text-xs text-gray-300">read-only</span>
-                    </div>
-
                     <Field
                         label="Provider"
                         hint="The AI provider for this model (locked after creation)"
