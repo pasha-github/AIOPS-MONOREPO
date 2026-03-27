@@ -58,7 +58,7 @@ class ServiceNowConnector(BaseConnector):
             method=method,
             headers=headers,
             params=params,
-            data=data,
+            json=data,
             basic_auth=(self.username, self.password)
         )
         
