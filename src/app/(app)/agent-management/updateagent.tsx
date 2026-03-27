@@ -5,13 +5,6 @@ import { X, Bot } from "lucide-react";
 import { trimTrailingSlash } from "@/config/agent";
 import { useRuntimeConfig } from "@/config/runtime-config";
 import { getProviderIconSrc } from "../llm-management/llmHelpers";
-import type { AgentRecord } from "./types";
-import { useEffect, useState } from "react";
-import { X, Bot, Plug, ChevronDown, Plus, Trash2 } from "lucide-react";
-import { trimTrailingSlash } from "@/config/agent";
-import { useRuntimeConfig } from "@/config/runtime-config";
-import { getProviderIconSrc } from "../llm-management/llmHelpers";
-import Image from "next/image";
 
 type UpdateAgentProps = {
     agent: any;
@@ -51,23 +44,9 @@ const getErrorMessage = (payload: unknown, fallback: string) => {
 const inputClass =
     "w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-900 placeholder-gray-400 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/10";
 
-/* ── Field wrapper ── */
-function Field({ label, hint, required, children }: {
-    label: string; hint?: string; required?: boolean; children: React.ReactNode;
-}) {
-    return (
-        <div className="flex flex-col gap-1.5">
-            <label className="flex items-center gap-1 text-sm font-medium text-gray-700">
-                {label}
-                {required && <span className="text-red-500">*</span>}
-            </label>
-            {hint && <p className="text-xs leading-snug text-gray-400">{hint}</p>}
-            {children}
-        </div>
-    );
-}
+const readonlyInputClass =
+    "w-full rounded-lg border border-dashed border-gray-200 bg-gray-100 px-3 py-2.5 text-sm text-gray-400 outline-none cursor-default";
 
-/* ── Section divider ── */
 function SectionLabel({ children }: { children: React.ReactNode }) {
     return (
         <p className="mt-1 text-[10px] font-semibold uppercase tracking-widest text-gray-400">
@@ -176,30 +155,6 @@ export default function UpdateAgent({
             }
         };
         load();
-    }, [base, isOpen]);
-
-    useEffect(() => {
-        if ((!error && !success) || !scrollContainerRef.current || !feedbackRef.current) {
-            return;
-        }
-
-        const container = scrollContainerRef.current;
-        const feedback = feedbackRef.current;
-        const targetTop = Math.max(
-            0,
-            feedback.offsetTop - container.clientHeight + feedback.clientHeight + 24
-        );
-
-        container.scrollTo({
-            top: targetTop,
-            behavior: "smooth",
-        });
-    }, [error, success]);
-            } catch (e: any) {
-                if (e?.name !== "AbortError") setModelsLoadError("Unable to load models.");
-            } finally { setIsModelsLoading(false); }
-        })();
-        return () => ctrl.abort();
     }, [isOpen]);
 
     const handleUpdate = async () => {
@@ -212,7 +167,7 @@ export default function UpdateAgent({
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    agent_id: agent.agent_id, // still sent to backend
+                    agent_id: agent.agent_id,
                     name: normalizeString(form.agentName),
                     description: normalizeString(form.description),
                     instruction: normalizeString(form.instruction),
@@ -236,10 +191,15 @@ export default function UpdateAgent({
                 return;
             }
             setSuccess("Agent updated successfully!");
-            await onUpdateSuccess?.();
-            setTimeout(() => { onClose(); }, 1400);
-        } catch { setSubmitError("Unable to update agent."); }
-        finally { setIsUpdating(false); }
+            setTimeout(() => {
+                onClose();
+                onUpdateSuccess?.();
+            }, 1500);
+        } catch {
+            setError("Something went wrong. Please check your connection and try again.");
+        } finally {
+            setIsUpdating(false);
+        }
     };
 
     if (!isOpen) return null;
@@ -249,9 +209,7 @@ export default function UpdateAgent({
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
             onClick={(e) => e.target === e.currentTarget && onClose()}
         >
-            <div className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
-
-                {/* Header */}
+            <div className="flex max-h-[92vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
                 <div className="flex shrink-0 items-center gap-3 border-b border-gray-100 px-6 py-4">
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
                         <Bot size={18} />
@@ -276,55 +234,59 @@ export default function UpdateAgent({
                 <div className="flex flex-col gap-4 overflow-y-auto px-6 py-5">
                     <SectionLabel>Identity</SectionLabel>
 
-                    <Field label="Agent Name" required hint="Human-readable display name for this agent">
+                    <Field label="Agent Name" required hint="Human-readable display name">
                         <input
                             className={inputClass}
                             value={form.agentName}
                             onChange={(e) => updateField("agentName", e.target.value)}
                             placeholder="e.g. Support Bot"
-                            className={inputClass}
                         />
                     </Field>
 
-                    {/* ── Behaviour ── */}
+                    <Field
+                        label="Description"
+                        required
+                        hint="Brief summary of what this agent does"
+                    >
+                        <textarea
+                            className={`${inputClass} min-h-[76px] resize-y`}
+                            value={form.description}
+                            onChange={(e) => updateField("description", e.target.value)}
+                            placeholder="e.g. Handles customer support queries and escalations"
+                        />
+                    </Field>
+
                     <SectionLabel>Behaviour</SectionLabel>
 
-                    <div className="grid grid-cols-2 gap-3">
-                        <Field label="Description" required hint="Brief summary of what this agent does">
-                            <textarea
-                                value={form.description}
-                                onChange={(e) => updateField("description", e.target.value)}
-                                placeholder="e.g. Handles customer support queries"
-                                rows={3}
-                                className={`${inputClass} resize-y`}
-                            />
-                        </Field>
+                    <Field
+                        label="System Instruction"
+                        required
+                        hint="System prompt that defines this agent's personality and behaviour"
+                    >
+                        <textarea
+                            className={`${inputClass} min-h-[108px] resize-y`}
+                            value={form.instruction}
+                            onChange={(e) => updateField("instruction", e.target.value)}
+                            placeholder="You are a helpful assistant that..."
+                        />
+                    </Field>
 
-                        <Field label="System Instruction" required hint="System prompt defining personality and behaviour">
-                            <textarea
-                                value={form.instruction}
-                                onChange={(e) => updateField("instruction", e.target.value)}
-                                placeholder="You are a helpful assistant that..."
-                                rows={3}
-                                className={`${inputClass} resize-y`}
-                            />
-                        </Field>
-                    </div>
-
-                    {/* ── Model ── */}
-                    <SectionLabel>Model</SectionLabel>
-
-                    <Field label="Language Model" required hint="The LLM this agent will use to generate responses">
-                        <ModelSelect
+                    <Field
+                        label="Model"
+                        required
+                        hint="Language model this agent will use"
+                    >
+                        <select
+                            className={`${inputClass} cursor-pointer appearance-none`}
                             value={form.modelId}
                             onChange={(e) => updateField("modelId", e.target.value)}
                         >
                             <option value="">
-                                {isModelsLoading ? "Loading models…" : "Select a model"}
+                                {isModelsLoading ? "Loading models..." : "Select a model"}
                             </option>
                             {modelOptions.map((m) => (
                                 <option key={m.value} value={m.value}>
-                                    {m.label} — {m.secondary}
+                                    {m.label} - {m.secondary}
                                 </option>
                             ))}
                         </select>
@@ -441,7 +403,7 @@ export default function UpdateAgent({
                             <div>
                                 <p className="font-medium">Agent updated successfully</p>
                                 <p className="mt-0.5 text-green-600">
-                                    Your changes have been saved. Closing in a moment…
+                                    Your changes have been saved. Closing in a moment...
                                 </p>
                             </div>
                         </div>
@@ -491,7 +453,7 @@ export default function UpdateAgent({
                                             d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
                                         />
                                     </svg>
-                                    Updating…
+                                    Updating...
                                 </>
                             ) : success ? (
                                 <>
