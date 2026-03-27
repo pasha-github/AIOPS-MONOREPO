@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { X, Bot } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
+import { X, Bot, ChevronDown, Plus, Trash2 } from "lucide-react";
 import { trimTrailingSlash } from "@/config/agent";
 import { useRuntimeConfig } from "@/config/runtime-config";
 import { getProviderIconSrc } from "../llm-management/llmHelpers";
@@ -44,9 +45,6 @@ const getErrorMessage = (payload: unknown, fallback: string) => {
 const inputClass =
     "w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-900 placeholder-gray-400 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/10";
 
-const readonlyInputClass =
-    "w-full rounded-lg border border-dashed border-gray-200 bg-gray-100 px-3 py-2.5 text-sm text-gray-400 outline-none cursor-default";
-
 function SectionLabel({ children }: { children: React.ReactNode }) {
     return (
         <p className="mt-1 text-[10px] font-semibold uppercase tracking-widest text-gray-400">
@@ -80,6 +78,182 @@ function Field({
     );
 }
 
+function DynamicListField({
+    label,
+    hint,
+    values,
+    placeholder,
+    onAdd,
+    onRemove,
+    onChange,
+}: {
+    label: string;
+    hint?: string;
+    values: string[];
+    placeholder: string;
+    onAdd: () => void;
+    onRemove: (index: number) => void;
+    onChange: (index: number, value: string) => void;
+}) {
+    return (
+        <Field label={label} hint={hint}>
+            <div className="flex flex-col gap-2">
+                {values.map((value, index) => (
+                    <div key={`${label}-${index}`} className="flex items-center gap-2">
+                        <input
+                            type="text"
+                            value={value}
+                            onChange={(e) => onChange(index, e.target.value)}
+                            placeholder={placeholder}
+                            className={inputClass}
+                        />
+                        <button
+                            type="button"
+                            onClick={onAdd}
+                            title="Add"
+                            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-600 transition hover:bg-indigo-100"
+                        >
+                            <Plus size={14} />
+                        </button>
+                        {values.length > 1 && (
+                            <button
+                                type="button"
+                                onClick={() => onRemove(index)}
+                                title="Remove"
+                                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-500 transition hover:bg-red-100"
+                            >
+                                <Trash2 size={14} />
+                            </button>
+                        )}
+                    </div>
+                ))}
+            </div>
+        </Field>
+    );
+}
+
+function ModelSelect({
+    value,
+    options,
+    placeholder,
+    disabled,
+    loading,
+    onChange,
+}: {
+    value: string;
+    options: ModelOption[];
+    placeholder: string;
+    disabled?: boolean;
+    loading?: boolean;
+    onChange: (value: string) => void;
+}) {
+    const [isOpen, setIsOpen] = useState(false);
+    const ref = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (!isOpen) return;
+        const handler = (event: MouseEvent) => {
+            if (ref.current && !ref.current.contains(event.target as Node)) {
+                setIsOpen(false);
+            }
+        };
+        document.addEventListener("mousedown", handler);
+        return () => document.removeEventListener("mousedown", handler);
+    }, [isOpen]);
+
+    const selected = options.find((option) => option.value === value) ?? null;
+
+    return (
+        <div ref={ref} className="relative">
+            <button
+                type="button"
+                onClick={() => {
+                    if (!disabled && !loading) {
+                        setIsOpen((previous) => !previous);
+                    }
+                }}
+                className={`flex w-full items-center justify-between rounded-lg border px-3 py-2.5 text-sm transition ${disabled || loading
+                    ? "cursor-not-allowed border-dashed border-gray-200 bg-gray-100 text-gray-400"
+                    : "border-gray-200 bg-gray-50 text-gray-900 hover:border-gray-300 hover:bg-white focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/10"
+                    }`}
+            >
+                <span className="flex min-w-0 items-center gap-2">
+                    {selected?.iconSrc ? (
+                        <Image
+                            src={selected.iconSrc}
+                            alt=""
+                            width={18}
+                            height={18}
+                            className="shrink-0 rounded-sm object-contain"
+                        />
+                    ) : null}
+                    {loading ? (
+                        <span className="text-gray-400">Loading models...</span>
+                    ) : selected ? (
+                        <span className="min-w-0">
+                            <span className="block truncate">{selected.label}</span>
+                            <span className="block truncate text-xs text-gray-400">
+                                {selected.secondary}
+                            </span>
+                        </span>
+                    ) : (
+                        <span className="text-gray-400">{placeholder}</span>
+                    )}
+                </span>
+                <ChevronDown
+                    size={15}
+                    className={`shrink-0 text-gray-400 transition-transform ${isOpen ? "rotate-180" : ""}`}
+                />
+            </button>
+
+            {isOpen && !disabled && !loading ? (
+                <div className="absolute z-30 mt-1.5 max-h-64 w-full overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-lg">
+                    <button
+                        type="button"
+                        onClick={() => {
+                            onChange("");
+                            setIsOpen(false);
+                        }}
+                        className="w-full px-3 py-2.5 text-left text-sm text-gray-400 hover:bg-gray-50"
+                    >
+                        {placeholder}
+                    </button>
+                    {options.map((option) => (
+                        <button
+                            key={option.value}
+                            type="button"
+                            onClick={() => {
+                                onChange(option.value);
+                                setIsOpen(false);
+                            }}
+                            className={`flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm transition ${option.value === value
+                                ? "bg-indigo-50 font-medium text-indigo-700"
+                                : "text-gray-700 hover:bg-gray-50"
+                                }`}
+                        >
+                            {option.iconSrc ? (
+                                <Image
+                                    src={option.iconSrc}
+                                    alt=""
+                                    width={18}
+                                    height={18}
+                                    className="shrink-0 rounded-sm object-contain"
+                                />
+                            ) : null}
+                            <span className="min-w-0">
+                                <span className="block truncate">{option.label}</span>
+                                <span className="block truncate text-xs text-gray-400">
+                                    {option.secondary}
+                                </span>
+                            </span>
+                        </button>
+                    ))}
+                </div>
+            ) : null}
+        </div>
+    );
+}
+
 export default function UpdateAgent({
     agent,
     isOpen,
@@ -101,6 +275,8 @@ export default function UpdateAgent({
         isEnabled: true,
     });
     const [modelOptions, setModelOptions] = useState<ModelOption[]>([]);
+    const [mcpServers, setMcpServers] = useState<string[]>([""]);
+    const [connectorConfigIds, setConnectorConfigIds] = useState<string[]>([""]);
     const [isModelsLoading, setIsModelsLoading] = useState(false);
     const [isUpdating, setIsUpdating] = useState(false);
     const [error, setError] = useState("");
@@ -114,6 +290,22 @@ export default function UpdateAgent({
     const updateField = (key: string, value: any) =>
         setForm((prev) => ({ ...prev, [key]: value }));
 
+    const updateList = (
+        setter: React.Dispatch<React.SetStateAction<string[]>>,
+        index: number,
+        value: string
+    ) => setter((previous) => previous.map((item, idx) => (idx === index ? value : item)));
+
+    const addToList = (setter: React.Dispatch<React.SetStateAction<string[]>>) =>
+        setter((previous) => [...previous, ""]);
+
+    const removeFromList = (
+        setter: React.Dispatch<React.SetStateAction<string[]>>,
+        index: number
+    ) => setter((previous) => (previous.length <= 1 ? previous : previous.filter((_, idx) => idx !== index)));
+
+    const normalizeList = (values: string[]) => values.map((value) => value.trim()).filter(Boolean);
+
     useEffect(() => {
         if (!isOpen || !agent) return;
         setForm({
@@ -124,11 +316,13 @@ export default function UpdateAgent({
             tools: Array.isArray(agent.tools)
                 ? agent.tools.join(", ")
                 : agent.tools || "",
-            mcpServers: (agent.mcp_servers || []).join(", "),
-            connectorConfigIds: (agent.connector_config_ids || []).join(", "),
             subAgents: (agent.sub_agents || []).join(", "),
             isEnabled: agent.isEnabled ?? true,
         });
+        setMcpServers(agent.mcp_servers?.length ? agent.mcp_servers : [""]);
+        setConnectorConfigIds(
+            agent.connector_config_ids?.length ? agent.connector_config_ids : [""]
+        );
         setError("");
         setSuccess("");
     }, [isOpen, agent]);
@@ -173,12 +367,8 @@ export default function UpdateAgent({
                     instruction: normalizeString(form.instruction),
                     model_id: form.modelId,
                     tools: form.tools || "",
-                    mcp_servers: form.mcpServers
-                        ? form.mcpServers.split(",").map((s) => s.trim())
-                        : [],
-                    connector_config_ids: form.connectorConfigIds
-                        ? form.connectorConfigIds.split(",").map((s) => s.trim())
-                        : [],
+                    mcp_servers: normalizeList(mcpServers),
+                    connector_config_ids: normalizeList(connectorConfigIds),
                     sub_agents: form.subAgents
                         ? form.subAgents.split(",").map((s) => s.trim())
                         : [],
@@ -209,7 +399,7 @@ export default function UpdateAgent({
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
             onClick={(e) => e.target === e.currentTarget && onClose()}
         >
-            <div className="flex max-h-[92vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
                 <div className="flex shrink-0 items-center gap-3 border-b border-gray-100 px-6 py-4">
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
                         <Bot size={18} />
@@ -272,75 +462,43 @@ export default function UpdateAgent({
                     </Field>
 
                     <Field
-                        label="Model"
+                        label="Language Model"
                         required
-                        hint="Language model this agent will use"
+                        hint="The LLM this agent will use to generate responses"
                     >
-                        <select
-                            className={`${inputClass} cursor-pointer appearance-none`}
+                        <ModelSelect
                             value={form.modelId}
-                            onChange={(e) => updateField("modelId", e.target.value)}
-                        >
-                            <option value="">
-                                {isModelsLoading ? "Loading models..." : "Select a model"}
-                            </option>
-                            {modelOptions.map((m) => (
-                                <option key={m.value} value={m.value}>
-                                    {m.label} - {m.secondary}
-                                </option>
-                            ))}
-                        </select>
+                            options={modelOptions}
+                            placeholder="Select a model"
+                            loading={isModelsLoading}
+                            disabled={isModelsLoading || modelOptions.length === 0}
+                            onChange={(value) => updateField("modelId", value)}
+                        />
                     </Field>
 
                     <SectionLabel>Capabilities</SectionLabel>
 
-                    <Field
-                        label="Tools"
-                        hint="Comma-separated tool identifiers this agent can invoke"
-                    >
-                        <input
-                            className={inputClass}
-                            value={form.tools}
-                            onChange={(e) => updateField("tools", e.target.value)}
-                            placeholder="web_search, calculator, code_runner"
-                        />
-                    </Field>
-
-                    <Field
-                        label="MCP Servers"
-                        hint="Comma-separated MCP server URLs or identifiers"
-                    >
-                        <input
-                            className={inputClass}
-                            value={form.mcpServers}
-                            onChange={(e) => updateField("mcpServers", e.target.value)}
+                    <div className="grid grid-cols-2 items-start gap-4">
+                        <DynamicListField
+                            label="MCP Servers"
+                            hint="URLs of MCP servers this agent can connect to"
+                            values={mcpServers}
                             placeholder="https://mcp.example.com/sse"
+                            onAdd={() => addToList(setMcpServers)}
+                            onRemove={(index) => removeFromList(setMcpServers, index)}
+                            onChange={(index, value) => updateList(setMcpServers, index, value)}
                         />
-                    </Field>
-
-                    <div className="grid grid-cols-2 gap-3">
-                        <Field
+                        <DynamicListField
                             label="Connector Config IDs"
-                            hint="Comma-separated connector IDs"
-                        >
-                            <input
-                                className={inputClass}
-                                value={form.connectorConfigIds}
-                                onChange={(e) =>
-                                    updateField("connectorConfigIds", e.target.value)
-                                }
-                                placeholder="conn_abc123"
-                            />
-                        </Field>
-
-                        <Field label="Sub-Agents" hint="Comma-separated sub-agent IDs">
-                            <input
-                                className={inputClass}
-                                value={form.subAgents}
-                                onChange={(e) => updateField("subAgents", e.target.value)}
-                                placeholder="agent_summariser"
-                            />
-                        </Field>
+                            hint="Identifiers for pre-configured connectors"
+                            values={connectorConfigIds}
+                            placeholder="conn_abc123"
+                            onAdd={() => addToList(setConnectorConfigIds)}
+                            onRemove={(index) => removeFromList(setConnectorConfigIds, index)}
+                            onChange={(index, value) =>
+                                updateList(setConnectorConfigIds, index, value)
+                            }
+                        />
                     </div>
 
                     <SectionLabel>Status</SectionLabel>
