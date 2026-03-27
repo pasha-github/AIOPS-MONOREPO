@@ -8,10 +8,6 @@ from urllib.parse import quote
 
 import httpx
 
-AGENT_CHAT_TIMEOUT_SECONDS = 20.0
-AGENT_CHAT_MAX_ATTEMPTS = 3
-AGENT_CHAT_RETRY_BASE_DELAY_SECONDS = 0.5
-RETRYABLE_HTTP_STATUS_CODES = {408, 429, 500, 502, 503, 504}
 SAFE_SESSION_ID_PATTERN = re.compile(r"^[A-Za-z0-9._-]{1,128}$")
 
 
@@ -267,63 +263,23 @@ async def fetch_agent_reply(
     message: str,
     on_event: EventCallback | None = None,
 ) -> AgentReply:
-    """Call ADK session+SSE endpoints and retry transient failures with backoff."""
-    fallback_session_id = _to_adk_safe_session_id(session_id)
-    candidate_session_ids = [session_id]
-    if fallback_session_id != session_id:
-        candidate_session_ids.append(fallback_session_id)
+    """Call ADK session+SSE endpoints without replaying a submitted user message."""
+    adk_session_id = _to_adk_safe_session_id(session_id)
 
-    async with httpx.AsyncClient(timeout=AGENT_CHAT_TIMEOUT_SECONDS) as client:
-        for attempt in range(1, AGENT_CHAT_MAX_ATTEMPTS + 1):
-            try:
-                for candidate_session_id in candidate_session_ids:
-                    try:
-                        await _create_session_with_id(
-                            client=client,
-                            adk_base_url=adk_base_url,
-                            app_name=app_name,
-                            user_id=user_id,
-                            session_id=candidate_session_id,
-                        )
-                        return await _run_prompt_sse(
-                            client=client,
-                            adk_base_url=adk_base_url,
-                            app_name=app_name,
-                            user_id=user_id,
-                            session_id=candidate_session_id,
-                            message=message,
-                            on_event=on_event,
-                        )
-                    except httpx.HTTPStatusError as exc:
-                        is_last_candidate = (
-                            candidate_session_id == candidate_session_ids[-1]
-                        )
-                        if exc.response.status_code >= 500 and not is_last_candidate:
-                            continue
-                        raise
-            except httpx.HTTPStatusError as exc:
-                status_code = exc.response.status_code
-                should_retry = (
-                    status_code in RETRYABLE_HTTP_STATUS_CODES
-                    and attempt < AGENT_CHAT_MAX_ATTEMPTS
-                )
-                if not should_retry:
-                    raise
-                await asyncio.sleep(
-                    AGENT_CHAT_RETRY_BASE_DELAY_SECONDS * (2 ** (attempt - 1))
-                )
-            except AdkStreamError:
-                raise
-            except (
-                httpx.ConnectError,
-                httpx.ReadError,
-                httpx.RemoteProtocolError,
-                httpx.TimeoutException,
-            ):
-                if attempt >= AGENT_CHAT_MAX_ATTEMPTS:
-                    raise
-                await asyncio.sleep(
-                    AGENT_CHAT_RETRY_BASE_DELAY_SECONDS * (2 ** (attempt - 1))
-                )
-
-    raise RuntimeError("Agent reply request exhausted all attempts unexpectedly.")
+    async with httpx.AsyncClient(timeout=None) as client:
+        await _create_session_with_id(
+            client=client,
+            adk_base_url=adk_base_url,
+            app_name=app_name,
+            user_id=user_id,
+            session_id=adk_session_id,
+        )
+        return await _run_prompt_sse(
+            client=client,
+            adk_base_url=adk_base_url,
+            app_name=app_name,
+            user_id=user_id,
+            session_id=adk_session_id,
+            message=message,
+            on_event=on_event,
+        )
