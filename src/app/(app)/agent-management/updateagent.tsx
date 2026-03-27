@@ -116,7 +116,6 @@ export default function UpdateAgent({
     const scrollContainerRef = useRef<HTMLDivElement | null>(null);
     const feedbackRef = useRef<HTMLDivElement | null>(null);
 
-    // agentId is still computed and sent to the backend — just not shown in the UI
     const isFormValid =
         form.agentName && form.description && form.instruction && form.modelId;
 
@@ -151,14 +150,42 @@ export default function UpdateAgent({
             setIsModelsLoading(true);
             try {
                 const res = await fetch(`${base}/llms/`);
-                const data = await res.json();
+                const data: unknown = await res.json();
+                if (!Array.isArray(data)) {
+                    setModelOptions([]);
+                    return;
+                }
                 setModelOptions(
-                    data.map((item: any) => ({
-                        value: item.model_id,
-                        label: item.name,
-                        secondary: item.provider,
-                        iconSrc: getProviderIconSrc(item.provider),
-                    }))
+                    data.flatMap((item) => {
+                        const record =
+                            item && typeof item === "object" && !Array.isArray(item)
+                                ? (item as Record<string, unknown>)
+                                : null;
+                        const value =
+                            record && typeof record.model_id === "string"
+                                ? record.model_id
+                                : "";
+
+                        if (!value) {
+                            return [];
+                        }
+
+                        const label =
+                            record && typeof record.name === "string"
+                                ? record.name
+                                : value;
+                        const secondary =
+                            record && typeof record.provider === "string"
+                                ? record.provider
+                                : "";
+
+                        return [{
+                            value,
+                            label,
+                            secondary,
+                            iconSrc: getProviderIconSrc(secondary),
+                        }];
+                    })
                 );
             } catch {
                 setModelOptions([]);
@@ -203,15 +230,9 @@ export default function UpdateAgent({
                     instruction: normalizeString(form.instruction),
                     model_id: form.modelId,
                     tools: form.tools || "",
-                    mcp_servers: form.mcpServers
-                        ? form.mcpServers.split(",").map((s) => s.trim())
-                        : [],
-                    connector_config_ids: form.connectorConfigIds
-                        ? form.connectorConfigIds.split(",").map((s) => s.trim())
-                        : [],
-                    sub_agents: form.subAgents
-                        ? form.subAgents.split(",").map((s) => s.trim())
-                        : [],
+                    mcp_servers: normalizeListInput(form.mcpServers),
+                    connector_config_ids: normalizeListInput(form.connectorConfigIds),
+                    sub_agents: normalizeListInput(form.subAgents),
                     isEnabled: form.isEnabled,
                 }),
             });
