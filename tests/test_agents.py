@@ -466,6 +466,20 @@ def test_create_job(client: TestClient):
     assert res.status_code == 200
     assert "job_id" in res.json()
 
+
+def test_create_job_invalid_cron_returns_400(client: TestClient):
+    _create_model(client)
+    _create_automation_agent(client)
+    res = client.post("/agent/a-auto/jobs", json={
+        "prompt": "job hello",
+        "cron_expression": "/5 * * * *"
+    })
+    assert res.status_code == 400
+    assert "Invalid cron_expression" in res.json()["detail"]
+
+    list_res = client.get("/agent/a-auto/jobs")
+    assert list_res.json() == []
+
 def test_create_job_missing_schedule(client: TestClient):
     _create_model(client)
     _create_automation_agent(client)
