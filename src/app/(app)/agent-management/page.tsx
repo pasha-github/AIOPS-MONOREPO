@@ -5,27 +5,9 @@ import { RefreshCw } from "lucide-react";
 import AgentRegistry from "./AgentRegistry";
 import AgentStats from "./AgentStats";
 import CreateNewAgent from "./createnewagent";
+import type { AgentRecord } from "./types";
 import { trimTrailingSlash } from "@/config/agent";
 import { useRuntimeConfig } from "@/config/runtime-config";
-
-type AgentRecord = {
-  agentId: number;
-  name: string;
-  port: number | null;
-  status: string;
-  type: string;
-  enterprise: string;
-  start_time: string | null;
-  stop_time: string | null;
-  agent_id: string | null;
-  description: string | null;
-  instruction: string | null;
-  model_id: string | null;
-  modelName: string | null;
-  modelProvider: string | null;
-  created_at: string | null;
-  updated_at: string | null;
-};
 
 const isOnlineStatus = (statusValue: string | null | undefined) => {
   const normalized = statusValue?.trim().toLowerCase() ?? "";
@@ -42,6 +24,17 @@ const getStringOrNull = (value: unknown) => {
   }
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
+};
+
+const getStringArray = (value: unknown) => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter((item): item is string => typeof item === "string")
+    .map((item) => item.trim())
+    .filter(Boolean);
 };
 
 const getLoadErrorMessage = (payload: unknown, fallback: string) => {
@@ -182,6 +175,13 @@ export default function AgentManagementPage() {
             modelProvider: llmRecord?.provider ?? null,
             created_at: getStringOrNull(record.created_at),
             updated_at: getStringOrNull(record.updated_at),
+            tools: Array.isArray(record.tools)
+              ? getStringArray(record.tools)
+              : getStringOrNull(record.tools) ?? "",
+            mcp_servers: getStringArray(record.mcp_servers),
+            connector_config_ids: getStringArray(record.connector_config_ids),
+            sub_agents: getStringArray(record.sub_agents),
+            isEnabled: isEnabledFromApi,
           } satisfies AgentRecord;
         });
 

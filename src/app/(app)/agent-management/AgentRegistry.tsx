@@ -18,26 +18,8 @@ import { useRuntimeConfig } from "@/config/runtime-config";
 import { formatDateTime, getProviderIconSrc } from "../llm-management/llmHelpers";
 import JobsAgentManagement from "./JobsAgentManagement";
 import WebhookAgentManagement from "./WebhookAgentManagement";
+import type { AgentRecord } from "./types";
 import UpdateAgent from "./updateagent";
-
-type AgentRecord = {
-  agentId: number;
-  name: string;
-  port: number | null;
-  status: string;
-  type: string;
-  enterprise: string;
-  start_time: string | null;
-  stop_time: string | null;
-  agent_id: string | null;
-  description: string | null;
-  instruction: string | null;
-  model_id: string | null;
-  modelName: string | null;
-  modelProvider: string | null;
-  created_at: string | null;
-  updated_at: string | null;
-};
 type AgentRegistryProps = {
   agents: AgentRecord[];
   isLoading: boolean;

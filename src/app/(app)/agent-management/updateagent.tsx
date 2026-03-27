@@ -1,5 +1,11 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
+import { X, Bot } from "lucide-react";
+import { trimTrailingSlash } from "@/config/agent";
+import { useRuntimeConfig } from "@/config/runtime-config";
+import { getProviderIconSrc } from "../llm-management/llmHelpers";
+import type { AgentRecord } from "./types";
 import { useEffect, useState } from "react";
 import { X, Bot, Plug, ChevronDown, Plus, Trash2 } from "lucide-react";
 import { trimTrailingSlash } from "@/config/agent";
@@ -8,7 +14,7 @@ import { getProviderIconSrc } from "../llm-management/llmHelpers";
 import Image from "next/image";
 
 type UpdateAgentProps = {
-    agent: any;
+    agent: AgentRecord | null;
     isOpen: boolean;
     onClose: () => void;
     onUpdateSuccess?: () => void;
@@ -21,16 +27,33 @@ type ModelOption = {
     iconSrc: string | null;
 };
 
+type UpdateAgentForm = {
+    agentName: string;
+    description: string;
+    instruction: string;
+    modelId: string;
+    tools: string;
+    mcpServers: string;
+    connectorConfigIds: string;
+    subAgents: string;
+    isEnabled: boolean;
+};
+
 const normalizeString = (value: string) => value.trim();
+const normalizeListInput = (value: string) =>
+    value
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean);
 
 const getErrorMessage = (payload: unknown, fallback: string) => {
     if (
         payload &&
         typeof payload === "object" &&
         "message" in payload &&
-        typeof (payload as any).message === "string"
+        typeof (payload as { message?: unknown }).message === "string"
     ) {
-        return String((payload as any).message);
+        return String((payload as { message: string }).message);
     }
     return fallback;
 };
@@ -202,7 +225,7 @@ export default function UpdateAgent({
     const { llmManagerApiBaseUrl } = useRuntimeConfig();
     const base = trimTrailingSlash(llmManagerApiBaseUrl);
 
-    const [form, setForm] = useState({
+    const [form, setForm] = useState<UpdateAgentForm>({
         agentName: "",
         description: "",
         instruction: "",
@@ -217,11 +240,17 @@ export default function UpdateAgent({
     const [isUpdating, setIsUpdating] = useState(false);
     const [submitError, setSubmitError] = useState("");
     const [success, setSuccess] = useState("");
+    const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+    const feedbackRef = useRef<HTMLDivElement | null>(null);
 
+    // agentId is still computed and sent to the backend — just not shown in the UI
     const isFormValid =
         form.agentName && form.description && form.instruction && form.modelId;
 
-    const updateField = (key: string, value: any) =>
+    const updateField = <K extends keyof UpdateAgentForm>(
+        key: K,
+        value: UpdateAgentForm[K]
+    ) =>
         setForm((prev) => ({ ...prev, [key]: value }));
 
     /* List helpers */
@@ -268,6 +297,32 @@ export default function UpdateAgent({
                         return [{ value: id, label: item?.name?.trim() || id, secondary: provider ? `${provider} | ${id}` : id, iconSrc: provider ? getProviderIconSrc(provider) : null }];
                     }).sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base", numeric: true }))
                 );
+            } catch {
+                setModelOptions([]);
+            } finally {
+                setIsModelsLoading(false);
+            }
+        };
+        load();
+    }, [base, isOpen]);
+
+    useEffect(() => {
+        if ((!error && !success) || !scrollContainerRef.current || !feedbackRef.current) {
+            return;
+        }
+
+        const container = scrollContainerRef.current;
+        const feedback = feedbackRef.current;
+        const targetTop = Math.max(
+            0,
+            feedback.offsetTop - container.clientHeight + feedback.clientHeight + 24
+        );
+
+        container.scrollTo({
+            top: targetTop,
+            behavior: "smooth",
+        });
+    }, [error, success]);
             } catch (e: any) {
                 if (e?.name !== "AbortError") setModelsLoadError("Unable to load models.");
             } finally { setIsModelsLoading(false); }
@@ -334,7 +389,10 @@ export default function UpdateAgent({
                 </div>
 
                 {/* Scrollable body */}
-                <div className="flex flex-col gap-4 overflow-y-auto px-6 py-5">
+                <div
+                    ref={scrollContainerRef}
+                    className="flex flex-col gap-4 overflow-y-auto px-6 py-5"
+                >
 
                     {/* ── Identity ── */}
                     <SectionLabel>Identity</SectionLabel>
@@ -445,6 +503,23 @@ export default function UpdateAgent({
                         </button>
                     </div>
 
+                    {/* ── Feedback messages ── */}
+
+                    {error && (
+                        <div
+                            ref={feedbackRef}
+                            className="flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+                        >
+                            <svg
+                                className="mt-0.5 h-4 w-4 shrink-0 text-red-500"
+                                viewBox="0 0 20 20"
+                                fill="currentColor"
+                            >
+                                <path
+                                    fillRule="evenodd"
+                                    d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z"
+                                    clipRule="evenodd"
+                                />
                     {/* ── Feedback ── */}
                     {submitError && (
                         <div className="flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -459,6 +534,20 @@ export default function UpdateAgent({
                     )}
 
                     {success && (
+                        <div
+                            ref={feedbackRef}
+                            className="flex items-start gap-2.5 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700"
+                        >
+                            <svg
+                                className="mt-0.5 h-4 w-4 shrink-0 text-green-500"
+                                viewBox="0 0 20 20"
+                                fill="currentColor"
+                            >
+                                <path
+                                    fillRule="evenodd"
+                                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
+                                    clipRule="evenodd"
+                                />
                         <div className="flex items-start gap-2.5 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
                             <svg className="mt-0.5 h-4 w-4 shrink-0 text-green-500" viewBox="0 0 20 20" fill="currentColor">
                                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clipRule="evenodd" />
