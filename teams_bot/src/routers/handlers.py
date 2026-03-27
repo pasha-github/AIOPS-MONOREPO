@@ -24,6 +24,7 @@ MISSING_USER_EMAIL_MESSAGE = (
 AGENT_UNAVAILABLE_MESSAGE = "I could not reach the configured agent service right now."
 TRANSIENT_SEND_STATUS_CODES = {502, 503, 504}
 TRANSIENT_SEND_ATTEMPTS = 3
+TYPING_INDICATOR_INTERVAL_SECONDS = 4
 
 
 def get_message_text(ctx: ActivityContext[MessageActivity]) -> str:
@@ -100,6 +101,17 @@ async def send_optional_typing(ctx: ActivityContext[MessageActivity], app: App) 
     )
 
 
+async def keep_sending_typing(
+    ctx: ActivityContext[MessageActivity], app: App
+) -> None:
+    try:
+        while True:
+            await send_optional_typing(ctx, app)
+            await asyncio.sleep(TYPING_INDICATOR_INTERVAL_SECONDS)
+    except asyncio.CancelledError:
+        raise
+
+
 def register_handlers(app: App, config: Config) -> None:
     # -----------------------------------------------------------------------
     # Teams activity handlers
@@ -140,7 +152,6 @@ def register_handlers(app: App, config: Config) -> None:
                 required=True,
             )
             return
-        await send_optional_typing(ctx, app)
         scope = detect_scope(ctx)
 
         # Keep channel/group targets fresh when users interact in non-personal scopes.
@@ -160,6 +171,7 @@ def register_handlers(app: App, config: Config) -> None:
             return
 
         status_activity = None
+        typing_task = asyncio.create_task(keep_sending_typing(ctx, app))
 
         try:
             session_id = normalize_conversation_id(
@@ -211,6 +223,8 @@ def register_handlers(app: App, config: Config) -> None:
                 on_event=send_progress_event,
             )
         except Exception:
+            typing_task.cancel()
+            await asyncio.gather(typing_task, return_exceptions=True)
             app.logger.exception("Failed to call configured agent chat endpoint.")
             if status_activity is None:
                 await send_with_retry(
@@ -231,6 +245,8 @@ def register_handlers(app: App, config: Config) -> None:
                     required=True,
                 )
             return
+        typing_task.cancel()
+        await asyncio.gather(typing_task, return_exceptions=True)
 
         if status_activity is None:
             await send_with_retry(
