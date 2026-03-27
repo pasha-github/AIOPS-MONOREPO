@@ -1,14 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { X, Bot } from "lucide-react";
 import { trimTrailingSlash } from "@/config/agent";
 import { useRuntimeConfig } from "@/config/runtime-config";
 import { getProviderIconSrc } from "../llm-management/llmHelpers";
-import type { AgentRecord } from "./types";
 
 type UpdateAgentProps = {
-    agent: AgentRecord | null;
+    agent: any;
     isOpen: boolean;
     onClose: () => void;
     onUpdateSuccess?: () => void;
@@ -21,39 +20,32 @@ type ModelOption = {
     iconSrc: string | null;
 };
 
-type UpdateAgentForm = {
-    agentName: string;
-    description: string;
-    instruction: string;
-    modelId: string;
-    tools: string;
-    mcpServers: string;
-    connectorConfigIds: string;
-    subAgents: string;
-    isEnabled: boolean;
-};
+const toSnakeCase = (value: string) =>
+    value
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "_")
+        .replace(/^_+|_+$/g, "");
 
 const normalizeString = (value: string) => value.trim();
-const normalizeListInput = (value: string) =>
-    value
-        .split(",")
-        .map((item) => item.trim())
-        .filter(Boolean);
 
 const getErrorMessage = (payload: unknown, fallback: string) => {
     if (
         payload &&
         typeof payload === "object" &&
         "message" in payload &&
-        typeof (payload as { message?: unknown }).message === "string"
+        typeof (payload as any).message === "string"
     ) {
-        return String((payload as { message: string }).message);
+        return String((payload as any).message);
     }
     return fallback;
 };
 
 const inputClass =
     "w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-900 placeholder-gray-400 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/10";
+
+const readonlyInputClass =
+    "w-full rounded-lg border border-dashed border-gray-200 bg-gray-100 px-3 py-2.5 text-sm text-gray-400 outline-none cursor-default";
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
     return (
@@ -97,7 +89,7 @@ export default function UpdateAgent({
     const { llmManagerApiBaseUrl } = useRuntimeConfig();
     const base = trimTrailingSlash(llmManagerApiBaseUrl);
 
-    const [form, setForm] = useState<UpdateAgentForm>({
+    const [form, setForm] = useState({
         agentName: "",
         description: "",
         instruction: "",
@@ -113,16 +105,13 @@ export default function UpdateAgent({
     const [isUpdating, setIsUpdating] = useState(false);
     const [error, setError] = useState("");
     const [success, setSuccess] = useState("");
-    const scrollContainerRef = useRef<HTMLDivElement | null>(null);
-    const feedbackRef = useRef<HTMLDivElement | null>(null);
+
+    const agentId = useMemo(() => toSnakeCase(form.agentName), [form.agentName]);
 
     const isFormValid =
         form.agentName && form.description && form.instruction && form.modelId;
 
-    const updateField = <K extends keyof UpdateAgentForm>(
-        key: K,
-        value: UpdateAgentForm[K]
-    ) =>
+    const updateField = (key: string, value: any) =>
         setForm((prev) => ({ ...prev, [key]: value }));
 
     useEffect(() => {
@@ -150,42 +139,14 @@ export default function UpdateAgent({
             setIsModelsLoading(true);
             try {
                 const res = await fetch(`${base}/llms/`);
-                const data: unknown = await res.json();
-                if (!Array.isArray(data)) {
-                    setModelOptions([]);
-                    return;
-                }
+                const data = await res.json();
                 setModelOptions(
-                    data.flatMap((item) => {
-                        const record =
-                            item && typeof item === "object" && !Array.isArray(item)
-                                ? (item as Record<string, unknown>)
-                                : null;
-                        const value =
-                            record && typeof record.model_id === "string"
-                                ? record.model_id
-                                : "";
-
-                        if (!value) {
-                            return [];
-                        }
-
-                        const label =
-                            record && typeof record.name === "string"
-                                ? record.name
-                                : value;
-                        const secondary =
-                            record && typeof record.provider === "string"
-                                ? record.provider
-                                : "";
-
-                        return [{
-                            value,
-                            label,
-                            secondary,
-                            iconSrc: getProviderIconSrc(secondary),
-                        }];
-                    })
+                    data.map((item: any) => ({
+                        value: item.model_id,
+                        label: item.name,
+                        secondary: item.provider,
+                        iconSrc: getProviderIconSrc(item.provider),
+                    }))
                 );
             } catch {
                 setModelOptions([]);
@@ -194,25 +155,7 @@ export default function UpdateAgent({
             }
         };
         load();
-    }, [base, isOpen]);
-
-    useEffect(() => {
-        if ((!error && !success) || !scrollContainerRef.current || !feedbackRef.current) {
-            return;
-        }
-
-        const container = scrollContainerRef.current;
-        const feedback = feedbackRef.current;
-        const targetTop = Math.max(
-            0,
-            feedback.offsetTop - container.clientHeight + feedback.clientHeight + 24
-        );
-
-        container.scrollTo({
-            top: targetTop,
-            behavior: "smooth",
-        });
-    }, [error, success]);
+    }, [isOpen]);
 
     const handleUpdate = async () => {
         if (!isFormValid) return;
@@ -224,15 +167,21 @@ export default function UpdateAgent({
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    agent_id: agent.agent_id, // still sent to backend
+                    agent_id: agent.agent_id,
                     name: normalizeString(form.agentName),
                     description: normalizeString(form.description),
                     instruction: normalizeString(form.instruction),
                     model_id: form.modelId,
                     tools: form.tools || "",
-                    mcp_servers: normalizeListInput(form.mcpServers),
-                    connector_config_ids: normalizeListInput(form.connectorConfigIds),
-                    sub_agents: normalizeListInput(form.subAgents),
+                    mcp_servers: form.mcpServers
+                        ? form.mcpServers.split(",").map((s) => s.trim())
+                        : [],
+                    connector_config_ids: form.connectorConfigIds
+                        ? form.connectorConfigIds.split(",").map((s) => s.trim())
+                        : [],
+                    sub_agents: form.subAgents
+                        ? form.subAgents.split(",").map((s) => s.trim())
+                        : [],
                     isEnabled: form.isEnabled,
                 }),
             });
@@ -246,7 +195,6 @@ export default function UpdateAgent({
                 onClose();
                 onUpdateSuccess?.();
             }, 1500);
-
         } catch {
             setError("Something went wrong. Please check your connection and try again.");
         } finally {
@@ -262,8 +210,6 @@ export default function UpdateAgent({
             onClick={(e) => e.target === e.currentTarget && onClose()}
         >
             <div className="flex max-h-[92vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
-
-                {/* Header */}
                 <div className="flex shrink-0 items-center gap-3 border-b border-gray-100 px-6 py-4">
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
                         <Bot size={18} />
@@ -285,16 +231,9 @@ export default function UpdateAgent({
                     </button>
                 </div>
 
-                {/* Scrollable body */}
-                <div
-                    ref={scrollContainerRef}
-                    className="flex flex-col gap-4 overflow-y-auto px-6 py-5"
-                >
-
-                    {/* ── Identity ── */}
+                <div className="flex flex-col gap-4 overflow-y-auto px-6 py-5">
                     <SectionLabel>Identity</SectionLabel>
 
-                    {/* Agent Name only — Agent ID hidden from UI but still sent to backend */}
                     <Field label="Agent Name" required hint="Human-readable display name">
                         <input
                             className={inputClass}
@@ -317,7 +256,6 @@ export default function UpdateAgent({
                         />
                     </Field>
 
-                    {/* ── Behaviour ── */}
                     <SectionLabel>Behaviour</SectionLabel>
 
                     <Field
@@ -354,7 +292,6 @@ export default function UpdateAgent({
                         </select>
                     </Field>
 
-                    {/* ── Capabilities ── */}
                     <SectionLabel>Capabilities</SectionLabel>
 
                     <Field
@@ -406,7 +343,6 @@ export default function UpdateAgent({
                         </Field>
                     </div>
 
-                    {/* ── Status ── */}
                     <SectionLabel>Status</SectionLabel>
 
                     <div className="flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
@@ -431,13 +367,8 @@ export default function UpdateAgent({
                         </button>
                     </div>
 
-                    {/* ── Feedback messages ── */}
-
                     {error && (
-                        <div
-                            ref={feedbackRef}
-                            className="flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
-                        >
+                        <div className="flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                             <svg
                                 className="mt-0.5 h-4 w-4 shrink-0 text-red-500"
                                 viewBox="0 0 20 20"
@@ -457,10 +388,7 @@ export default function UpdateAgent({
                     )}
 
                     {success && (
-                        <div
-                            ref={feedbackRef}
-                            className="flex items-start gap-2.5 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700"
-                        >
+                        <div className="flex items-start gap-2.5 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
                             <svg
                                 className="mt-0.5 h-4 w-4 shrink-0 text-green-500"
                                 viewBox="0 0 20 20"
@@ -482,7 +410,6 @@ export default function UpdateAgent({
                     )}
                 </div>
 
-                {/* Footer */}
                 <div className="flex shrink-0 items-center justify-between border-t border-gray-100 px-6 py-4">
                     <p className="text-xs text-gray-400">
                         {!isFormValid && !success
