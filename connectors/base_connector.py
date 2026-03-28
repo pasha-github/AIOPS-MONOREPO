@@ -9,7 +9,7 @@ import base64
 import inspect
 
 import requests
-from google.adk.tools import FunctionTool
+from google.adk.tools.function_tool import FunctionTool
 
 
 def connector_tool(func):
@@ -95,10 +95,14 @@ class BaseConnector:
             username, password = basic_auth
             credentials = f"{username}:{password}"
             encoded_credentials = base64.b64encode(credentials.encode()).decode()
+            if headers is None:
+                headers = {}
             headers["Authorization"] = f"Basic {encoded_credentials}"
 
         # Bearer Token support
         if bearer_token:
+            if headers is None:
+                headers = {}
             headers["Authorization"] = f"Bearer {bearer_token}"
 
         return requests.request(

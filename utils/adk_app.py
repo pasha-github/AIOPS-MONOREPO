@@ -8,14 +8,21 @@ from utils.cache import cache
 from utils.constants import A2A, AGENT_SERVER_DATABASE_URL, WEB
 
 
-def _get_adk_web_server_instance(fastapi_app):
+def _get_adk_web_server_instance(fastapi_app) -> AdkWebServer:
     """Extracts the internal AdkWebServer instance from route closures."""
     for route in fastapi_app.routes:
         if getattr(route, "name", "") == "run_agent":
             # The route endpoint is a nested function that closes over 'self'
             closure_vars = inspect.getclosurevars(route.endpoint)
-            return closure_vars.nonlocals.get("self")
-    return None
+            adk_web_server_instance: AdkWebServer | None = closure_vars.nonlocals.get(
+                "self"
+            )
+
+            if adk_web_server_instance is None:
+                continue
+
+            return adk_web_server_instance
+    raise Exception("Adk web server instance not found")
 
 
 def _invalidate_runner_cache(app_name: str):

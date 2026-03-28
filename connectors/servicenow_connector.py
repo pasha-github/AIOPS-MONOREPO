@@ -109,7 +109,7 @@ class ServiceNowConnector(BaseConnector):
         Returns:
             A dict containing the list of incidents.
         """
-        params = {"sysparm_limit": limit}
+        params: dict[str, Any] = {"sysparm_limit": limit}
         if query:
             params["sysparm_query"] = query
 
@@ -212,7 +212,7 @@ class ServiceNowConnector(BaseConnector):
         Returns:
             A dict containing the list of change requests.
         """
-        params = {"sysparm_limit": limit}
+        params: dict[str, Any] = {"sysparm_limit": limit}
         if query:
             params["sysparm_query"] = query
 
@@ -297,7 +297,7 @@ class ServiceNowConnector(BaseConnector):
         Returns:
             A dict containing the list of knowledge articles.
         """
-        params = {"sysparm_limit": limit}
+        params: dict[str, Any] = {"sysparm_limit": limit}
         if query:
             params["sysparm_query"] = query
 
