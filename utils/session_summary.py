@@ -3,7 +3,8 @@ import os
 
 import litellm
 from google.adk.agents.callback_context import CallbackContext
-from google.adk.models import LlmRequest, LlmResponse
+from google.adk.models.llm_request import LlmRequest
+from google.adk.models.llm_response import LlmResponse
 
 logger = logging.getLogger(__name__)
 FIRST_MESSAGE_SUMMARY_KEY = "first_message_summary"
@@ -89,7 +90,7 @@ def make_session_summary_callback(model: str):
                 summarizer_model,
                 response,
             )
-            content = response.choices[0].message.content
+            content = response.choices[0].message.content  # type: ignore
             summary = content.strip() if isinstance(content, str) else ""
             logger.info(
                 "Session summary response: agent=%s summarizer_model=%s content_type=%s content=%r",
