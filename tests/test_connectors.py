@@ -227,7 +227,7 @@ class BaseConnector:
         connector_source, encoding="utf-8"
     )
 
-    monkeypatch.setattr("utils.helper.CONNECTORS_DIR", str(temp_connectors))
+    monkeypatch.setattr("utils.helper.CONNECTORS_DIR", temp_connectors)
 
     cfg = ConnectorConfig(
         name="ok",
@@ -261,7 +261,7 @@ class BaseConnector:
         connector_source, encoding="utf-8"
     )
 
-    monkeypatch.setattr("utils.helper.CONNECTORS_DIR", str(temp_connectors))
+    monkeypatch.setattr("utils.helper.CONNECTORS_DIR", temp_connectors)
 
     cfg = ConnectorConfig(
         name="bad",

@@ -66,9 +66,6 @@ def make_session_summary_callback(model: str):
             summarizer_model,
             user_text_preview,
         )
-        print(
-            f"[session_summary] request agent={agent_name} model={summarizer_model} user_text={user_text_preview!r}"
-        )
 
         try:
             response = litellm.completion(
@@ -92,9 +89,6 @@ def make_session_summary_callback(model: str):
                 summarizer_model,
                 response,
             )
-            print(
-                f"[session_summary] raw_response agent={agent_name} model={summarizer_model} response={response!r}"
-            )
             content = response.choices[0].message.content
             summary = content.strip() if isinstance(content, str) else ""
             logger.info(
@@ -104,19 +98,12 @@ def make_session_summary_callback(model: str):
                 type(content).__name__,
                 content,
             )
-            print(
-                f"[session_summary] response agent={agent_name} "
-                f"model={summarizer_model} content_type={type(content).__name__} content={content!r}"
-            )
         except Exception as exc:
             logger.warning(
                 "Failed to generate first message summary: agent=%s summarizer_model=%s error=%s",
                 agent_name,
                 summarizer_model,
                 exc,
-            )
-            print(
-                f"[session_summary] error agent={agent_name} model={summarizer_model} error={exc!r}"
             )
 
         if not summary:
@@ -125,9 +112,6 @@ def make_session_summary_callback(model: str):
                 agent_name,
                 summarizer_model,
                 user_text_preview,
-            )
-            print(
-                f"[session_summary] fallback agent={agent_name} model={summarizer_model} fallback={user_text_preview!r}"
             )
             summary = _fallback_summary(user_text)
 
@@ -138,9 +122,6 @@ def make_session_summary_callback(model: str):
                 agent_name,
                 summarizer_model,
                 summary,
-            )
-            print(
-                f"[session_summary] stored agent={agent_name} model={summarizer_model} summary={summary!r}"
             )
 
         return None

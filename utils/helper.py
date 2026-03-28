@@ -1,13 +1,13 @@
 import ast
 import importlib.util
 import inspect
-import os
 import sys
 from functools import lru_cache
+from pathlib import Path
 
 from database.models import ConnectorConfig
 
-CONNECTORS_DIR = os.path.join(os.path.dirname(__file__), "..", "connectors")
+CONNECTORS_DIR = Path(__file__).parent.parent / "connectors"
 
 
 def resolve_connector_tools(connector_config: ConnectorConfig):
@@ -29,15 +29,15 @@ def resolve_connector_tools(connector_config: ConnectorConfig):
     config = connector_config.config
 
     # --- 1. Locate the connector module file ---
-    module_path = os.path.abspath(os.path.join(CONNECTORS_DIR, f"{connector_id}.py"))
-    if not os.path.isfile(module_path):
+    module_path = (CONNECTORS_DIR / f"{connector_id}.py").resolve()
+    if not module_path.is_file():
         raise FileNotFoundError(
             f"Connector '{connector_id}' not found. Expected file: {module_path}"
         )
 
     # --- 2. Dynamically import the module ---
     # Add connectors dir to sys.path so relative imports (e.g. base_connector) resolve
-    connectors_abs = os.path.abspath(CONNECTORS_DIR)
+    connectors_abs = str(CONNECTORS_DIR.resolve())
     if connectors_abs not in sys.path:
         sys.path.insert(0, connectors_abs)
 
@@ -73,7 +73,6 @@ def resolve_connector_tools(connector_config: ConnectorConfig):
 def cached_connector_info(source: str, mtime: float):
     # your AST parsing logic here
     tree = ast.parse(source)
-    time = mtime
 
     # -----------------------------
     # Module-level documentation
@@ -124,9 +123,9 @@ def cached_connector_info(source: str, mtime: float):
                     # Detect @connector_tool decorator
                     has_decorator = False
                     for dec in item.decorator_list:
-                        if isinstance(dec, ast.Name) and dec.id == "connector_tool":
-                            has_decorator = True
-                        elif (
+                        if (
+                            isinstance(dec, ast.Name) and dec.id == "connector_tool"
+                        ) or (
                             isinstance(dec, ast.Attribute)
                             and dec.attr == "connector_tool"
                         ):
