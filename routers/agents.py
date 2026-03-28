@@ -1,4 +1,5 @@
 import json
+import logging
 from pathlib import Path
 from uuid import UUID
 
@@ -15,6 +16,8 @@ router = APIRouter(prefix="/agent", tags=["agent"])
 TEMPLATES_FILE = (
     Path(__file__).resolve().parent.parent / "static" / "agent_templates.json"
 )
+
+logger = logging.getLogger(__name__)
 
 
 class AgentCreate(BaseModel):
@@ -115,9 +118,10 @@ def update_agent(
         raise HTTPException(status_code=404, detail="Agent not found")
 
     updates = patch_data.model_dump(exclude_unset=True)
-    if "model_id" in updates:
-        if updates["model_id"] is None or not session.get(Model, updates["model_id"]):
-            raise HTTPException(status_code=400, detail="Invalid model_id")
+    if "model_id" in updates and (
+        updates["model_id"] is None or not session.get(Model, updates["model_id"])
+    ):
+        raise HTTPException(status_code=400, detail="Invalid model_id")
 
     for key, value in updates.items():
         setattr(agent, key, value)
@@ -202,7 +206,7 @@ async def invoke_agent_session(agent_id: str, prompt: str):
         ):
             events.append(event)
     except Exception as e:
-        print(e)
+        logger.error(e)
 
     return events
 
@@ -222,7 +226,7 @@ async def invoke_webhook(
         result = await invoke_agent_session(agent_id, final_prompt)
         return {"status": "success", "result": result}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 # --- Jobs ---
@@ -288,8 +292,8 @@ async def delete_job(
     job = session.get(Job, job_id)
     if not job or job.agent_id != agent_id:
         raise HTTPException(status_code=404, detail="Job not found")
-    print("BEFORE DELETE")
-    print(
+    logger.info("BEFORE DELETE")
+    logger.info(
         f"[DeleteJob] agent_id={agent_id} job_id={job_id} "
         f"agent_cached={cache.get_agent(agent_id) is not None} "
         f"cache_keys={list(cache._cache.keys())} "
@@ -302,8 +306,8 @@ async def delete_job(
     from utils.scheduler import reload_jobs
 
     await reload_jobs()
-    print("AFTER DELETE")
-    print(
+    logger.info("AFTER DELETE")
+    logger.info(
         f"[DeleteJob] agent_id={agent_id} job_id={job_id} "
         f"agent_cached={cache.get_agent(agent_id) is not None} "
         f"cache_keys={list(cache._cache.keys())} "
