@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 from sqlalchemy import engine_from_config, pool
 from sqlmodel import SQLModel
 
-from database.models import *  # This imports all models so they are registered with SQLModel.metadata
+from database.models import *  # This imports all models so they are registered with SQLModel.metadata  # noqa: F403
 
 load_dotenv()
 
