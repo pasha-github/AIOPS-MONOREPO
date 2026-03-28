@@ -37,7 +37,7 @@ class DatabaseAgentLoader(BaseAgentLoader):
     def list_agents(self) -> list[str]:
         """Lists the names of enabled agents from the database."""
         with Session(engine) as session:
-            statement = select(Agent.agent_id).where(Agent.isEnabled == True)
+            statement = select(Agent.agent_id).where(Agent.isEnabled)
             results = session.exec(statement).all()
             return list(results)
 
@@ -99,7 +99,7 @@ class DatabaseAgentLoader(BaseAgentLoader):
                     exec(agent_config.tools, {}, local_scope)
 
                     # Iterate and add callables to tools_list
-                    for name, func in local_scope.items():
+                    for _, func in local_scope.items():
                         if callable(func):
                             tools_list.append(func)
                 except Exception as e:
@@ -158,7 +158,6 @@ class DatabaseAgentLoader(BaseAgentLoader):
                             f"Error loading sub agent config '{sub_agent_id}' for agent {agent_name}: {e}"
                         )
 
-            print(tools_list)
             tools_list.extend(sub_agents)
 
             summary_callback = make_session_summary_callback(
@@ -175,7 +174,7 @@ class DatabaseAgentLoader(BaseAgentLoader):
                 # --- Tool Definition ---
                 def exit_loop(tool_context: ToolContext):
                     """Call this function ONLY when the tasks are completed and no further changes are needed, signaling the iterative process should end."""
-                    print(
+                    logger.info(
                         f"  [Tool Call] exit_loop triggered by {tool_context.agent_name}"
                     )
                     tool_context.actions.escalate = True
@@ -188,7 +187,7 @@ class DatabaseAgentLoader(BaseAgentLoader):
                     name="core_automation_agent",
                     description=agent_config.description,
                     instruction=agent_config.instruction,
-                    tools=[exit_loop] + tools_list,
+                    tools=[exit_loop, *tools_list],
                     sub_agents=[],
                     before_model_callback=summary_callback,
                 )

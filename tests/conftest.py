@@ -1,3 +1,4 @@
+import logging
 import os
 
 import pytest
@@ -8,11 +9,13 @@ from sqlmodel.pool import StaticPool
 from database.database import get_session
 from main import app
 
+logger = logging.getLogger(__name__)
+
 
 @pytest.fixture(name="session")
 def session_fixture():
     db_url = os.getenv("TEST_MAIN_DATABASE_URL") or "sqlite:///./test.db"
-    print(f"[tests] Running on DB: {db_url}")
+    logger.info(f"[tests] Running on DB: {db_url}")
     is_sqlite = db_url.startswith("sqlite")
 
     if is_sqlite:

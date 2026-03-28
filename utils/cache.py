@@ -1,9 +1,9 @@
-from typing import Any
+from typing import Any, ClassVar
 
 
 class AgentCache:
     _instance = None
-    _cache: dict[str, Any] = {}
+    _cache: ClassVar[dict[str, Any]] = {}
 
     def __new__(cls):
         if cls._instance is None:
