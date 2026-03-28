@@ -1,4 +1,4 @@
-import os
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -22,9 +22,10 @@ router = APIRouter(prefix="/connectors", tags=["connectors"])
 @router.get("/", response_model=list[dict[str, str]])
 def list_connectors():
     connectors = []
-    connectors_dir = "connectors"
-    if os.path.exists(connectors_dir):
-        for filename in os.listdir(connectors_dir):
+    connectors_dir = Path("connectors")
+    if connectors_dir.exists():
+        for path_obj in connectors_dir.iterdir():
+            filename = path_obj.name
             if filename in {"base_connector.py", "__init__.py", "example_connector.py"}:
                 continue
             if filename.endswith("_connector.py"):
@@ -40,16 +41,16 @@ def get_connector_details(connector_id: str) -> dict[str, Any]:
     if connector_id in ["__init__", "base_connector"]:
         raise HTTPException(status_code=404, detail="Connector not found")
 
-    connectors_dir = "connectors"
-    file_path = os.path.join(connectors_dir, f"{connector_id}.py")
+    connectors_dir = Path("connectors")
+    file_path = connectors_dir / f"{connector_id}.py"
 
-    if not os.path.exists(file_path):
+    if not file_path.exists():
         raise HTTPException(status_code=404, detail="Connector not found")
 
-    with open(file_path, encoding="utf-8") as f:
+    with file_path.open(encoding="utf-8") as f:
         source = f.read()
 
-    return cached_connector_info(source, os.path.getmtime(file_path))
+    return cached_connector_info(source, file_path.stat().st_mtime)
 
 
 @router.get("/{connector_id}/config")
@@ -59,7 +60,7 @@ def get_connector_config(
     db_connector_config = session.exec(
         select(ConnectorConfig).where(ConnectorConfig.connector_id == connector_id)
     ).all()
-    return db_connector_config
+    return list(db_connector_config)
 
 
 @router.post("/{connector_id}/config")
@@ -76,8 +77,8 @@ def set_connector_config(
     if connector_id in {"__init__", "base_connector"}:
         raise HTTPException(status_code=404, detail="Connector not found")
 
-    connector_file = os.path.join("connectors", f"{connector_id}.py")
-    if not os.path.exists(connector_file):
+    connector_file = Path("connectors") / f"{connector_id}.py"
+    if not connector_file.exists():
         raise HTTPException(status_code=404, detail="Connector not found")
 
     db = ConnectorConfig.model_validate(connector_config)
