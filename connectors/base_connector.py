@@ -7,7 +7,6 @@ Each connector extends BaseConnector and exposes its tools to an LlmAgent.
 
 import base64
 import inspect
-from abc import ABC
 
 import requests
 from google.adk.tools import FunctionTool
@@ -21,8 +20,15 @@ def connector_tool(func):
     return func
 
 
-class BaseConnector(ABC):
+class BaseConnector:
     """BaseConnector class that all pre-built connectors must extend."""
+
+    def __new__(cls, *args, **kwargs):
+        if cls is BaseConnector:
+            raise TypeError(
+                "BaseConnector is an abstract base class and cannot be instantiated directly."
+            )
+        return super().__new__(cls)
 
     def __init__(self, prefix: str = ""):
         self.prefix = prefix
@@ -33,7 +39,7 @@ class BaseConnector(ABC):
         ]
 
     def _make_tool(self, func, name: str | None = None) -> FunctionTool:
-        tool_name = name or f"{self.prefix}{func.__name__}"
+        _tool_name = name or f"{self.prefix}{func.__name__}"
         return FunctionTool(func=func)
 
     def get_tools(self) -> list[FunctionTool]:
