@@ -3,7 +3,9 @@ import importlib.util
 import inspect
 import sys
 from functools import lru_cache
+from importlib.machinery import ModuleSpec
 from pathlib import Path
+from typing import Any
 
 from database.models import ConnectorConfig
 
@@ -41,12 +43,18 @@ def resolve_connector_tools(connector_config: ConnectorConfig):
     if connectors_abs not in sys.path:
         sys.path.insert(0, connectors_abs)
 
-    spec = importlib.util.spec_from_file_location(connector_id, module_path)
+    spec: ModuleSpec | None = importlib.util.spec_from_file_location(
+        connector_id, module_path
+    )
+    if spec is None:
+        raise ValueError(f"Could not load module '{connector_id}'.")
     module = importlib.util.module_from_spec(spec)
+    if spec.loader is None:
+        raise ValueError(f"Could not load module '{connector_id}'.")
     spec.loader.exec_module(module)
 
     # --- 3. Find the BaseConnector subclass in the module ---
-    from base_connector import BaseConnector  # imported after sys.path is set
+    from base_connector import BaseConnector
 
     connector_class = None
     for _, obj in inspect.getmembers(module, inspect.isclass):
@@ -80,7 +88,7 @@ def cached_connector_info(source: str, mtime: float):
     module_doc = ast.get_docstring(tree) or ""
 
     tools: list[dict[str, str]] = []
-    config_vars: list[str] = []
+    config_vars: list[dict[str, Any]] = []
 
     # -----------------------------
     # Find connector class

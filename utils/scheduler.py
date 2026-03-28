@@ -29,7 +29,7 @@ def build_job_trigger(job: Job):
     raise ValueError("Either cron_expression or interval_seconds must be provided")
 
 
-async def execute_job(agent_id: str, prompt: dict):
+async def execute_job(agent_id: str, prompt: str):
     try:
         await invoke_agent_session(agent_id, prompt)
     except Exception as e:

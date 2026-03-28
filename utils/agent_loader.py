@@ -126,9 +126,13 @@ class DatabaseAgentLoader(BaseAgentLoader):
             if agent_config.connector_config_ids:
                 for connector_config_id in agent_config.connector_config_ids:
                     try:
-                        connector_config = session.get(
+                        connector_config: ConnectorConfig | None = session.get(
                             ConnectorConfig, UUID(connector_config_id)
                         )
+                        if connector_config is None:
+                            raise ValueError(
+                                f"Connector config '{connector_config_id}' not found."
+                            )
                         connector_tools = resolve_connector_tools(connector_config)
                         tools_list.extend(connector_tools)
                     except Exception as e:
