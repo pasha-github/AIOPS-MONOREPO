@@ -5,4 +5,4 @@ AGENT_SERVER_DATABASE_URL = os.getenv(
 )
 ENV = os.getenv("ENV", "DEV")
 A2A = os.getenv("A2A", False)
-WEB = True if ENV == "DEV" else False
+WEB = ENV == "DEV"

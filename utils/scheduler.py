@@ -13,6 +13,7 @@ from routers.agents import invoke_agent_session
 logger = logging.getLogger(__name__)
 
 scheduler = AsyncIOScheduler()
+_background_tasks = set()
 
 
 def build_job_trigger(job: Job):
@@ -57,11 +58,13 @@ async def reload_jobs():
             )
 
 
-def start_scheduler():
+def start_scheduler() -> None:
     if not scheduler.running:
         scheduler.start()
         try:
             loop = asyncio.get_running_loop()
-            loop.create_task(reload_jobs())
+            task = loop.create_task(reload_jobs())
+            _background_tasks.add(task)
+            task.add_done_callback(_background_tasks.discard)
         except RuntimeError:
             pass
