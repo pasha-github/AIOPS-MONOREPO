@@ -203,6 +203,20 @@ async def create_job(agent_id: str, job: JobCreate, session: Session = Depends(g
         raise HTTPException(status_code=400, detail="Agent not found or not an automation agent")
     if not job.cron_expression and not job.interval_seconds:
         raise HTTPException(status_code=400, detail="Either cron_expression or interval_seconds must be provided")
+
+    from utils.scheduler import build_job_trigger
+
+    try:
+        build_job_trigger(
+            Job(
+                agent_id=agent_id,
+                prompt=job.prompt,
+                cron_expression=job.cron_expression,
+                interval_seconds=job.interval_seconds
+            )
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     
     db_job = Job(
         agent_id=agent_id,

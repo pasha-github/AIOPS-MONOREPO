@@ -12,6 +12,17 @@ logger = logging.getLogger(__name__)
 
 scheduler = AsyncIOScheduler()
 
+
+def build_job_trigger(job: Job):
+    if job.cron_expression:
+        try:
+            return CronTrigger.from_crontab(job.cron_expression)
+        except ValueError as exc:
+            raise ValueError(f"Invalid cron_expression '{job.cron_expression}': {exc}") from exc
+    if job.interval_seconds:
+        return IntervalTrigger(seconds=job.interval_seconds)
+    raise ValueError("Either cron_expression or interval_seconds must be provided")
+
 async def execute_job(agent_id: str, prompt: dict):
     try:
         await invoke_agent_session(agent_id, prompt)
@@ -29,12 +40,7 @@ async def reload_jobs():
         jobs = session.exec(select(Job)).all()
         for job in jobs:
             job_id_str = str(job.job_id)
-            if job.cron_expression:
-                trigger = CronTrigger.from_crontab(job.cron_expression)
-            elif job.interval_seconds:
-                trigger = IntervalTrigger(seconds=job.interval_seconds)
-            else:
-                continue
+            trigger = build_job_trigger(job)
                 
             scheduler.add_job(
                 execute_job,
