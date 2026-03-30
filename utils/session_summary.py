@@ -1,10 +1,11 @@
 import logging
-import os
 
 import litellm
 from google.adk.agents.callback_context import CallbackContext
 from google.adk.models.llm_request import LlmRequest
 from google.adk.models.llm_response import LlmResponse
+
+from utils.constants import SUMMARIZER_MODEL
 
 logger = logging.getLogger(__name__)
 FIRST_MESSAGE_SUMMARY_KEY = "first_message_summary"
@@ -44,7 +45,7 @@ def _fallback_summary(user_text: str) -> str:
 
 
 def make_session_summary_callback(model: str):
-    summarizer_model = os.getenv("SUMMARIZER_MODEL") or model
+    summarizer_model = SUMMARIZER_MODEL or model
 
     def callback(
         callback_context: CallbackContext,

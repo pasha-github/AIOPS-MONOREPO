@@ -17,7 +17,7 @@ def test_encrypt_secret_roundtrip(monkeypatch: pytest.MonkeyPatch):
 
 
 def test_encrypt_secret_missing_env_key_raises(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.delenv("ENCRYPTION_KEY", raising=False)
+    monkeypatch.setattr("utils.secrets.ENCRYPTION_KEY", None)
     with pytest.raises(RuntimeError):
         encrypt_secret("x")
 
