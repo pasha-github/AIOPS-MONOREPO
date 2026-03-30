@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from database.database import create_db_and_tables
-from routers import agents, llms, connectors
+from routers import agents, llms, connectors, visualizer
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from utils.constants import WEB
@@ -39,6 +39,7 @@ def health_check():
 app.include_router(agents.router)
 app.include_router(llms.router)
 app.include_router(connectors.router)
+app.include_router(visualizer.router)
 
 # Mount ADK App
 app.mount("/agent-server", ADK_APP)
