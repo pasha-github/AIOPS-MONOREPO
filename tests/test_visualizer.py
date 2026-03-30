@@ -29,7 +29,9 @@ def test_visualizer_returns_empty_graph(client: TestClient):
     assert response.json() == {"nodes": [], "edges": []}
 
 
-def test_visualizer_returns_expected_nodes_edges_and_masked_data(client: TestClient, session):
+def test_visualizer_returns_expected_nodes_edges_and_masked_data(
+    client: TestClient, session
+):
     _create_model(client, model_id="viz-model")
 
     connector_id = uuid4()
@@ -159,7 +161,9 @@ def test_visualizer_includes_agents_with_no_optional_relationships(client: TestC
     assert node["data"]["agent"]["mcp_servers"] == []
 
 
-def test_visualizer_aggregates_multiple_webhooks_jobs_and_relationships(client: TestClient, session):
+def test_visualizer_aggregates_multiple_webhooks_jobs_and_relationships(
+    client: TestClient, session
+):
     _create_model(client, model_id="agg-model")
 
     connector_one = uuid4()
@@ -219,7 +223,10 @@ def test_visualizer_aggregates_multiple_webhooks_jobs_and_relationships(client: 
     edges = _edges_by_id(data)
 
     aggregator = nodes["aggregator"]["data"]["agent"]
-    assert {item["prompt"] for item in aggregator["webhooks"]} == {"webhook one", "webhook two"}
+    assert {item["prompt"] for item in aggregator["webhooks"]} == {
+        "webhook one",
+        "webhook two",
+    }
     assert {item["prompt"] for item in aggregator["jobs"]} == {"job one", "job two"}
 
     assert edges["e-aggregator-child-one"] == {
@@ -234,11 +241,19 @@ def test_visualizer_aggregates_multiple_webhooks_jobs_and_relationships(client: 
     }
     assert edges[f"e-aggregator-{connector_one}"]["target"] == str(connector_one)
     assert edges[f"e-aggregator-{connector_two}"]["target"] == str(connector_two)
-    assert edges["e-aggregator-http://localhost:7100/sse"]["target"] == "http://localhost:7100/sse"
-    assert edges["e-aggregator-http://localhost:7200/mcp"]["target"] == "http://localhost:7200/mcp"
+    assert (
+        edges["e-aggregator-http://localhost:7100/sse"]["target"]
+        == "http://localhost:7100/sse"
+    )
+    assert (
+        edges["e-aggregator-http://localhost:7200/mcp"]["target"]
+        == "http://localhost:7200/mcp"
+    )
 
 
-def test_visualizer_sets_model_to_none_when_linked_model_missing(client: TestClient, session):
+def test_visualizer_sets_model_to_none_when_linked_model_missing(
+    client: TestClient, session
+):
     session.add(
         Agent(
             agent_id="orphan-model-agent",
@@ -258,7 +273,9 @@ def test_visualizer_sets_model_to_none_when_linked_model_missing(client: TestCli
     assert data["nodes"][0]["data"]["agent"]["model"] is None
 
 
-def test_visualizer_preserves_duplicate_relationship_entries(client: TestClient, session):
+def test_visualizer_preserves_duplicate_relationship_entries(
+    client: TestClient, session
+):
     _create_model(client, model_id="dup-model")
 
     connector_id = uuid4()
@@ -299,15 +316,21 @@ def test_visualizer_preserves_duplicate_relationship_entries(client: TestClient,
     data = response.json()
 
     assert [edge["id"] for edge in data["edges"]].count("e-dup-agent-dup-child") == 2
-    assert [edge["id"] for edge in data["edges"]].count(f"e-dup-agent-{connector_id}") == 2
-    assert [edge["id"] for edge in data["edges"]].count("e-dup-agent-http://localhost:7300/sse") == 2
+    assert [edge["id"] for edge in data["edges"]].count(
+        f"e-dup-agent-{connector_id}"
+    ) == 2
+    assert [edge["id"] for edge in data["edges"]].count(
+        "e-dup-agent-http://localhost:7300/sse"
+    ) == 2
 
     mcp_nodes = [node for node in data["nodes"] if node["type"] == "mcp"]
     assert len(mcp_nodes) == 1
     assert mcp_nodes[0]["id"] == "http://localhost:7300/sse"
 
 
-def test_visualizer_masks_only_connector_config_items_with_value_key(client: TestClient, session):
+def test_visualizer_masks_only_connector_config_items_with_value_key(
+    client: TestClient, session
+):
     _create_model(client, model_id="mask-model")
 
     connector_id = uuid4()
@@ -346,7 +369,9 @@ def test_visualizer_masks_only_connector_config_items_with_value_key(client: Tes
     ]
 
 
-def test_visualizer_keeps_non_list_connector_config_unchanged(client: TestClient, session):
+def test_visualizer_keeps_non_list_connector_config_unchanged(
+    client: TestClient, session
+):
     _create_model(client, model_id="non-list-model")
 
     connector_id = uuid4()
