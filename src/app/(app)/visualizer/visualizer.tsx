@@ -9,6 +9,7 @@ import {
   Handle,
   MarkerType,
   MiniMap,
+  NodeToolbar,
   Position,
   ReactFlow,
   useEdgesState,
@@ -37,7 +38,6 @@ export type GraphNodeData = {
   kind: GraphKind;
   name: string;
   role: string;
-  status: string;
   description: string;
   llm: string;
   hoverTitle: string;
@@ -50,8 +50,6 @@ export type GraphNodeData = {
     emptyText?: string;
   }>;
   longText: string;
-  listLabel?: string;
-  listItems: string[];
   sections?: Array<{ title: string; items: string[] }>;
 };
 
@@ -374,7 +372,6 @@ function buildNodeData(node: VisualizerNode): GraphNodeData {
     kind: "mcp",
     name: "",
     role: "Unknown",
-    status: "unknown",
     description: "",
     llm: "N/A",
     hoverTitle: "",
@@ -382,23 +379,15 @@ function buildNodeData(node: VisualizerNode): GraphNodeData {
     detailItems: [],
     expandableDetails: [],
     longText: "",
-    listItems: [],
   };
 }
 
 function buildAgentNodeData(agent: VisualizerAgent): GraphNodeData {
-  const relationships = [
-    ...agent.sub_agents.map((item) => `Sub-agent: ${item}`),
-    ...agent.connector_config_ids.map((item) => `Connector: ${item}`),
-    ...agent.mcp_servers.map((item) => `MCP: ${item}`),
-  ];
-
   return {
     id: agent.agent_id,
     kind: "agent",
     name: agent.name,
     role: `${agent.type} | ${agent.model.provider}`,
-    status: agent.status,
     description: agent.description,
     llm: agent.model.name,
     hoverTitle: agent.name,
@@ -434,8 +423,6 @@ function buildAgentNodeData(agent: VisualizerAgent): GraphNodeData {
       },
     ],
     longText: agent.instruction,
-    listLabel: relationships.length > 0 ? "Relationships" : undefined,
-    listItems: relationships,
     sections: [
       {
         title: "Sub-agents",
@@ -459,7 +446,6 @@ function buildConnectorNodeData(connector: VisualizerConnector): GraphNodeData {
     kind: "connector",
     name: connector.name,
     role: connector.connector_id,
-    status: "configured",
     description:
       connector.description ?? `${connector.config.length} config keys configured`,
     llm: "N/A",
@@ -473,8 +459,6 @@ function buildConnectorNodeData(connector: VisualizerConnector): GraphNodeData {
     longText:
       connector.description ??
       "Connector configuration used by the linked agent to call an external platform.",
-    listLabel: "Config keys",
-    listItems: connector.config.map((item) => item.name),
     sections: [
       {
         title: "Config entries",
@@ -492,7 +476,6 @@ function buildMcpNodeData(mcp: VisualizerMcp): GraphNodeData {
     kind: "mcp",
     name: mcp.name,
     role: "MCP Server",
-    status: "linked",
     description: mcp.url,
     llm: "N/A",
     hoverTitle: mcp.name,
@@ -505,7 +488,6 @@ function buildMcpNodeData(mcp: VisualizerMcp): GraphNodeData {
     ],
     longText:
       "Model Context Protocol server linked to an agent in the visualizer response.",
-    listItems: [],
     sections: [
       {
         title: "Endpoint",
@@ -573,8 +555,11 @@ function getEdgeColor(nodeType?: VisualizerNode["type"]) {
 }
 
 export function VisualizerNodeCard({
+  id,
   data,
 }: NodeProps<GraphFlowNode>) {
+  const [isHovered, setIsHovered] = useState(false);
+
   if (!data) {
     return null;
   }
@@ -584,13 +569,31 @@ export function VisualizerNodeCard({
 
   return (
     <>
+      <NodeToolbar
+        nodeId={id}
+        isVisible={isHovered}
+        position={Position.Bottom}
+        offset={12}
+      >
+        <div className="pointer-events-none w-80 rounded-2xl border border-slate-200 bg-slate-950 px-4 py-3 text-xs text-slate-200 shadow-2xl">
+          <div className="text-[10px] uppercase tracking-[0.22em] text-sky-300">
+            Hover preview
+          </div>
+          <div className="mt-2 text-sm font-medium text-white">
+            {data.hoverTitle}
+          </div>
+          <div className="mt-2 leading-5 text-slate-300">{data.hoverText}</div>
+        </div>
+      </NodeToolbar>
       <Handle
         type="target"
         position={Position.Top}
         className="!h-3 !w-3 !border-2 !border-sky-500 !bg-white"
       />
       <div
-        className="group relative w-[320px] rounded-2xl border border-slate-200 bg-white px-4 py-4 text-left shadow-[0_18px_45px_rgba(15,23,42,0.08)] transition-shadow hover:shadow-[0_24px_60px_rgba(15,23,42,0.14)]"
+        className="relative z-10 w-[320px] rounded-2xl border border-slate-200 bg-white px-4 py-4 text-left shadow-[0_18px_45px_rgba(15,23,42,0.08)] transition-shadow hover:z-50 hover:shadow-[0_24px_60px_rgba(15,23,42,0.14)]"
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
       >
         <div className="flex items-start gap-3">
           <NodeLogo kind={kind} />
@@ -624,16 +627,6 @@ export function VisualizerNodeCard({
             </div>
           </div>
         ) : null}
-
-        <div className="pointer-events-none absolute left-1/2 top-full z-10 mt-3 hidden w-80 -translate-x-1/2 rounded-2xl border border-slate-200 bg-slate-950 px-4 py-3 text-xs text-slate-200 shadow-2xl group-hover:block">
-          <div className="text-[10px] uppercase tracking-[0.22em] text-sky-300">
-            Hover preview
-          </div>
-          <div className="mt-2 text-sm font-medium text-white">
-            {data.hoverTitle}
-          </div>
-          <div className="mt-2 leading-5 text-slate-300">{data.hoverText}</div>
-        </div>
       </div>
       <Handle
         type="source"
@@ -816,9 +809,6 @@ export default function VisualizerView() {
   const { llmManagerApiBaseUrl } = useRuntimeConfig();
   const visualizerUrl = `${trimTrailingSlash(llmManagerApiBaseUrl)}/visualizer/`;
 
-  const [graph, setGraph] = useState<ReturnType<typeof createVisualizerGraph> | null>(
-    null
-  );
   const [nodes, setNodes, onNodesChange] = useNodesState<GraphFlowNode>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [selectedNode, setSelectedNode] = useState<GraphNodeData | null>(null);
@@ -851,23 +841,25 @@ export default function VisualizerView() {
           !Array.isArray(data.edges)
         ) {
           setLoadError("Unable to load visualizer graph.");
-          setGraph(null);
+          setNodes([]);
+          setEdges([]);
           return;
         }
 
-        setGraph(
-          createVisualizerGraph({
-            nodes: data.nodes,
-            edges: data.edges,
-          })
-        );
+        const nextGraph = createVisualizerGraph({
+          nodes: data.nodes,
+          edges: data.edges,
+        });
+        setNodes(nextGraph.nodes);
+        setEdges(nextGraph.edges);
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") {
           return;
         }
         if (mounted) {
           setLoadError("Unable to load visualizer graph.");
-          setGraph(null);
+          setNodes([]);
+          setEdges([]);
         }
       } finally {
         if (mounted) {
@@ -882,12 +874,7 @@ export default function VisualizerView() {
       mounted = false;
       controller.abort();
     };
-  }, [visualizerUrl]);
-
-  useEffect(() => {
-    setNodes(graph?.nodes ?? []);
-    setEdges(graph?.edges ?? []);
-  }, [graph, setEdges, setNodes]);
+  }, [setEdges, setNodes, visualizerUrl]);
 
   useEffect(() => {
     if (!selectedNode) {
@@ -923,12 +910,12 @@ export default function VisualizerView() {
         return;
       }
 
-      setGraph(
-        createVisualizerGraph({
-          nodes: data.nodes,
-          edges: data.edges,
-        })
-      );
+      const nextGraph = createVisualizerGraph({
+        nodes: data.nodes,
+        edges: data.edges,
+      });
+      setNodes(nextGraph.nodes);
+      setEdges(nextGraph.edges);
     } catch {
       setLoadError("Unable to load visualizer graph.");
     } finally {
@@ -1013,7 +1000,7 @@ export default function VisualizerView() {
             <p className="mt-2 text-sm text-[#c2410c]">{loadError}</p>
           </div>
         </div>
-      ) : graph ? (
+      ) : (
         <div className="h-full min-h-0 flex-1 overflow-hidden">
           <ReactFlow
             nodes={nodes}
@@ -1040,7 +1027,7 @@ export default function VisualizerView() {
             <Controls showInteractive={false} />
           </ReactFlow>
         </div>
-      ) : null}
+      )}
 
       {selectedNode ? (
         <>
