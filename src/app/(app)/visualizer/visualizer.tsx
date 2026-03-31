@@ -17,7 +17,7 @@ import {
   type Node,
   type NodeProps,
 } from "@xyflow/react";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, X } from "lucide-react";
 import { trimTrailingSlash } from "@/config/agent";
 import { useRuntimeConfig } from "@/config/runtime-config";
 import {
@@ -41,6 +41,7 @@ export type GraphNodeData = {
   hoverTitle: string;
   hoverText: string;
   detailItems: Array<{ label: string; value: string }>;
+  modelDetails?: Array<{ label: string; value: string }>;
   longText: string;
   listLabel?: string;
   listItems: string[];
@@ -395,11 +396,21 @@ function buildAgentNodeData(agent: VisualizerAgent): GraphNodeData {
     detailItems: [
       { label: "Agent id", value: agent.agent_id },
       { label: "Type", value: agent.type },
-      { label: "Provider", value: agent.model.provider },
-      { label: "Model", value: agent.model.name },
       { label: "Status", value: agent.status },
       { label: "Enabled", value: agent.isEnabled ? "True" : "False" },
       { label: "Webhooks", value: `${agent.webhooks.length}` },
+      { label: "Jobs", value: `${agent.jobs?.length ?? 0}` },
+      { label: "Created at", value: formatDateTime(agent.created_at) },
+      { label: "Updated at", value: formatDateTime(agent.updated_at) },
+    ],
+    modelDetails: [
+      { label: "Provider", value: agent.model.provider },
+      { label: "Name", value: agent.model.name },
+      { label: "Model id", value: agent.model.model_id ?? agent.model_id ?? "-" },
+      { label: "Description", value: agent.model.description ?? "-" },
+      { label: "Enabled", value: agent.model.isEnabled ? "True" : "False" },
+      { label: "Created at", value: formatDateTime(agent.model.created_at) },
+      { label: "Updated at", value: formatDateTime(agent.model.updated_at) },
     ],
     longText: agent.instruction,
     listLabel: relationships.length > 0 ? "Relationships" : undefined,
@@ -421,6 +432,15 @@ function buildAgentNodeData(agent: VisualizerAgent): GraphNodeData {
         title: "Webhook prompts",
         items: agent.webhooks.map((item) => item.prompt),
       },
+      {
+        title: "Jobs",
+        items:
+          agent.jobs && agent.jobs.length > 0
+            ? agent.jobs.map((job, index) =>
+                typeof job === "string" ? job : `Job ${index + 1}`
+              )
+            : ["No jobs configured"],
+      },
     ].filter((section) => section.items.length > 0),
   };
 }
@@ -441,8 +461,8 @@ function buildConnectorNodeData(connector: VisualizerConnector): GraphNodeData {
       { label: "Connector id", value: connector.connector_id },
       { label: "Config id", value: connector.connector_config_id },
       { label: "Config keys", value: `${connector.config.length}` },
-      { label: "Created", value: formatDate(connector.created_at) },
-      { label: "Updated", value: formatDate(connector.updated_at) },
+      { label: "Created at", value: formatDateTime(connector.created_at) },
+      { label: "Updated at", value: formatDateTime(connector.updated_at) },
     ],
     longText:
       connector.description ??
@@ -493,11 +513,22 @@ function truncate(value: string, maxLength: number) {
   return value.length > maxLength ? `${value.slice(0, maxLength)}...` : value;
 }
 
-function formatDate(value: string) {
-  return new Date(value).toLocaleDateString("en-US", {
+function formatDateTime(value?: string) {
+  if (!value) {
+    return "-";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleString("en-US", {
     year: "numeric",
     month: "short",
     day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
   });
 }
 
@@ -643,6 +674,113 @@ function NodeLogo({ kind }: { kind: GraphKind }) {
   );
 }
 
+function renderMarkdownBlocks(text: string) {
+  const lines = text.replace(/\r\n/g, "\n").split("\n");
+  const blocks: React.ReactNode[] = [];
+  let index = 0;
+
+  while (index < lines.length) {
+    const line = lines[index];
+    const trimmed = line.trim();
+
+    if (!trimmed) {
+      index += 1;
+      continue;
+    }
+
+    const headingMatch = trimmed.match(/^(#{1,6})\s+(.+)$/);
+    if (headingMatch) {
+      const level = headingMatch[1].length;
+      const content = headingMatch[2];
+      const className =
+        level === 1
+          ? "text-lg font-semibold text-[#111827]"
+          : level === 2
+            ? "text-base font-semibold text-[#111827]"
+            : "text-sm font-semibold text-[#111827]";
+
+      blocks.push(
+        <p key={`md-heading-${index}`} className={className}>
+          {content}
+        </p>
+      );
+      index += 1;
+      continue;
+    }
+
+    if (/^\d+\.\s+/.test(trimmed)) {
+      const items: string[] = [];
+      while (index < lines.length && /^\d+\.\s+/.test(lines[index].trim())) {
+        items.push(lines[index].trim().replace(/^\d+\.\s+/, ""));
+        index += 1;
+      }
+
+      blocks.push(
+        <ol
+          key={`md-ordered-${index}`}
+          className="list-decimal space-y-2 pl-5 text-sm leading-7 text-[#344054]"
+        >
+          {items.map((item, itemIndex) => (
+            <li key={`md-ordered-item-${index}-${itemIndex}`}>{item}</li>
+          ))}
+        </ol>
+      );
+      continue;
+    }
+
+    if (/^[-*]\s+/.test(trimmed)) {
+      const items: string[] = [];
+      while (index < lines.length && /^[-*]\s+/.test(lines[index].trim())) {
+        items.push(lines[index].trim().replace(/^[-*]\s+/, ""));
+        index += 1;
+      }
+
+      blocks.push(
+        <ul
+          key={`md-unordered-${index}`}
+          className="list-disc space-y-2 pl-5 text-sm leading-7 text-[#344054]"
+        >
+          {items.map((item, itemIndex) => (
+            <li key={`md-unordered-item-${index}-${itemIndex}`}>{item}</li>
+          ))}
+        </ul>
+      );
+      continue;
+    }
+
+    const paragraphLines: string[] = [];
+    while (index < lines.length) {
+      const current = lines[index].trim();
+      if (
+        !current ||
+        /^(#{1,6})\s+/.test(current) ||
+        /^\d+\.\s+/.test(current) ||
+        /^[-*]\s+/.test(current)
+      ) {
+        break;
+      }
+      paragraphLines.push(current);
+      index += 1;
+    }
+
+    if (paragraphLines.length > 0) {
+      blocks.push(
+        <p
+          key={`md-paragraph-${index}`}
+          className="text-sm leading-7 text-[#344054]"
+        >
+          {paragraphLines.join(" ")}
+        </p>
+      );
+      continue;
+    }
+
+    index += 1;
+  }
+
+  return blocks;
+}
+
 export default function VisualizerView() {
   const { llmManagerApiBaseUrl } = useRuntimeConfig();
   const visualizerUrl = `${trimTrailingSlash(llmManagerApiBaseUrl)}/visualizer/`;
@@ -652,6 +790,7 @@ export default function VisualizerView() {
   );
   const [nodes, setNodes, onNodesChange] = useNodesState<Node<GraphNodeData>>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+  const [selectedNode, setSelectedNode] = useState<GraphNodeData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [loadError, setLoadError] = useState("");
@@ -719,6 +858,17 @@ export default function VisualizerView() {
     setEdges(graph?.edges ?? []);
   }, [graph, setEdges, setNodes]);
 
+  useEffect(() => {
+    if (!selectedNode) {
+      return;
+    }
+
+    const stillExists = nodes.some((node) => node.id === selectedNode.id);
+    if (!stillExists) {
+      setSelectedNode(null);
+    }
+  }, [nodes, selectedNode]);
+
   const handleRefresh = async () => {
     if (isRefreshing) {
       return;
@@ -758,18 +908,18 @@ export default function VisualizerView() {
   return (
     <section className="flex h-[calc(100vh-180px)] min-h-[720px] flex-col rounded-3xl bg-white p-6 shadow-[0_18px_50px_-38px_rgba(16,24,40,0.5)]">
       <div className="mb-4 flex justify-end">
-          <button
-            type="button"
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-            className="inline-flex items-center gap-2 rounded-xl border border-[#e3e7f2] bg-white px-4 py-2 text-sm font-semibold text-[#4f49e2] shadow-[0_10px_20px_-16px_rgba(79,73,226,0.5)] transition hover:bg-[#eef2ff] disabled:cursor-not-allowed disabled:opacity-70"
-          >
-            <RefreshCw
-              className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`}
-            />
-            Refresh Graph
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={handleRefresh}
+          disabled={isRefreshing}
+          className="inline-flex items-center gap-2 rounded-xl border border-[#e3e7f2] bg-white px-4 py-2 text-sm font-semibold text-[#4f49e2] shadow-[0_10px_20px_-16px_rgba(79,73,226,0.5)] transition hover:bg-[#eef2ff] disabled:cursor-not-allowed disabled:opacity-70"
+        >
+          <RefreshCw
+            className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`}
+          />
+          Refresh Graph
+        </button>
+      </div>
 
       {isLoading ? (
         <div className="flex min-h-[720px] flex-1 items-center justify-center rounded-3xl border border-dashed border-[#d9deea] bg-[linear-gradient(135deg,#f8faff_0%,#f3f5fb_100%)]">
@@ -797,6 +947,7 @@ export default function VisualizerView() {
             nodeTypes={visualizerNodeTypes}
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
+            onNodeClick={(_, node) => setSelectedNode(node.data)}
             className="h-full w-full"
             fitView
             fitViewOptions={{ padding: 0.12 }}
@@ -815,6 +966,159 @@ export default function VisualizerView() {
             <Controls showInteractive={false} />
           </ReactFlow>
         </div>
+      ) : null}
+
+      {selectedNode ? (
+        <>
+          <button
+            type="button"
+            aria-label="Close details"
+            className="fixed inset-0 z-40 bg-black/20 backdrop-blur-[1px]"
+            onClick={() => setSelectedNode(null)}
+          />
+          <aside className="fixed right-0 top-0 z-50 flex h-screen w-full max-w-[460px] flex-col border-l border-[#e6eaf2] bg-white shadow-[-24px_0_60px_-38px_rgba(15,23,42,0.45)]">
+            <div className="flex items-start justify-between border-b border-[#eef1f7] px-6 py-5">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#8b94a7]">
+                  {selectedNode.role}
+                </p>
+                <h3
+                  className="mt-2 truncate text-xl font-semibold text-[#111827]"
+                  title={selectedNode.name}
+                >
+                  {selectedNode.name}
+                </h3>
+                <p className="mt-2 text-sm leading-6 text-[#5b6476]">
+                  {selectedNode.description}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedNode(null)}
+                className="ml-4 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#e5e7eb] text-[#475467] transition hover:bg-[#f8fafc]"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="flex-1 space-y-6 overflow-y-auto px-6 py-6">
+              <section className="border-b border-[#eef1f7] pb-6">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b94a7]">
+                  Description
+                </p>
+                <p className="mt-3 text-sm leading-7 text-[#344054]">
+                  {selectedNode.description || "No description available."}
+                </p>
+              </section>
+
+              {selectedNode.kind === "agent" ? (
+                <section className="border-b border-[#eef1f7] pb-6">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b94a7]">
+                    LLM
+                  </p>
+                  <p className="mt-3 break-words text-sm font-semibold text-[#111827]">
+                    {selectedNode.llm}
+                  </p>
+                </section>
+              ) : null}
+
+              {selectedNode.detailItems.length > 0 ? (
+                <section className="border-b border-[#eef1f7] pb-6">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b94a7]">
+                    Details
+                  </p>
+                  <div className="mt-4 divide-y divide-[#eef1f7]">
+                    {selectedNode.detailItems.map((item) => (
+                      <div
+                        key={`${selectedNode.id}-${item.label}`}
+                        className="grid grid-cols-[140px_minmax(0,1fr)] gap-4 py-3"
+                      >
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#8b94a7]">
+                          {item.label}
+                        </p>
+                        <p className="break-words text-sm font-medium text-[#111827]">
+                          {item.value || "-"}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
+
+              {selectedNode.kind === "agent" && selectedNode.modelDetails?.length ? (
+                <section className="border-b border-[#eef1f7] pb-6">
+                  <details className="group" open>
+                    <summary className="cursor-pointer list-none text-xs font-semibold uppercase tracking-[0.18em] text-[#8b94a7]">
+                      <span className="inline-flex items-center gap-2">
+                        Model Details
+                        <span className="text-[#667085] transition group-open:rotate-180">
+                          ▼
+                        </span>
+                      </span>
+                    </summary>
+                    <div className="mt-4 divide-y divide-[#eef1f7]">
+                      {selectedNode.modelDetails.map((item) => (
+                        <div
+                          key={`${selectedNode.id}-model-${item.label}`}
+                          className="grid grid-cols-[140px_minmax(0,1fr)] gap-4 py-3"
+                        >
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#8b94a7]">
+                            {item.label}
+                          </p>
+                          <p className="break-words text-sm font-medium text-[#111827]">
+                            {item.value || "-"}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                </section>
+              ) : null}
+
+              {selectedNode.longText ? (
+                <section className="border-b border-[#eef1f7] pb-6">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b94a7]">
+                    {selectedNode.kind === "agent" ? "Instruction" : "Overview"}
+                  </p>
+                  <div className="mt-4 space-y-4 break-words">
+                    {renderMarkdownBlocks(selectedNode.longText)}
+                  </div>
+                </section>
+              ) : null}
+
+              {selectedNode.sections?.length ? (
+                <section className="pb-6">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b94a7]">
+                    Linked Items
+                  </p>
+                  <div className="mt-4 space-y-4">
+                    {selectedNode.sections.map((section) => (
+                      <div
+                        key={`${selectedNode.id}-${section.title}`}
+                        className="border-b border-[#eef1f7] pb-4 last:border-b-0"
+                      >
+                        <p className="text-sm font-semibold text-[#111827]">
+                          {section.title}
+                        </p>
+                        <div className="mt-3 space-y-2">
+                          {section.items.map((item, index) => (
+                            <p
+                              key={`${selectedNode.id}-${section.title}-${index}`}
+                              className="break-words text-sm leading-6 text-[#344054]"
+                              title={item}
+                            >
+                              {item}
+                            </p>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
+            </div>
+          </aside>
+        </>
       ) : null}
     </section>
   );
