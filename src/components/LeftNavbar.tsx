@@ -5,16 +5,12 @@ import { usePathname } from "next/navigation";
 import type { ReactElement } from "react";
 import {
   Bot,
-  Cloud,
   LayoutGrid,
   Link2,
-  Mail,
   MessageSquare,
   Network,
-  Truck,
   Users,
   Workflow,
-  Wrench,
 } from "lucide-react";
 
 type NavItem = {
@@ -46,30 +42,11 @@ const navSections: NavSection[] = [
         active: true,
         href: "/dashboard",
       },
-      {
-        label: "Enterprise Systems",
-        id: "core-enterprise-systems",
-        icon: <Mail className="h-5 w-5" />,
-        href: "#",
-      },
     ],
   },
   {
     title: "Platform",
     items: [
-      {
-        label: "Hybrids",
-        id: "platform-hybrids",
-        icon: <Wrench className="h-5 w-5" />,
-        dot: true,
-        href: "#",
-      },
-      {
-        label: "Clouds",
-        id: "platform-clouds-primary",
-        icon: <Cloud className="h-5 w-5" />,
-        href: "#",
-      },
       {
         label: "Agent Managements",
         id: "platform-agent-managements",
@@ -81,12 +58,6 @@ const navSections: NavSection[] = [
         id: "platform-chatops",
         icon: <MessageSquare className="h-5 w-5" />,
         dot: true,
-        href: "#",
-      },
-      {
-        label: "Transport",
-        id: "platform-clouds-secondary",
-        icon: <Truck className="h-5 w-5" />,
         href: "#",
       },
       {

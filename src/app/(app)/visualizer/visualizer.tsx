@@ -906,8 +906,8 @@ export default function VisualizerView() {
   };
 
   return (
-    <section className="flex h-[calc(100vh-180px)] min-h-[720px] flex-col rounded-3xl bg-white p-6 shadow-[0_18px_50px_-38px_rgba(16,24,40,0.5)]">
-      <div className="mb-4 flex justify-end">
+    <section className="-m-10 flex h-[calc(100vh-73px)] min-h-[720px] flex-col bg-[radial-gradient(circle_at_top,#f8faff_0%,#f5f7fc_48%,#f1f4fa_100%)]">
+      <div className="flex justify-end px-6 py-4">
         <button
           type="button"
           onClick={handleRefresh}
@@ -922,16 +922,59 @@ export default function VisualizerView() {
       </div>
 
       {isLoading ? (
-        <div className="flex min-h-[720px] flex-1 items-center justify-center rounded-3xl border border-dashed border-[#d9deea] bg-[linear-gradient(135deg,#f8faff_0%,#f3f5fb_100%)]">
-          <div className="text-center">
-            <div className="mx-auto h-10 w-10 animate-spin rounded-full border-2 border-[#c7d2fe] border-t-[#4f49e2]" />
-            <p className="mt-4 text-sm font-semibold text-[#344054]">
-              Loading visualizer canvas
-            </p>
+        <div className="flex min-h-[720px] flex-1 bg-[linear-gradient(135deg,#f8faff_0%,#f3f5fb_100%)] px-6 pb-6">
+          <div className="relative h-full min-h-[720px] w-full overflow-hidden">
+            <div className="pointer-events-none absolute inset-0 opacity-60">
+              <div
+                className="absolute inset-0"
+                style={{
+                  backgroundImage:
+                    "linear-gradient(to right, rgba(148,163,184,0.10) 1px, transparent 1px), linear-gradient(to bottom, rgba(148,163,184,0.10) 1px, transparent 1px)",
+                  backgroundSize: "24px 24px",
+                }}
+              />
+            </div>
+
+            {[
+              { left: "23%", top: "8%", width: "320px", height: "148px" },
+              { left: "4%", top: "38%", width: "320px", height: "170px" },
+              { left: "25%", top: "38%", width: "320px", height: "170px" },
+              { left: "46%", top: "38%", width: "320px", height: "170px" },
+              { left: "67%", top: "38%", width: "320px", height: "170px" },
+              { left: "88%", top: "38%", width: "320px", height: "170px" },
+              { left: "4%", top: "70%", width: "320px", height: "120px" },
+              { left: "25%", top: "70%", width: "320px", height: "120px" },
+              { left: "46%", top: "70%", width: "320px", height: "120px" },
+              { left: "67%", top: "70%", width: "320px", height: "120px" },
+              { left: "88%", top: "70%", width: "320px", height: "120px" },
+            ].map((item, index) => (
+              <div
+                key={`visualizer-skeleton-${index}`}
+                className="absolute animate-pulse rounded-2xl border border-[#e5eaf3] bg-white/90 p-4 shadow-[0_18px_45px_rgba(15,23,42,0.05)]"
+                style={{
+                  left: item.left,
+                  top: item.top,
+                  width: item.width,
+                  height: item.height,
+                  transform: "translateX(-50%)",
+                }}
+              >
+                <div className="flex items-start gap-3">
+                  <div className="h-11 w-11 rounded-2xl bg-[#edf2f9]" />
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <div className="h-3 w-24 rounded bg-[#edf2f9]" />
+                    <div className="h-5 w-40 rounded bg-[#edf2f9]" />
+                    <div className="h-4 w-full rounded bg-[#edf2f9]" />
+                    <div className="h-4 w-4/5 rounded bg-[#edf2f9]" />
+                  </div>
+                </div>
+                <div className="mt-4 h-12 rounded-xl bg-[#edf2f9]" />
+              </div>
+            ))}
           </div>
         </div>
       ) : loadError ? (
-        <div className="flex min-h-[720px] flex-1 items-center justify-center rounded-3xl border border-[#fee2e2] bg-[#fff5f5] px-6 text-center">
+        <div className="flex min-h-[720px] flex-1 items-center justify-center bg-[#fff5f5] px-6 text-center">
           <div>
             <p className="text-base font-semibold text-[#b91c1c]">
               Unable to load visualizer graph
@@ -940,7 +983,7 @@ export default function VisualizerView() {
           </div>
         </div>
       ) : graph ? (
-        <div className="h-full min-h-0 flex-1 overflow-hidden rounded-3xl border border-[#e6eaf2] bg-[radial-gradient(circle_at_top,#f8faff_0%,#f5f7fc_48%,#f1f4fa_100%)]">
+        <div className="h-full min-h-0 flex-1 overflow-hidden">
           <ReactFlow
             nodes={nodes}
             edges={edges}
