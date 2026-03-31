@@ -34,6 +34,7 @@ def list_connectors():
             if filename.endswith("_connector.py"):
                 # Take prefix before _connector.py and making it capital case
                 name = filename.split("_connector.py")[0].replace("_", " ").title()
+                name = {"ibm_mq_connector.py": "IBM MQ"}.get(filename, name)
                 connectors.append({
                     "id": filename.strip(".py"),
                     "name": name
