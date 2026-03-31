@@ -279,7 +279,7 @@ def test_delete_connector_config_in_use_returns_409(client: TestClient):
         f"/connectors/example_connector/config/{connector_config_id}"
     )
     assert response.status_code == 409
-    assert response.json()["detail"] == "Connector config is in use by agent(s): Agent 1"
+    assert response.json()["detail"] == "Connector config is in use by agent: Agent 1"
 
     list_response = client.get("/connectors/example_connector/config")
     assert list_response.status_code == 200
