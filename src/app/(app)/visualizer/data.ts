@@ -23,11 +23,26 @@ export type VisualizerAgent = {
     updated_at?: string;
     isEnabled?: boolean;
   };
-  webhooks: Array<{
-    webhook_id: string;
-    prompt: string;
-  }>;
-  jobs?: unknown[];
+  webhooks: VisualizerWebhook[];
+  jobs?: VisualizerJob[];
+};
+
+export type VisualizerWebhook = {
+  webhook_id: string;
+  agent_id: string;
+  created_at?: string;
+  updated_at?: string;
+  prompt: string;
+};
+
+export type VisualizerJob = {
+  job_id: string;
+  agent_id: string;
+  prompt: string;
+  interval_seconds?: number;
+  cron_expression?: string;
+  created_at?: string;
+  updated_at?: string;
 };
 
 export type VisualizerConnector = {

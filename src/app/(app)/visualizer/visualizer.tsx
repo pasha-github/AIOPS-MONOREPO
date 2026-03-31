@@ -9,6 +9,7 @@ import {
   Handle,
   MarkerType,
   MiniMap,
+  NodeToolbar,
   Position,
   ReactFlow,
   useEdgesState,
@@ -23,9 +24,11 @@ import { useRuntimeConfig } from "@/config/runtime-config";
 import {
   type VisualizerAgent,
   type VisualizerConnector,
+  type VisualizerJob,
   type VisualizerMcp,
   type VisualizerNode,
   type VisualizerResponse,
+  type VisualizerWebhook,
 } from "./data";
 
 export type GraphKind = "agent" | "connector" | "mcp";
@@ -35,16 +38,18 @@ export type GraphNodeData = {
   kind: GraphKind;
   name: string;
   role: string;
-  status: string;
   description: string;
   llm: string;
   hoverTitle: string;
   hoverText: string;
   detailItems: Array<{ label: string; value: string }>;
   modelDetails?: Array<{ label: string; value: string }>;
+  expandableDetails?: Array<{
+    title: string;
+    items: Array<Array<{ label: string; value: string }>>;
+    emptyText?: string;
+  }>;
   longText: string;
-  listLabel?: string;
-  listItems: string[];
   sections?: Array<{ title: string; items: string[] }>;
 };
 
@@ -367,30 +372,22 @@ function buildNodeData(node: VisualizerNode): GraphNodeData {
     kind: "mcp",
     name: "",
     role: "Unknown",
-    status: "unknown",
     description: "",
     llm: "N/A",
     hoverTitle: "",
     hoverText: "",
     detailItems: [],
+    expandableDetails: [],
     longText: "",
-    listItems: [],
   };
 }
 
 function buildAgentNodeData(agent: VisualizerAgent): GraphNodeData {
-  const relationships = [
-    ...agent.sub_agents.map((item) => `Sub-agent: ${item}`),
-    ...agent.connector_config_ids.map((item) => `Connector: ${item}`),
-    ...agent.mcp_servers.map((item) => `MCP: ${item}`),
-  ];
-
   return {
     id: agent.agent_id,
     kind: "agent",
     name: agent.name,
     role: `${agent.type} | ${agent.model.provider}`,
-    status: agent.status,
     description: agent.description,
     llm: agent.model.name,
     hoverTitle: agent.name,
@@ -408,15 +405,24 @@ function buildAgentNodeData(agent: VisualizerAgent): GraphNodeData {
     modelDetails: [
       { label: "Provider", value: agent.model.provider },
       { label: "Name", value: agent.model.name },
-      { label: "Model id", value: agent.model.model_id ?? agent.model_id ?? "-" },
       { label: "Description", value: agent.model.description ?? "-" },
       { label: "Enabled", value: agent.model.isEnabled ? "True" : "False" },
       { label: "Created at", value: formatDateTime(agent.model.created_at) },
       { label: "Updated at", value: formatDateTime(agent.model.updated_at) },
     ],
+    expandableDetails: [
+      {
+        title: "Webhooks",
+        items: agent.webhooks.map((webhook) => buildWebhookDetails(webhook)),
+        emptyText: "No webhooks configured",
+      },
+      {
+        title: "Jobs",
+        items: (agent.jobs ?? []).map((job) => buildJobDetails(job)),
+        emptyText: "No jobs configured",
+      },
+    ],
     longText: agent.instruction,
-    listLabel: relationships.length > 0 ? "Relationships" : undefined,
-    listItems: relationships,
     sections: [
       {
         title: "Sub-agents",
@@ -430,19 +436,6 @@ function buildAgentNodeData(agent: VisualizerAgent): GraphNodeData {
         title: "MCP servers",
         items: agent.mcp_servers,
       },
-      {
-        title: "Webhook prompts",
-        items: agent.webhooks.map((item) => item.prompt),
-      },
-      {
-        title: "Jobs",
-        items:
-          agent.jobs && agent.jobs.length > 0
-            ? agent.jobs.map((job, index) =>
-                typeof job === "string" ? job : `Job ${index + 1}`
-              )
-            : ["No jobs configured"],
-      },
     ].filter((section) => section.items.length > 0),
   };
 }
@@ -453,15 +446,12 @@ function buildConnectorNodeData(connector: VisualizerConnector): GraphNodeData {
     kind: "connector",
     name: connector.name,
     role: connector.connector_id,
-    status: "configured",
     description:
       connector.description ?? `${connector.config.length} config keys configured`,
     llm: "N/A",
     hoverTitle: connector.name,
     hoverText: `${connector.connector_id} with ${connector.config.length} config keys.`,
     detailItems: [
-      { label: "Connector id", value: connector.connector_id },
-      { label: "Config id", value: connector.connector_config_id },
       { label: "Config keys", value: `${connector.config.length}` },
       { label: "Created at", value: formatDateTime(connector.created_at) },
       { label: "Updated at", value: formatDateTime(connector.updated_at) },
@@ -469,8 +459,6 @@ function buildConnectorNodeData(connector: VisualizerConnector): GraphNodeData {
     longText:
       connector.description ??
       "Connector configuration used by the linked agent to call an external platform.",
-    listLabel: "Config keys",
-    listItems: connector.config.map((item) => item.name),
     sections: [
       {
         title: "Config entries",
@@ -488,7 +476,6 @@ function buildMcpNodeData(mcp: VisualizerMcp): GraphNodeData {
     kind: "mcp",
     name: mcp.name,
     role: "MCP Server",
-    status: "linked",
     description: mcp.url,
     llm: "N/A",
     hoverTitle: mcp.name,
@@ -501,7 +488,6 @@ function buildMcpNodeData(mcp: VisualizerMcp): GraphNodeData {
     ],
     longText:
       "Model Context Protocol server linked to an agent in the visualizer response.",
-    listItems: [],
     sections: [
       {
         title: "Endpoint",
@@ -513,6 +499,30 @@ function buildMcpNodeData(mcp: VisualizerMcp): GraphNodeData {
 
 function truncate(value: string, maxLength: number) {
   return value.length > maxLength ? `${value.slice(0, maxLength)}...` : value;
+}
+
+function buildWebhookDetails(webhook: VisualizerWebhook) {
+  return [
+    { label: "Prompt", value: webhook.prompt || "-" },
+    { label: "Created at", value: formatDateTime(webhook.created_at) },
+    { label: "Updated at", value: formatDateTime(webhook.updated_at) },
+  ];
+}
+
+function buildJobDetails(job: VisualizerJob) {
+  return [
+    { label: "Prompt", value: job.prompt || "-" },
+    {
+      label: "Interval seconds",
+      value:
+        typeof job.interval_seconds === "number"
+          ? String(job.interval_seconds)
+          : "-",
+    },
+    { label: "Cron expression", value: job.cron_expression || "-" },
+    { label: "Created at", value: formatDateTime(job.created_at) },
+    { label: "Updated at", value: formatDateTime(job.updated_at) },
+  ];
 }
 
 function formatDateTime(value?: string) {
@@ -545,8 +555,11 @@ function getEdgeColor(nodeType?: VisualizerNode["type"]) {
 }
 
 export function VisualizerNodeCard({
+  id,
   data,
 }: NodeProps<GraphFlowNode>) {
+  const [isHovered, setIsHovered] = useState(false);
+
   if (!data) {
     return null;
   }
@@ -556,13 +569,31 @@ export function VisualizerNodeCard({
 
   return (
     <>
+      <NodeToolbar
+        nodeId={id}
+        isVisible={isHovered}
+        position={Position.Bottom}
+        offset={12}
+      >
+        <div className="pointer-events-none w-80 rounded-2xl border border-slate-200 bg-slate-950 px-4 py-3 text-xs text-slate-200 shadow-2xl">
+          <div className="text-[10px] uppercase tracking-[0.22em] text-sky-300">
+            Hover preview
+          </div>
+          <div className="mt-2 text-sm font-medium text-white">
+            {data.hoverTitle}
+          </div>
+          <div className="mt-2 leading-5 text-slate-300">{data.hoverText}</div>
+        </div>
+      </NodeToolbar>
       <Handle
         type="target"
         position={Position.Top}
         className="!h-3 !w-3 !border-2 !border-sky-500 !bg-white"
       />
       <div
-        className="group relative w-[320px] rounded-2xl border border-slate-200 bg-white px-4 py-4 text-left shadow-[0_18px_45px_rgba(15,23,42,0.08)] transition-shadow hover:shadow-[0_24px_60px_rgba(15,23,42,0.14)]"
+        className="relative z-10 w-[320px] rounded-2xl border border-slate-200 bg-white px-4 py-4 text-left shadow-[0_18px_45px_rgba(15,23,42,0.08)] transition-shadow hover:z-50 hover:shadow-[0_24px_60px_rgba(15,23,42,0.14)]"
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
       >
         <div className="flex items-start gap-3">
           <NodeLogo kind={kind} />
@@ -596,16 +627,6 @@ export function VisualizerNodeCard({
             </div>
           </div>
         ) : null}
-
-        <div className="pointer-events-none absolute left-1/2 top-full z-10 mt-3 hidden w-80 -translate-x-1/2 rounded-2xl border border-slate-200 bg-slate-950 px-4 py-3 text-xs text-slate-200 shadow-2xl group-hover:block">
-          <div className="text-[10px] uppercase tracking-[0.22em] text-sky-300">
-            Hover preview
-          </div>
-          <div className="mt-2 text-sm font-medium text-white">
-            {data.hoverTitle}
-          </div>
-          <div className="mt-2 leading-5 text-slate-300">{data.hoverText}</div>
-        </div>
       </div>
       <Handle
         type="source"
@@ -788,9 +809,6 @@ export default function VisualizerView() {
   const { llmManagerApiBaseUrl } = useRuntimeConfig();
   const visualizerUrl = `${trimTrailingSlash(llmManagerApiBaseUrl)}/visualizer/`;
 
-  const [graph, setGraph] = useState<ReturnType<typeof createVisualizerGraph> | null>(
-    null
-  );
   const [nodes, setNodes, onNodesChange] = useNodesState<GraphFlowNode>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [selectedNode, setSelectedNode] = useState<GraphNodeData | null>(null);
@@ -823,23 +841,25 @@ export default function VisualizerView() {
           !Array.isArray(data.edges)
         ) {
           setLoadError("Unable to load visualizer graph.");
-          setGraph(null);
+          setNodes([]);
+          setEdges([]);
           return;
         }
 
-        setGraph(
-          createVisualizerGraph({
-            nodes: data.nodes,
-            edges: data.edges,
-          })
-        );
+        const nextGraph = createVisualizerGraph({
+          nodes: data.nodes,
+          edges: data.edges,
+        });
+        setNodes(nextGraph.nodes);
+        setEdges(nextGraph.edges);
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") {
           return;
         }
         if (mounted) {
           setLoadError("Unable to load visualizer graph.");
-          setGraph(null);
+          setNodes([]);
+          setEdges([]);
         }
       } finally {
         if (mounted) {
@@ -854,12 +874,7 @@ export default function VisualizerView() {
       mounted = false;
       controller.abort();
     };
-  }, [visualizerUrl]);
-
-  useEffect(() => {
-    setNodes(graph?.nodes ?? []);
-    setEdges(graph?.edges ?? []);
-  }, [graph, setEdges, setNodes]);
+  }, [setEdges, setNodes, visualizerUrl]);
 
   useEffect(() => {
     if (!selectedNode) {
@@ -895,12 +910,12 @@ export default function VisualizerView() {
         return;
       }
 
-      setGraph(
-        createVisualizerGraph({
-          nodes: data.nodes,
-          edges: data.edges,
-        })
-      );
+      const nextGraph = createVisualizerGraph({
+        nodes: data.nodes,
+        edges: data.edges,
+      });
+      setNodes(nextGraph.nodes);
+      setEdges(nextGraph.edges);
     } catch {
       setLoadError("Unable to load visualizer graph.");
     } finally {
@@ -985,7 +1000,7 @@ export default function VisualizerView() {
             <p className="mt-2 text-sm text-[#c2410c]">{loadError}</p>
           </div>
         </div>
-      ) : graph ? (
+      ) : (
         <div className="h-full min-h-0 flex-1 overflow-hidden">
           <ReactFlow
             nodes={nodes}
@@ -1012,7 +1027,7 @@ export default function VisualizerView() {
             <Controls showInteractive={false} />
           </ReactFlow>
         </div>
-      ) : null}
+      )}
 
       {selectedNode ? (
         <>
@@ -1120,6 +1135,59 @@ export default function VisualizerView() {
                   </details>
                 </section>
               ) : null}
+
+              {selectedNode.expandableDetails?.length
+                ? selectedNode.expandableDetails.map((section) => (
+                    <section
+                      key={`${selectedNode.id}-${section.title}`}
+                      className="border-b border-[#eef1f7] pb-6"
+                    >
+                      <details className="group" open>
+                        <summary className="cursor-pointer list-none text-xs font-semibold uppercase tracking-[0.18em] text-[#8b94a7]">
+                          <span className="inline-flex items-center gap-2">
+                            {section.title}
+                            <span className="text-[#667085] transition group-open:rotate-180">
+                              ▼
+                            </span>
+                          </span>
+                        </summary>
+                        {section.items.length > 0 ? (
+                          <div className="mt-4 space-y-5">
+                            {section.items.map((detailGroup, index) => (
+                              <div
+                                key={`${selectedNode.id}-${section.title}-${index}`}
+                                className="border-b border-[#eef1f7] pb-4 last:border-b-0"
+                              >
+                                <p className="mb-3 text-sm font-semibold text-[#111827]">
+                                  {section.title.slice(0, -1)} {index + 1}
+                                </p>
+                                <div className="divide-y divide-[#eef1f7]">
+                                  {detailGroup.map((item) => (
+                                    <div
+                                      key={`${selectedNode.id}-${section.title}-${index}-${item.label}`}
+                                      className="grid grid-cols-[140px_minmax(0,1fr)] gap-4 py-3"
+                                    >
+                                      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#8b94a7]">
+                                        {item.label}
+                                      </p>
+                                      <p className="break-words text-sm font-medium text-[#111827]">
+                                        {item.value || "-"}
+                                      </p>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="mt-4 text-sm text-[#667085]">
+                            {section.emptyText ?? "No data available"}
+                          </p>
+                        )}
+                      </details>
+                    </section>
+                  ))
+                : null}
 
               {selectedNode.longText ? (
                 <section className="border-b border-[#eef1f7] pb-6">
