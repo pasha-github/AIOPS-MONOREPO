@@ -14,6 +14,7 @@ def test_list_connectors_success(client: TestClient):
     ids = {item["id"] for item in data}
     # Based on current repository connector files
     assert "datadog_connector" in ids
+    assert "ibm_mq_connector" in ids
     assert "servicenow_connector" in ids
 
 
@@ -181,6 +182,23 @@ class DemoConnector(BaseConnector):
     assert "Returns" not in info["tools"][0]["documentation"]
     assert {"name": "API_KEY", "required": True} in info["config_variables"]
     assert {"name": "BASE_URL", "required": False} in info["config_variables"]
+
+
+def test_ibm_mq_connector_details_include_expected_tools(client: TestClient):
+    response = client.get("/connectors/ibm_mq_connector")
+    assert response.status_code == 200
+
+    data = response.json()
+    tool_names = {tool["name"] for tool in data["tools"]}
+    config_vars = {item["name"]: item["required"] for item in data["config_variables"]}
+
+    assert {"dspmq", "runmqsc", "get_mq_logs", "run_commands_ssh"} <= tool_names
+    assert config_vars["URL_BASE"] is True
+    assert config_vars["USER_NAME"] is True
+    assert config_vars["PASSWORD"] is True
+    assert config_vars["LOGS_URL"] is True
+    assert config_vars["SSH_URL"] is True
+    assert config_vars["VERIFY_TLS"] is False
 
 
 def test_resolve_connector_tools_missing_file_raises():
