@@ -240,6 +240,52 @@ def test_delete_connector_config_not_found_returns_404(client: TestClient):
     assert response.json()["detail"] == "Connector config not found"
 
 
+def test_delete_connector_config_in_use_returns_409(client: TestClient):
+    model_response = client.post(
+        "/llms/",
+        json={
+            "model_id": "gemini-pro",
+            "provider": "google",
+            "name": "gemini-1.5-pro",
+            "api_key": "test-key",
+            "description": "model",
+        },
+    )
+    assert model_response.status_code == 200
+
+    payload = {
+        "connector_id": "example_connector",
+        "name": "Config In Use",
+        "config": [{"name": "token", "value": "abc"}],
+    }
+    create_response = client.post("/connectors/example_connector/config", json=payload)
+    assert create_response.status_code == 200
+
+    connector_config_id = create_response.json()["connector_config_id"]
+    agent_response = client.post(
+        "/agent/",
+        json={
+            "agent_id": "a1",
+            "name": "Agent 1",
+            "description": "desc",
+            "instruction": "instr",
+            "model_id": "gemini-pro",
+            "connector_config_ids": [connector_config_id],
+        },
+    )
+    assert agent_response.status_code == 200
+
+    response = client.delete(
+        f"/connectors/example_connector/config/{connector_config_id}"
+    )
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Connector config is in use by agent(s): Agent 1"
+
+    list_response = client.get("/connectors/example_connector/config")
+    assert list_response.status_code == 200
+    assert len(list_response.json()) == 1
+
+
 def test_delete_connector_config_wrong_connector_returns_404(client: TestClient):
     payload = {
         "connector_id": "example_connector",

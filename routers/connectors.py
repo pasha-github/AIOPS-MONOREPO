@@ -8,8 +8,9 @@ from fastapi import HTTPException
 from utils.helper import cached_connector_info
 from sqlmodel import Session, select
 from database.database import get_session
-from database.models import ConnectorConfig
+from database.models import Agent, ConnectorConfig
 from pydantic import BaseModel
+from utils.adk_app import invalidate_cache
 
 class ConnectorConfigCreate(BaseModel):
     connector_id: str
@@ -96,6 +97,12 @@ def patch_connector_config(
         raise HTTPException(status_code=404, detail="Connector config not found")
     if db_connector_config.connector_id != connector_id:
         raise HTTPException(status_code=404, detail="Connector config not found")
+    connector_config_id_str = str(connector_config_id)
+    affected_agent_ids = [
+        agent.agent_id
+        for agent in session.exec(select(Agent)).all()
+        if connector_config_id_str in (agent.connector_config_ids or [])
+    ]
 
     updates = connector_config.model_dump(exclude_unset=True)
     for field, value in updates.items():
@@ -105,6 +112,10 @@ def patch_connector_config(
     session.add(db_connector_config)
     session.commit()
     session.refresh(db_connector_config)
+
+    for agent_id in affected_agent_ids:
+        invalidate_cache(agent_id)
+
     return db_connector_config
 
 
@@ -119,6 +130,19 @@ def delete_connector_config(
         raise HTTPException(status_code=404, detail="Connector config not found")
     if db_connector_config.connector_id != connector_id:
         raise HTTPException(status_code=404, detail="Connector config not found")
+
+    connector_config_id_str = str(connector_config_id)
+    agents_using_config = session.exec(select(Agent)).all()
+    agent_names = [
+        agent.name
+        for agent in agents_using_config
+        if connector_config_id_str in (agent.connector_config_ids or [])
+    ]
+    if agent_names:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Connector config is in use by agent: {', '.join(agent_names)}",
+        )
 
     session.delete(db_connector_config)
     session.commit()
