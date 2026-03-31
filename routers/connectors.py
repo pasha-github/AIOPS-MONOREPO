@@ -1,6 +1,9 @@
+from datetime import datetime
+from uuid import UUID
+
 from fastapi import APIRouter, Depends
 import os
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from fastapi import HTTPException
 from utils.helper import cached_connector_info
 from sqlmodel import Session, select
@@ -12,6 +15,11 @@ class ConnectorConfigCreate(BaseModel):
     connector_id: str
     name: str
     config: List[Dict[str, Any]]
+
+
+class ConnectorConfigPatch(BaseModel):
+    name: Optional[str] = None
+    config: Optional[List[Dict[str, Any]]] = None
 
 router = APIRouter(prefix="/connectors", tags=["connectors"])
 
@@ -73,6 +81,47 @@ def set_connector_config(connector_id: str, connector_config: ConnectorConfigCre
     session.commit()
     session.refresh(db)
     return db
+
+
+@router.patch("/{connector_id}/config/{connector_config_id}")
+def patch_connector_config(
+    connector_id: str,
+    connector_config_id: UUID,
+    connector_config: ConnectorConfigPatch,
+    session: Session = Depends(get_session),
+) -> ConnectorConfig:
+    db_connector_config = session.get(ConnectorConfig, connector_config_id)
+    if db_connector_config is None:
+        raise HTTPException(status_code=404, detail="Connector config not found")
+    if db_connector_config.connector_id != connector_id:
+        raise HTTPException(status_code=404, detail="Connector config not found")
+
+    updates = connector_config.model_dump(exclude_unset=True)
+    for field, value in updates.items():
+        setattr(db_connector_config, field, value)
+    db_connector_config.updated_at = datetime.now()
+
+    session.add(db_connector_config)
+    session.commit()
+    session.refresh(db_connector_config)
+    return db_connector_config
+
+
+@router.delete("/{connector_id}/config/{connector_config_id}")
+def delete_connector_config(
+    connector_id: str,
+    connector_config_id: UUID,
+    session: Session = Depends(get_session),
+) -> Dict[str, bool]:
+    db_connector_config = session.get(ConnectorConfig, connector_config_id)
+    if db_connector_config is None:
+        raise HTTPException(status_code=404, detail="Connector config not found")
+    if db_connector_config.connector_id != connector_id:
+        raise HTTPException(status_code=404, detail="Connector config not found")
+
+    session.delete(db_connector_config)
+    session.commit()
+    return {"success": True}
 
 
 
