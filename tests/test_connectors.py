@@ -1,6 +1,7 @@
 from fastapi.testclient import TestClient
 import pytest
 from pathlib import Path
+from uuid import uuid4
 
 from database.models import ConnectorConfig
 from utils.helper import cached_connector_info, resolve_connector_tools
@@ -142,6 +143,164 @@ def test_create_connector_config_missing_required_field_422(client: TestClient):
         },
     )
     assert response.status_code == 422
+
+
+def test_patch_connector_config_name_only(client: TestClient):
+    payload = {
+        "connector_id": "example_connector",
+        "name": "Original Config",
+        "config": [{"name": "token", "value": "abc"}],
+    }
+    create_response = client.post("/connectors/example_connector/config", json=payload)
+    assert create_response.status_code == 200
+
+    connector_config_id = create_response.json()["connector_config_id"]
+    response = client.patch(
+        f"/connectors/example_connector/config/{connector_config_id}",
+        json={"name": "Updated Config"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["name"] == "Updated Config"
+    assert data["config"] == payload["config"]
+
+
+def test_patch_connector_config_config_only(client: TestClient):
+    payload = {
+        "connector_id": "example_connector",
+        "name": "Config",
+        "config": [{"name": "token", "value": "abc"}],
+    }
+    create_response = client.post("/connectors/example_connector/config", json=payload)
+    assert create_response.status_code == 200
+
+    connector_config_id = create_response.json()["connector_config_id"]
+    updated_config = [{"name": "token", "value": "xyz"}]
+    response = client.patch(
+        f"/connectors/example_connector/config/{connector_config_id}",
+        json={"config": updated_config},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["name"] == payload["name"]
+    assert data["config"] == updated_config
+
+
+def test_patch_connector_config_not_found_returns_404(client: TestClient):
+    response = client.patch(
+        f"/connectors/example_connector/config/{uuid4()}",
+        json={"name": "Missing Config"},
+    )
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Connector config not found"
+
+
+def test_patch_connector_config_wrong_connector_returns_404(client: TestClient):
+    payload = {
+        "connector_id": "example_connector",
+        "name": "Original Config",
+        "config": [{"name": "token", "value": "abc"}],
+    }
+    create_response = client.post("/connectors/example_connector/config", json=payload)
+    assert create_response.status_code == 200
+
+    connector_config_id = create_response.json()["connector_config_id"]
+    response = client.patch(
+        f"/connectors/servicenow_connector/config/{connector_config_id}",
+        json={"name": "Updated Config"},
+    )
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Connector config not found"
+
+
+def test_delete_connector_config_success(client: TestClient):
+    payload = {
+        "connector_id": "example_connector",
+        "name": "Config To Delete",
+        "config": [{"name": "token", "value": "abc"}],
+    }
+    create_response = client.post("/connectors/example_connector/config", json=payload)
+    assert create_response.status_code == 200
+
+    connector_config_id = create_response.json()["connector_config_id"]
+    delete_response = client.delete(
+        f"/connectors/example_connector/config/{connector_config_id}"
+    )
+    assert delete_response.status_code == 200
+    assert delete_response.json() == {"success": True}
+
+    list_response = client.get("/connectors/example_connector/config")
+    assert list_response.status_code == 200
+    assert list_response.json() == []
+
+
+def test_delete_connector_config_not_found_returns_404(client: TestClient):
+    response = client.delete(f"/connectors/example_connector/config/{uuid4()}")
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Connector config not found"
+
+
+def test_delete_connector_config_in_use_returns_409(client: TestClient):
+    model_response = client.post(
+        "/llms/",
+        json={
+            "model_id": "gemini-pro",
+            "provider": "google",
+            "name": "gemini-1.5-pro",
+            "api_key": "test-key",
+            "description": "model",
+        },
+    )
+    assert model_response.status_code == 200
+
+    payload = {
+        "connector_id": "example_connector",
+        "name": "Config In Use",
+        "config": [{"name": "token", "value": "abc"}],
+    }
+    create_response = client.post("/connectors/example_connector/config", json=payload)
+    assert create_response.status_code == 200
+
+    connector_config_id = create_response.json()["connector_config_id"]
+    agent_response = client.post(
+        "/agent/",
+        json={
+            "agent_id": "a1",
+            "name": "Agent 1",
+            "description": "desc",
+            "instruction": "instr",
+            "model_id": "gemini-pro",
+            "connector_config_ids": [connector_config_id],
+        },
+    )
+    assert agent_response.status_code == 200
+
+    response = client.delete(
+        f"/connectors/example_connector/config/{connector_config_id}"
+    )
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Connector config is in use by agent: Agent 1"
+
+    list_response = client.get("/connectors/example_connector/config")
+    assert list_response.status_code == 200
+    assert len(list_response.json()) == 1
+
+
+def test_delete_connector_config_wrong_connector_returns_404(client: TestClient):
+    payload = {
+        "connector_id": "example_connector",
+        "name": "Config To Delete",
+        "config": [{"name": "token", "value": "abc"}],
+    }
+    create_response = client.post("/connectors/example_connector/config", json=payload)
+    assert create_response.status_code == 200
+
+    connector_config_id = create_response.json()["connector_config_id"]
+    response = client.delete(
+        f"/connectors/servicenow_connector/config/{connector_config_id}"
+    )
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Connector config not found"
 
 
 def test_cached_connector_info_extracts_expected_sections():
