@@ -11,6 +11,8 @@ import {
   MiniMap,
   Position,
   ReactFlow,
+  useEdgesState,
+  useNodesState,
   type Edge,
   type Node,
   type NodeProps,
@@ -44,6 +46,19 @@ export type GraphNodeData = {
   listItems: string[];
   sections?: Array<{ title: string; items: string[] }>;
 };
+
+const NODE_WIDTH: Record<GraphKind, number> = {
+  agent: 320,
+  connector: 240,
+  mcp: 240,
+};
+
+const SUPERVISOR_Y = 40;
+const AGENT_Y = 320;
+const RESOURCE_Y = 600;
+const SIBLING_GAP = 72;
+const ROOT_GAP = 120;
+const START_X = 80;
 
 export function createVisualizerGraph(response: VisualizerResponse) {
   const nodeMap = new Map(response.nodes.map((node) => [node.id, node]));
@@ -95,59 +110,243 @@ function createPositionMap(
   outgoing: Map<string, string[]>
 ) {
   const positionMap = new Map<string, { x: number; y: number }>();
+  const resourceOwner = new Map<string, string>();
 
-  const supervisorIds = response.nodes
-    .filter(
-      (node) => node.type === "agent" && node.data.agent.sub_agents.length > 0
-    )
+  for (const edge of response.edges) {
+    const sourceType = nodeMap.get(edge.source)?.type;
+    const targetType = nodeMap.get(edge.target)?.type;
+    if (
+      sourceType === "agent" &&
+      (targetType === "connector" || targetType === "mcp") &&
+      !resourceOwner.has(edge.target)
+    ) {
+      resourceOwner.set(edge.target, edge.source);
+    }
+  }
+
+  const agentIds = response.nodes
+    .filter((node) => node.type === "agent")
     .map((node) => node.id);
 
-  const childAgentIds = supervisorIds
-    .flatMap((id) => outgoing.get(id) ?? [])
-    .filter((id) => nodeMap.get(id)?.type === "agent");
+  const supervisorIds = agentIds
+    .filter((id) => isSupervisorAgent(nodeMap.get(id)))
+    .sort((left, right) => compareNodes(left, right, nodeMap));
 
-  const standaloneAgentIds = response.nodes
-    .filter((node) => node.type === "agent")
-    .map((node) => node.id)
-    .filter((id) => !supervisorIds.includes(id) && !childAgentIds.includes(id));
+  const otherAgentIds = agentIds
+    .filter((id) => !supervisorIds.includes(id))
+    .sort((left, right) => compareNodes(left, right, nodeMap));
 
-  supervisorIds.forEach((id, index) => {
-    positionMap.set(id, { x: 520 + index * 320, y: 20 });
+  const resourcesByAgent = new Map<string, string[]>();
+  resourceOwner.forEach((ownerId, resourceId) => {
+    const resources = resourcesByAgent.get(ownerId) ?? [];
+    resources.push(resourceId);
+    resourcesByAgent.set(ownerId, resources);
   });
 
-  childAgentIds.forEach((id, index) => {
-    positionMap.set(id, { x: 80 + index * 330, y: 300 });
+  resourcesByAgent.forEach((resourceIds, ownerId) => {
+    resourceIds.sort((left, right) => compareNodes(left, right, nodeMap));
+    resourcesByAgent.set(ownerId, resourceIds);
   });
 
-  standaloneAgentIds.forEach((id, index) => {
-    positionMap.set(id, { x: 80 + index * 330, y: 620 });
+  const agentSpanWidth = (agentId: string) => {
+    const resources = resourcesByAgent.get(agentId) ?? [];
+    const resourceWidth = getRowWidth(resources, nodeMap);
+    return Math.max(getNodeWidth(agentId, nodeMap), resourceWidth);
+  };
+
+  const supervisorChildren = new Map<string, string[]>();
+  supervisorIds.forEach((supervisorId) => {
+    const childAgents = (outgoing.get(supervisorId) ?? [])
+      .filter((targetId) => nodeMap.get(targetId)?.type === "agent")
+      .sort((left, right) => compareNodes(left, right, nodeMap));
+    supervisorChildren.set(supervisorId, childAgents);
   });
 
-  for (const [sourceId, targets] of outgoing.entries()) {
-    const sourcePosition = positionMap.get(sourceId);
-    if (!sourcePosition) {
-      continue;
+  const assignedAgents = new Set<string>();
+  let currentLeft = START_X;
+
+  supervisorIds.forEach((supervisorId, index) => {
+    const children = supervisorChildren.get(supervisorId) ?? [];
+    const rowWidth = getRowWidth(children, nodeMap, agentSpanWidth);
+    const supervisorWidth = getNodeWidth(supervisorId, nodeMap);
+    const blockWidth = Math.max(supervisorWidth, rowWidth);
+
+    if (index > 0) {
+      currentLeft += ROOT_GAP;
     }
 
-    const resourceTargets = targets.filter((targetId) => {
-      const type = nodeMap.get(targetId)?.type;
-      return type === "connector" || type === "mcp";
+    const supervisorX = currentLeft + (blockWidth - supervisorWidth) / 2;
+    positionMap.set(supervisorId, { x: supervisorX, y: SUPERVISOR_Y });
+    assignedAgents.add(supervisorId);
+
+    let childLeft = currentLeft;
+    children.forEach((childId) => {
+      const childBlockWidth = agentSpanWidth(childId);
+      const childNodeWidth = getNodeWidth(childId, nodeMap);
+      positionMap.set(childId, {
+        x: childLeft + (childBlockWidth - childNodeWidth) / 2,
+        y: AGENT_Y,
+      });
+      assignedAgents.add(childId);
+
+      layoutResourcesForAgent(
+        childId,
+        childLeft,
+        positionMap,
+        resourcesByAgent,
+        nodeMap
+      );
+
+      childLeft += childBlockWidth + SIBLING_GAP;
     });
 
-    resourceTargets.forEach((targetId, index) => {
-      const offset = (index - (resourceTargets.length - 1) / 2) * 220;
-      positionMap.set(targetId, {
-        x: sourcePosition.x + offset,
-        y: sourcePosition.y + 240,
+    currentLeft += blockWidth;
+  });
+
+  const unassignedAgents = otherAgentIds.filter((id) => !assignedAgents.has(id));
+
+  if (unassignedAgents.length > 0) {
+    if (currentLeft > START_X) {
+      currentLeft += ROOT_GAP;
+    }
+
+    let agentLeft = currentLeft;
+    unassignedAgents.forEach((agentId) => {
+      const blockWidth = agentSpanWidth(agentId);
+      const agentWidth = getNodeWidth(agentId, nodeMap);
+      positionMap.set(agentId, {
+        x: agentLeft + (blockWidth - agentWidth) / 2,
+        y: AGENT_Y,
       });
+      layoutResourcesForAgent(
+        agentId,
+        agentLeft,
+        positionMap,
+        resourcesByAgent,
+        nodeMap
+      );
+      agentLeft += blockWidth + SIBLING_GAP;
     });
   }
+
+  response.nodes.forEach((node, index) => {
+    if (!positionMap.has(node.id)) {
+      positionMap.set(node.id, fallbackPosition(index));
+    }
+  });
 
   return positionMap;
 }
 
 function fallbackPosition(index: number) {
   return { x: 80 + index * 280, y: 940 };
+}
+
+function layoutResourcesForAgent(
+  agentId: string,
+  left: number,
+  positionMap: Map<string, { x: number; y: number }>,
+  resourcesByAgent: Map<string, string[]>,
+  nodeMap: Map<string, VisualizerNode>
+) {
+  const resourceIds = resourcesByAgent.get(agentId) ?? [];
+  let resourceLeft = left;
+
+  resourceIds.forEach((resourceId) => {
+    const resourceWidth = getNodeWidth(resourceId, nodeMap);
+    positionMap.set(resourceId, {
+      x: resourceLeft,
+      y: RESOURCE_Y,
+    });
+    resourceLeft += resourceWidth + SIBLING_GAP;
+  });
+}
+
+function getRowWidth(
+  nodeIds: string[],
+  nodeMap: Map<string, VisualizerNode>,
+  getWidth?: (nodeId: string) => number
+) {
+  if (nodeIds.length === 0) {
+    return 0;
+  }
+
+  return nodeIds.reduce((sum, nodeId, index) => {
+    const width = getWidth ? getWidth(nodeId) : getNodeWidth(nodeId, nodeMap);
+    return sum + width + (index > 0 ? SIBLING_GAP : 0);
+  }, 0);
+}
+
+function getNodeWidth(nodeId: string, nodeMap: Map<string, VisualizerNode>) {
+  const nodeType = nodeMap.get(nodeId)?.type;
+  if (nodeType === "agent" || nodeType === "connector" || nodeType === "mcp") {
+    return NODE_WIDTH[nodeType];
+  }
+  return NODE_WIDTH.agent;
+}
+
+function isSupervisorAgent(node?: VisualizerNode) {
+  if (!node || node.type !== "agent") {
+    return false;
+  }
+
+  const name = node.data.agent.name.trim().toLowerCase();
+  const agentId = node.data.agent.agent_id.trim().toLowerCase();
+  return (
+    agentId === "supervisor" ||
+    name === "supervisor agent" ||
+    node.data.agent.sub_agents.length > 0
+  );
+}
+
+function compareNodes(
+  leftId: string,
+  rightId: string,
+  nodeMap: Map<string, VisualizerNode>
+) {
+  const leftNode = nodeMap.get(leftId);
+  const rightNode = nodeMap.get(rightId);
+  const leftTypeWeight = getTypeWeight(leftNode?.type);
+  const rightTypeWeight = getTypeWeight(rightNode?.type);
+
+  if (leftTypeWeight !== rightTypeWeight) {
+    return leftTypeWeight - rightTypeWeight;
+  }
+
+  return getDisplayName(leftNode).localeCompare(getDisplayName(rightNode), undefined, {
+    sensitivity: "base",
+    numeric: true,
+  });
+}
+
+function getTypeWeight(type?: VisualizerNode["type"]) {
+  if (type === "agent") {
+    return 0;
+  }
+  if (type === "connector") {
+    return 1;
+  }
+  if (type === "mcp") {
+    return 2;
+  }
+  return 3;
+}
+
+function getDisplayName(node?: VisualizerNode) {
+  if (!node) {
+    return "";
+  }
+
+  if (node.type === "agent") {
+    return node.data.agent.name || node.id;
+  }
+  if (node.type === "connector") {
+    return node.data.connector.name || node.id;
+  }
+  if (node.type === "mcp") {
+    return node.data.mcp.name || node.id;
+  }
+  return node.id;
 }
 
 function buildNodeData(node: VisualizerNode): GraphNodeData {
@@ -493,6 +692,8 @@ export default function VisualizerView() {
   const [graph, setGraph] = useState<ReturnType<typeof createVisualizerGraph> | null>(
     null
   );
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node<GraphNodeData>>([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [loadError, setLoadError] = useState("");
@@ -554,6 +755,11 @@ export default function VisualizerView() {
       controller.abort();
     };
   }, [visualizerUrl]);
+
+  useEffect(() => {
+    setNodes(graph?.nodes ?? []);
+    setEdges(graph?.edges ?? []);
+  }, [graph, setEdges, setNodes]);
 
   const counts = useMemo(() => {
     const nodes = graph?.nodes ?? [];
@@ -668,9 +874,11 @@ export default function VisualizerView() {
         ) : graph ? (
           <div className="h-[720px] overflow-hidden rounded-3xl border border-[#e6eaf2] bg-[radial-gradient(circle_at_top,#f8faff_0%,#f5f7fc_48%,#f1f4fa_100%)]">
             <ReactFlow
-              nodes={graph.nodes}
-              edges={graph.edges}
+              nodes={nodes}
+              edges={edges}
               nodeTypes={visualizerNodeTypes}
+              onNodesChange={onNodesChange}
+              onEdgesChange={onEdgesChange}
               fitView
               fitViewOptions={{ padding: 0.12 }}
               minZoom={0.25}
