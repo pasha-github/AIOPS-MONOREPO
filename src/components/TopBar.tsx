@@ -16,6 +16,7 @@ function formatTitle(pathname: string) {
   const segment = clean.split("/").filter(Boolean).at(-1) ?? "dashboard";
   const overrides: Record<string, string> = {
     connectors: "Connectors",
+    visualizer: "Agent Visualizer",
   };
   if (overrides[segment]) {
     return overrides[segment];

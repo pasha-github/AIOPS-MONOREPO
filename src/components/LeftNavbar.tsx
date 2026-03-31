@@ -10,6 +10,7 @@ import {
   Link2,
   Mail,
   MessageSquare,
+  Network,
   Truck,
   Users,
   Workflow,
@@ -120,11 +121,11 @@ const navSections: NavSection[] = [
     title: "Flow",
     items: [
       {
-        label: "Flow builder",
+        label: "Agent Visualizer",
         id: "flow-builder",
-        icon: <Workflow className="h-5 w-5" />,
+        icon: <Network className="h-5 w-5" />,
         dot: true,
-        href: "#",
+        href: "/visualizer",
       },
     ],
   },
