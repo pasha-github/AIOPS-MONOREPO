@@ -48,6 +48,8 @@ export type GraphNodeData = {
   sections?: Array<{ title: string; items: string[] }>;
 };
 
+type GraphFlowNode = Node<GraphNodeData, "visualizer">;
+
 const NODE_WIDTH: Record<GraphKind, number> = {
   agent: 320,
   connector: 320,
@@ -66,7 +68,7 @@ export function createVisualizerGraph(response: VisualizerResponse) {
   const outgoing = buildOutgoingEdges(response);
   const positionMap = createPositionMap(response, nodeMap, outgoing);
 
-  const nodes: Node<GraphNodeData>[] = response.nodes.map((node, index) => ({
+  const nodes: GraphFlowNode[] = response.nodes.map((node, index) => ({
     id: node.id,
     type: "visualizer",
     position: positionMap.get(node.id) ?? fallbackPosition(index),
@@ -347,7 +349,7 @@ function getDisplayName(node?: VisualizerNode) {
   if (node.type === "mcp") {
     return node.data.mcp.name || node.id;
   }
-  return node.id;
+  return "";
 }
 
 function buildNodeData(node: VisualizerNode): GraphNodeData {
@@ -358,22 +360,22 @@ function buildNodeData(node: VisualizerNode): GraphNodeData {
       return buildConnectorNodeData(node.data.connector);
     case "mcp":
       return buildMcpNodeData(node.data.mcp);
-    default:
-      return {
-        id: node.id,
-        kind: "mcp",
-        name: node.id,
-        role: "Unknown",
-        status: "unknown",
-        description: node.id,
-        llm: "N/A",
-        hoverTitle: node.id,
-        hoverText: node.id,
-        detailItems: [],
-        longText: node.id,
-        listItems: [],
-      };
   }
+
+  return {
+    id: "",
+    kind: "mcp",
+    name: "",
+    role: "Unknown",
+    status: "unknown",
+    description: "",
+    llm: "N/A",
+    hoverTitle: "",
+    hoverText: "",
+    detailItems: [],
+    longText: "",
+    listItems: [],
+  };
 }
 
 function buildAgentNodeData(agent: VisualizerAgent): GraphNodeData {
@@ -544,12 +546,13 @@ function getEdgeColor(nodeType?: VisualizerNode["type"]) {
 
 export function VisualizerNodeCard({
   data,
-}: NodeProps<Node<GraphNodeData>["data"]>) {
+}: NodeProps<GraphFlowNode>) {
   if (!data) {
     return null;
   }
 
-  const isAgent = data.kind === "agent";
+  const kind = data.kind;
+  const isAgent = kind === "agent";
 
   return (
     <>
@@ -562,7 +565,7 @@ export function VisualizerNodeCard({
         className="group relative w-[320px] rounded-2xl border border-slate-200 bg-white px-4 py-4 text-left shadow-[0_18px_45px_rgba(15,23,42,0.08)] transition-shadow hover:shadow-[0_24px_60px_rgba(15,23,42,0.14)]"
       >
         <div className="flex items-start gap-3">
-          <NodeLogo kind={data.kind} />
+          <NodeLogo kind={kind} />
           <div className="min-w-0 flex-1">
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -788,7 +791,7 @@ export default function VisualizerView() {
   const [graph, setGraph] = useState<ReturnType<typeof createVisualizerGraph> | null>(
     null
   );
-  const [nodes, setNodes, onNodesChange] = useNodesState<Node<GraphNodeData>>([]);
+  const [nodes, setNodes, onNodesChange] = useNodesState<GraphFlowNode>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [selectedNode, setSelectedNode] = useState<GraphNodeData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
