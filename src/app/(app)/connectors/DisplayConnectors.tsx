@@ -17,7 +17,15 @@ type DisplayConnectorsProps = {
   searchTerm?: string;
 };
 
+const CONNECTOR_LOGO_MAP: Record<string, string> = {
+  datadog_connector: "/img/datadog_connector.png",
+  servicenow_connector: "/img/servicenow_connector.png",
+  ibm_mq: "/img/MQ.png",
+  mq: "/img/MQ.png",
+};
+
 const getLogoSrc = (connectorId: string) =>
+  CONNECTOR_LOGO_MAP[connectorId.toLowerCase()] ??
   `/img/${connectorId.toLowerCase()}.png`;
 
 export default function DisplayConnectors({ searchTerm }: DisplayConnectorsProps) {

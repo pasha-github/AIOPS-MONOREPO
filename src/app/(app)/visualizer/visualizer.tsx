@@ -2,7 +2,7 @@
 
 import "@xyflow/react/dist/style.css";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Background,
   Controls,
@@ -17,7 +17,7 @@ import {
   type Node,
   type NodeProps,
 } from "@xyflow/react";
-import { Network, RefreshCw } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { trimTrailingSlash } from "@/config/agent";
 import { useRuntimeConfig } from "@/config/runtime-config";
 import {
@@ -36,10 +36,10 @@ export type GraphNodeData = {
   name: string;
   role: string;
   status: string;
-  summary: string;
+  description: string;
+  llm: string;
   hoverTitle: string;
   hoverText: string;
-  tags: string[];
   detailItems: Array<{ label: string; value: string }>;
   longText: string;
   listLabel?: string;
@@ -49,8 +49,8 @@ export type GraphNodeData = {
 
 const NODE_WIDTH: Record<GraphKind, number> = {
   agent: 320,
-  connector: 240,
-  mcp: 240,
+  connector: 320,
+  mcp: 320,
 };
 
 const SUPERVISOR_Y = 40;
@@ -364,10 +364,10 @@ function buildNodeData(node: VisualizerNode): GraphNodeData {
         name: node.id,
         role: "Unknown",
         status: "unknown",
-        summary: node.id,
+        description: node.id,
+        llm: "N/A",
         hoverTitle: node.id,
         hoverText: node.id,
-        tags: [],
         detailItems: [],
         longText: node.id,
         listItems: [],
@@ -388,10 +388,10 @@ function buildAgentNodeData(agent: VisualizerAgent): GraphNodeData {
     name: agent.name,
     role: `${agent.type} | ${agent.model.provider}`,
     status: agent.status,
-    summary: agent.description,
+    description: agent.description,
+    llm: agent.model.name,
     hoverTitle: agent.name,
     hoverText: truncate(agent.instruction, 160),
-    tags: [agent.model.name, `${relationships.length} links`],
     detailItems: [
       { label: "Agent id", value: agent.agent_id },
       { label: "Type", value: agent.type },
@@ -432,10 +432,11 @@ function buildConnectorNodeData(connector: VisualizerConnector): GraphNodeData {
     name: connector.name,
     role: connector.connector_id,
     status: "configured",
-    summary: connector.description ?? `${connector.config.length} config keys`,
+    description:
+      connector.description ?? `${connector.config.length} config keys configured`,
+    llm: "N/A",
     hoverTitle: connector.name,
     hoverText: `${connector.connector_id} with ${connector.config.length} config keys.`,
-    tags: [connector.connector_id, `${connector.config.length} keys`],
     detailItems: [
       { label: "Connector id", value: connector.connector_id },
       { label: "Config id", value: connector.connector_config_id },
@@ -466,10 +467,10 @@ function buildMcpNodeData(mcp: VisualizerMcp): GraphNodeData {
     name: mcp.name,
     role: "MCP Server",
     status: "linked",
-    summary: mcp.url,
+    description: mcp.url,
+    llm: "N/A",
     hoverTitle: mcp.name,
     hoverText: mcp.url,
-    tags: ["MCP", parsedUrl.hostname],
     detailItems: [
       { label: "Name", value: mcp.name },
       { label: "URL", value: mcp.url },
@@ -518,7 +519,6 @@ export function VisualizerNodeCard({
   }
 
   const isAgent = data.kind === "agent";
-  const statusTone = getStatusTone(data.status);
 
   return (
     <>
@@ -528,11 +528,7 @@ export function VisualizerNodeCard({
         className="!h-3 !w-3 !border-2 !border-sky-500 !bg-white"
       />
       <div
-        className={`group relative border bg-white text-left shadow-[0_18px_45px_rgba(15,23,42,0.08)] transition-shadow hover:shadow-[0_24px_60px_rgba(15,23,42,0.14)] ${
-          isAgent
-            ? "min-w-72 rounded-2xl border-slate-200 px-4 py-4"
-            : "min-w-52 rounded-2xl border-slate-200 px-3 py-3"
-        }`}
+        className="group relative w-[320px] rounded-2xl border border-slate-200 bg-white px-4 py-4 text-left shadow-[0_18px_45px_rgba(15,23,42,0.08)] transition-shadow hover:shadow-[0_24px_60px_rgba(15,23,42,0.14)]"
       >
         <div className="flex items-start gap-3">
           <NodeLogo kind={data.kind} />
@@ -542,50 +538,30 @@ export function VisualizerNodeCard({
                 <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-sky-700">
                   {data.role}
                 </div>
-                <div className="mt-1 text-lg font-semibold text-slate-950">
+                <div
+                  className="mt-1 max-w-[180px] overflow-hidden text-ellipsis whitespace-nowrap text-lg font-semibold text-slate-950"
+                  title={data.name}
+                >
                   {data.name}
                 </div>
               </div>
-              <div
-                className={`mt-1 inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] ${statusTone}`}
-              >
-                <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                {data.status}
-              </div>
             </div>
-            <div className="mt-2 text-sm leading-5 text-slate-600">
-              {data.summary}
+            <div className="mt-2 min-h-[48px] break-words text-sm leading-5 text-slate-600">
+              {data.description}
             </div>
           </div>
         </div>
 
-        <div className="mt-4 grid grid-cols-2 gap-2 text-[11px] text-slate-500">
-          <div className="rounded-xl bg-slate-50 px-3 py-2">
-            <div className="uppercase tracking-[0.18em] text-slate-400">
-              Kind
+        {isAgent ? (
+          <div className="mt-4 rounded-xl bg-slate-50 px-3 py-3">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+              LLM
             </div>
-            <div className="mt-1 font-medium text-slate-700">{data.kind}</div>
-          </div>
-          <div className="rounded-xl bg-slate-50 px-3 py-2">
-            <div className="uppercase tracking-[0.18em] text-slate-400">
-              Details
-            </div>
-            <div className="mt-1 font-medium text-slate-700">
-              {data.detailItems.length} fields
+            <div className="mt-1 break-words text-sm font-medium text-slate-700">
+              {data.llm}
             </div>
           </div>
-        </div>
-
-        <div className="mt-4 flex flex-wrap gap-2">
-          {data.tags.map((tag) => (
-            <span
-              key={tag}
-              className="rounded-full border border-sky-100 bg-sky-50 px-2.5 py-1 text-[11px] font-medium text-sky-800"
-            >
-              {tag}
-            </span>
-          ))}
-        </div>
+        ) : null}
 
         <div className="pointer-events-none absolute left-1/2 top-full z-10 mt-3 hidden w-80 -translate-x-1/2 rounded-2xl border border-slate-200 bg-slate-950 px-4 py-3 text-xs text-slate-200 shadow-2xl group-hover:block">
           <div className="text-[10px] uppercase tracking-[0.22em] text-sky-300">
@@ -621,24 +597,6 @@ export function getMiniMapColor(kind?: GraphKind) {
     return "#8b5cf6";
   }
   return "#38bdf8";
-}
-
-function getStatusTone(status: string) {
-  const normalized = status.toLowerCase();
-
-  if (
-    normalized === "active" ||
-    normalized === "linked" ||
-    normalized === "configured"
-  ) {
-    return "border-emerald-200 bg-emerald-50 text-emerald-700";
-  }
-
-  if (normalized === "inactive" || normalized === "disabled") {
-    return "border-rose-200 bg-rose-50 text-rose-700";
-  }
-
-  return "border-amber-200 bg-amber-50 text-amber-700";
 }
 
 function NodeLogo({ kind }: { kind: GraphKind }) {
@@ -761,16 +719,6 @@ export default function VisualizerView() {
     setEdges(graph?.edges ?? []);
   }, [graph, setEdges, setNodes]);
 
-  const counts = useMemo(() => {
-    const nodes = graph?.nodes ?? [];
-    return {
-      agents: nodes.filter((node) => node.data.kind === "agent").length,
-      connectors: nodes.filter((node) => node.data.kind === "connector").length,
-      mcps: nodes.filter((node) => node.data.kind === "mcp").length,
-      edges: graph?.edges.length ?? 0,
-    };
-  }, [graph]);
-
   const handleRefresh = async () => {
     if (isRefreshing) {
       return;
@@ -808,29 +756,8 @@ export default function VisualizerView() {
   };
 
   return (
-    <div className="space-y-8">
-      <section className="rounded-3xl bg-white px-8 py-7 shadow-[0_18px_50px_-38px_rgba(16,24,40,0.5)]">
-        <div className="flex flex-wrap items-start justify-between gap-6">
-          <div className="max-w-2xl">
-            <div className="flex items-center gap-3">
-              <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#eef2ff] text-[#4f49e2]">
-                <Network className="h-5 w-5" />
-              </span>
-              <div>
-                <h2 className="text-xl font-semibold text-[#111827]">
-                  Agent Visualizer
-                </h2>
-                <p className="mt-1 text-sm text-[#5b6476]">
-                  Live graph for agents, connector configs, and MCP servers.
-                </p>
-              </div>
-            </div>
-            <p className="mt-5 text-sm text-[#667085]">
-              Source endpoint:{" "}
-              <span className="font-medium text-[#344054]">{visualizerUrl}</span>
-            </p>
-          </div>
-
+    <section className="flex h-[calc(100vh-180px)] min-h-[720px] flex-col rounded-3xl bg-white p-6 shadow-[0_18px_50px_-38px_rgba(16,24,40,0.5)]">
+      <div className="mb-4 flex justify-end">
           <button
             type="button"
             onClick={handleRefresh}
@@ -844,71 +771,51 @@ export default function VisualizerView() {
           </button>
         </div>
 
-        <div className="mt-6 grid gap-4 md:grid-cols-4">
-          <StatCard label="Agents" value={counts.agents} />
-          <StatCard label="Connectors" value={counts.connectors} />
-          <StatCard label="MCP Servers" value={counts.mcps} />
-          <StatCard label="Connections" value={counts.edges} />
+      {isLoading ? (
+        <div className="flex min-h-[720px] flex-1 items-center justify-center rounded-3xl border border-dashed border-[#d9deea] bg-[linear-gradient(135deg,#f8faff_0%,#f3f5fb_100%)]">
+          <div className="text-center">
+            <div className="mx-auto h-10 w-10 animate-spin rounded-full border-2 border-[#c7d2fe] border-t-[#4f49e2]" />
+            <p className="mt-4 text-sm font-semibold text-[#344054]">
+              Loading visualizer canvas
+            </p>
+          </div>
         </div>
-      </section>
-
-      <section className="rounded-3xl bg-white p-6 shadow-[0_18px_50px_-38px_rgba(16,24,40,0.5)]">
-        {isLoading ? (
-          <div className="flex min-h-[720px] items-center justify-center rounded-3xl border border-dashed border-[#d9deea] bg-[linear-gradient(135deg,#f8faff_0%,#f3f5fb_100%)]">
-            <div className="text-center">
-              <div className="mx-auto h-10 w-10 animate-spin rounded-full border-2 border-[#c7d2fe] border-t-[#4f49e2]" />
-              <p className="mt-4 text-sm font-semibold text-[#344054]">
-                Loading visualizer canvas
-              </p>
-            </div>
+      ) : loadError ? (
+        <div className="flex min-h-[720px] flex-1 items-center justify-center rounded-3xl border border-[#fee2e2] bg-[#fff5f5] px-6 text-center">
+          <div>
+            <p className="text-base font-semibold text-[#b91c1c]">
+              Unable to load visualizer graph
+            </p>
+            <p className="mt-2 text-sm text-[#c2410c]">{loadError}</p>
           </div>
-        ) : loadError ? (
-          <div className="flex min-h-[720px] items-center justify-center rounded-3xl border border-[#fee2e2] bg-[#fff5f5] px-6 text-center">
-            <div>
-              <p className="text-base font-semibold text-[#b91c1c]">
-                Unable to load visualizer graph
-              </p>
-              <p className="mt-2 text-sm text-[#c2410c]">{loadError}</p>
-            </div>
-          </div>
-        ) : graph ? (
-          <div className="h-[720px] overflow-hidden rounded-3xl border border-[#e6eaf2] bg-[radial-gradient(circle_at_top,#f8faff_0%,#f5f7fc_48%,#f1f4fa_100%)]">
-            <ReactFlow
-              nodes={nodes}
-              edges={edges}
-              nodeTypes={visualizerNodeTypes}
-              onNodesChange={onNodesChange}
-              onEdgesChange={onEdgesChange}
-              fitView
-              fitViewOptions={{ padding: 0.12 }}
-              minZoom={0.25}
-              maxZoom={1.6}
-              nodesDraggable
-              proOptions={{ hideAttribution: true }}
-            >
-              <Background gap={20} size={1} color="#dbe3f0" />
-              <MiniMap
-                zoomable
-                pannable
-                nodeStrokeWidth={3}
-                nodeColor={(node) => getMiniMapColor((node.data as GraphNodeData)?.kind)}
-              />
-              <Controls showInteractive={false} />
-            </ReactFlow>
-          </div>
-        ) : null}
-      </section>
-    </div>
-  );
-}
-
-function StatCard({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="rounded-2xl border border-[#e8eefb] bg-[#f8faff] p-4">
-      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#667085]">
-        {label}
-      </p>
-      <p className="mt-2 text-2xl font-semibold text-[#111827]">{value}</p>
-    </div>
+        </div>
+      ) : graph ? (
+        <div className="h-full min-h-0 flex-1 overflow-hidden rounded-3xl border border-[#e6eaf2] bg-[radial-gradient(circle_at_top,#f8faff_0%,#f5f7fc_48%,#f1f4fa_100%)]">
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            nodeTypes={visualizerNodeTypes}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            className="h-full w-full"
+            fitView
+            fitViewOptions={{ padding: 0.12 }}
+            minZoom={0.25}
+            maxZoom={1.6}
+            nodesDraggable
+            proOptions={{ hideAttribution: true }}
+          >
+            <Background gap={20} size={1} color="#dbe3f0" />
+            <MiniMap
+              zoomable
+              pannable
+              nodeStrokeWidth={3}
+              nodeColor={(node) => getMiniMapColor((node.data as GraphNodeData)?.kind)}
+            />
+            <Controls showInteractive={false} />
+          </ReactFlow>
+        </div>
+      ) : null}
+    </section>
   );
 }
