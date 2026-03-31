@@ -3,18 +3,32 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from datetime import datetime
+from uuid import UUID
+
+from fastapi import APIRouter, Depends
+import os
+from typing import List, Dict, Any, Optional
+from fastapi import HTTPException
+from utils.helper import cached_connector_info
 from sqlmodel import Session, select
 
 from database.database import get_session
-from database.models import ConnectorConfig
 from utils.helper import cached_connector_info
 
+from database.models import Agent, ConnectorConfig
+from utils.adk_app import invalidate_cache
 
 class ConnectorConfigCreate(BaseModel):
     connector_id: str
     name: str
     config: list[dict[str, Any]]
 
+
+
+class ConnectorConfigPatch(BaseModel):
+    name: Optional[str] = None
+    config: Optional[List[Dict[str, Any]]] = None
 
 router = APIRouter(prefix="/connectors", tags=["connectors"])
 
@@ -31,7 +45,11 @@ def list_connectors():
             if filename.endswith("_connector.py"):
                 # Take prefix before _connector.py and making it capital case
                 name = filename.split("_connector.py")[0].replace("_", " ").title()
-                connectors.append({"id": filename.strip(".py"), "name": name})
+                name = {"ibm_mq_connector.py": "IBM MQ"}.get(filename, name)
+                connectors.append({
+                    "id": filename.strip(".py"),
+                    "name": name
+                })
     return connectors
 
 
@@ -86,3 +104,72 @@ def set_connector_config(
     session.commit()
     session.refresh(db)
     return db
+
+
+@router.patch("/{connector_id}/config/{connector_config_id}")
+def patch_connector_config(
+    connector_id: str,
+    connector_config_id: UUID,
+    connector_config: ConnectorConfigPatch,
+    session: Session = Depends(get_session),
+) -> ConnectorConfig:
+    db_connector_config = session.get(ConnectorConfig, connector_config_id)
+    if db_connector_config is None:
+        raise HTTPException(status_code=404, detail="Connector config not found")
+    if db_connector_config.connector_id != connector_id:
+        raise HTTPException(status_code=404, detail="Connector config not found")
+    connector_config_id_str = str(connector_config_id)
+    affected_agent_ids = [
+        agent.agent_id
+        for agent in session.exec(select(Agent)).all()
+        if connector_config_id_str in (agent.connector_config_ids or [])
+    ]
+
+    updates = connector_config.model_dump(exclude_unset=True)
+    for field, value in updates.items():
+        setattr(db_connector_config, field, value)
+    db_connector_config.updated_at = datetime.now()
+
+    session.add(db_connector_config)
+    session.commit()
+    session.refresh(db_connector_config)
+
+    for agent_id in affected_agent_ids:
+        invalidate_cache(agent_id)
+
+    return db_connector_config
+
+
+@router.delete("/{connector_id}/config/{connector_config_id}")
+def delete_connector_config(
+    connector_id: str,
+    connector_config_id: UUID,
+    session: Session = Depends(get_session),
+) -> Dict[str, bool]:
+    db_connector_config = session.get(ConnectorConfig, connector_config_id)
+    if db_connector_config is None:
+        raise HTTPException(status_code=404, detail="Connector config not found")
+    if db_connector_config.connector_id != connector_id:
+        raise HTTPException(status_code=404, detail="Connector config not found")
+
+    connector_config_id_str = str(connector_config_id)
+    agents_using_config = session.exec(select(Agent)).all()
+    agent_names = [
+        agent.name
+        for agent in agents_using_config
+        if connector_config_id_str in (agent.connector_config_ids or [])
+    ]
+    if agent_names:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Connector config is in use by agent: {', '.join(agent_names)}",
+        )
+
+    session.delete(db_connector_config)
+    session.commit()
+    return {"success": True}
+
+
+
+
+
