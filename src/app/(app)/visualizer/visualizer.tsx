@@ -23,9 +23,11 @@ import { useRuntimeConfig } from "@/config/runtime-config";
 import {
   type VisualizerAgent,
   type VisualizerConnector,
+  type VisualizerJob,
   type VisualizerMcp,
   type VisualizerNode,
   type VisualizerResponse,
+  type VisualizerWebhook,
 } from "./data";
 
 export type GraphKind = "agent" | "connector" | "mcp";
@@ -42,6 +44,11 @@ export type GraphNodeData = {
   hoverText: string;
   detailItems: Array<{ label: string; value: string }>;
   modelDetails?: Array<{ label: string; value: string }>;
+  expandableDetails?: Array<{
+    title: string;
+    items: Array<Array<{ label: string; value: string }>>;
+    emptyText?: string;
+  }>;
   longText: string;
   listLabel?: string;
   listItems: string[];
@@ -373,6 +380,7 @@ function buildNodeData(node: VisualizerNode): GraphNodeData {
     hoverTitle: "",
     hoverText: "",
     detailItems: [],
+    expandableDetails: [],
     longText: "",
     listItems: [],
   };
@@ -408,11 +416,22 @@ function buildAgentNodeData(agent: VisualizerAgent): GraphNodeData {
     modelDetails: [
       { label: "Provider", value: agent.model.provider },
       { label: "Name", value: agent.model.name },
-      { label: "Model id", value: agent.model.model_id ?? agent.model_id ?? "-" },
       { label: "Description", value: agent.model.description ?? "-" },
       { label: "Enabled", value: agent.model.isEnabled ? "True" : "False" },
       { label: "Created at", value: formatDateTime(agent.model.created_at) },
       { label: "Updated at", value: formatDateTime(agent.model.updated_at) },
+    ],
+    expandableDetails: [
+      {
+        title: "Webhooks",
+        items: agent.webhooks.map((webhook) => buildWebhookDetails(webhook)),
+        emptyText: "No webhooks configured",
+      },
+      {
+        title: "Jobs",
+        items: (agent.jobs ?? []).map((job) => buildJobDetails(job)),
+        emptyText: "No jobs configured",
+      },
     ],
     longText: agent.instruction,
     listLabel: relationships.length > 0 ? "Relationships" : undefined,
@@ -429,19 +448,6 @@ function buildAgentNodeData(agent: VisualizerAgent): GraphNodeData {
       {
         title: "MCP servers",
         items: agent.mcp_servers,
-      },
-      {
-        title: "Webhook prompts",
-        items: agent.webhooks.map((item) => item.prompt),
-      },
-      {
-        title: "Jobs",
-        items:
-          agent.jobs && agent.jobs.length > 0
-            ? agent.jobs.map((job, index) =>
-                typeof job === "string" ? job : `Job ${index + 1}`
-              )
-            : ["No jobs configured"],
       },
     ].filter((section) => section.items.length > 0),
   };
@@ -460,8 +466,6 @@ function buildConnectorNodeData(connector: VisualizerConnector): GraphNodeData {
     hoverTitle: connector.name,
     hoverText: `${connector.connector_id} with ${connector.config.length} config keys.`,
     detailItems: [
-      { label: "Connector id", value: connector.connector_id },
-      { label: "Config id", value: connector.connector_config_id },
       { label: "Config keys", value: `${connector.config.length}` },
       { label: "Created at", value: formatDateTime(connector.created_at) },
       { label: "Updated at", value: formatDateTime(connector.updated_at) },
@@ -513,6 +517,30 @@ function buildMcpNodeData(mcp: VisualizerMcp): GraphNodeData {
 
 function truncate(value: string, maxLength: number) {
   return value.length > maxLength ? `${value.slice(0, maxLength)}...` : value;
+}
+
+function buildWebhookDetails(webhook: VisualizerWebhook) {
+  return [
+    { label: "Prompt", value: webhook.prompt || "-" },
+    { label: "Created at", value: formatDateTime(webhook.created_at) },
+    { label: "Updated at", value: formatDateTime(webhook.updated_at) },
+  ];
+}
+
+function buildJobDetails(job: VisualizerJob) {
+  return [
+    { label: "Prompt", value: job.prompt || "-" },
+    {
+      label: "Interval seconds",
+      value:
+        typeof job.interval_seconds === "number"
+          ? String(job.interval_seconds)
+          : "-",
+    },
+    { label: "Cron expression", value: job.cron_expression || "-" },
+    { label: "Created at", value: formatDateTime(job.created_at) },
+    { label: "Updated at", value: formatDateTime(job.updated_at) },
+  ];
 }
 
 function formatDateTime(value?: string) {
@@ -1120,6 +1148,59 @@ export default function VisualizerView() {
                   </details>
                 </section>
               ) : null}
+
+              {selectedNode.expandableDetails?.length
+                ? selectedNode.expandableDetails.map((section) => (
+                    <section
+                      key={`${selectedNode.id}-${section.title}`}
+                      className="border-b border-[#eef1f7] pb-6"
+                    >
+                      <details className="group" open>
+                        <summary className="cursor-pointer list-none text-xs font-semibold uppercase tracking-[0.18em] text-[#8b94a7]">
+                          <span className="inline-flex items-center gap-2">
+                            {section.title}
+                            <span className="text-[#667085] transition group-open:rotate-180">
+                              ▼
+                            </span>
+                          </span>
+                        </summary>
+                        {section.items.length > 0 ? (
+                          <div className="mt-4 space-y-5">
+                            {section.items.map((detailGroup, index) => (
+                              <div
+                                key={`${selectedNode.id}-${section.title}-${index}`}
+                                className="border-b border-[#eef1f7] pb-4 last:border-b-0"
+                              >
+                                <p className="mb-3 text-sm font-semibold text-[#111827]">
+                                  {section.title.slice(0, -1)} {index + 1}
+                                </p>
+                                <div className="divide-y divide-[#eef1f7]">
+                                  {detailGroup.map((item) => (
+                                    <div
+                                      key={`${selectedNode.id}-${section.title}-${index}-${item.label}`}
+                                      className="grid grid-cols-[140px_minmax(0,1fr)] gap-4 py-3"
+                                    >
+                                      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#8b94a7]">
+                                        {item.label}
+                                      </p>
+                                      <p className="break-words text-sm font-medium text-[#111827]">
+                                        {item.value || "-"}
+                                      </p>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="mt-4 text-sm text-[#667085]">
+                            {section.emptyText ?? "No data available"}
+                          </p>
+                        )}
+                      </details>
+                    </section>
+                  ))
+                : null}
 
               {selectedNode.longText ? (
                 <section className="border-b border-[#eef1f7] pb-6">
