@@ -75,7 +75,9 @@ class IbmMqConnector(BaseConnector):
             verify=self.verify_tls,
         )
 
-    def _error_result(self, message: str, response: Optional[requests.Response] = None) -> Dict[str, Any]:
+    def _error_result(
+        self, message: str, response: Optional[requests.Response] = None
+    ) -> Dict[str, Any]:
         result: Dict[str, Any] = {"status": "error", "message": message}
         if response is not None:
             result["code"] = response.status_code
@@ -227,7 +229,9 @@ class IbmMqConnector(BaseConnector):
         try:
             payload = response.json()
         except ValueError:
-            return self._error_result("Logs endpoint did not return valid JSON", response)
+            return self._error_result(
+                "Logs endpoint did not return valid JSON", response
+            )
 
         return self._format_logs(payload)
 
@@ -257,6 +261,8 @@ class IbmMqConnector(BaseConnector):
         try:
             payload = response.json()
         except ValueError:
-            return self._error_result("SSH endpoint did not return valid JSON", response)
+            return self._error_result(
+                "SSH endpoint did not return valid JSON", response
+            )
 
         return self._format_ssh_response(payload)

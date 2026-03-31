@@ -19,16 +19,17 @@ from utils.helper import cached_connector_info
 from database.models import Agent, ConnectorConfig
 from utils.adk_app import invalidate_cache
 
+
 class ConnectorConfigCreate(BaseModel):
     connector_id: str
     name: str
     config: list[dict[str, Any]]
 
 
-
 class ConnectorConfigPatch(BaseModel):
     name: Optional[str] = None
     config: Optional[List[Dict[str, Any]]] = None
+
 
 router = APIRouter(prefix="/connectors", tags=["connectors"])
 
@@ -46,10 +47,7 @@ def list_connectors():
                 # Take prefix before _connector.py and making it capital case
                 name = filename.split("_connector.py")[0].replace("_", " ").title()
                 name = {"ibm_mq_connector.py": "IBM MQ"}.get(filename, name)
-                connectors.append({
-                    "id": filename.strip(".py"),
-                    "name": name
-                })
+                connectors.append({"id": filename.strip(".py"), "name": name})
     return connectors
 
 
@@ -168,8 +166,3 @@ def delete_connector_config(
     session.delete(db_connector_config)
     session.commit()
     return {"success": True}
-
-
-
-
-
