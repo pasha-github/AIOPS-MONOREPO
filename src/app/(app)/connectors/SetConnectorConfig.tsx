@@ -81,6 +81,51 @@ const CONNECTOR_CONFIG_SCHEMAS: Record<string, ConfigField[]> = {
       placeholder: "Servicenow",
     },
   ],
+  ibm_mq_connector: [
+    {
+      name: "URL_BASE",
+      label: "URL Base",
+      required: true,
+      placeholder: "Enter base URL",
+    },
+    {
+      name: "USER_NAME",
+      label: "User Name",
+      required: true,
+      placeholder: "Enter username",
+    },
+    {
+      name: "PASSWORD",
+      label: "Password",
+      required: true,
+      secret: true,
+      placeholder: "Enter password",
+    },
+    {
+      name: "LOGS_URL",
+      label: "Logs URL",
+      required: true,
+      placeholder: "Enter logs URL",
+    },
+    {
+      name: "SSH_URL",
+      label: "SSH URL",
+      required: true,
+      placeholder: "Enter SSH URL",
+    },
+    {
+      name: "VERIFY_TLS",
+      label: "Verify TLS",
+      required: false,
+      placeholder: "true or false",
+    },
+    {
+      name: "prefix",
+      label: "Prefix",
+      required: false,
+      placeholder: "IBM MQ",
+    },
+  ],
 };
 
 const getDefaultFieldsState = (fields: ConfigField[]) => {
