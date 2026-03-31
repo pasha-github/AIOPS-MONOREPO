@@ -1,23 +1,16 @@
+from datetime import datetime
 from pathlib import Path
 from typing import Any
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from datetime import datetime
-from uuid import UUID
-
-from fastapi import APIRouter, Depends
-import os
-from typing import List, Dict, Any, Optional
-from fastapi import HTTPException
-from utils.helper import cached_connector_info
 from sqlmodel import Session, select
 
 from database.database import get_session
-from utils.helper import cached_connector_info
-
 from database.models import Agent, ConnectorConfig
 from utils.adk_app import invalidate_cache
+from utils.helper import cached_connector_info
 
 
 class ConnectorConfigCreate(BaseModel):
@@ -27,8 +20,8 @@ class ConnectorConfigCreate(BaseModel):
 
 
 class ConnectorConfigPatch(BaseModel):
-    name: Optional[str] = None
-    config: Optional[List[Dict[str, Any]]] = None
+    name: str | None = None
+    config: list[dict[str, Any]] | None = None
 
 
 router = APIRouter(prefix="/connectors", tags=["connectors"])
@@ -143,7 +136,7 @@ def delete_connector_config(
     connector_id: str,
     connector_config_id: UUID,
     session: Session = Depends(get_session),
-) -> Dict[str, bool]:
+) -> dict[str, bool]:
     db_connector_config = session.get(ConnectorConfig, connector_config_id)
     if db_connector_config is None:
         raise HTTPException(status_code=404, detail="Connector config not found")
