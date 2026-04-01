@@ -5,7 +5,6 @@ import { useRuntimeConfig } from "@/config/runtime-config";
 import { Bot, Layers3, Loader2, RefreshCw, Waypoints } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { serviceNowApiDetails } from "./staticData";
 
 const iconMap = {
   agents: Bot,
@@ -109,12 +108,7 @@ export default function DashboardOverview() {
               <h2 className="text-2xl font-semibold text-[#10131a]">
                 Welcome back, Alice!
               </h2>
-              <p className="mt-2 text-sm text-[#5b6476]">
-                ServiceNow instance: {serviceNowApiDetails.instance}
-              </p>
-              <p className="mt-1 text-xs text-[#8a94a6]">
-                Endpoint: {serviceNowApiDetails.endpoint}
-              </p>
+              
             </div>
             <button
               type="button"
