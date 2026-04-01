@@ -224,7 +224,7 @@ export default function AgentManagementSection() {
               <Bot className="h-5 w-5" />
             </span>
             <h3 className="text-lg font-semibold text-[#111827]">
-              Agent management
+              Agent Management
             </h3>
             <span className="rounded-md border border-[#cbd2ff] px-2 py-0.5 text-xs font-semibold text-[#5b4cf0]">
               {totalAgents}
@@ -416,7 +416,7 @@ export default function AgentManagementSection() {
               <div>
                 <div className="flex items-center gap-3">
                   <h3 className="text-xl font-semibold text-[#111827]">
-                    Agent management
+                    Agent Management
                   </h3>
                   <span className="rounded-md border border-[#cbd2ff] px-2 py-0.5 text-xs font-semibold text-[#5b4cf0]">
                     {totalAgents}

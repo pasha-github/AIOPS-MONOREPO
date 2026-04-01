@@ -260,7 +260,7 @@ export default function AgentManagementPage() {
           <div className="max-w-md space-y-4">
             <div>
               <h2 className="text-xl font-semibold text-[#111827]">
-                Agent management
+                Agent Management
               </h2>
               <p className="mt-2 text-sm text-[#5b6476]">
                 Lifecycle, versioning, and health of deployed agents.

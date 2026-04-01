@@ -72,7 +72,7 @@ export default function LLMOverviewSection({
         <div className="max-w-md space-y-4">
           <div>
             <h2 className="text-xl font-semibold text-[#111827]">
-              LLM management
+              LLM Management
             </h2>
             <p className="mt-2 text-sm text-[#5b6476]">
               Model availability, versions, and lifecycle status.

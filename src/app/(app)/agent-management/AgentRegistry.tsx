@@ -559,19 +559,19 @@ export default function AgentRegistry({
                     }`}
                   />
                 </button>
-                <div className="flex h-full items-center px-3 text-left leading-tight whitespace-normal break-words">
+                <div className="flex h-full items-center capitalize px-3 text-left leading-tight whitespace-normal break-words">
                   Description
                 </div>
-                <div className="flex h-full items-center px-3 text-left leading-tight whitespace-normal break-words">
+                <div className="flex h-full items-center capitalize px-3 text-left leading-tight whitespace-normal break-words">
                   Model name
                 </div>
-                <div className="flex h-full items-center px-3 text-left leading-tight whitespace-normal break-words">
+                <div className="flex h-full items-center capitalize px-3 text-left leading-tight whitespace-normal break-words">
                   Instructions
                 </div>
                 <button
                   type="button"
                   onClick={() => handleSort("created_at")}
-                  className="inline-flex h-full w-full items-center justify-start gap-1 px-3 text-left leading-tight whitespace-normal break-words transition hover:text-[#4f49e2]"
+                  className="inline-flex h-full w-full capitalize items-center justify-start gap-1 px-3 text-left leading-tight whitespace-normal break-words transition hover:text-[#4f49e2]"
                 >
                   Created at
                   <ChevronDown
@@ -585,7 +585,7 @@ export default function AgentRegistry({
                 <button
                   type="button"
                   onClick={() => handleSort("updated_at")}
-                  className="inline-flex h-full w-full items-center justify-start gap-1 px-3 text-left leading-tight whitespace-normal break-words transition hover:text-[#4f49e2]"
+                  className="inline-flex h-full w-full capitalize items-center justify-start gap-1 px-3 text-left leading-tight whitespace-normal break-words transition hover:text-[#4f49e2]"
                 >
                   Updated at
                   <ChevronDown
@@ -599,7 +599,7 @@ export default function AgentRegistry({
                 <button
                   type="button"
                   onClick={() => handleSort("status")}
-                  className="inline-flex h-full w-full items-center justify-center gap-1 px-3 text-center leading-tight whitespace-normal break-words transition hover:text-[#4f49e2]"
+                  className="inline-flex h-full w-full capitalize items-center justify-center gap-1 px-3 text-center leading-tight whitespace-normal break-words transition hover:text-[#4f49e2]"
                 >
                   Status
                   <ChevronDown
@@ -610,7 +610,7 @@ export default function AgentRegistry({
                     }`}
                   />
                 </button>
-                <div className="flex h-full items-center justify-end px-3 text-right leading-tight whitespace-normal break-words">
+                <div className="flex h-full items-center capitalize justify-end px-3 text-right leading-tight whitespace-normal break-words">
                   Action
                 </div>
               </div>
