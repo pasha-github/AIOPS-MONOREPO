@@ -479,7 +479,7 @@ export default function UserManagementPage() {
       <div className="mt-8 flex flex-wrap items-start justify-between gap-6">
         <div className="space-y-2">
           <h2 className="text-2xl font-semibold text-[#10131a]">
-            User management
+            User Management
           </h2>
           <p className="max-w-lg text-sm text-[#5c647a]">
             Centralize organizations, menus, roles, and people access across your

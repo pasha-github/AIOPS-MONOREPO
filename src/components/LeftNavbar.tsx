@@ -61,7 +61,7 @@ const navSections: NavSection[] = [
         href: "#",
       },
       {
-        label: "LLM management",
+        label: "LLM Management",
         id: "platform-llm-management",
         icon: <Workflow className="h-5 w-5" />,
         href: "/llm-management",
@@ -81,7 +81,7 @@ const navSections: NavSection[] = [
         reloadOnNavigate: true,
       },
       {
-        label: "User management",
+        label: "User Management",
         id: "operations-user-management",
         icon: <Users className="h-5 w-5" />,
         href: "/user-management",
