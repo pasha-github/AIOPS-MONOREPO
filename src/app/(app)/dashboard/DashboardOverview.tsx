@@ -1,20 +1,105 @@
-import { CheckCircle2, RefreshCw, TriangleAlert, Zap } from "lucide-react";
+ "use client";
 
-import { overviewStats, serviceNowApiDetails } from "./staticData";
+import { trimTrailingSlash } from "@/config/agent";
+import { useRuntimeConfig } from "@/config/runtime-config";
+import { Bot, Layers3, Loader2, RefreshCw, Waypoints } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+
+import { serviceNowApiDetails } from "./staticData";
 
 const iconMap = {
-  warning: TriangleAlert,
-  success: CheckCircle2,
-  info: Zap,
+  agents: Bot,
+  providers: Layers3,
+  llms: Waypoints,
 } as const;
 
 const gradientMap = {
-  warning: "from-[#ff7a45] to-[#ff4d4f]",
-  success: "from-[#18c964] to-[#00b56c]",
-  info: "from-[#2f80ff] to-[#1aa7ff]",
+  agents: "from-[#ff7a45] to-[#ff4d4f]",
+  providers: "from-[#18c964] to-[#00b56c]",
+  llms: "from-[#2f80ff] to-[#1aa7ff]",
 } as const;
 
+type OverviewCounts = {
+  totalAgents: number;
+  providerCount: number;
+  totalLlms: number;
+};
+
+const EMPTY_COUNTS: OverviewCounts = {
+  totalAgents: 0,
+  providerCount: 0,
+  totalLlms: 0,
+};
+
 export default function DashboardOverview() {
+  const { llmManagerApiBaseUrl } = useRuntimeConfig();
+  const baseUrl = trimTrailingSlash(llmManagerApiBaseUrl);
+  const [counts, setCounts] = useState<OverviewCounts>(EMPTY_COUNTS);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const loadCounts = useCallback(
+    async (refresh = false) => {
+      if (refresh) {
+        setIsRefreshing(true);
+      } else {
+        setIsLoading(true);
+      }
+
+      try {
+        const [agentResponse, llmResponse] = await Promise.all([
+          fetch(`${baseUrl}/agent/`, { headers: { accept: "application/json" } }),
+          fetch(`${baseUrl}/llms/`, { headers: { accept: "application/json" } }),
+        ]);
+        const [agentPayload, llmPayload] = await Promise.all([
+          agentResponse.json(),
+          llmResponse.json(),
+        ]);
+
+        const agents = Array.isArray(agentPayload) ? agentPayload : [];
+        const llms = Array.isArray(llmPayload) ? llmPayload : [];
+        const providers = new Set(
+          llms
+            .map((item) =>
+              item && typeof item === "object" && !Array.isArray(item)
+                ? (item as Record<string, unknown>).provider
+                : null
+            )
+            .filter(
+              (provider): provider is string =>
+                typeof provider === "string" && provider.trim().length > 0
+            )
+            .map((provider) => provider.trim().toLowerCase())
+        );
+
+        setCounts({
+          totalAgents: agents.length,
+          providerCount: providers.size,
+          totalLlms: llms.length,
+        });
+      } catch {
+        setCounts(EMPTY_COUNTS);
+      } finally {
+        setIsLoading(false);
+        setIsRefreshing(false);
+      }
+    },
+    [baseUrl]
+  );
+
+  useEffect(() => {
+    void loadCounts();
+  }, [loadCounts]);
+
+  const overviewStats = useMemo(
+    () => [
+      { title: "Total Agents", value: counts.totalAgents, tone: "agents" as const },
+      { title: "LLM Providers", value: counts.providerCount, tone: "providers" as const },
+      { title: "Total LLMs", value: counts.totalLlms, tone: "llms" as const },
+    ],
+    [counts]
+  );
+
   return (
     <section className="relative rounded-3xl bg-white px-8 py-7 shadow-[0_18px_50px_-38px_rgba(16,24,40,0.5)]">
       <div className="grid gap-6 lg:grid-cols-[1.05fr_2fr]">
@@ -33,10 +118,14 @@ export default function DashboardOverview() {
             </div>
             <button
               type="button"
+              onClick={() => void loadCounts(true)}
+              disabled={isRefreshing}
               className="inline-flex items-center gap-2 rounded-xl border border-[#e3e7f2] bg-white px-4 py-2 text-sm font-semibold text-[#4f49e2] shadow-[0_10px_24px_-16px_rgba(16,24,40,0.35)]"
             >
-              <RefreshCw className="h-4 w-4" />
-              Refresh Incident details
+              <RefreshCw
+                className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`}
+              />
+              Refresh Overview
             </button>
           </div>
           <div className="space-y-2">
@@ -69,7 +158,11 @@ export default function DashboardOverview() {
                   {card.title}
                 </p>
                 <p className="mt-2 text-3xl font-semibold text-[#0f1115]">
-                  {card.value}
+                  {isLoading || isRefreshing ? (
+                    <Loader2 className="mx-auto h-6 w-6 animate-spin text-[#5b4cf0]" />
+                  ) : (
+                    card.value
+                  )}
                 </p>
               </div>
             );
