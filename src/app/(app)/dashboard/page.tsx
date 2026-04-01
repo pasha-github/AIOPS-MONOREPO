@@ -1,8 +1,7 @@
+import VisualizerPage from "../visualizer/page";
 import AgentActivityLog from "./AgentActivityLog";
 import AgentManagementSection from "./AgentManagementSection";
 import DashboardOverview from "./DashboardOverview";
-import IncidentDetails from "./IncidentDetails";
-
 export default function DashboardPage() {
   return (
     <div className="space-y-8">
@@ -13,7 +12,9 @@ export default function DashboardPage() {
         <AgentActivityLog />
       </section>
 
-      <IncidentDetails />
+      <div className="space-y-8 overflow-hidden rounded-[32px] border border-[#d9deea] px-6 pt-8 pb-6">
+        <VisualizerPage />
+      </div>
     </div>
   );
 }
