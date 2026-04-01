@@ -1,11 +1,11 @@
 import logging
-import os
-from typing import Optional
 
 import litellm
 from google.adk.agents.callback_context import CallbackContext
-from google.adk.models import LlmRequest, LlmResponse
+from google.adk.models.llm_request import LlmRequest
+from google.adk.models.llm_response import LlmResponse
 
+from utils.constants import SUMMARIZER_MODEL
 
 logger = logging.getLogger(__name__)
 FIRST_MESSAGE_SUMMARY_KEY = "first_message_summary"
@@ -45,12 +45,12 @@ def _fallback_summary(user_text: str) -> str:
 
 
 def make_session_summary_callback(model: str):
-    summarizer_model = os.getenv("SUMMARIZER_MODEL") or model
+    summarizer_model = SUMMARIZER_MODEL or model
 
     def callback(
         callback_context: CallbackContext,
         llm_request: LlmRequest,
-    ) -> Optional[LlmResponse]:
+    ) -> LlmResponse | None:
         agent_name = getattr(callback_context, "agent_name", "unknown")
         if callback_context.state.get(FIRST_MESSAGE_SUMMARY_KEY):
             return None
@@ -68,10 +68,6 @@ def make_session_summary_callback(model: str):
             summarizer_model,
             user_text_preview,
         )
-        print(
-            f"[session_summary] request agent={agent_name} "
-            f"model={summarizer_model} user_text={user_text_preview!r}"
-        )
 
         try:
             response = litellm.completion(
@@ -79,7 +75,7 @@ def make_session_summary_callback(model: str):
                 messages=[
                     {
                         "role": "system",
-                         "content": (
+                        "content": (
                             "Summarize the first message in one concise sentence in just 3-6 words capturing the main intent or request. "
                             "Write the summary as a direct statement, not referring to “the user” or describing the act of asking. "
                             "Do not include explanations or extra details."
@@ -95,11 +91,7 @@ def make_session_summary_callback(model: str):
                 summarizer_model,
                 response,
             )
-            print(
-                f"[session_summary] raw_response agent={agent_name} "
-                f"model={summarizer_model} response={response!r}"
-            )
-            content = response.choices[0].message.content
+            content = response.choices[0].message.content  # type: ignore
             summary = content.strip() if isinstance(content, str) else ""
             logger.info(
                 "Session summary response: agent=%s summarizer_model=%s content_type=%s content=%r",
@@ -108,10 +100,6 @@ def make_session_summary_callback(model: str):
                 type(content).__name__,
                 content,
             )
-            print(
-                f"[session_summary] response agent={agent_name} "
-                f"model={summarizer_model} content_type={type(content).__name__} content={content!r}"
-            )
         except Exception as exc:
             logger.warning(
                 "Failed to generate first message summary: agent=%s summarizer_model=%s error=%s",
@@ -119,21 +107,13 @@ def make_session_summary_callback(model: str):
                 summarizer_model,
                 exc,
             )
-            print(
-                f"[session_summary] error agent={agent_name} "
-                f"model={summarizer_model} error={exc!r}"
-            )
- 
+
         if not summary:
             logger.warning(
                 "Session summary fallback used: agent=%s summarizer_model=%s fallback=%r",
                 agent_name,
                 summarizer_model,
                 user_text_preview,
-            )
-            print(
-                f"[session_summary] fallback agent={agent_name} "
-                f"model={summarizer_model} fallback={user_text_preview!r}"
             )
             summary = _fallback_summary(user_text)
 
@@ -144,10 +124,6 @@ def make_session_summary_callback(model: str):
                 agent_name,
                 summarizer_model,
                 summary,
-            )
-            print(
-                f"[session_summary] stored agent={agent_name} "
-                f"model={summarizer_model} summary={summary!r}"
             )
 
         return None

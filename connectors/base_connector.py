@@ -5,13 +5,11 @@ Provides the abstract BaseConnector class that all pre-built connectors must ext
 Each connector extends BaseConnector and exposes its tools to an LlmAgent.
 """
 
-import inspect
-from abc import ABC
-from typing import List, Optional, Dict, Tuple
 import base64
+import inspect
 
-from google.adk.tools import FunctionTool
 import requests
+from google.adk.tools.function_tool import FunctionTool
 
 
 def connector_tool(func):
@@ -22,26 +20,33 @@ def connector_tool(func):
     return func
 
 
-class BaseConnector(ABC):
+class BaseConnector:
     """BaseConnector class that all pre-built connectors must extend."""
-    
+
+    def __new__(cls, *args, **kwargs):
+        if cls is BaseConnector:
+            raise TypeError(
+                "BaseConnector is an abstract base class and cannot be instantiated directly."
+            )
+        return super().__new__(cls)
+
     def __init__(self, prefix: str = ""):
         self.prefix = prefix
-        self._tools: List[FunctionTool] = [
+        self._tools: list[FunctionTool] = [
             self._make_tool(func)
             for _, func in inspect.getmembers(self, predicate=inspect.ismethod)
             if getattr(func, "_is_tool", False)
         ]
 
-    def _make_tool(self, func, name: Optional[str] = None) -> FunctionTool:
-        tool_name = name or f"{self.prefix}{func.__name__}"
+    def _make_tool(self, func, name: str | None = None) -> FunctionTool:
+        _tool_name = name or f"{self.prefix}{func.__name__}"
         return FunctionTool(func=func)
 
-    def get_tools(self) -> List[FunctionTool]:
+    def get_tools(self) -> list[FunctionTool]:
         return self._tools
 
     @property
-    def tool_names(self) -> List[str]:
+    def tool_names(self) -> list[str]:
         return [t.name for t in self._tools]
 
     def __repr__(self) -> str:
@@ -51,15 +56,15 @@ class BaseConnector(ABC):
         self,
         url: str,
         method: str = "GET",
-        headers: Optional[Dict[str, str]] = None,
-        data: Optional[Dict[str, str]] = None,
-        json: Optional[Dict[str, str]] = None,
-        params: Optional[Dict[str, str]] = None,
-        basic_auth: Optional[Tuple[str, str]] = None,
-        bearer_token: Optional[str] = None,
+        headers: dict[str, str] | None = None,
+        data: dict[str, str] | None = None,
+        json: dict[str, str] | None = None,
+        params: dict[str, str] | None = None,
+        basic_auth: tuple[str, str] | None = None,
+        bearer_token: str | None = None,
     ) -> requests.Response:
         """Calls an API endpoint with optional authentication.
-        
+
         Args:
             url (str): The URL of the API endpoint.
             method (str, optional): The HTTP method to use. Defaults to "GET".
@@ -68,7 +73,7 @@ class BaseConnector(ABC):
             params (Optional[Dict[str, str]], optional): The query parameters to include in the request. Defaults to None.
             basic_auth (Optional[Tuple[str, str]], optional): The basic authentication credentials to include in the request. Defaults to None.
             bearer_token (Optional[str], optional): The bearer token to include in the request. Defaults to None.
-        
+
         Returns:
             requests.Response: The response from the API endpoint.
         """
@@ -90,12 +95,16 @@ class BaseConnector(ABC):
             username, password = basic_auth
             credentials = f"{username}:{password}"
             encoded_credentials = base64.b64encode(credentials.encode()).decode()
+            if headers is None:
+                headers = {}
             headers["Authorization"] = f"Basic {encoded_credentials}"
 
         # Bearer Token support
         if bearer_token:
+            if headers is None:
+                headers = {}
             headers["Authorization"] = f"Bearer {bearer_token}"
 
-        return requests.request(method, url, headers=headers, data=data, params=params, json=json)
-
-
+        return requests.request(
+            method, url, headers=headers, data=data, params=params, json=json
+        )

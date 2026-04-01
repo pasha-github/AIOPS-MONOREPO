@@ -1,23 +1,23 @@
-from dotenv import load_dotenv
-load_dotenv()
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from contextlib import asynccontextmanager
-from database.database import create_db_and_tables
-from routers import agents, llms, connectors, visualizer
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from utils.constants import WEB
-from utils.adk_app import ADK_APP
+from fastapi.staticfiles import StaticFiles
 
+from database.database import create_db_and_tables
+from routers import agents, connectors, llms, visualizer
+from utils.adk_app import ADK_APP
+from utils.constants import WEB
 from utils.scheduler import start_scheduler
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     create_db_and_tables()
     start_scheduler()
     yield
+
 
 app = FastAPI(lifespan=lifespan)
 
@@ -30,10 +30,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 # Health Check
 @app.get("/health/")
 def health_check():
     return {"status": "ok"}
+
 
 # Routers
 app.include_router(agents.router)
@@ -46,14 +48,16 @@ app.mount("/agent-server", ADK_APP)
 
 # Mount Static Files for UI
 # Serve index.html at root
-# This is for testing only 
+# This is for testing only
 if WEB:
+
     @app.get("/")
     async def read_index():
-        return FileResponse('static/index.html')
+        return FileResponse("static/index.html")
 
     app.mount("/static", StaticFiles(directory="static"), name="static")
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="localhost", port=8000)

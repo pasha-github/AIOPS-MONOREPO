@@ -1,7 +1,8 @@
-from fastapi.testclient import TestClient
-import pytest
 from pathlib import Path
 from uuid import uuid4
+
+import pytest
+from fastapi.testclient import TestClient
 
 from database.models import ConnectorConfig
 from utils.helper import cached_connector_info, resolve_connector_tools
@@ -370,7 +371,9 @@ def test_resolve_connector_tools_missing_file_raises():
         resolve_connector_tools(cfg)
 
 
-def test_resolve_connector_tools_success(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+def test_resolve_connector_tools_success(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
     connector_source = '''
 from base_connector import BaseConnector, connector_tool
 
@@ -386,20 +389,22 @@ class TempConnector(BaseConnector):
     def get_tools(self):
         return [self.ping]
 '''
-    base_source = '''
+    base_source = """
 def connector_tool(func):
     return func
 
 class BaseConnector:
     pass
-'''
+"""
 
     temp_connectors = tmp_path / "connectors"
     temp_connectors.mkdir(parents=True, exist_ok=True)
     (temp_connectors / "base_connector.py").write_text(base_source, encoding="utf-8")
-    (temp_connectors / "temp_connector.py").write_text(connector_source, encoding="utf-8")
+    (temp_connectors / "temp_connector.py").write_text(
+        connector_source, encoding="utf-8"
+    )
 
-    monkeypatch.setattr("utils.helper.CONNECTORS_DIR", str(temp_connectors))
+    monkeypatch.setattr("utils.helper.CONNECTORS_DIR", temp_connectors)
 
     cfg = ConnectorConfig(
         name="ok",
@@ -414,24 +419,26 @@ class BaseConnector:
 def test_resolve_connector_tools_no_baseconnector_subclass_raises(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ):
-    connector_source = '''
+    connector_source = """
 class NotConnector:
     def __init__(self):
         pass
-'''
-    base_source = '''
+"""
+    base_source = """
 def connector_tool(func):
     return func
 
 class BaseConnector:
     pass
-'''
+"""
     temp_connectors = tmp_path / "connectors"
     temp_connectors.mkdir(parents=True, exist_ok=True)
     (temp_connectors / "base_connector.py").write_text(base_source, encoding="utf-8")
-    (temp_connectors / "bad_connector.py").write_text(connector_source, encoding="utf-8")
+    (temp_connectors / "bad_connector.py").write_text(
+        connector_source, encoding="utf-8"
+    )
 
-    monkeypatch.setattr("utils.helper.CONNECTORS_DIR", str(temp_connectors))
+    monkeypatch.setattr("utils.helper.CONNECTORS_DIR", temp_connectors)
 
     cfg = ConnectorConfig(
         name="bad",

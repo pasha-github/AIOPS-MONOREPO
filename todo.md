@@ -13,7 +13,7 @@
 - [X] Encrypt API Keys in database.
 - [ ] Add support for multiple API Keys depending on the model.
 - [ ] Add support for modular custom python tools.
-- [ ] Add support for automated triggers.
+- [X] Add support for automated triggers.
 - [X] Added database migrations.
 - [X] Added support for bedrock models.
 
@@ -21,12 +21,12 @@
 
 - [X] Test with postgres database url.
 - [X] Create and test with more pre built connectors (Basic Servicenow and Datadog Connector).
-- [ ] Create more test cases for better code coverage.
+- [X] Create more test cases for better code coverage.
 
 # Design
 - [X] Use sub agents or Agent-as-a-Tool. 1st Phase Agent-as-a-Tool
-- [ ] Built update APIs with auto-updation of agents in cache.
-- [ ] Design Agent Marketplace with pre-built agents.
+- [X] Built update APIs with auto-updation of agents in cache.
+- [X] Design Agent Marketplace with pre-built agents.
 - [ ] Add model and tools gateway through callbacks. 
 
 # Deployment

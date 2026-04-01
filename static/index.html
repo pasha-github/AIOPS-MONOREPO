@@ -6,16 +6,54 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Agent Management Kit</title>
     <style>
+        :root {
+            --bg-color: #ffffff;
+            --text-color: #000000;
+            --heading-color: #333333;
+            --section-border: #dddddd;
+            --status-bg: #f0f0f0;
+            --card-border: #eeeeee;
+            --input-bg: #ffffff;
+            --input-border: #cccccc;
+            --chat-bg: #fafafa;
+            --msg-user-bg: #e3f2fd;
+            --msg-user-text: #000000;
+            --msg-agent-bg: #f1f8e9;
+            --msg-agent-text: #000000;
+            --graph-bg: #fafafa;
+        }
+
+        body.dark-mode {
+            --bg-color: #121212;
+            --text-color: #e0e0e0;
+            --heading-color: #ffffff;
+            --section-border: #444444;
+            --status-bg: #1e1e1e;
+            --card-border: #333333;
+            --input-bg: #2c2c2c;
+            --input-border: #555555;
+            --chat-bg: #1e1e1e;
+            --msg-user-bg: #0d47a1;
+            --msg-user-text: #ffffff;
+            --msg-agent-bg: #1b5e20;
+            --msg-agent-text: #ffffff;
+            --graph-bg: #1e1e1e;
+        }
+
         body {
             font-family: sans-serif;
             margin: 20px;
             line-height: 1.6;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            transition: background-color 0.3s, color 0.3s;
         }
 
         h1,
         h2,
         h3 {
-            color: #333;
+            color: var(--heading-color);
+            transition: color 0.3s;
         }
 
         .container {
@@ -25,16 +63,18 @@
 
         .section {
             margin-bottom: 40px;
-            border: 1px solid #ddd;
+            border: 1px solid var(--section-border);
             padding: 20px;
             border-radius: 8px;
+            transition: border-color 0.3s;
         }
 
         .status {
             padding: 10px;
-            background: #f0f0f0;
+            background: var(--status-bg);
             margin-bottom: 20px;
             border-radius: 4px;
+            transition: background-color 0.3s;
         }
 
         .grid {
@@ -44,10 +84,11 @@
         }
 
         .card {
-            border: 1px solid #eee;
+            border: 1px solid var(--card-border);
             padding: 15px;
             border-radius: 4px;
             margin-bottom: 10px;
+            transition: border-color 0.3s;
         }
 
         .form-group {
@@ -62,11 +103,17 @@
 
         input[type="text"],
         input[type="password"],
+        input[type="number"],
         textarea,
         select {
             width: 100%;
             padding: 8px;
             box-sizing: border-box;
+            background-color: var(--input-bg);
+            color: var(--text-color);
+            border: 1px solid var(--input-border);
+            border-radius: 4px;
+            transition: background-color 0.3s, color 0.3s, border-color 0.3s;
         }
 
         select[multiple] {
@@ -80,6 +127,7 @@
             border: none;
             cursor: pointer;
             border-radius: 4px;
+            transition: background-color 0.3s, color 0.3s;
         }
 
         button:hover {
@@ -97,10 +145,11 @@
         #chat-messages {
             height: 300px;
             overflow-y: scroll;
-            border: 1px solid #ccc;
+            border: 1px solid var(--input-border);
             padding: 10px;
             margin-bottom: 10px;
-            background: #fafafa;
+            background: var(--chat-bg);
+            transition: background-color 0.3s, border-color 0.3s;
         }
 
         .message {
@@ -110,13 +159,17 @@
         }
 
         .message.user {
-            background: #e3f2fd;
+            background: var(--msg-user-bg);
+            color: var(--msg-user-text);
             text-align: right;
+            transition: background-color 0.3s, color 0.3s;
         }
 
         .message.agent {
-            background: #f1f8e9;
+            background: var(--msg-agent-bg);
+            color: var(--msg-agent-text);
             text-align: left;
+            transition: background-color 0.3s, color 0.3s;
         }
 
         /* Connector config fields rendered dynamically */
@@ -150,13 +203,27 @@
         .badge.optional {
             background: #6c757d;
         }
+        
+        .theme-toggle {
+            background: var(--status-bg);
+            color: var(--text-color);
+            border: 1px solid var(--section-border);
+        }
+        
+        .theme-toggle:hover {
+            background: var(--card-border);
+            color: var(--text-color);
+        }
     </style>
     <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
 </head>
 
 <body>
     <div class="container">
-        <h1>Agent Management Kit</h1>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h1>Agent Management Kit</h1>
+            <button id="theme-toggle" class="theme-toggle">🌙 Dark Mode</button>
+        </div>
         <div id="health-status" class="status">Checking connection...</div>
 
         <div class="grid">
@@ -442,7 +509,7 @@
         <div class="section">
             <h2>Architecture Visualizer</h2>
             <button onclick="loadGraph()">Refresh Graph</button>
-            <div id="graph-container" style="width: 100%; height: 600px; border: 1px solid #ccc; margin-top: 10px; background: #fafafa; border-radius: 4px;"></div>
+            <div id="graph-container" style="width: 100%; height: 600px; border: 1px solid var(--input-border); margin-top: 10px; background: var(--graph-bg); border-radius: 4px;"></div>
         </div>
 
         <!-- Chat Section -->
@@ -1230,6 +1297,24 @@
         document.getElementById('add-connector-config-form').addEventListener('submit', addConnectorConfig);
         document.getElementById('connector-select').addEventListener('change', onConnectorSelected);
         document.getElementById('connector-config-filter').addEventListener('change', loadAllConnectorConfigs);
+
+        const themeToggleBtn = document.getElementById('theme-toggle');
+        
+        if (localStorage.getItem('theme') === 'dark' || (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.body.classList.add('dark-mode');
+            themeToggleBtn.textContent = '☀️ Light Mode';
+        }
+
+        themeToggleBtn.addEventListener('click', () => {
+            document.body.classList.toggle('dark-mode');
+            if (document.body.classList.contains('dark-mode')) {
+                localStorage.setItem('theme', 'dark');
+                themeToggleBtn.textContent = '☀️ Light Mode';
+            } else {
+                localStorage.setItem('theme', 'light');
+                themeToggleBtn.textContent = '🌙 Dark Mode';
+            }
+        });
 
         // ─── Visualizer ───────────────────────────────────────────────────────
         async function loadGraph() {

@@ -5,10 +5,10 @@ Sample connector using the JSONPlaceholder fake REST API.
 https://jsonplaceholder.typicode.com
 """
 
-from typing import Any, Dict, Optional
-from google.adk.tools.tool_context import ToolContext
+from typing import Any
 
 from base_connector import BaseConnector, connector_tool
+from google.adk.tools.tool_context import ToolContext
 
 
 class JSONPlaceholderConnector(BaseConnector):
@@ -20,7 +20,7 @@ class JSONPlaceholderConnector(BaseConnector):
         {prefix}list_posts    — fetch all posts (optionally filter by user)
         {prefix}create_post   — create a new post
         {prefix}delete_post   — delete a post by ID
-    
+
     Example:
         connector = JSONPlaceholderConnector()
         agent = LlmAgent(..., tools=[*connector.get_tools()])
@@ -28,7 +28,9 @@ class JSONPlaceholderConnector(BaseConnector):
 
     BASE_URL = "https://jsonplaceholder.typicode.com"
 
-    def __init__(self, API_KEY: str, API_URL: str = "https://jsonplaceholder.typicode.com"):
+    def __init__(
+        self, API_KEY: str, API_URL: str = "https://jsonplaceholder.typicode.com"
+    ):
         super().__init__()
 
     # ------------------------------------------------------------------ #
@@ -36,7 +38,7 @@ class JSONPlaceholderConnector(BaseConnector):
     # ------------------------------------------------------------------ #
 
     @connector_tool
-    def get_post(self, post_id: int, tool_context: ToolContext) -> Dict[str, Any]:
+    def get_post(self, post_id: int, tool_context: ToolContext) -> dict[str, Any]:
         """Fetches a single post by its ID.
 
         Args:
@@ -55,7 +57,7 @@ class JSONPlaceholderConnector(BaseConnector):
         return {"status": "success", "post": post}
 
     @connector_tool
-    def list_posts(self, user_id:str , tool_context: ToolContext) -> Dict[str, Any]:
+    def list_posts(self, user_id: str, tool_context: ToolContext) -> dict[str, Any]:
         """Fetches all posts, optionally filtered by a user ID.
 
         Args:
@@ -81,7 +83,7 @@ class JSONPlaceholderConnector(BaseConnector):
         body: str,
         user_id: str,
         tool_context: ToolContext,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Creates a new post.
 
         Args:
@@ -100,14 +102,18 @@ class JSONPlaceholderConnector(BaseConnector):
         )
 
         if response.status_code != 201:
-            return {"status": "error", "code": response.status_code, "message": response.text}
+            return {
+                "status": "error",
+                "code": response.status_code,
+                "message": response.text,
+            }
 
         created = response.json()
-        
+
         return {"status": "success", "post": created}
 
     @connector_tool
-    def delete_post(self, post_id: int, tool_context: ToolContext) -> Dict[str, Any]:
+    def delete_post(self, post_id: int, tool_context: ToolContext) -> dict[str, Any]:
         """Deletes a post by its ID.
 
         Args:
