@@ -2,33 +2,33 @@
 
 import "@xyflow/react/dist/style.css";
 
-import { useEffect, useState } from "react";
-import {
-  Background,
-  Controls,
-  Handle,
-  MarkerType,
-  MiniMap,
-  NodeToolbar,
-  Position,
-  ReactFlow,
-  useEdgesState,
-  useNodesState,
-  type Edge,
-  type Node,
-  type NodeProps,
-} from "@xyflow/react";
-import { RefreshCw, X } from "lucide-react";
 import { trimTrailingSlash } from "@/config/agent";
 import { useRuntimeConfig } from "@/config/runtime-config";
 import {
-  type VisualizerAgent,
-  type VisualizerConnector,
-  type VisualizerJob,
-  type VisualizerMcp,
-  type VisualizerNode,
-  type VisualizerResponse,
-  type VisualizerWebhook,
+    Background,
+    Controls,
+    Handle,
+    MarkerType,
+    MiniMap,
+    NodeToolbar,
+    Position,
+    ReactFlow,
+    useEdgesState,
+    useNodesState,
+    type Edge,
+    type Node,
+    type NodeProps,
+} from "@xyflow/react";
+import { RefreshCw, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import {
+    type VisualizerAgent,
+    type VisualizerConnector,
+    type VisualizerJob,
+    type VisualizerMcp,
+    type VisualizerNode,
+    type VisualizerResponse,
+    type VisualizerWebhook,
 } from "./data";
 
 export type GraphKind = "agent" | "connector" | "mcp";
