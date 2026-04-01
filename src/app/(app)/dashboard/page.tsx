@@ -11,9 +11,10 @@ export default function DashboardPage() {
         <AgentManagementSection />
         <AgentActivityLog />
       </section>
-    <div className="space-y-8 border border-[#d9deea] px-6 pt-8 pb-6">
-      <VisualizerPage />
-    </div>
+
+      <div className="space-y-8 overflow-hidden rounded-[32px] border border-[#d9deea] px-6 pt-8 pb-6">
+        <VisualizerPage />
+      </div>
     </div>
   );
 }

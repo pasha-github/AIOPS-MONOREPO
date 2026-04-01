@@ -118,17 +118,26 @@ function createPositionMap(
   outgoing: Map<string, string[]>
 ) {
   const positionMap = new Map<string, { x: number; y: number }>();
-  const resourceOwner = new Map<string, string>();
+  const parentAgents = new Map<string, string[]>();
+  const resourceParents = new Map<string, string[]>();
 
   for (const edge of response.edges) {
     const sourceType = nodeMap.get(edge.source)?.type;
     const targetType = nodeMap.get(edge.target)?.type;
+
+    if (sourceType === "agent" && targetType === "agent") {
+      const parents = parentAgents.get(edge.target) ?? [];
+      parents.push(edge.source);
+      parentAgents.set(edge.target, parents);
+    }
+
     if (
       sourceType === "agent" &&
-      (targetType === "connector" || targetType === "mcp") &&
-      !resourceOwner.has(edge.target)
+      (targetType === "connector" || targetType === "mcp")
     ) {
-      resourceOwner.set(edge.target, edge.source);
+      const parents = resourceParents.get(edge.target) ?? [];
+      parents.push(edge.source);
+      resourceParents.set(edge.target, parents);
     }
   }
 
@@ -136,106 +145,97 @@ function createPositionMap(
     .filter((node) => node.type === "agent")
     .map((node) => node.id);
 
-  const supervisorIds = agentIds
-    .filter((id) => isSupervisorAgent(nodeMap.get(id)))
+  const rootAgentIds = agentIds
+    .filter((id) => {
+      const childAgents = (outgoing.get(id) ?? []).filter(
+        (targetId) => nodeMap.get(targetId)?.type === "agent"
+      );
+      return childAgents.length > 0 || isSupervisorAgent(nodeMap.get(id));
+    })
     .sort((left, right) => compareNodes(left, right, nodeMap));
 
-  const otherAgentIds = agentIds
-    .filter((id) => !supervisorIds.includes(id))
+  const childAgentIds = agentIds
+    .filter((id) => !rootAgentIds.includes(id))
     .sort((left, right) => compareNodes(left, right, nodeMap));
 
-  const resourcesByAgent = new Map<string, string[]>();
-  resourceOwner.forEach((ownerId, resourceId) => {
-    const resources = resourcesByAgent.get(ownerId) ?? [];
-    resources.push(resourceId);
-    resourcesByAgent.set(ownerId, resources);
+  const orderedChildAgents = childAgentIds.sort((leftId, rightId) => {
+    const leftParents = parentAgents.get(leftId) ?? [];
+    const rightParents = parentAgents.get(rightId) ?? [];
+    const leftAnchor = getIndexAnchor(leftParents, rootAgentIds);
+    const rightAnchor = getIndexAnchor(rightParents, rootAgentIds);
+
+    if (leftAnchor !== rightAnchor) {
+      return leftAnchor - rightAnchor;
+    }
+
+    return compareNodes(leftId, rightId, nodeMap);
   });
 
-  resourcesByAgent.forEach((resourceIds, ownerId) => {
-    resourceIds.sort((left, right) => compareNodes(left, right, nodeMap));
-    resourcesByAgent.set(ownerId, resourceIds);
-  });
+  placeNodesInRow(
+    orderedChildAgents,
+    () => null,
+    AGENT_Y,
+    positionMap,
+    nodeMap
+  );
 
-  const agentSpanWidth = (agentId: string) => {
-    const resources = resourcesByAgent.get(agentId) ?? [];
-    const resourceWidth = getRowWidth(resources, nodeMap);
-    return Math.max(getNodeWidth(agentId, nodeMap), resourceWidth);
-  };
-
-  const supervisorChildren = new Map<string, string[]>();
-  supervisorIds.forEach((supervisorId) => {
-    const childAgents = (outgoing.get(supervisorId) ?? [])
+  const rootAnchors = new Map<string, number>();
+  rootAgentIds.forEach((rootId, index) => {
+    const childCenters = ((outgoing.get(rootId) ?? [])
       .filter((targetId) => nodeMap.get(targetId)?.type === "agent")
-      .sort((left, right) => compareNodes(left, right, nodeMap));
-    supervisorChildren.set(supervisorId, childAgents);
+      .map((targetId) => getNodeCenter(targetId, positionMap, nodeMap))
+      .filter((value): value is number => typeof value === "number"));
+
+    rootAnchors.set(
+      rootId,
+      childCenters.length > 0
+        ? childCenters.reduce((sum, value) => sum + value, 0) / childCenters.length
+        : START_X + index * (NODE_WIDTH.agent + ROOT_GAP) + NODE_WIDTH.agent / 2
+    );
   });
 
-  const assignedAgents = new Set<string>();
-  let currentLeft = START_X;
+  const orderedRoots = [...rootAgentIds].sort((leftId, rightId) => {
+    const leftAnchor = rootAnchors.get(leftId) ?? 0;
+    const rightAnchor = rootAnchors.get(rightId) ?? 0;
 
-  supervisorIds.forEach((supervisorId, index) => {
-    const children = supervisorChildren.get(supervisorId) ?? [];
-    const rowWidth = getRowWidth(children, nodeMap, agentSpanWidth);
-    const supervisorWidth = getNodeWidth(supervisorId, nodeMap);
-    const blockWidth = Math.max(supervisorWidth, rowWidth);
-
-    if (index > 0) {
-      currentLeft += ROOT_GAP;
+    if (leftAnchor !== rightAnchor) {
+      return leftAnchor - rightAnchor;
     }
 
-    const supervisorX = currentLeft + (blockWidth - supervisorWidth) / 2;
-    positionMap.set(supervisorId, { x: supervisorX, y: SUPERVISOR_Y });
-    assignedAgents.add(supervisorId);
-
-    let childLeft = currentLeft;
-    children.forEach((childId) => {
-      const childBlockWidth = agentSpanWidth(childId);
-      const childNodeWidth = getNodeWidth(childId, nodeMap);
-      positionMap.set(childId, {
-        x: childLeft + (childBlockWidth - childNodeWidth) / 2,
-        y: AGENT_Y,
-      });
-      assignedAgents.add(childId);
-
-      layoutResourcesForAgent(
-        childId,
-        childLeft,
-        positionMap,
-        resourcesByAgent,
-        nodeMap
-      );
-
-      childLeft += childBlockWidth + SIBLING_GAP;
-    });
-
-    currentLeft += blockWidth;
+    return compareNodes(leftId, rightId, nodeMap);
   });
 
-  const unassignedAgents = otherAgentIds.filter((id) => !assignedAgents.has(id));
+  placeNodesInRow(
+    orderedRoots,
+    (nodeId) => rootAnchors.get(nodeId) ?? null,
+    SUPERVISOR_Y,
+    positionMap,
+    nodeMap
+  );
 
-  if (unassignedAgents.length > 0) {
-    if (currentLeft > START_X) {
-      currentLeft += ROOT_GAP;
-    }
+  const resourceIds = response.nodes
+    .filter((node) => node.type === "connector" || node.type === "mcp")
+    .map((node) => node.id)
+    .sort((leftId, rightId) => {
+      const leftParents = resourceParents.get(leftId) ?? [];
+      const rightParents = resourceParents.get(rightId) ?? [];
+      const leftAnchor = getPositionAnchor(leftParents, positionMap, nodeMap);
+      const rightAnchor = getPositionAnchor(rightParents, positionMap, nodeMap);
 
-    let agentLeft = currentLeft;
-    unassignedAgents.forEach((agentId) => {
-      const blockWidth = agentSpanWidth(agentId);
-      const agentWidth = getNodeWidth(agentId, nodeMap);
-      positionMap.set(agentId, {
-        x: agentLeft + (blockWidth - agentWidth) / 2,
-        y: AGENT_Y,
-      });
-      layoutResourcesForAgent(
-        agentId,
-        agentLeft,
-        positionMap,
-        resourcesByAgent,
-        nodeMap
-      );
-      agentLeft += blockWidth + SIBLING_GAP;
+      if (leftAnchor !== rightAnchor) {
+        return leftAnchor - rightAnchor;
+      }
+
+      return compareNodes(leftId, rightId, nodeMap);
     });
-  }
+
+  placeNodesInRow(
+    resourceIds,
+    (nodeId) => getPositionAnchor(resourceParents.get(nodeId) ?? [], positionMap, nodeMap),
+    RESOURCE_Y,
+    positionMap,
+    nodeMap
+  );
 
   response.nodes.forEach((node, index) => {
     if (!positionMap.has(node.id)) {
@@ -250,39 +250,92 @@ function fallbackPosition(index: number) {
   return { x: 80 + index * 280, y: 940 };
 }
 
-function layoutResourcesForAgent(
-  agentId: string,
-  left: number,
+function placeNodesInRow(
+  nodeIds: string[],
+  getAnchor: (nodeId: string) => number | null,
+  y: number,
   positionMap: Map<string, { x: number; y: number }>,
-  resourcesByAgent: Map<string, string[]>,
   nodeMap: Map<string, VisualizerNode>
 ) {
-  const resourceIds = resourcesByAgent.get(agentId) ?? [];
-  let resourceLeft = left;
+  let currentLeft = START_X;
 
-  resourceIds.forEach((resourceId) => {
-    const resourceWidth = getNodeWidth(resourceId, nodeMap);
-    positionMap.set(resourceId, {
-      x: resourceLeft,
-      y: RESOURCE_Y,
-    });
-    resourceLeft += resourceWidth + SIBLING_GAP;
+  nodeIds.forEach((nodeId) => {
+    const width = getNodeWidth(nodeId, nodeMap);
+    const anchor = getAnchor(nodeId);
+    const desiredLeft =
+      typeof anchor === "number" ? anchor - width / 2 : currentLeft;
+    const x = Math.max(currentLeft, desiredLeft);
+
+    positionMap.set(nodeId, { x, y });
+    currentLeft = x + width + SIBLING_GAP;
   });
-}
 
-function getRowWidth(
-  nodeIds: string[],
-  nodeMap: Map<string, VisualizerNode>,
-  getWidth?: (nodeId: string) => number
-) {
   if (nodeIds.length === 0) {
-    return 0;
+    return;
   }
 
-  return nodeIds.reduce((sum, nodeId, index) => {
-    const width = getWidth ? getWidth(nodeId) : getNodeWidth(nodeId, nodeMap);
-    return sum + width + (index > 0 ? SIBLING_GAP : 0);
-  }, 0);
+  const leftMost = Math.min(
+    ...nodeIds.map((nodeId) => positionMap.get(nodeId)?.x ?? START_X)
+  );
+  const shift = leftMost - START_X;
+
+  if (shift > 0) {
+    nodeIds.forEach((nodeId) => {
+      const current = positionMap.get(nodeId);
+      if (!current) {
+        return;
+      }
+      positionMap.set(nodeId, { x: current.x - shift, y: current.y });
+    });
+  }
+}
+
+function getIndexAnchor(
+  ids: string[],
+  orderedIds: string[]
+) {
+  if (ids.length === 0) {
+    return Number.POSITIVE_INFINITY;
+  }
+
+  const anchors = ids
+    .map((id) => orderedIds.indexOf(id))
+    .filter((index) => index >= 0);
+
+  if (anchors.length === 0) {
+    return Number.POSITIVE_INFINITY;
+  }
+
+  return anchors.reduce((sum, value) => sum + value, 0) / anchors.length;
+}
+
+function getPositionAnchor(
+  nodeIds: string[],
+  positionMap: Map<string, { x: number; y: number }>,
+  nodeMap: Map<string, VisualizerNode>
+) {
+  const centers = nodeIds
+    .map((nodeId) => getNodeCenter(nodeId, positionMap, nodeMap))
+    .filter((value): value is number => typeof value === "number");
+
+  if (centers.length === 0) {
+    return Number.POSITIVE_INFINITY;
+  }
+
+  return centers.reduce((sum, value) => sum + value, 0) / centers.length;
+}
+
+function getNodeCenter(
+  nodeId: string,
+  positionMap: Map<string, { x: number; y: number }>,
+  nodeMap: Map<string, VisualizerNode>
+) {
+  const position = positionMap.get(nodeId);
+  if (!position) {
+    return null;
+  }
+
+  return position.x + getNodeWidth(nodeId, nodeMap) / 2;
 }
 
 function getNodeWidth(nodeId: string, nodeMap: Map<string, VisualizerNode>) {
