@@ -203,6 +203,21 @@
         .badge.optional {
             background: #6c757d;
         }
+
+        .connector-help {
+            margin-bottom: 12px;
+            padding: 10px 12px;
+            border-radius: 6px;
+            background: #eef6ff;
+            border: 1px solid #c8def5;
+            color: #214a75;
+            font-size: 0.92em;
+        }
+
+        .connector-help strong {
+            display: block;
+            margin-bottom: 4px;
+        }
         
         .theme-toggle {
             background: var(--status-bg);
@@ -486,6 +501,7 @@
                             <input type="text" id="connector-config-name" placeholder="e.g. My JSONPlaceholder Config"
                                 required>
                         </div>
+                        <div id="connector-help-text"></div>
                         <div id="connector-config-fields">
                             <!-- Dynamically populated when a connector is selected -->
                         </div>
@@ -1000,11 +1016,33 @@
         // ─── Connectors ───────────────────────────────────────────────────────
 
         let editingConnectorConfig = null;
+        const connectorFieldPlaceholders = {
+            TEAMS_BOT_BASE_URL: 'http://localhost:3978',
+            ALERT_API_KEY: 'same value configured in teams_bot/.env',
+            EMAILS: 'user1@company.com, user2@company.com',
+            CONVERSATION_IDS: '19:...@thread.tacv2, 19:...@thread.tacv2',
+        };
+
+        function getConnectorHelpHtml(connectorId) {
+            if (connectorId !== 'teams_connector') {
+                return '';
+            }
+
+            return `
+                <div class="connector-help">
+                    <strong>Teams connector setup</strong>
+                    Add <code>TEAMS_BOT_BASE_URL</code> and <code>ALERT_API_KEY</code> for the Teams bot API.
+                    Configure one or more targets using <code>EMAILS</code> / <code>CONVERSATION_IDS</code>.
+                    Only tools with a configured target are exposed to the agent. If both are blank, no Teams tool is exposed.
+                </div>
+            `;
+        }
 
         function resetConnectorConfigForm() {
             editingConnectorConfig = null;
             document.getElementById('add-connector-config-form').reset();
             document.getElementById('connector-config-fields').innerHTML = '';
+            document.getElementById('connector-help-text').innerHTML = '';
             document.getElementById('connector-details-doc').textContent = '';
             document.getElementById('connector-config-edit-state').style.display = 'none';
             document.getElementById('connector-config-submit-btn').textContent = 'Save Config';
@@ -1052,6 +1090,7 @@
             const connectorId = document.getElementById('connector-select').value;
             const fieldsEl = document.getElementById('connector-config-fields');
             const docEl = document.getElementById('connector-details-doc');
+            const helpEl = document.getElementById('connector-help-text');
 
             if (
                 editingConnectorConfig
@@ -1066,6 +1105,7 @@
 
             fieldsEl.innerHTML = '';
             docEl.textContent = '';
+            helpEl.innerHTML = getConnectorHelpHtml(connectorId);
 
             if (!connectorId) return;
 
@@ -1085,6 +1125,7 @@
             // ── Config variable inputs ─────────────────────────────────────
             const configVars = details.config_variables || [];
             configVars.forEach(v => {
+                const placeholder = connectorFieldPlaceholders[v.name] || v.name;
                 const row = document.createElement('div');
                 row.className = 'config-field';
                 row.innerHTML = `
@@ -1092,7 +1133,7 @@
                         ${v.name}
                         <span class="badge ${v.required ? '' : 'optional'}">${v.required ? 'required' : 'optional'}</span>
                     </label>
-                    <input type="text" id="cfg-${v.name}" data-config-name="${v.name}" placeholder="${v.name}" ${v.required ? 'required' : ''}>
+                    <input type="text" id="cfg-${v.name}" data-config-name="${v.name}" placeholder="${placeholder}" ${v.required ? 'required' : ''}>
                 `;
                 fieldsEl.appendChild(row);
             });
@@ -1257,9 +1298,17 @@
                     // Card in config list
                     const div = document.createElement('div');
                     div.className = 'card';
+                    const configMap = new Map((cfg.config || []).map(f => [f.name, f.value]));
+                    const teamsTarget = configMap.get('EMAILS')
+                        || configMap.get('CONVERSATION_IDS')
+                        || 'no target configured';
+                    const teamsSummary = connector.id === 'teams_connector'
+                        ? `<small>Target: ${teamsTarget}</small><br>`
+                        : '';
                     div.innerHTML = `
                         <strong>${cfg.name}</strong><br>
                         <small>Connector: ${connector.name} &bull; ID: ${cfg.connector_config_id}</small><br>
+                        ${teamsSummary}
                         <small>Fields: ${(cfg.config || []).map(f => f.name).join(', ') || '(none)'}</small><br>
                     `;
 
