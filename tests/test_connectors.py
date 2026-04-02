@@ -1,3 +1,4 @@
+import sys
 from pathlib import Path
 from uuid import uuid4
 
@@ -413,9 +414,12 @@ class BaseConnector:
         connector_id="temp_connector",
         config=[{"name": "token", "value": "abc"}],
     )
-    tools = resolve_connector_tools(cfg)
-    assert isinstance(tools, list)
-    assert len(tools) == 1
+    try:
+        tools = resolve_connector_tools(cfg)
+        assert isinstance(tools, list)
+        assert len(tools) == 1
+    finally:
+        sys.modules.pop("base_connector", None)
 
 
 def test_resolve_connector_tools_no_baseconnector_subclass_raises(
@@ -447,8 +451,11 @@ class BaseConnector:
         connector_id="bad_connector",
         config=[],
     )
-    with pytest.raises(ValueError):
-        resolve_connector_tools(cfg)
+    try:
+        with pytest.raises(ValueError):
+            resolve_connector_tools(cfg)
+    finally:
+        sys.modules.pop("base_connector", None)
 
 
 def test_teams_connector_exposes_no_tools_without_targets():
