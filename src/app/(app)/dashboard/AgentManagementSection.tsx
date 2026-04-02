@@ -398,16 +398,18 @@ export default function AgentManagementSection() {
         )}
       </div>
 
-      <button
-        type="button"
-        onClick={() => {
-          setIsSeeAllOpen(true);
-          setIsFilterOpen(false);
-        }}
-        className="mt-5 w-full rounded-xl bg-[#4f49e2] py-3 text-sm font-semibold text-white shadow-[0_12px_24px_-14px_rgba(79,73,226,0.6)]"
-      >
-        See All
-      </button>
+      <div className="mt-auto pt-5">
+        <button
+          type="button"
+          onClick={() => {
+            setIsSeeAllOpen(true);
+            setIsFilterOpen(false);
+          }}
+          className="w-full rounded-xl bg-[#4f49e2] py-3 text-sm font-semibold text-white shadow-[0_12px_24px_-14px_rgba(79,73,226,0.6)]"
+        >
+          See All
+        </button>
+      </div>
 
       {isSeeAllOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4 py-8">
