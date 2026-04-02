@@ -471,6 +471,10 @@
 
                     <h3>Create Connector Config</h3>
                     <form id="add-connector-config-form">
+                        <div id="connector-config-edit-state" style="display:none; margin-bottom:10px; padding:8px 10px; background:#fff3cd; border-radius:4px;">
+                            Editing existing connector config
+                            <button type="button" id="connector-config-cancel-edit" style="margin-left:10px;">Cancel</button>
+                        </div>
                         <div class="form-group">
                             <label>Connector</label>
                             <select id="connector-select">
@@ -487,7 +491,7 @@
                         </div>
                         <div id="connector-details-doc" style="margin-bottom:10px; color: #555; font-style: italic;">
                         </div>
-                        <button type="submit">Save Config</button>
+                        <button type="submit" id="connector-config-submit-btn">Save Config</button>
                     </form>
                 </div>
 
@@ -995,6 +999,17 @@
 
         // ─── Connectors ───────────────────────────────────────────────────────
 
+        let editingConnectorConfig = null;
+
+        function resetConnectorConfigForm() {
+            editingConnectorConfig = null;
+            document.getElementById('add-connector-config-form').reset();
+            document.getElementById('connector-config-fields').innerHTML = '';
+            document.getElementById('connector-details-doc').textContent = '';
+            document.getElementById('connector-config-edit-state').style.display = 'none';
+            document.getElementById('connector-config-submit-btn').textContent = 'Save Config';
+        }
+
         /** Fetches available connector types and populates selects + list */
         async function loadConnectors() {
             const res = await fetch(`${API_BASE}/connectors/`);
@@ -1037,6 +1052,17 @@
             const connectorId = document.getElementById('connector-select').value;
             const fieldsEl = document.getElementById('connector-config-fields');
             const docEl = document.getElementById('connector-details-doc');
+
+            if (
+                editingConnectorConfig
+                && connectorId
+                && connectorId !== editingConnectorConfig.connectorId
+            ) {
+                editingConnectorConfig = null;
+                document.getElementById('connector-config-edit-state').style.display = 'none';
+                document.getElementById('connector-config-submit-btn').textContent = 'Save Config';
+                document.getElementById('connector-config-name').value = '';
+            }
 
             fieldsEl.innerHTML = '';
             docEl.textContent = '';
@@ -1094,7 +1120,64 @@
             }
         }
 
-        /** POST /connectors/{connector_id}/config */
+        function populateConnectorConfigFields(configEntries) {
+            const configMap = new Map((configEntries || []).map(entry => [entry.name, entry.value ?? '']));
+            document.querySelectorAll('#connector-config-fields input[data-config-name]').forEach(inp => {
+                inp.value = configMap.get(inp.dataset.configName) || '';
+            });
+        }
+
+        async function editConnectorConfig(connectorId, connectorConfigId) {
+            const selectEl = document.getElementById('connector-select');
+            selectEl.value = connectorId;
+            await onConnectorSelected();
+
+            const res = await fetch(`${API_BASE}/connectors/${connectorId}/config`);
+            if (!res.ok) {
+                alert('Failed to load connector configs: ' + await res.text());
+                return;
+            }
+
+            const configs = await res.json();
+            const cfg = configs.find(item => item.connector_config_id === connectorConfigId);
+            if (!cfg) {
+                alert('Connector config not found.');
+                return;
+            }
+
+            editingConnectorConfig = {
+                connectorId,
+                connectorConfigId,
+            };
+
+            document.getElementById('connector-config-name').value = cfg.name || '';
+            populateConnectorConfigFields(cfg.config || []);
+            document.getElementById('connector-config-edit-state').style.display = 'block';
+            document.getElementById('connector-config-submit-btn').textContent = 'Update Config';
+        }
+
+        async function deleteConnectorConfig(connectorId, connectorConfigId, connectorName) {
+            if (!confirm(`Delete config from ${connectorName}?`)) {
+                return;
+            }
+
+            const res = await fetch(`${API_BASE}/connectors/${connectorId}/config/${connectorConfigId}`, {
+                method: 'DELETE'
+            });
+
+            if (!res.ok) {
+                alert('Failed to delete config: ' + await res.text());
+                return;
+            }
+
+            if (editingConnectorConfig && editingConnectorConfig.connectorConfigId === connectorConfigId) {
+                resetConnectorConfigForm();
+            }
+
+            await loadAllConnectorConfigs();
+        }
+
+        /** POST or PATCH /connectors/{connector_id}/config */
         async function addConnectorConfig(e) {
             e.preventDefault();
             const connectorId = document.getElementById('connector-select').value;
@@ -1114,20 +1197,31 @@
 
             const payload = { connector_id: connectorId, name, config };
 
-            const res = await fetch(`${API_BASE}/connectors/${connectorId}/config`, {
-                method: 'POST',
+            const isEdit = editingConnectorConfig && editingConnectorConfig.connectorConfigId;
+            if (isEdit && connectorId !== editingConnectorConfig.connectorId) {
+                alert('Connector cannot be changed while editing a saved config.');
+                return;
+            }
+            const url = isEdit
+                ? `${API_BASE}/connectors/${connectorId}/config/${editingConnectorConfig.connectorConfigId}`
+                : `${API_BASE}/connectors/${connectorId}/config`;
+            const method = isEdit ? 'PATCH' : 'POST';
+            const body = isEdit
+                ? JSON.stringify({ name, config })
+                : JSON.stringify(payload);
+
+            const res = await fetch(url, {
+                method,
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+                body
             });
 
             if (!res.ok) {
-                alert('Failed to save config: ' + await res.text());
+                alert(`Failed to ${isEdit ? 'update' : 'save'} config: ` + await res.text());
                 return;
             }
 
-            e.target.reset();
-            document.getElementById('connector-config-fields').innerHTML = '';
-            document.getElementById('connector-details-doc').textContent = '';
+            resetConnectorConfigForm();
 
             // Refresh saved configs list and agent connector select
             await loadAllConnectorConfigs();
@@ -1166,8 +1260,33 @@
                     div.innerHTML = `
                         <strong>${cfg.name}</strong><br>
                         <small>Connector: ${connector.name} &bull; ID: ${cfg.connector_config_id}</small><br>
-                        <small>Fields: ${(cfg.config || []).map(f => f.name).join(', ') || '(none)'}</small>
+                        <small>Fields: ${(cfg.config || []).map(f => f.name).join(', ') || '(none)'}</small><br>
                     `;
+
+                    const editBtn = document.createElement('button');
+                    editBtn.type = 'button';
+                    editBtn.style.marginTop = '8px';
+                    editBtn.textContent = 'Edit';
+                    editBtn.addEventListener('click', () => {
+                        editConnectorConfig(connector.id, cfg.connector_config_id);
+                    });
+                    div.appendChild(editBtn);
+
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.type = 'button';
+                    deleteBtn.className = 'delete';
+                    deleteBtn.style.marginTop = '8px';
+                    deleteBtn.style.marginLeft = '6px';
+                    deleteBtn.textContent = 'Delete';
+                    deleteBtn.addEventListener('click', () => {
+                        deleteConnectorConfig(
+                            connector.id,
+                            cfg.connector_config_id,
+                            connector.name,
+                        );
+                    });
+                    div.appendChild(deleteBtn);
+
                     listEl.appendChild(div);
 
                     // Option in agent multi-select
@@ -1295,6 +1414,7 @@
         document.getElementById('update-agent-form').addEventListener('submit', updateAgent);
         document.getElementById('send-msg-btn').addEventListener('click', sendMessage);
         document.getElementById('add-connector-config-form').addEventListener('submit', addConnectorConfig);
+        document.getElementById('connector-config-cancel-edit').addEventListener('click', resetConnectorConfigForm);
         document.getElementById('connector-select').addEventListener('change', onConnectorSelected);
         document.getElementById('connector-config-filter').addEventListener('change', loadAllConnectorConfigs);
 
