@@ -5,8 +5,8 @@ import pytest
 
 from utils.session_summary_plugin import (
     FIRST_MESSAGE_SUMMARY_KEY,
-    _extract_user_text,
     SessionSummaryPlugin,
+    _extract_user_text,
 )
 
 
@@ -68,7 +68,9 @@ def test_session_summary_plugin_skips_when_summary_already_exists(
         called["value"] = True
         return None
 
-    monkeypatch.setattr("utils.session_summary_plugin.litellm.completion", fake_completion)
+    monkeypatch.setattr(
+        "utils.session_summary_plugin.litellm.completion", fake_completion
+    )
 
     asyncio.run(
         plugin.before_model_callback(
@@ -89,7 +91,7 @@ def test_session_summary_plugin_skips_when_user_text_missing(
         model="openai/gpt-4o-mini",
         contents=[
             SimpleNamespace(role="model", parts=[SimpleNamespace(text="ignored")])
-        ]
+        ],
     )
 
     called = {"value": False}
@@ -98,7 +100,9 @@ def test_session_summary_plugin_skips_when_user_text_missing(
         called["value"] = True
         return None
 
-    monkeypatch.setattr("utils.session_summary_plugin.litellm.completion", fake_completion)
+    monkeypatch.setattr(
+        "utils.session_summary_plugin.litellm.completion", fake_completion
+    )
 
     asyncio.run(
         plugin.before_model_callback(
@@ -148,7 +152,9 @@ def test_session_summary_plugin_falls_back_when_completion_raises(
     def fake_completion(**kwargs):
         raise RuntimeError("provider failure")
 
-    monkeypatch.setattr("utils.session_summary_plugin.litellm.completion", fake_completion)
+    monkeypatch.setattr(
+        "utils.session_summary_plugin.litellm.completion", fake_completion
+    )
 
     result = asyncio.run(
         plugin.before_model_callback(

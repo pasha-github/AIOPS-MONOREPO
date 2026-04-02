@@ -22,6 +22,7 @@ from utils.secrets import decrypt_secret
 
 logger = logging.getLogger(__name__)
 
+
 class DatabaseAgentLoader(BaseAgentLoader):
     def __init__(self):
         super().__init__()
