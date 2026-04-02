@@ -30,7 +30,7 @@ public class ToolController {
     public Map<String, Object> healthCheck() {
         return Map.of(
                 "status", "MCP server running v.10",
-                "server", "enterprise-mcp-server VM"
+                "server", "enterprise-mcp-server Google Cloud"
         );
     }
 
