@@ -22,7 +22,7 @@ public class ToolExecutor {
         HttpEntity<Map<String, Object>> request = new HttpEntity<>(params, headers);
 
         ResponseEntity<Object> response =
-                restTemplate.exchange(url, HttpMethod.POST, request, Object.class);
+                restTemplate.exchange(url, HttpMethod.GET, request, Object.class);
 
         return response.getBody();
     }
