@@ -54,6 +54,7 @@ ADK_APP = get_fast_api_app(
     url_prefix="/agent-server",
     logo_text="RC AIOps - DEV",
     logo_image_url="/static/royal_cyber.jpeg",
+    extra_plugins=["utils.session_summary_plugin.plugin"],
 )
 
 # Retrieve the server instance

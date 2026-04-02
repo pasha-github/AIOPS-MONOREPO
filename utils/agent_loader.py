@@ -19,16 +19,8 @@ from database.models import Agent, ConnectorConfig, Model
 from utils.cache import cache
 from utils.helper import resolve_connector_tools
 from utils.secrets import decrypt_secret
-from utils.session_summary import make_session_summary_callback
 
 logger = logging.getLogger(__name__)
-
-
-def _build_summarizer_model(provider: str, model_name: str) -> str:
-    if provider.lower() == "google":
-        return f"gemini/{model_name}"
-    return f"{provider}/{model_name}"
-
 
 class DatabaseAgentLoader(BaseAgentLoader):
     def __init__(self):
@@ -164,10 +156,6 @@ class DatabaseAgentLoader(BaseAgentLoader):
 
             tools_list.extend(sub_agents)
 
-            summary_callback = make_session_summary_callback(
-                _build_summarizer_model(model_config.provider, model_config.name)
-            )
-
             if model_config.provider.lower() == "google":
                 model = model_config.name
             else:
@@ -193,7 +181,6 @@ class DatabaseAgentLoader(BaseAgentLoader):
                     instruction=agent_config.instruction,
                     tools=[exit_loop, *tools_list],
                     sub_agents=[],
-                    before_model_callback=summary_callback,
                 )
                 agent = LoopAgent(
                     name=agent_config.agent_id,
@@ -210,7 +197,6 @@ class DatabaseAgentLoader(BaseAgentLoader):
                     instruction=agent_config.instruction,
                     tools=tools_list,
                     sub_agents=[],
-                    before_model_callback=summary_callback,
                 )
             # Store in cache
             cache.set_agent(agent_name, agent)

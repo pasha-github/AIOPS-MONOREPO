@@ -232,7 +232,7 @@ def test_agent_loader_google_model_path(monkeypatch: pytest.MonkeyPatch):
     assert agent.kwargs["model"] == "gemini-2.0-flash"
 
 
-def test_agent_loader_attaches_session_summary_callback(
+def test_agent_loader_does_not_attach_session_summary_callback(
     monkeypatch: pytest.MonkeyPatch,
 ):
     _patch_common_runtime(monkeypatch)
@@ -245,23 +245,9 @@ def test_agent_loader_attaches_session_summary_callback(
         lambda _engine: _FakeSession(agent_config=cfg, model_config=model),
     )
 
-    callback_models = []
-    callback_sentinel = object()
-
-    def fake_make_session_summary_callback(model_name: str):
-        callback_models.append(model_name)
-        return callback_sentinel
-
-    monkeypatch.setattr(
-        agent_loader_module,
-        "make_session_summary_callback",
-        fake_make_session_summary_callback,
-    )
-
     loader = DatabaseAgentLoader()
     agent = loader.load_agent("main")
-    assert agent.kwargs["before_model_callback"] is callback_sentinel
-    assert callback_models == ["gemini/gemini-2.0-flash"]
+    assert "before_model_callback" not in agent.kwargs
 
 
 def test_agent_loader_non_google_model_path(monkeypatch: pytest.MonkeyPatch):
