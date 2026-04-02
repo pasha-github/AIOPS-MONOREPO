@@ -7,7 +7,7 @@ export default function DashboardPage() {
     <div className="space-y-8">
       <DashboardOverview />
 
-      <section className="grid gap-6 lg:grid-cols-[1.1fr_1.6fr]">
+      <section className="grid gap-6 lg:h-[720px] lg:grid-cols-[1.1fr_1.6fr]">
         <AgentManagementSection />
         <AgentActivityLog />
       </section>
