@@ -1,17 +1,21 @@
+import asyncio
 from types import SimpleNamespace
 
 import pytest
 
-from utils.session_summary import (
+from utils.session_summary_plugin import (
     FIRST_MESSAGE_SUMMARY_KEY,
+    SessionSummaryPlugin,
     _extract_user_text,
-    make_session_summary_callback,
 )
 
 
 def _request_with_text(*texts: str):
     parts = [SimpleNamespace(text=text) for text in texts]
-    return SimpleNamespace(contents=[SimpleNamespace(role="user", parts=parts)])
+    return SimpleNamespace(
+        model="openai/gpt-4o-mini",
+        contents=[SimpleNamespace(role="user", parts=parts)],
+    )
 
 
 def test_extract_user_text_joins_text_parts():
@@ -19,8 +23,8 @@ def test_extract_user_text_joins_text_parts():
     assert _extract_user_text(request) == "Investigate MQ backlog"
 
 
-def test_session_summary_callback_sets_summary_once(monkeypatch: pytest.MonkeyPatch):
-    callback = make_session_summary_callback("openai/gpt-4o-mini")
+def test_session_summary_plugin_sets_summary_once(monkeypatch: pytest.MonkeyPatch):
+    plugin = SessionSummaryPlugin()
     callback_context = SimpleNamespace(state={})
     request = _request_with_text("Investigate queue backlog in production")
 
@@ -32,10 +36,16 @@ def test_session_summary_callback_sets_summary_once(monkeypatch: pytest.MonkeyPa
         ]
     )
     monkeypatch.setattr(
-        "utils.session_summary.litellm.completion", lambda **kwargs: fake_response
+        "utils.session_summary_plugin.litellm.completion",
+        lambda **kwargs: fake_response,
     )
 
-    result = callback(callback_context, request)
+    result = asyncio.run(
+        plugin.before_model_callback(
+            callback_context=callback_context,
+            llm_request=request,
+        )
+    )
     assert result is None
     assert (
         callback_context.state[FIRST_MESSAGE_SUMMARY_KEY]
@@ -43,10 +53,10 @@ def test_session_summary_callback_sets_summary_once(monkeypatch: pytest.MonkeyPa
     )
 
 
-def test_session_summary_callback_skips_when_summary_already_exists(
+def test_session_summary_plugin_skips_when_summary_already_exists(
     monkeypatch: pytest.MonkeyPatch,
 ):
-    callback = make_session_summary_callback("openai/gpt-4o-mini")
+    plugin = SessionSummaryPlugin()
     callback_context = SimpleNamespace(
         state={FIRST_MESSAGE_SUMMARY_KEY: "Existing summary"}
     )
@@ -58,22 +68,30 @@ def test_session_summary_callback_skips_when_summary_already_exists(
         called["value"] = True
         return None
 
-    monkeypatch.setattr("utils.session_summary.litellm.completion", fake_completion)
+    monkeypatch.setattr(
+        "utils.session_summary_plugin.litellm.completion", fake_completion
+    )
 
-    callback(callback_context, request)
+    asyncio.run(
+        plugin.before_model_callback(
+            callback_context=callback_context,
+            llm_request=request,
+        )
+    )
     assert called["value"] is False
     assert callback_context.state[FIRST_MESSAGE_SUMMARY_KEY] == "Existing summary"
 
 
-def test_session_summary_callback_skips_when_user_text_missing(
+def test_session_summary_plugin_skips_when_user_text_missing(
     monkeypatch: pytest.MonkeyPatch,
 ):
-    callback = make_session_summary_callback("openai/gpt-4o-mini")
+    plugin = SessionSummaryPlugin()
     callback_context = SimpleNamespace(state={})
     request = SimpleNamespace(
+        model="openai/gpt-4o-mini",
         contents=[
             SimpleNamespace(role="model", parts=[SimpleNamespace(text="ignored")])
-        ]
+        ],
     )
 
     called = {"value": False}
@@ -82,17 +100,24 @@ def test_session_summary_callback_skips_when_user_text_missing(
         called["value"] = True
         return None
 
-    monkeypatch.setattr("utils.session_summary.litellm.completion", fake_completion)
+    monkeypatch.setattr(
+        "utils.session_summary_plugin.litellm.completion", fake_completion
+    )
 
-    callback(callback_context, request)
+    asyncio.run(
+        plugin.before_model_callback(
+            callback_context=callback_context,
+            llm_request=request,
+        )
+    )
     assert called["value"] is False
     assert FIRST_MESSAGE_SUMMARY_KEY not in callback_context.state
 
 
-def test_session_summary_callback_falls_back_when_model_returns_none_content(
+def test_session_summary_plugin_falls_back_when_model_returns_none_content(
     monkeypatch: pytest.MonkeyPatch,
 ):
-    callback = make_session_summary_callback("openai/gpt-4o-mini")
+    plugin = SessionSummaryPlugin()
     callback_context = SimpleNamespace(state={})
     request = _request_with_text("Investigate queue backlog in production")
 
@@ -100,10 +125,16 @@ def test_session_summary_callback_falls_back_when_model_returns_none_content(
         choices=[SimpleNamespace(message=SimpleNamespace(content=None))]
     )
     monkeypatch.setattr(
-        "utils.session_summary.litellm.completion", lambda **kwargs: fake_response
+        "utils.session_summary_plugin.litellm.completion",
+        lambda **kwargs: fake_response,
     )
 
-    result = callback(callback_context, request)
+    result = asyncio.run(
+        plugin.before_model_callback(
+            callback_context=callback_context,
+            llm_request=request,
+        )
+    )
     assert result is None
     assert (
         callback_context.state[FIRST_MESSAGE_SUMMARY_KEY]
@@ -111,19 +142,26 @@ def test_session_summary_callback_falls_back_when_model_returns_none_content(
     )
 
 
-def test_session_summary_callback_falls_back_when_completion_raises(
+def test_session_summary_plugin_falls_back_when_completion_raises(
     monkeypatch: pytest.MonkeyPatch,
 ):
-    callback = make_session_summary_callback("openai/gpt-4o-mini")
+    plugin = SessionSummaryPlugin()
     callback_context = SimpleNamespace(state={})
     request = _request_with_text("Investigate queue backlog in production")
 
     def fake_completion(**kwargs):
         raise RuntimeError("provider failure")
 
-    monkeypatch.setattr("utils.session_summary.litellm.completion", fake_completion)
+    monkeypatch.setattr(
+        "utils.session_summary_plugin.litellm.completion", fake_completion
+    )
 
-    result = callback(callback_context, request)
+    result = asyncio.run(
+        plugin.before_model_callback(
+            callback_context=callback_context,
+            llm_request=request,
+        )
+    )
     assert result is None
     assert (
         callback_context.state[FIRST_MESSAGE_SUMMARY_KEY]
