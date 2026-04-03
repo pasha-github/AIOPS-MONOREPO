@@ -1,4 +1,5 @@
 import logging
+import os
 from typing import Any
 from uuid import UUID
 
@@ -17,10 +18,17 @@ from sqlmodel import Session, select
 from database.database import engine
 from database.models import Agent, ConnectorConfig, Model
 from utils.cache import cache
+from utils.constants import HARDCODED_FALLBACK_MODEL
 from utils.helper import resolve_connector_tools
 from utils.secrets import decrypt_secret
 
 logger = logging.getLogger(__name__)
+
+
+def _litellm_model_name(model_config: Model) -> str:
+    if model_config.provider.lower() == "google":
+        return f"gemini/{model_config.name}"
+    return f"{model_config.provider}/{model_config.name}"
 
 
 class DatabaseAgentLoader(BaseAgentLoader):
@@ -68,8 +76,6 @@ class DatabaseAgentLoader(BaseAgentLoader):
             # We might need to set env vars for keys or pass them explicitly if supported.
             # For now, we'll assume LlmAgent handles it or we set it globally/contextually.
             # LiteLLM usually reads from env, so we might need to set os.environ temporarily or globally.
-            import os
-
             if model_config.api_key:
                 decrypted_api_key = decrypt_secret(model_config.api_key)
                 # This is a simple way, might strictly need to be scoped if multiple providers
@@ -157,10 +163,12 @@ class DatabaseAgentLoader(BaseAgentLoader):
 
             tools_list.extend(sub_agents)
 
-            if model_config.provider.lower() == "google":
-                model = model_config.name
-            else:
-                model = LiteLlm(model=f"{model_config.provider}/{model_config.name}")
+            model = LiteLlm(
+                model=_litellm_model_name(model_config),
+                fallbacks=[HARDCODED_FALLBACK_MODEL],
+                num_retries=0,
+                timeout=20,
+            )
 
             # Create LlmAgent
             if agent_config.type.lower() == "automation":

@@ -3,7 +3,9 @@ from types import SimpleNamespace
 
 import pytest
 
+import utils.session_summary_plugin as session_summary_plugin_module
 from utils.session_summary_plugin import (
+    HARDCODED_FALLBACK_MODEL,
     FIRST_MESSAGE_SUMMARY_KEY,
     SessionSummaryPlugin,
     _extract_user_text,
@@ -51,6 +53,39 @@ def test_session_summary_plugin_sets_summary_once(monkeypatch: pytest.MonkeyPatc
         callback_context.state[FIRST_MESSAGE_SUMMARY_KEY]
         == "Production MQ backlog investigation"
     )
+
+
+def test_session_summary_plugin_uses_request_model_with_shared_fallback_by_default(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    plugin = SessionSummaryPlugin()
+    callback_context = SimpleNamespace(state={})
+    request = _request_with_text("Investigate queue backlog in production")
+
+    captured = {}
+    fake_response = SimpleNamespace(
+        choices=[SimpleNamespace(message=SimpleNamespace(content="Queue backlog"))]
+    )
+
+    def fake_completion(**kwargs):
+        captured.update(kwargs)
+        return fake_response
+
+    monkeypatch.setattr(session_summary_plugin_module, "SUMMARIZER_MODEL", None)
+    monkeypatch.setattr(
+        "utils.session_summary_plugin.litellm.completion",
+        fake_completion,
+    )
+
+    asyncio.run(
+        plugin.before_model_callback(
+            callback_context=callback_context,
+            llm_request=request,
+        )
+    )
+
+    assert captured["model"] == "openai/gpt-4o-mini"
+    assert captured["fallbacks"] == [HARDCODED_FALLBACK_MODEL]
 
 
 def test_session_summary_plugin_skips_when_summary_already_exists(

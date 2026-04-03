@@ -118,8 +118,9 @@ def _patch_common_runtime(monkeypatch: pytest.MonkeyPatch):
     )
 
     class _FakeLiteLlm:
-        def __init__(self, model):
+        def __init__(self, model, **kwargs):
             self.model = model
+            self.kwargs = kwargs
 
     class _FakeLlmAgent:
         def __init__(self, **kwargs):
@@ -229,7 +230,10 @@ def test_agent_loader_google_model_path(monkeypatch: pytest.MonkeyPatch):
 
     loader = DatabaseAgentLoader()
     agent = loader.load_agent("main")
-    assert agent.kwargs["model"] == "gemini-2.0-flash"
+    assert getattr(agent.kwargs["model"], "model", "") == "gemini/gemini-2.0-flash"
+    assert agent.kwargs["model"].kwargs["fallbacks"] == [
+        "gemini/gemini-3-flash-preview"
+    ]
 
 
 def test_agent_loader_does_not_attach_session_summary_callback(
@@ -264,6 +268,9 @@ def test_agent_loader_non_google_model_path(monkeypatch: pytest.MonkeyPatch):
     loader = DatabaseAgentLoader()
     agent = loader.load_agent("main")
     assert getattr(agent.kwargs["model"], "model", "") == "openai/gpt-4.1"
+    assert agent.kwargs["model"].kwargs["fallbacks"] == [
+        "gemini/gemini-3-flash-preview"
+    ]
 
 
 def test_agent_loader_exec_tools_success(monkeypatch: pytest.MonkeyPatch):

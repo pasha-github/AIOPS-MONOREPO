@@ -18,6 +18,7 @@ ENCRYPTION_KEY = os.getenv("ENCRYPTION_KEY")
 SUMMARIZER_MODEL = os.getenv("SUMMARIZER_MODEL")
 ENV = os.getenv("ENV", "DEV")
 A2A = os.getenv("A2A", False)
+HARDCODED_FALLBACK_MODEL = "gemini/gemini-3-flash-preview"
 
 # Derived constants
 WEB = ENV == "DEV"
