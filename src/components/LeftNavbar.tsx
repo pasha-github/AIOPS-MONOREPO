@@ -48,7 +48,7 @@ const navSections: NavSection[] = [
     title: "Platform",
     items: [
       {
-        label: "Agent Managements",
+        label: "Agent Management",
         id: "platform-agent-managements",
         icon: <Bot className="h-5 w-5" />,
         href: "/agent-management",

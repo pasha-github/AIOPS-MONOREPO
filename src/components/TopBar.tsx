@@ -18,13 +18,28 @@ function formatTitle(pathname: string) {
     connectors: "Connectors",
     visualizer: "Agent Visualizer",
   };
+  const wordMap: Record<string, string> = {
+    llm: "LLM",
+    api: "API",
+    ui: "UI",
+    id: "ID",
+  };
+
   if (overrides[segment]) {
     return overrides[segment];
   }
   return segment
     .replace(/[-_]/g, " ")
     .split(" ")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .map((word) => {
+      const lower = word.toLowerCase();
+
+      if (wordMap[lower]) {
+        return wordMap[lower];
+      }
+
+      return word.charAt(0).toUpperCase() + word.slice(1);
+    })
     .join(" ");
 }
 
