@@ -44,7 +44,7 @@ export default function WebhookAgentManagement({
   const { llmManagerApiBaseUrl } = useRuntimeConfig();
   const agentManagerBaseUrl = trimTrailingSlash(llmManagerApiBaseUrl);
   const buildWebhookUrl = (webhookId: string) =>
-    `${agentManagerBaseUrl}/agent/${encodeURIComponent(agentId)}/webhook/${encodeURIComponent(webhookId)}`;
+    `${agentManagerBaseUrl}/agent/${encodeURIComponent(agentId)}/webhook/invoke/${encodeURIComponent(webhookId)}`;
   const [webhookPrompt, setWebhookPrompt] = useState("");
   const [webhooks, setWebhooks] = useState<WebhookRecord[]>([]);
   const [isWebhooksLoading, setIsWebhooksLoading] = useState(false);
