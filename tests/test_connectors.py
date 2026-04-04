@@ -5,9 +5,9 @@ from uuid import uuid4
 import pytest
 from fastapi.testclient import TestClient
 
+from src.connectors.loader import cached_connector_info, resolve_connector_tools
 from src.connectors.teams_connector import TeamsConnector
 from src.database.models import ConnectorConfig
-from src.utils.helper import cached_connector_info, resolve_connector_tools
 
 
 def test_list_connectors_success(client: TestClient):
@@ -407,7 +407,7 @@ class BaseConnector:
         connector_source, encoding="utf-8"
     )
 
-    monkeypatch.setattr("src.utils.helper.CONNECTORS_DIR", temp_connectors)
+    monkeypatch.setattr("src.connectors.loader.CONNECTORS_DIR", temp_connectors)
 
     cfg = ConnectorConfig(
         name="ok",
@@ -444,7 +444,7 @@ class BaseConnector:
         connector_source, encoding="utf-8"
     )
 
-    monkeypatch.setattr("src.utils.helper.CONNECTORS_DIR", temp_connectors)
+    monkeypatch.setattr("src.connectors.loader.CONNECTORS_DIR", temp_connectors)
 
     cfg = ConnectorConfig(
         name="bad",

@@ -8,9 +8,9 @@ from pydantic import BaseModel
 from sqlmodel import Session, select
 
 from src.agent_runtime.adk.adk_app import invalidate_cache
+from src.connectors.loader import cached_connector_info
 from src.database.database import get_session
 from src.database.models import Agent, ConnectorConfig
-from src.utils.helper import cached_connector_info
 
 
 class ConnectorConfigCreate(BaseModel):

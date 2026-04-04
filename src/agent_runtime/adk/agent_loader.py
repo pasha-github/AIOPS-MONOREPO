@@ -15,9 +15,9 @@ from google.adk.tools.tool_context import ToolContext
 from sqlmodel import Session, select
 
 from src.agent_runtime.adk.cache import cache
+from src.connectors.loader import resolve_connector_tools
 from src.database.database import engine
 from src.database.models import Agent, ConnectorConfig, Model
-from src.utils.helper import resolve_connector_tools
 from src.utils.secrets import decrypt_secret
 
 logger = logging.getLogger(__name__)
