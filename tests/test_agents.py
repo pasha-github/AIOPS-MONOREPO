@@ -349,7 +349,7 @@ def test_update_agent_invalidates_cache(
     def fake_invalidate(agent_id: str):
         called["value"] = agent_id
 
-    monkeypatch.setattr("routers.agents.invalidate_cache", fake_invalidate)
+    monkeypatch.setattr("src.routers.agents.invalidate_cache", fake_invalidate)
 
     response = client.patch("/agent/a1", json={"name": "x"})
     assert response.status_code == 200
@@ -367,7 +367,7 @@ def test_delete_agent_invalidates_cache(
     def fake_invalidate(agent_id: str):
         called["value"] = agent_id
 
-    monkeypatch.setattr("routers.agents.invalidate_cache", fake_invalidate)
+    monkeypatch.setattr("src.routers.agents.invalidate_cache", fake_invalidate)
 
     response = client.delete("/agent/a1")
     assert response.status_code == 200

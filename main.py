@@ -5,11 +5,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from database.database import create_db_and_tables
-from routers import agents, connectors, llms, visualizer
-from utils.adk_app import ADK_APP
-from utils.constants import WEB
-from utils.scheduler import start_scheduler
+from src.agent_runtime.adk.adk_app import ADK_APP
+from src.database.database import create_db_and_tables
+from src.routers import agents, connectors, llms, visualizer
+from src.utils.constants import WEB
+from src.utils.scheduler import start_scheduler
 
 
 @asynccontextmanager

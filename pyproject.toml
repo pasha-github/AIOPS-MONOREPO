@@ -45,7 +45,7 @@ known-first-party = ["routers", "database", "utils", "connectors", "main"]
 ignore = ["migrations", "tests"]
 pythonVersion = "3.12"           # your python version
 pythonPlatform = "Linux"
-extraPaths = ["connectors"]
+extraPaths = ["src/connectors"]
 typeCheckingMode = "basic"       # "basic" | "standard" | "strict"
 
 # TODO: Will be changed to standard

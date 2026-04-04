@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends
 from sqlmodel import Session, select
 
-from database.database import get_session
-from database.models import Agent, ConnectorConfig, Job, Model, Webhook
+from src.database.database import get_session
+from src.database.models import Agent, ConnectorConfig, Job, Model, Webhook
 
 router = APIRouter(prefix="/visualizer", tags=["visualizer"])
 

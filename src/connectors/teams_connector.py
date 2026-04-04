@@ -9,7 +9,7 @@ from typing import Any, cast
 try:
     from base_connector import BaseConnector, connector_tool
 except ModuleNotFoundError:
-    from connectors.base_connector import BaseConnector, connector_tool
+    from src.connectors.base_connector import BaseConnector, connector_tool
 from google.adk.tools.tool_context import ToolContext
 
 

@@ -6,7 +6,7 @@ from google.adk.models.llm_request import LlmRequest
 from google.adk.models.llm_response import LlmResponse
 from google.adk.plugins.base_plugin import BasePlugin
 
-from utils.constants import SUMMARIZER_MODEL
+from src.utils.constants import SUMMARIZER_MODEL
 
 logger = logging.getLogger(__name__)
 

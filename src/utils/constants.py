@@ -2,7 +2,7 @@ import os
 
 from dotenv import load_dotenv
 
-from utils.db_url import encode_database_url_password
+from src.database.db_url import encode_database_url_password
 
 load_dotenv()
 

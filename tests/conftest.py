@@ -6,8 +6,8 @@ from fastapi.testclient import TestClient
 from sqlmodel import Session, SQLModel, create_engine
 from sqlmodel.pool import StaticPool
 
-from database.database import get_session
 from main import app
+from src.database.database import get_session
 
 logger = logging.getLogger(__name__)
 
