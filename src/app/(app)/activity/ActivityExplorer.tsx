@@ -28,6 +28,8 @@ const entryIconStyles = {
   request: "bg-[#fff1e8] text-[#ea580c]",
 } as const;
 
+const ROWS_PER_PAGE = 5;
+
 const formatEntryDate = (timestamp: number) => {
   if (!Number.isFinite(timestamp) || timestamp <= 0) {
     return "--";
@@ -123,6 +125,7 @@ export default function ActivityExplorer() {
   const [loadingSessionId, setLoadingSessionId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [isSessionMenuOpen, setIsSessionMenuOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
   const sessionDetailsRef = useRef<Record<string, AgentSessionDetail>>({});
   const selectedSessionIdRef = useRef<string | null>(null);
   const menuContainerRef = useRef<HTMLDivElement | null>(null);
@@ -192,6 +195,7 @@ export default function ActivityExplorer() {
         startTransition(() => {
           setSessions(nextSessions);
           setSelectedSessionId(nextSelectedSessionId);
+          setCurrentPage(1);
           if (refresh) {
             sessionDetailsRef.current = {};
             setSessionDetails({});
@@ -239,6 +243,7 @@ export default function ActivityExplorer() {
     async (sessionId: string) => {
       setSelectedSessionId(sessionId);
       setSelectedEntryId(null);
+      setCurrentPage(1);
       setIsSessionMenuOpen(false);
       try {
         const detail = await loadSessionDetail(sessionId);
@@ -278,7 +283,18 @@ export default function ActivityExplorer() {
   }, [selectedDetail, selectedEntryId]);
 
   const detailMeta = selectedEntry ?? null;
-  const timelineEntries = selectedDetail?.entries ?? [];
+  const timelineEntries = useMemo(() => selectedDetail?.entries ?? [], [selectedDetail]);
+  const totalPages = Math.max(1, Math.ceil(timelineEntries.length / ROWS_PER_PAGE));
+  const paginatedEntries = useMemo(() => {
+    const startIndex = (currentPage - 1) * ROWS_PER_PAGE;
+    return timelineEntries.slice(startIndex, startIndex + ROWS_PER_PAGE);
+  }, [currentPage, timelineEntries]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   return (
     <div className="space-y-8">
@@ -441,7 +457,7 @@ export default function ActivityExplorer() {
             </div>
           ) : (
             <div className="overflow-hidden rounded-xl bg-white shadow-[0_24px_60px_-44px_rgba(15,23,42,0.45)]">
-              <div className="max-h-[68vh] overflow-auto">
+              <div className="overflow-x-auto">
                 <table className="min-w-full border-collapse table-fixed">
                   <colgroup>
                     <col className="w-[24%]" />
@@ -470,7 +486,7 @@ export default function ActivityExplorer() {
                     </tr>
                   </thead>
                   <tbody>
-                    {timelineEntries.map((entry) => {
+                    {paginatedEntries.map((entry) => {
                       const isSelected = entry.id === selectedEntryId;
                       return (
                         <tr
@@ -533,11 +549,39 @@ export default function ActivityExplorer() {
                   </tbody>
                 </table>
               </div>
+              <div className="flex items-center justify-between border-t border-[#edf1f7] px-5 py-3">
+                <p className="text-sm text-[#687285]">
+                  Showing {(currentPage - 1) * ROWS_PER_PAGE + 1}-
+                  {Math.min(currentPage * ROWS_PER_PAGE, timelineEntries.length)} of{" "}
+                  {timelineEntries.length}
+                </p>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                    disabled={currentPage === 1}
+                    className="rounded-full border border-[#dbe4f5] px-3 py-1.5 text-sm font-medium text-[#4f49e2] disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Previous
+                  </button>
+                  <span className="min-w-[72px] text-center text-sm font-medium text-[#44506a]">
+                    Page {currentPage} / {totalPages}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                    disabled={currentPage === totalPages}
+                    className="rounded-full border border-[#dbe4f5] px-3 py-1.5 text-sm font-medium text-[#4f49e2] disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
             </div>
           )}
         </div>
 
-        <div className="hidden xl:flex flex-col items-center pt-[6.5rem]">
+        <div className="hidden xl:flex self-start justify-center pt-40">
           <div className="flex h-12 w-12 items-center justify-center rounded-full border border-[#d9e2f3] bg-white text-[#4f49e2] shadow-[0_18px_35px_-24px_rgba(15,23,42,0.45)]">
             <ArrowRight className="h-5 w-5" />
           </div>
