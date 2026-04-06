@@ -2,6 +2,7 @@
 
 import {
   Activity,
+  ArrowRight,
   Check,
   ChevronDown,
   Loader2,
@@ -69,7 +70,7 @@ function SessionDropdownSkeleton() {
 function TimelineSkeleton() {
   return (
     <div className="overflow-hidden rounded-xl bg-white shadow-[0_24px_60px_-44px_rgba(15,23,42,0.45)]">
-      <div className="grid grid-cols-[1.1fr_1fr_2.2fr_1fr_1fr] gap-4 border-b border-[#edf1f7] px-6 py-4">
+      <div className="grid grid-cols-[1.2fr_1fr_2.8fr_1fr_1fr] gap-4 border-b border-[#edf1f7] px-6 py-4">
         {Array.from({ length: 5 }).map((_, index) => (
           <span key={`table-head-skeleton-${index}`} className="h-3 rounded-full bg-[#e8edf7]" />
         ))}
@@ -78,7 +79,7 @@ function TimelineSkeleton() {
         {Array.from({ length: 4 }).map((_, index) => (
           <div
             key={`timeline-skeleton-${index}`}
-            className="grid animate-pulse grid-cols-[1.1fr_1fr_2.2fr_1fr_1fr] gap-4 px-6 py-5"
+            className="grid animate-pulse grid-cols-[1.2fr_1fr_2.8fr_1fr_1fr] gap-4 px-6 py-5"
           >
             <span className="h-5 w-28 rounded-full bg-[#e8edf7]" />
             <span className="h-5 w-24 rounded-full bg-[#e8edf7]" />
@@ -279,7 +280,7 @@ export default function ActivityExplorer() {
 
   return (
     <div className="space-y-8">
-      <section className="overflow-hidden rounded-[36px] bg-[radial-gradient(circle_at_top_left,#ffffff_0%,#f7f8fd_48%,#eef3ff_100%)] px-8 py-8 shadow-[0_32px_80px_-52px_rgba(15,23,42,0.5)]">
+      <section className="overflow-hidden rounded-xl bg-[radial-gradient(circle_at_top_left,#ffffff_0%,#f7f8fd_48%,#eef3ff_100%)] px-8 py-8 shadow-[0_32px_80px_-52px_rgba(15,23,42,0.5)]">
         <div className="flex flex-col gap-8">
           <div className="flex flex-wrap items-start justify-between gap-6">
             <div className="max-w-3xl">
@@ -394,28 +395,33 @@ export default function ActivityExplorer() {
       </section>
 
       {error ? (
-        <div className="rounded-[28px] border border-[#fee2e2] bg-[#fff5f5] px-6 py-4 text-sm text-[#b42318]">
+        <div className="rounded-xl border border-[#fee2e2] bg-[#fff5f5] px-6 py-4 text-sm text-[#b42318]">
           {error}
         </div>
       ) : null}
 
-      <section className="grid gap-10 xl:grid-cols-[minmax(0,1.15fr)_minmax(380px,0.85fr)]">
+      <section className="grid items-start gap-6 xl:grid-cols-[minmax(0,1.08fr)_64px_minmax(380px,0.84fr)]">
         <div className="min-w-0">
-          <div className="mb-6 flex items-end justify-between gap-4">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#7a8498]">
-                Activity Table
-              </p>
-              <h2 className="mt-2 text-2xl font-semibold text-[#111827]">
-                User activity
-              </h2>
+          <div className="mb-6">
+            <div className="mb-5 flex items-center gap-4">
+              <span className="h-px w-full bg-[#dde4f1]" />
             </div>
-            {loadingSessionId && selectedSessionId === loadingSessionId ? (
-              <div className="inline-flex items-center gap-2 text-sm font-medium text-[#5f677a]">
-                <Loader2 className="h-4 w-4 animate-spin text-[#5b4cf0]" />
-                Syncing logs
+            <div className="flex items-end justify-between gap-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#7a8498]">
+                  Activity Table
+                </p>
+                <h2 className="mt-2 text-2xl font-semibold text-[#111827]">
+                  User activity
+                </h2>
               </div>
-            ) : null}
+              {loadingSessionId && selectedSessionId === loadingSessionId ? (
+                <div className="inline-flex items-center gap-2 text-sm font-medium text-[#5f677a]">
+                  <Loader2 className="h-4 w-4 animate-spin text-[#5b4cf0]" />
+                  Syncing logs
+                </div>
+              ) : null}
+            </div>
           </div>
 
           {isLoading ? (
@@ -428,23 +434,30 @@ export default function ActivityExplorer() {
             </div>
           ) : (
             <div className="overflow-hidden rounded-xl bg-white shadow-[0_24px_60px_-44px_rgba(15,23,42,0.45)]">
-              <div className="overflow-x-auto">
-                <table className="min-w-full border-collapse">
+              <div className="max-h-[68vh] overflow-auto">
+                <table className="min-w-full border-collapse table-fixed">
+                  <colgroup>
+                    <col className="w-[24%]" />
+                    <col className="w-[20%]" />
+                    <col className="w-[28%]" />
+                    <col className="w-[16%]" />
+                    <col className="w-[12%]" />
+                  </colgroup>
                   <thead>
                     <tr className="border-b border-[#edf1f7] bg-[#fbfcff]">
-                      <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-[0.16em] text-[#7a8498]">
+                      <th className="sticky top-0 z-10 bg-[#fbfcff] px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-[0.16em] text-[#7a8498]">
                         Type
                       </th>
-                      <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-[0.16em] text-[#7a8498]">
+                      <th className="sticky top-0 z-10 bg-[#fbfcff] px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-[0.16em] text-[#7a8498]">
                         Action
                       </th>
-                      <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-[0.16em] text-[#7a8498]">
+                      <th className="sticky top-0 z-10 bg-[#fbfcff] px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-[0.16em] text-[#7a8498]">
                         Details
                       </th>
-                      <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-[0.16em] text-[#7a8498]">
+                      <th className="sticky top-0 z-10 bg-[#fbfcff] px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-[0.16em] text-[#7a8498]">
                         Date
                       </th>
-                      <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-[0.16em] text-[#7a8498]">
+                      <th className="sticky top-0 z-10 bg-[#fbfcff] px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-[0.16em] text-[#7a8498]">
                         Time
                       </th>
                     </tr>
@@ -456,21 +469,21 @@ export default function ActivityExplorer() {
                         <tr
                           key={entry.id}
                           onClick={() => setSelectedEntryId(entry.id)}
-                          className={`cursor-pointer border-b border-[#edf1f7] transition ${
+                          className={`group cursor-pointer border-b border-[#edf1f7] transition ${
                             isSelected
                               ? "bg-[#e9efff]"
                               : "bg-white hover:bg-[#f5f8ff]"
                           }`}
                         >
                           <td
-                            className={`align-top ${
+                            className={`align-middle ${
                               isSelected
                                 ? "border-l-4 border-[#4f49e2] pl-4 pr-5 py-4"
-                                : "px-5 py-4"
+                                : "border-l-4 border-transparent px-5 py-4 group-hover:border-[#c7d2fe]"
                             }`}
                           >
                             <span
-                              className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${
+                              className={`inline-flex items-center whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold ${
                                 entryIconStyles[entry.source]
                               }`}
                             >
@@ -478,13 +491,13 @@ export default function ActivityExplorer() {
                             </span>
                           </td>
                           <td
-                            className={`align-top text-sm font-semibold ${
+                            className={`align-middle text-sm font-semibold ${
                               isSelected ? "px-5 py-4 text-[#13203a]" : "px-5 py-4 text-[#111827]"
                             }`}
                           >
                             {entry.title}
                           </td>
-                          <td className="max-w-0 px-5 py-4 align-top">
+                          <td className="max-w-0 px-5 py-4 align-middle">
                             <p
                               className={`line-clamp-2 text-sm leading-6 ${
                                 isSelected ? "text-[#44506a]" : "text-[#5f677a]"
@@ -494,14 +507,14 @@ export default function ActivityExplorer() {
                             </p>
                           </td>
                           <td
-                            className={`whitespace-nowrap px-5 py-4 align-top text-sm ${
+                            className={`whitespace-nowrap px-5 py-4 align-middle text-sm ${
                               isSelected ? "text-[#44506a]" : "text-[#5f677a]"
                             }`}
                           >
                             {formatEntryDate(entry.timestamp)}
                           </td>
                           <td
-                            className={`whitespace-nowrap px-5 py-4 align-top text-sm font-medium ${
+                            className={`whitespace-nowrap px-5 py-4 align-middle text-sm font-medium ${
                               isSelected ? "text-[#334155]" : "text-[#5f677a]"
                             }`}
                           >
@@ -517,14 +530,25 @@ export default function ActivityExplorer() {
           )}
         </div>
 
-        <div>
+        <div className="hidden xl:flex flex-col items-center pt-[6.5rem]">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full border border-[#d9e2f3] bg-white text-[#4f49e2] shadow-[0_18px_35px_-24px_rgba(15,23,42,0.45)]">
+            <ArrowRight className="h-5 w-5" />
+          </div>
+        </div>
+
+        <div className="min-w-0">
           <div className="mb-6">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#7a8498]">
-              Detail View
-            </p>
-            <h2 className="mt-2 text-2xl font-semibold text-[#111827]">
-              Event details
-            </h2>
+            <div className="mb-5 flex items-center gap-4">
+              <span className="h-px w-full bg-[#dde4f1]" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#7a8498]">
+                Detail View
+              </p>
+              <h2 className="mt-2 text-2xl font-semibold text-[#111827]">
+                Event details
+              </h2>
+            </div>
           </div>
 
           {isLoading || (selectedSessionId && loadingSessionId === selectedSessionId && !selectedDetail) ? (
@@ -537,19 +561,19 @@ export default function ActivityExplorer() {
             </div>
           ) : (
             <div className="overflow-hidden rounded-xl bg-[linear-gradient(180deg,#ffffff_0%,#fbfcff_100%)] shadow-[0_24px_60px_-44px_rgba(15,23,42,0.45)]">
-              <div className="border-b border-[#edf1f7] px-8 py-7">
+              <div className="border-b border-[#edf1f7] px-7 py-6">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#7a8498]">
                   {detailMeta.authorLabel}
                 </p>
-                <h3 className="mt-3 text-3xl font-semibold tracking-tight text-[#111827]">
+                <h3 className="mt-2 text-3xl font-semibold tracking-tight text-[#111827]">
                   {detailMeta.title}
                 </h3>
-                <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-[#687285]">
+                <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-[#687285]">
                   <span>{detailMeta.timestampLabel}</span>
                   <span className="text-[#c8cfdb]">/</span>
                   <span>{selectedSession?.summary}</span>
                 </div>
-                <div className="mt-5 flex flex-wrap items-center gap-3">
+                <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg bg-[#f8faff] px-4 py-3">
                   <span
                     className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${
                       levelStyles[detailMeta.source]
@@ -557,13 +581,16 @@ export default function ActivityExplorer() {
                   >
                     {detailMeta.source}
                   </span>
-                  <span className="text-xs uppercase tracking-[0.16em] text-[#98a2b3]">
-                    Activity ID {selectedDetail?.id}
+                  <span className="text-[11px] uppercase tracking-[0.16em] text-[#a0abc0]">
+                    Activity ID
+                  </span>
+                  <span className="min-w-0 break-all text-sm font-medium text-[#6b7280]">
+                    {selectedDetail?.id}
                   </span>
                 </div>
               </div>
 
-              <div className="soft-scrollbar max-h-[70vh] overflow-y-auto px-8 py-7">
+              <div className="soft-scrollbar max-h-[70vh] overflow-y-auto px-7 py-6">
                 <div className="space-y-4 break-words text-sm leading-7 text-[#5f677a]">
                   {renderMarkdownBlocks(detailMeta.text)}
                 </div>
