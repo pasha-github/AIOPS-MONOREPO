@@ -547,6 +547,7 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
           </div>
         </div>
       )}
+      
 
       {/* Toast */}
       {isToastVisible && (
