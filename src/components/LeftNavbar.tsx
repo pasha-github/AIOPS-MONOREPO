@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactElement } from "react";
 import {
+  Activity,
   Bot,
   LayoutGrid,
   Link2,
@@ -43,12 +44,11 @@ const navSections: NavSection[] = [
         href: "/dashboard",
       },
       {
-        label: "ChatOps",
-        id: "platform-chatops",
-        icon: <MessageSquare className="h-5 w-5" />,
-        dot: true,
-        href: "/chatOps",
-      }
+        label: "Activity",
+        id: "core-activity",
+        icon: <Activity className="h-5 w-5" />,
+        href: "/activity",
+      },
     ],
   },
   {
@@ -59,6 +59,13 @@ const navSections: NavSection[] = [
         id: "platform-agent-managements",
         icon: <Bot className="h-5 w-5" />,
         href: "/agent-management",
+      },
+      {
+        label: "ChatOps",
+        id: "platform-chatops",
+        icon: <MessageSquare className="h-5 w-5" />,
+        dot: true,
+        href: "/chatOps",
       },
       {
         label: "LLM Management",
