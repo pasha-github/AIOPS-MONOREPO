@@ -44,20 +44,11 @@ const navSections: NavSection[] = [
         href: "/dashboard",
       },
       {
-<<<<<<< HEAD
-        label: "ChatOps",
-        id: "platform-chatops",
-        icon: <MessageSquare className="h-5 w-5" />,
-        dot: true,
-        href: "/chatOps",
-      }
-=======
         label: "Activity",
         id: "core-activity",
         icon: <Activity className="h-5 w-5" />,
         href: "/activity",
       },
->>>>>>> main
     ],
   },
   {
@@ -68,6 +59,13 @@ const navSections: NavSection[] = [
         id: "platform-agent-managements",
         icon: <Bot className="h-5 w-5" />,
         href: "/agent-management",
+      },
+      {
+        label: "ChatOps",
+        id: "platform-chatops",
+        icon: <MessageSquare className="h-5 w-5" />,
+        dot: true,
+        href: "/chatOps",
       },
       {
         label: "LLM Management",
