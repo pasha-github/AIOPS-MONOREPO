@@ -5,9 +5,9 @@ import {
   Bell,
   ChevronDown,
   Loader2,
-  Maximize2,
   RefreshCw,
   Sparkles,
+  X,
 } from "lucide-react";
 import {
   startTransition,
@@ -31,6 +31,11 @@ const levelStyles = {
   request: "bg-[#fff7ed] text-[#ea580c]",
 } as const;
 
+const entryIconStyles = {
+  text: "bg-[#ecebff] text-[#5b4cf0]",
+  request: "bg-[#fff1e8] text-[#ea580c]",
+} as const;
+
 const REVEAL_INTERVAL_MS = 140;
 
 export default function AgentActivityLog() {
@@ -39,11 +44,10 @@ export default function AgentActivityLog() {
     {}
   );
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
-  const [expandedEntryIds, setExpandedEntryIds] = useState<Record<string, boolean>>({});
+  const [activeEntryId, setActiveEntryId] = useState<string | null>(null);
   const [visibleEntryCount, setVisibleEntryCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isPanelExpanded, setIsPanelExpanded] = useState(false);
   const [loadingSessionId, setLoadingSessionId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const sessionDetailsRef = useRef<Record<string, AgentSessionDetail>>({});
@@ -105,7 +109,7 @@ export default function AgentActivityLog() {
           if (refresh) {
             sessionDetailsRef.current = {};
             setSessionDetails({});
-            setExpandedEntryIds({});
+            setActiveEntryId(null);
           }
         });
 
@@ -144,6 +148,10 @@ export default function AgentActivityLog() {
   const visibleEntries = useMemo(
     () => selectedDetail?.entries.slice(0, visibleEntryCount) ?? [],
     [selectedDetail, visibleEntryCount]
+  );
+  const activeEntry = useMemo(
+    () => visibleEntries.find((entry) => entry.id === activeEntryId) ?? null,
+    [activeEntryId, visibleEntries]
   );
 
   useEffect(() => {
@@ -195,38 +203,26 @@ export default function AgentActivityLog() {
     void loadSessions(true, controller.signal);
   }, [loadSessions]);
 
-  const toggleExpandedEntry = useCallback((entryId: string) => {
-    setExpandedEntryIds((current) => ({
-      ...current,
-      [entryId]: !current[entryId],
-    }));
+  const openEntryModal = useCallback((entryId: string) => {
+    setActiveEntryId(entryId);
+  }, []);
+
+  const closeEntryModal = useCallback(() => {
+    setActiveEntryId(null);
   }, []);
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-3xl bg-white p-6 shadow-[0_18px_50px_-38px_rgba(16,24,40,0.5)]">
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex items-start gap-3">
-          <span className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-2xl bg-[#e6f9ee] text-[#16a34a]">
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-[#e6f9ee] text-[#16a34a]">
             <Activity className="h-5 w-5" />
           </span>
-          <div>
-            <h3 className="text-lg font-semibold text-[#111827]">Automation Agent</h3>
-          </div>
+          <h3 className="text-lg font-semibold leading-none text-[#111827]">
+            Automation Agent
+          </h3>
         </div>
-        <div className="mt-1 inline-flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setIsPanelExpanded((current) => !current)}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#e3e7f2] bg-white text-[#6b7280] shadow-[0_8px_16px_-14px_rgba(16,24,40,0.4)]"
-            aria-label="Maximize logs"
-            title="Maximize logs"
-          >
-            <Maximize2
-              className={`h-4 w-4 transition-transform ${
-                isPanelExpanded ? "scale-90" : ""
-              }`}
-            />
-          </button>
+        <div className="inline-flex items-center gap-2">
           <button
             type="button"
             onClick={handleRefresh}
@@ -242,9 +238,21 @@ export default function AgentActivityLog() {
 
       <div className="mt-6 max-h-[172px] space-y-3 overflow-y-auto pr-2">
         {isLoading ? (
-          <div className="flex items-center gap-2 rounded-2xl border border-[#edf1f7] bg-[#fafbff] px-4 py-3 text-sm text-[#5f677a]">
-            <Loader2 className="h-4 w-4 animate-spin text-[#5b4cf0]" />
-            Loading latest MuleSoft sessions...
+          <div className="space-y-3">
+            {Array.from({ length: 2 }).map((_, index) => (
+              <div
+                key={`session-skeleton-${index}`}
+                className="animate-pulse rounded-2xl border border-[#eef1f7] bg-white px-4 py-3 shadow-[0_10px_30px_-28px_rgba(16,24,40,0.4)]"
+              >
+                <div className="flex items-center justify-between gap-4">
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <span className="block h-4 w-3/4 rounded bg-[#edf2f9]" />
+                    <span className="block h-3 w-24 rounded bg-[#edf2f9]" />
+                  </div>
+                  <span className="h-4 w-4 rounded bg-[#edf2f9]" />
+                </div>
+              </div>
+            ))}
           </div>
         ) : null}
 
@@ -290,14 +298,46 @@ export default function AgentActivityLog() {
         ) : null}
       </div>
 
-      <div
-        className={`soft-scrollbar mt-6 min-h-0 flex-1 space-y-6 overflow-y-auto pr-2 ${
-          isPanelExpanded ? "max-h-none" : ""
-        }`}
-      >
+      <div className="soft-scrollbar mt-6 min-h-0 flex-1 space-y-6 overflow-y-auto pr-2">
         {error ? (
           <div className="rounded-2xl border border-[#fee2e2] bg-[#fff5f5] px-4 py-3 text-sm text-[#b42318]">
             {error}
+          </div>
+        ) : null}
+
+        {isLoading ? (
+          <div className="animate-pulse rounded-2xl border border-[#eef1f7] bg-[#fcfdff] p-4 shadow-[0_10px_30px_-28px_rgba(16,24,40,0.4)]">
+            <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[#edf1f7] pb-4">
+              <div className="space-y-2">
+                <span className="block h-4 w-48 rounded bg-[#edf2f9]" />
+                <span className="block h-3 w-28 rounded bg-[#edf2f9]" />
+              </div>
+              <span className="block h-3 w-32 rounded bg-[#edf2f9]" />
+            </div>
+
+            <div className="mt-5 space-y-6">
+              {Array.from({ length: 2 }).map((_, index) => (
+                <div key={`entry-skeleton-${index}`} className="flex gap-4">
+                  <div className="flex flex-col items-center">
+                    <span className="h-9 w-9 rounded-2xl bg-[#edf2f9]" />
+                    <span className="mt-2 h-16 w-px bg-[#edf2f9]" />
+                  </div>
+                  <div className="flex-1 space-y-3">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="min-w-0 flex-1 space-y-2">
+                        <span className="block h-4 w-28 rounded bg-[#edf2f9]" />
+                        <span className="block h-3 w-24 rounded bg-[#edf2f9]" />
+                        <span className="block h-3 w-full rounded bg-[#edf2f9]" />
+                        <span className="block h-3 w-5/6 rounded bg-[#edf2f9]" />
+                        <span className="block h-3 w-16 rounded bg-[#edf2f9]" />
+                      </div>
+                      <span className="mt-1 block h-3 w-24 rounded bg-[#edf2f9]" />
+                    </div>
+                    <span className="block h-6 w-14 rounded-lg bg-[#edf2f9]" />
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         ) : null}
 
@@ -319,7 +359,7 @@ export default function AgentActivityLog() {
                 </p>
               </div>
               <p className="text-xs text-[#8a94a6]">
-                Session ID: <span className="font-medium text-[#5f677a]">{selectedDetail.id}</span>
+                Activity ID: <span className="font-medium text-[#5f677a]">{selectedDetail.id}</span>
               </p>
             </div>
 
@@ -331,7 +371,6 @@ export default function AgentActivityLog() {
               ) : null}
 
               {visibleEntries.map((entry, index) => {
-                const isExpanded = Boolean(expandedEntryIds[entry.id]);
                 return (
                   <div
                     key={entry.id}
@@ -339,7 +378,11 @@ export default function AgentActivityLog() {
                     style={{ animationDelay: `${index * 40}ms` }}
                   >
                     <div className="flex flex-col items-center">
-                      <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-[#ecebff] text-[#5b4cf0]">
+                      <div
+                        className={`flex h-9 w-9 items-center justify-center rounded-2xl ${
+                          entryIconStyles[entry.source]
+                        }`}
+                      >
                         <Sparkles className="h-4 w-4" />
                       </div>
                       <div className="mt-2 h-full w-px bg-[#e6eaf3]" />
@@ -352,21 +395,15 @@ export default function AgentActivityLog() {
                             {entry.authorLabel}
                           </p>
                           <div className="mt-2 text-sm text-[#5f677a]">
-                            {isExpanded ? (
-                              <div className="space-y-3 break-words">
-                                {renderMarkdownBlocks(entry.text)}
-                              </div>
-                            ) : (
-                              <p className="break-words">{entry.preview}</p>
-                            )}
+                            <p className="break-words">{entry.preview}</p>
                           </div>
                           {entry.isTruncated ? (
                             <button
                               type="button"
-                              onClick={() => toggleExpandedEntry(entry.id)}
+                              onClick={() => openEntryModal(entry.id)}
                               className="mt-2 text-xs font-semibold text-[#4f49e2]"
                             >
-                              {isExpanded ? "Show less" : "Expand"}
+                              Show more...
                             </button>
                           ) : null}
                         </div>
@@ -397,6 +434,39 @@ export default function AgentActivityLog() {
           </div>
         ) : null}
       </div>
+
+      {activeEntry ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[#111827]/45 px-4 py-6"
+          onClick={closeEntryModal}
+        >
+          <div
+            className="max-h-[85vh] w-full max-w-3xl overflow-hidden rounded-3xl bg-white shadow-[0_28px_80px_-32px_rgba(16,24,40,0.65)]"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-4 border-b border-[#edf1f7] px-6 py-5">
+              <div className="min-w-0">
+                <p className="text-base font-semibold text-[#111827]">{activeEntry.title}</p>
+                <p className="mt-1 text-sm text-[#7a8498]">
+                  {activeEntry.authorLabel} | {activeEntry.timestampLabel}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeEntryModal}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#e3e7f2] bg-white text-[#6b7280]"
+                aria-label="Close message"
+                title="Close message"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="soft-scrollbar max-h-[calc(85vh-88px)] overflow-y-auto px-6 py-5 text-sm text-[#5f677a]">
+              <div className="space-y-3 break-words">{renderMarkdownBlocks(activeEntry.text)}</div>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

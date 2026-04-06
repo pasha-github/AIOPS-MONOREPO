@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactElement } from "react";
 import {
+  Activity,
   Bot,
   LayoutGrid,
   Link2,
@@ -41,6 +42,12 @@ const navSections: NavSection[] = [
         icon: <LayoutGrid className="h-5 w-5" />,
         active: true,
         href: "/dashboard",
+      },
+      {
+        label: "Activity",
+        id: "core-activity",
+        icon: <Activity className="h-5 w-5" />,
+        href: "/activity",
       },
     ],
   },

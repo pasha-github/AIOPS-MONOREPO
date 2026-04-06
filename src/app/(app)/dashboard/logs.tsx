@@ -116,7 +116,7 @@ const getAuthorLabel = (author: string, source: AgentLogEntry["source"]) => {
     return "Tool request";
   }
   if (normalized === "user") {
-    return "User message";
+    return "Trigger message";
   }
   if (normalized.includes("agent")) {
     return "Agent response";
@@ -243,12 +243,14 @@ export async function fetchAgentSessionDetail(
     });
   });
 
+  const sortedEntries = [...entries].sort((a, b) => b.timestamp - a.timestamp);
+
   return {
     id: getTrimmedText(payload?.id) || sessionId,
     summary,
     updatedAt,
     updatedAtLabel: formatTimestamp(updatedAt),
-    entries,
+    entries: sortedEntries,
   } satisfies AgentSessionDetail;
 }
 
