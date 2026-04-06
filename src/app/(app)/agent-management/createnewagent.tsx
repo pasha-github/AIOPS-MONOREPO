@@ -1,32 +1,11 @@
-"use client";
-
-import { useEffect, useMemo, useRef, useState } from "react";
-import Image from "next/image";
-import { Bot, ChevronDown, Plus, Trash2, X, LayoutTemplate } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Bot, ChevronDown, Plus, LayoutTemplate  } from "lucide-react";
 import { trimTrailingSlash } from "@/config/agent";
 import { useRuntimeConfig } from "@/config/runtime-config";
 import { getProviderIconSrc } from "../llm-management/llmHelpers";
-
-type CreateNewAgentProps = {
-  onCreateSuccess?: () => void | Promise<void>;
-};
-
-type ActionResult = { ok: boolean; error?: string };
-
-type ModelOption = {
-  value: string;
-  label: string;
-  secondary: string;
-  iconSrc: string | null;
-};
-
-type ModelTemplate = {
-  template_id: string;
-  name: string;
-  description?: string;
-  instruction?: string;
-  model_id?: string;
-};
+import { DynamicDropdownField, DynamicListField } from "./DynamicConnector";
+import ModelSelect, { ModelOption } from "./ModelSelect";
+import { CreateNewAgentProps, ModelTemplate } from "./types";
 
 const toSnakeCase = (value: string) =>
   value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
@@ -34,170 +13,17 @@ const toSnakeCase = (value: string) =>
 const normalizeString = (value: string) => value.trim();
 
 const getErrorMessage = (payload: unknown, fallback: string) => {
-  if (payload && typeof payload === "object" && "message" in payload && typeof (payload as any).message === "string") {
+  if (
+    payload &&
+    typeof payload === "object" &&
+    "message" in payload &&
+    typeof (payload as any).message === "string"
+  ) {
     return String((payload as any).message);
   }
   return fallback;
 };
 
-/* ── Shared classes ── */
-const inputClass =
-  "w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-900 placeholder-gray-400 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/10";
-
-/* ── Field wrapper ── */
-function Field({ label, hint, required, children }: {
-  label: string; hint?: string; required?: boolean; children: React.ReactNode;
-}) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <label className="flex items-center gap-1 text-sm font-medium text-gray-700">
-        {label}
-        {required && <span className="text-red-500">*</span>}
-      </label>
-      {hint && <p className="text-xs leading-snug text-gray-400">{hint}</p>}
-      {children}
-    </div>
-  );
-}
-
-/* ── Section divider ── */
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="mt-1 text-[10px] font-semibold uppercase tracking-widest text-gray-400">
-      {children}
-    </p>
-  );
-}
-
-/* ── Dynamic list field (MCP / Connector) ── */
-function DynamicListField({ label, hint, values, placeholder, onAdd, onRemove, onChange }: {
-  label: string; hint?: string; values: string[]; placeholder: string;
-  onAdd: () => void; onRemove: (i: number) => void; onChange: (i: number, v: string) => void;
-}) {
-  return (
-    <Field label={label} hint={hint}>
-      <div className="flex flex-col gap-2">
-        {values.map((val, i) => (
-          <div key={i} className="flex items-center gap-2">
-            <input
-              type="text"
-              value={val}
-              onChange={(e) => onChange(i, e.target.value)}
-              placeholder={placeholder}
-              className={inputClass}
-            />
-            <button
-              type="button"
-              onClick={onAdd}
-              title="Add"
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-600 transition hover:bg-indigo-100"
-            >
-              <Plus size={14} />
-            </button>
-            {values.length > 1 && (
-              <button
-                type="button"
-                onClick={() => onRemove(i)}
-                title="Remove"
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-500 transition hover:bg-red-100"
-              >
-                <Trash2 size={14} />
-              </button>
-            )}
-          </div>
-        ))}
-      </div>
-    </Field>
-  );
-}
-
-/* ── Model select dropdown ── */
-function ModelSelect({ value, options, placeholder, disabled, loading, onChange }: {
-  value: string; options: ModelOption[]; placeholder: string;
-  disabled?: boolean; loading?: boolean; onChange: (v: string) => void;
-}) {
-  const [isOpen, setIsOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setIsOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [isOpen]);
-
-  const selected = options.find((o) => o.value === value) ?? null;
-
-  return (
-    <div ref={ref} className="relative">
-      <button
-        type="button"
-        onClick={() => { if (!disabled && !loading) setIsOpen((p) => !p); }}
-        className={`flex w-full items-center justify-between rounded-lg border px-3 py-2.5 text-sm transition ${
-          disabled || loading
-            ? "cursor-not-allowed border-dashed border-gray-200 bg-gray-100 text-gray-400"
-            : "border-gray-200 bg-gray-50 text-gray-900 hover:border-gray-300 hover:bg-white focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/10"
-        }`}
-      >
-        <span className="flex min-w-0 items-center gap-2">
-          {selected?.iconSrc && (
-            <Image src={selected.iconSrc} alt="" width={18} height={18} className="shrink-0 rounded-sm object-contain" />
-          )}
-          {loading ? (
-            <span className="text-gray-400">Loading models…</span>
-          ) : selected ? (
-            <span className="min-w-0">
-              <span className="block truncate">{selected.label}</span>
-              <span className="block truncate text-xs text-gray-400">{selected.secondary}</span>
-            </span>
-          ) : (
-            <span className="text-gray-400">{placeholder}</span>
-          )}
-        </span>
-        <ChevronDown size={15} className={`shrink-0 text-gray-400 transition-transform ${isOpen ? "rotate-180" : ""}`} />
-      </button>
-
-      {isOpen && !disabled && !loading && (
-        <div className="absolute z-30 mt-1.5 max-h-64 w-full overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-lg">
-          <button
-            type="button"
-            onClick={() => { onChange(""); setIsOpen(false); }}
-            className="w-full px-3 py-2.5 text-left text-sm text-gray-400 hover:bg-gray-50"
-          >
-            {placeholder}
-          </button>
-          {options.map((o) => (
-            <button
-              key={o.value}
-              type="button"
-              onClick={() => { onChange(o.value); setIsOpen(false); }}
-              className={`flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm transition ${
-                o.value === value ? "bg-indigo-50 text-indigo-700 font-medium" : "text-gray-700 hover:bg-gray-50"
-              }`}
-            >
-              {o.iconSrc && <Image src={o.iconSrc} alt="" width={18} height={18} className="shrink-0 rounded-sm object-contain" />}
-              <span className="min-w-0">
-                <span className="block truncate">{o.label}</span>
-                <span className="block truncate text-xs text-gray-400">{o.secondary}</span>
-              </span>
-              {o.value === value && (
-                <svg className="ml-auto h-3.5 w-3.5 shrink-0 text-indigo-600" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" />
-                </svg>
-              )}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ══════════════════════════════════════════
-   Main component
-══════════════════════════════════════════ */
 export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps) {
   const { llmManagerApiBaseUrl } = useRuntimeConfig();
   const base = trimTrailingSlash(llmManagerApiBaseUrl);
@@ -208,7 +34,7 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
   const [instruction, setInstruction] = useState("");
   const [modelId, setModelId] = useState("");
   const [mcpServers, setMcpServers] = useState<string[]>([""]);
-  const [connectorConfigIds, setConnectorConfigIds] = useState<string[]>([""]);
+  const [connectorConfigIds, setConnectorConfigIds] = useState<string[][]>([[]]);
   const [modelOptions, setModelOptions] = useState<ModelOption[]>([]);
   const [isModelsLoading, setIsModelsLoading] = useState(false);
   const [modelsLoadError, setModelsLoadError] = useState("");
@@ -221,9 +47,74 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
   const [templatesLoadError, setTemplatesLoadError] = useState("");
   const [isToastVisible, setIsToastVisible] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
+  const [connectorOptions, setConnectorOptions] = useState<{ value: string; label: string }[]>([]);
+  const [isConnectorsLoading, setIsConnectorsLoading] = useState(false);
+  const [configDataMap, setConfigDataMap] = useState<Record<string, any>>({});
 
-  // agentId is still computed and sent to the backend — just not shown in the UI
   const agentId = useMemo(() => toSnakeCase(agentName), [agentName]);
+
+  // Fetch connectors
+  useEffect(() => {
+    if (!isModalOpen) return;
+    const ctrl = new AbortController();
+    (async () => {
+      setIsConnectorsLoading(true);
+      try {
+        const res = await fetch(`${base}/connectors/`, {
+          headers: { accept: "application/json" },
+          signal: ctrl.signal,
+        });
+        const data = await res.json();
+        if (res.ok && Array.isArray(data)) {
+          setConnectorOptions(
+            data.map((item: any) => ({
+              value: item.connector_config_id ?? item.id ?? "",
+              label: item.name ?? item.connector_config_id ?? item.id ?? "",
+            }))
+          );
+        }
+      } catch (e: any) {
+        if (e?.name !== "AbortError") setConnectorOptions([]);
+      } finally {
+        setIsConnectorsLoading(false);
+      }
+    })();
+    return () => ctrl.abort();
+  }, [base, isModalOpen]);
+
+  const fetchConnectorConfig = async (value: string) => {
+    if (!value || configDataMap[value] !== undefined) return;
+    setConfigDataMap((prev) => ({ ...prev, [value]: null }));
+    try {
+      const res = await fetch(`${base}/connectors/${value}/config`, {
+        headers: { accept: "application/json" },
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setConfigDataMap((prev) => ({ ...prev, [value]: data }));
+      } else {
+        setConfigDataMap((prev) => {
+          const next = { ...prev };
+          delete next[value];
+          return next;
+        });
+      }
+    } catch (err) {
+      console.error("Failed to fetch connector config:", err);
+      setConfigDataMap((prev) => {
+        const next = { ...prev };
+        delete next[value];
+        return next;
+      });
+    }
+  };
+
+  useEffect(() => {
+    if (!connectorOptions.length) return;
+    connectorOptions.forEach((opt) => {
+      fetchConnectorConfig(opt.value);
+    });
+  }, [connectorOptions]);
 
   const isFormValid =
     normalizeString(agentName).length > 0 &&
@@ -232,14 +123,14 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
     normalizeString(instruction).length > 0 &&
     modelId.length > 0;
 
-  /* toast auto-hide */
+  // Toast auto hide
   useEffect(() => {
     if (!isToastVisible) return;
     const t = setTimeout(() => setIsToastVisible(false), 3000);
     return () => clearTimeout(t);
   }, [isToastVisible]);
 
-  /* load models */
+  // Fetch Models
   useEffect(() => {
     if (!isModalOpen) return;
     const ctrl = new AbortController();
@@ -247,25 +138,44 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
       setIsModelsLoading(true);
       setModelsLoadError("");
       try {
-        const res = await fetch(`${base}/llms/`, { headers: { accept: "application/json" }, signal: ctrl.signal });
+        const res = await fetch(`${base}/llms/`, {
+          headers: { accept: "application/json" },
+          signal: ctrl.signal,
+        });
         const data = await res.json();
-        if (!res.ok || !Array.isArray(data)) { setModelsLoadError(getErrorMessage(data, "Unable to load models.")); return; }
+        if (!res.ok || !Array.isArray(data)) {
+          setModelsLoadError(getErrorMessage(data, "Unable to load models."));
+          return;
+        }
         setModelOptions(
-          data.flatMap((item: any) => {
-            const id = item?.model_id?.trim();
-            if (!id) return [];
-            const provider = item?.provider?.trim() || "";
-            return [{ value: id, label: item?.name?.trim() || id, secondary: provider ? `${provider} | ${id}` : id, iconSrc: provider ? getProviderIconSrc(provider) : null }];
-          }).sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base", numeric: true }))
+          data
+            .flatMap((item: any) => {
+              const id = item?.model_id?.trim();
+              if (!id) return [];
+              const provider = item?.provider?.trim() || "";
+              return [
+                {
+                  value: id,
+                  label: item?.name?.trim() || id,
+                  secondary: provider ? `${provider} | ${id}` : id,
+                  iconSrc: provider ? getProviderIconSrc(provider) : null,
+                },
+              ];
+            })
+            .sort((a, b) =>
+              a.label.localeCompare(b.label, undefined, { sensitivity: "base", numeric: true })
+            )
         );
       } catch (e: any) {
         if (e?.name !== "AbortError") setModelsLoadError("Unable to load models.");
-      } finally { setIsModelsLoading(false); }
+      } finally {
+        setIsModelsLoading(false);
+      }
     })();
     return () => ctrl.abort();
   }, [base, isModalOpen]);
 
-  /* load templates */
+  // Fetch Templates
   useEffect(() => {
     if (!isModalOpen) return;
     const ctrl = new AbortController();
@@ -285,9 +195,7 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
         }
         setModelTemplates(data);
       } catch (error: unknown) {
-        if (error instanceof DOMException && error.name === "AbortError") {
-          return;
-        }
+        if (error instanceof DOMException && error.name === "AbortError") return;
         setModelTemplates([]);
         setTemplatesLoadError("Unable to load templates.");
       } finally {
@@ -297,7 +205,6 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
     return () => ctrl.abort();
   }, [base, isModalOpen]);
 
-  /* apply template */
   useEffect(() => {
     if (!selectedTemplateId) return;
     const t = modelTemplates.find((x) => x.template_id === selectedTemplateId);
@@ -309,81 +216,122 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
   }, [selectedTemplateId, modelTemplates]);
 
   const resetForm = () => {
-    setAgentName(""); setDescription(""); setInstruction(""); setModelId("");
-    setMcpServers([""]); setConnectorConfigIds([""]); setSubmitError(""); setSuccess(""); setSelectedTemplateId("");
+    setAgentName("");
+    setDescription("");
+    setInstruction("");
+    setModelId("");
+    setMcpServers([""]);
+    setConnectorConfigIds([[]]);
+    setConfigDataMap({});
+    setSubmitError("");
+    setSuccess("");
+    setSelectedTemplateId("");
   };
 
   const openModal = () => { resetForm(); setIsModalOpen(true); };
   const closeModal = () => { if (!isCreating) setIsModalOpen(false); };
 
-  const updateList = (setter: React.Dispatch<React.SetStateAction<string[]>>, i: number, v: string) =>
-    setter((p) => p.map((x, idx) => idx === i ? v : x));
+  const updateList = (i: number, val: string[]) => {
+    setConnectorConfigIds((prev) =>
+      prev.map((x, idx) => (idx === i ? val : x))
+    );
+  };
+
   const addToList = (setter: React.Dispatch<React.SetStateAction<string[]>>) =>
     setter((p) => [...p, ""]);
+
   const removeFromList = (setter: React.Dispatch<React.SetStateAction<string[]>>, i: number) =>
-    setter((p) => p.length <= 1 ? p : p.filter((_, idx) => idx !== i));
+    setter((p) => (p.length <= 1 ? p : p.filter((_, idx) => idx !== i)));
+
   const normalizeList = (vals: string[]) => vals.map((v) => v.trim()).filter(Boolean);
 
   const handleCreate = async () => {
-    if (!isFormValid) { setSubmitError("Please fill all required fields."); return; }
-    setIsCreating(true); setSubmitError(""); setSuccess("");
+    if (!isFormValid) {
+      setSubmitError("Please fill all required fields.");
+      return;
+    }
+    setIsCreating(true);
+    setSubmitError("");
+    setSuccess("");
     try {
       const res = await fetch(`${base}/agent/`, {
         method: "POST",
         headers: { accept: "application/json", "Content-Type": "application/json" },
         body: JSON.stringify({
-          agent_id: agentId,  // still sent to backend
+          agent_id: agentId,
           name: normalizeString(agentName),
           description: normalizeString(description),
           instruction: normalizeString(instruction),
           model_id: modelId,
           tools: "",
           mcp_servers: normalizeList(mcpServers),
-          connector_config_ids: normalizeList(connectorConfigIds),
+          connector_config_ids: connectorConfigIds.flat(),
           isEnabled: true,
           sub_agents: [],
         }),
       });
       const data = await res.json().catch(() => null);
-      if (!res.ok) { setSubmitError(getErrorMessage(data, "Unable to create agent.")); return; }
+      if (!res.ok) {
+        setSubmitError(getErrorMessage(data, "Unable to create agent."));
+        return;
+      }
       setSuccess("Agent created successfully!");
       await onCreateSuccess?.();
-      setTimeout(() => { setIsModalOpen(false); setToastMessage("Agent created successfully."); setIsToastVisible(true); }, 1400);
-    } catch { setSubmitError("Unable to create agent."); }
-    finally { setIsCreating(false); }
+      setTimeout(() => {
+        setIsModalOpen(false);
+        setToastMessage("Agent created successfully.");
+        setIsToastVisible(true);
+      }, 1400);
+    } catch {
+      setSubmitError("Unable to create agent.");
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  const addConnector = () => {
+    setConnectorConfigIds((prev) => [...prev, []]);
+  };
+
+  const removeConnector = (index: number) => {
+    setConnectorConfigIds((prev) =>
+      prev.length <= 1 ? prev : prev.filter((_, i) => i !== index)
+    );
   };
 
   return (
     <>
-      {/* ── Trigger button ── */}
+      {/* Trigger Button */}
       <button
         type="button"
         onClick={openModal}
         className="inline-flex items-center gap-2 rounded-xl bg-[#4f49e2] px-5 py-3 text-sm font-semibold text-white shadow-[0_12px_24px_-14px_rgba(79,73,226,0.6)] transition hover:bg-[#3f39d6] active:scale-95"
       >
-        <Plus size={16} />
+        <Plus size={18} />
         Create New Agent
       </button>
 
-      {/* ── Modal ── */}
+      {/* Modal */}
       {isModalOpen && (
         <div
-          className="fixed inset-0 z-[75] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-[75] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
           onClick={(e) => e.target === e.currentTarget && closeModal()}
         >
-          <div className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+          <div className="relative w-full max-w-2xl max-h-[92vh] flex flex-col bg-white rounded-2xl shadow-2xl overflow-hidden">
 
             {/* Header */}
-            <div className="flex shrink-0 items-center gap-3 border-b border-gray-100 px-6 py-4">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
-                <Bot size={18} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <h2 className="text-sm font-semibold text-gray-900 leading-tight">Create Agent</h2>
-                <p className="mt-0.5 text-xs text-gray-400">Configure a new agent from scratch or from a template</p>
+            <div className="border-b border-gray-100 px-6 py-4 flex items-center justify-between bg-white/80 backdrop-blur-md sticky top-0 z-10">
+              <div className="flex items-center gap-3">
+                <div className="h-9 w-9 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600">
+                  <Bot size={18} />
+                </div>
+                <div>
+                  {/* ← doc 2 header text sizes */}
+                  <h1 className="text-sm font-semibold text-gray-900 leading-tight">Create New Agent</h1>
+                  <p className="text-xs text-gray-400 mt-0.5">Fill the details below</p>
+                </div>
               </div>
 
-              {/* Template picker */}
               <div className="relative flex items-center">
                 <LayoutTemplate size={14} className="pointer-events-none absolute left-2.5 text-indigo-400" />
                 <select
@@ -416,66 +364,73 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
                 </select>
                 <ChevronDown size={12} className="pointer-events-none absolute right-2 text-indigo-400" />
               </div>
-
-              <button
-                onClick={closeModal}
-                aria-label="Close"
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-500 transition hover:bg-gray-200"
-              >
-                <X size={14} />
-              </button>
             </div>
 
-            {/* Scrollable body */}
-            <div className="flex flex-col gap-4 overflow-y-auto px-6 py-5">
+            {/* Form Content */}
+            <div className="flex-1 overflow-y-auto px-6 py-5 flex flex-col gap-4">
 
-              {/* ── Identity ── */}
-              <SectionLabel>Identity</SectionLabel>
+              {/* Identity */}
+              {/* ← doc 2 section label style */}
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">Identity</p>
 
-              {/* Agent Name only — Agent ID is hidden from UI but still sent to the backend */}
-              <Field label="Agent Name" required hint="Human-readable display name for this agent">
+              <div className="flex flex-col gap-1.5">
+                <label className="flex items-center gap-1 text-sm font-medium text-gray-700">
+                  Agent Name <span className="text-red-500">*</span>
+                </label>
+                <p className="text-xs leading-snug text-gray-400">Human-readable display name for this agent</p>
                 <input
                   type="text"
                   value={agentName}
                   onChange={(e) => setAgentName(e.target.value)}
-                  placeholder="e.g. Support Bot"
-                  className={inputClass}
+                  placeholder="e.g., Customer Support Assistant"
+                  className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-900 placeholder-gray-400 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/10"
                 />
-              </Field>
+              </div>
 
-              {/* ── Behaviour ── */}
-              <SectionLabel>Behaviour</SectionLabel>
+              {/* Behavior & Intelligence */}
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">Behaviour</p>
 
               <div className="grid grid-cols-2 gap-3">
-                <Field label="Description" required hint="Brief summary of what this agent does">
+                <div className="flex flex-col gap-1.5">
+                  <label className="flex items-center gap-1 text-sm font-medium text-gray-700">
+                    Description <span className="text-red-500">*</span>
+                  </label>
+                  <p className="text-xs leading-snug text-gray-400">Brief summary of what this agent does</p>
                   <textarea
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    placeholder="e.g. Handles customer support queries"
+                    placeholder="What does this agent do?"
                     rows={3}
-                    className={`${inputClass} resize-y`}
+                    className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-900 placeholder-gray-400 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/10 resize-y"
                   />
-                </Field>
-
-                <Field label="System Instruction" required hint="System prompt defining personality and behaviour">
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="flex items-center gap-1 text-sm font-medium text-gray-700">
+                    System Instruction <span className="text-red-500">*</span>
+                  </label>
+                  <p className="text-xs leading-snug text-gray-400">System prompt defining personality and behaviour</p>
                   <textarea
                     value={instruction}
                     onChange={(e) => setInstruction(e.target.value)}
-                    placeholder="You are a helpful assistant that..."
+                    placeholder="You are a helpful AI assistant that..."
                     rows={3}
-                    className={`${inputClass} resize-y`}
+                    className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-900 placeholder-gray-400 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/10 resize-y"
                   />
-                </Field>
+                </div>
               </div>
 
-              {/* ── Model ── */}
-              <SectionLabel>Model</SectionLabel>
+              {/* Language Model */}
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">Model</p>
 
-              <Field label="Language Model" required hint="The LLM this agent will use to generate responses">
+              <div className="flex flex-col gap-1.5">
+                <label className="flex items-center gap-1 text-sm font-medium text-gray-700">
+                  Language Model <span className="text-red-500">*</span>
+                </label>
+                <p className="text-xs leading-snug text-gray-400">The LLM this agent will use to generate responses</p>
                 <ModelSelect
                   value={modelId}
                   options={modelOptions}
-                  placeholder="Select a model"
+                  placeholder="Choose a language model"
                   loading={isModelsLoading}
                   disabled={isModelsLoading || modelOptions.length === 0}
                   onChange={setModelId}
@@ -488,33 +443,34 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
                     {modelsLoadError}
                   </p>
                 )}
-              </Field>
+              </div>
 
-              {/* ── Capabilities ── */}
-              <SectionLabel>Capabilities</SectionLabel>
+              {/* Capabilities */}
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">Capabilities</p>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-4">
                 <DynamicListField
                   label="MCP Servers"
-                  hint="URLs of MCP servers this agent can connect to"
+                  hint="URLs of Model Context Protocol servers"
                   values={mcpServers}
                   placeholder="https://mcp.example.com/sse"
                   onAdd={() => addToList(setMcpServers)}
                   onRemove={(i) => removeFromList(setMcpServers, i)}
-                  onChange={(i, v) => updateList(setMcpServers, i, v)}
+                  onChange={(i, v) => updateList(i, v)}
                 />
-                <DynamicListField
-                  label="Connector Config IDs"
-                  hint="Identifiers for pre-configured connectors"
+
+                <DynamicDropdownField
+                  label="Connector Config"
                   values={connectorConfigIds}
-                  placeholder="conn_abc123"
-                  onAdd={() => addToList(setConnectorConfigIds)}
-                  onRemove={(i) => removeFromList(setConnectorConfigIds, i)}
-                  onChange={(i, v) => updateList(setConnectorConfigIds, i, v)}
+                  options={connectorOptions}
+                  configDataMap={configDataMap}
+                  onAdd={addConnector}
+                  onRemove={removeConnector}
+                  onChange={(i, val) => updateList(i, val)}
                 />
               </div>
 
-              {/* ── Feedback ── */}
+              {/* Error */}
               {submitError && (
                 <div className="flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                   <svg className="mt-0.5 h-4 w-4 shrink-0 text-red-500" viewBox="0 0 20 20" fill="currentColor">
@@ -527,6 +483,7 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
                 </div>
               )}
 
+              {/* Success */}
               {success && (
                 <div className="flex items-start gap-2.5 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
                   <svg className="mt-0.5 h-4 w-4 shrink-0 text-green-500" viewBox="0 0 20 20" fill="currentColor">
@@ -541,12 +498,13 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
             </div>
 
             {/* Footer */}
-            <div className="flex shrink-0 items-center justify-between border-t border-gray-100 px-6 py-4">
+            <div className="border-t border-gray-100 px-6 py-4 bg-slate-50 flex justify-between items-center">
               <p className="text-xs text-gray-400">
                 {!isFormValid && !success
                   ? <>Fields marked <span className="text-red-400">*</span> are required</>
                   : null}
               </p>
+
               <div className="flex gap-2.5">
                 <button
                   onClick={closeModal}
@@ -586,7 +544,7 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
         </div>
       )}
 
-      {/* ── Toast ── */}
+      {/* Toast */}
       {isToastVisible && (
         <div className="fixed bottom-6 right-6 z-[80] flex items-center gap-3 rounded-xl border border-green-200 bg-white px-4 py-3 shadow-xl shadow-black/10">
           <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-green-100 text-green-600">
@@ -596,11 +554,8 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
           </div>
           <div>
             <p className="text-sm font-medium text-gray-900">{toastMessage}</p>
-            <p className="text-xs text-gray-400">The agent is now available</p>
+            <p className="text-xs text-gray-400">Your agent is now live</p>
           </div>
-          <button onClick={() => setIsToastVisible(false)} className="ml-2 text-gray-300 hover:text-gray-500">
-            <X size={14} />
-          </button>
         </div>
       )}
     </>

@@ -42,6 +42,13 @@ const navSections: NavSection[] = [
         active: true,
         href: "/dashboard",
       },
+      {
+        label: "ChatOps",
+        id: "platform-chatops",
+        icon: <MessageSquare className="h-5 w-5" />,
+        dot: true,
+        href: "/chatOps",
+      }
     ],
   },
   {
@@ -52,13 +59,6 @@ const navSections: NavSection[] = [
         id: "platform-agent-managements",
         icon: <Bot className="h-5 w-5" />,
         href: "/agent-management",
-      },
-      {
-        label: "ChatOps",
-        id: "platform-chatops",
-        icon: <MessageSquare className="h-5 w-5" />,
-        dot: true,
-        href: "#",
       },
       {
         label: "LLM Management",
