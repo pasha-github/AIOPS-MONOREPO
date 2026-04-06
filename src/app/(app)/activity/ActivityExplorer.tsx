@@ -54,14 +54,16 @@ const formatEntryTime = (timestamp: number) => {
 
 function SessionDropdownSkeleton() {
   return (
-    <div className="animate-pulse rounded-xl bg-[linear-gradient(135deg,#ffffff_0%,#f7f9ff_100%)] p-6 shadow-[0_24px_60px_-44px_rgba(15,23,42,0.45)]">
-      <div className="flex items-center justify-between gap-4">
+    <div className="animate-pulse rounded-xl bg-[linear-gradient(135deg,#ffffff_0%,#f7f9ff_100%)] p-5 shadow-[0_24px_60px_-44px_rgba(15,23,42,0.45)]">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px]">
         <div className="space-y-3">
           <span className="block h-3 w-24 rounded-full bg-[#e8edf7]" />
-          <span className="block h-6 w-72 rounded-full bg-[#e8edf7]" />
-          <span className="block h-4 w-40 rounded-full bg-[#e8edf7]" />
+          <span className="block h-12 w-full rounded-xl bg-[#e8edf7]" />
         </div>
-        <span className="h-12 w-12 rounded-full bg-[#e8edf7]" />
+        <div className="flex items-center justify-end gap-3">
+          <span className="h-11 w-11 rounded-full bg-[#e8edf7]" />
+          <span className="h-10 w-28 rounded-full bg-[#e8edf7]" />
+        </div>
       </div>
     </div>
   );
@@ -280,18 +282,18 @@ export default function ActivityExplorer() {
 
   return (
     <div className="space-y-8">
-      <section className="overflow-hidden rounded-xl bg-[radial-gradient(circle_at_top_left,#ffffff_0%,#f7f8fd_48%,#eef3ff_100%)] px-8 py-8 shadow-[0_32px_80px_-52px_rgba(15,23,42,0.5)]">
-        <div className="flex flex-col gap-8">
-          <div className="flex flex-wrap items-start justify-between gap-6">
-            <div className="max-w-3xl">
+      <section className="overflow-visible rounded-xl bg-[radial-gradient(circle_at_top_left,#ffffff_0%,#f7f8fd_48%,#eef3ff_100%)] px-8 py-7 shadow-[0_32px_80px_-52px_rgba(15,23,42,0.5)]">
+        <div className="flex flex-col gap-6">
+          <div className="flex flex-wrap items-start justify-between gap-5">
+            <div className="max-w-[860px]">
               <div className="inline-flex items-center gap-2 rounded-full bg-white/75 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-[#5b6476]">
                 <Activity className="h-3.5 w-3.5 text-[#4f49e2]" />
                 User Activity
               </div>
-              <h1 className="mt-4 text-3xl font-semibold tracking-tight text-[#10131a]">
+              <h1 className="mt-3 text-3xl font-semibold tracking-tight text-[#10131a]">
                 Activity Explorer
               </h1>
-              <p className="mt-3 max-w-2xl text-sm leading-7 text-[#5f677a]">
+              <p className="mt-2 max-w-3xl text-sm leading-8 text-[#5f677a]">
                 Review session history for the default automation app and inspect individual
                 events without leaving the activity stream.
               </p>
@@ -313,29 +315,32 @@ export default function ActivityExplorer() {
           ) : (
             <div
               ref={menuContainerRef}
-              className="relative overflow-visible rounded-xl bg-[linear-gradient(135deg,#ffffff_0%,#f7f9ff_100%)] p-6 shadow-[0_24px_60px_-44px_rgba(15,23,42,0.45)]"
+              className="relative overflow-visible p-5"
             >
-              <div className="flex flex-wrap items-center justify-between gap-5">
-                <div className="min-w-0 flex-1">
+              <div className="grid items-center gap-4 lg:grid-cols-[minmax(0,1fr)_220px]">
+                <div className="min-w-0">
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#7a8498]">
                     Session
                   </p>
                   <button
                     type="button"
                     onClick={() => setIsSessionMenuOpen((current) => !current)}
-                    className="mt-3 flex w-full items-center justify-between gap-4 text-left"
+                    className="mt-2 flex w-full items-center justify-between gap-4 px-4 py-4 text-left transition focus-visible:outline-none"
                   >
                     <div className="min-w-0">
-                      <p className="truncate text-2xl font-semibold text-[#111827]">
+                      <p className="truncate text-[15px] font-semibold uppercase tracking-[0.12em] text-[#7a8498]">
+                        {selectedSession ? "Selected session" : "Select session"}
+                      </p>
+                      <p className="mt-1 truncate text-[2rem] font-semibold leading-tight text-[#111827]">
                         {selectedSession?.summary ?? "Select a session"}
                       </p>
-                      <p className="mt-2 text-sm text-[#687285]">
+                      <p className="mt-1 text-sm text-[#687285]">
                         {selectedSession
                           ? `Last updated ${selectedSession.updatedAtLabel}`
                           : "No sessions available"}
                       </p>
                     </div>
-                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#eef2ff] text-[#4f49e2]">
+                    <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#eef2ff] text-[#4f49e2] shadow-[0_10px_20px_-18px_rgba(79,73,226,0.65)]">
                       <ChevronDown
                         className={`h-5 w-5 transition-transform ${
                           isSessionMenuOpen ? "rotate-180" : ""
@@ -345,13 +350,15 @@ export default function ActivityExplorer() {
                   </button>
                 </div>
 
-                <div className="flex items-center gap-3 rounded-full bg-[#f8faff] px-4 py-3 text-sm text-[#5f677a]">
-                  <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#e8f0ff] text-[#3662ff]">
+                <div className="flex items-center justify-end gap-3 px-4 py-4 text-sm text-[#5f677a]">
+                  <span className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-[#e8f0ff] text-[#3662ff]">
                     <Activity className="h-4 w-4" />
                   </span>
-                  <div>
-                    <p className="font-semibold text-[#111827]">{sessions.length}</p>
-                    <p className="text-xs uppercase tracking-[0.16em] text-[#7a8498]">
+                  <div className="text-left">
+                    <p className="text-2xl font-semibold leading-none text-[#111827]">
+                      {sessions.length}
+                    </p>
+                    <p className="mt-1 text-xs uppercase tracking-[0.16em] text-[#7a8498]">
                       Sessions
                     </p>
                   </div>
@@ -359,7 +366,7 @@ export default function ActivityExplorer() {
               </div>
 
               {isSessionMenuOpen && sessions.length > 0 ? (
-                <div className="absolute left-6 right-6 top-[calc(100%-8px)] z-20 rounded-xl bg-white/96 p-3 shadow-[0_28px_60px_-34px_rgba(15,23,42,0.35)] backdrop-blur">
+                <div className="absolute left-5 top-[calc(100%-6px)] z-20 w-[min(100%-2.5rem,calc(100%-240px-1rem))] rounded-xl border border-[#e4ebf8] bg-white/98 p-3 shadow-[0_28px_60px_-34px_rgba(15,23,42,0.35)] backdrop-blur">
                   <div className="max-h-[320px] overflow-y-auto pr-1">
                     {sessions.map((session) => {
                       const isActive = session.id === selectedSessionId;
