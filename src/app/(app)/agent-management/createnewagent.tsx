@@ -231,10 +231,16 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
   const openModal = () => { resetForm(); setIsModalOpen(true); };
   const closeModal = () => { if (!isCreating) setIsModalOpen(false); };
 
+  // For connectorConfigIds (string[][])
   const updateList = (i: number, val: string[]) => {
     setConnectorConfigIds((prev) =>
       prev.map((x, idx) => (idx === i ? val : x))
     );
+  };
+
+  // For mcpServers (string[]) — each entry is a plain string
+  const updateMcpServer = (i: number, val: string) => {
+    setMcpServers((prev) => prev.map((x, idx) => (idx === i ? val : x)));
   };
 
   const addToList = (setter: React.Dispatch<React.SetStateAction<string[]>>) =>
@@ -326,7 +332,6 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
                   <Bot size={18} />
                 </div>
                 <div>
-                  {/* ← doc 2 header text sizes */}
                   <h1 className="text-sm font-semibold text-gray-900 leading-tight">Create New Agent</h1>
                   <p className="text-xs text-gray-400 mt-0.5">Fill the details below</p>
                 </div>
@@ -370,7 +375,6 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
             <div className="flex-1 overflow-y-auto px-6 py-5 flex flex-col gap-4">
 
               {/* Identity */}
-              {/* ← doc 2 section label style */}
               <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">Identity</p>
 
               <div className="flex flex-col gap-1.5">
@@ -387,7 +391,7 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
                 />
               </div>
 
-              {/* Behavior & Intelligence */}
+              {/* Behaviour */}
               <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">Behaviour</p>
 
               <div className="grid grid-cols-2 gap-3">
@@ -419,7 +423,7 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
                 </div>
               </div>
 
-              {/* Language Model */}
+              {/* Model */}
               <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">Model</p>
 
               <div className="flex flex-col gap-1.5">
@@ -456,7 +460,7 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
                   placeholder="https://mcp.example.com/sse"
                   onAdd={() => addToList(setMcpServers)}
                   onRemove={(i) => removeFromList(setMcpServers, i)}
-                  onChange={(i, v) => updateList(i, v)}
+                  onChange={(i, v) => updateMcpServer(i, v)}  // ✅ fixed: string, not string[]
                 />
 
                 <DynamicDropdownField
@@ -466,7 +470,7 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
                   configDataMap={configDataMap}
                   onAdd={addConnector}
                   onRemove={removeConnector}
-                  onChange={(i, val) => updateList(i, val)}
+                  onChange={(i, v) => updateList(i, v)}  // ✅ correct: string[]
                 />
               </div>
 
