@@ -5,7 +5,6 @@ import {
   Bell,
   ChevronDown,
   Loader2,
-  Maximize2,
   RefreshCw,
   Sparkles,
 } from "lucide-react";
@@ -43,7 +42,6 @@ export default function AgentActivityLog() {
   const [visibleEntryCount, setVisibleEntryCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isPanelExpanded, setIsPanelExpanded] = useState(false);
   const [loadingSessionId, setLoadingSessionId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const sessionDetailsRef = useRef<Record<string, AgentSessionDetail>>({});
@@ -204,29 +202,16 @@ export default function AgentActivityLog() {
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-3xl bg-white p-6 shadow-[0_18px_50px_-38px_rgba(16,24,40,0.5)]">
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex items-start gap-3">
-          <span className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-2xl bg-[#e6f9ee] text-[#16a34a]">
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-[#e6f9ee] text-[#16a34a]">
             <Activity className="h-5 w-5" />
           </span>
-          <div>
-            <h3 className="text-lg font-semibold text-[#111827]">Automation Agent</h3>
-          </div>
+          <h3 className="text-lg font-semibold leading-none text-[#111827]">
+            Automation Agent
+          </h3>
         </div>
-        <div className="mt-1 inline-flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setIsPanelExpanded((current) => !current)}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#e3e7f2] bg-white text-[#6b7280] shadow-[0_8px_16px_-14px_rgba(16,24,40,0.4)]"
-            aria-label="Maximize logs"
-            title="Maximize logs"
-          >
-            <Maximize2
-              className={`h-4 w-4 transition-transform ${
-                isPanelExpanded ? "scale-90" : ""
-              }`}
-            />
-          </button>
+        <div className="inline-flex items-center gap-2">
           <button
             type="button"
             onClick={handleRefresh}
@@ -290,11 +275,7 @@ export default function AgentActivityLog() {
         ) : null}
       </div>
 
-      <div
-        className={`soft-scrollbar mt-6 min-h-0 flex-1 space-y-6 overflow-y-auto pr-2 ${
-          isPanelExpanded ? "max-h-none" : ""
-        }`}
-      >
+      <div className="soft-scrollbar mt-6 min-h-0 flex-1 space-y-6 overflow-y-auto pr-2">
         {error ? (
           <div className="rounded-2xl border border-[#fee2e2] bg-[#fff5f5] px-4 py-3 text-sm text-[#b42318]">
             {error}
