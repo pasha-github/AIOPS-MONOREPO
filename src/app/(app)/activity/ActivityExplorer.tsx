@@ -302,14 +302,15 @@ export default function ActivityExplorer() {
         <div className="flex flex-col gap-6">
           <div className="flex flex-wrap items-start justify-between gap-5">
             <div className="max-w-[860px]">
-              <div className="inline-flex items-center gap-2 rounded-full bg-white/75 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-[#5b6476]">
-                <Activity className="h-3.5 w-3.5 text-[#4f49e2]" />
-                User Activity
+              <div className="flex items-center gap-3">
+                <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-white/85 text-[#4f49e2] shadow-[0_12px_28px_-24px_rgba(79,73,226,0.55)]">
+                  <Activity className="h-6 w-6" />
+                </span>
+                <h1 className="text-3xl font-semibold tracking-tight text-[#10131a]">
+                  Activity Explorer
+                </h1>
               </div>
-              <h1 className="mt-3 text-3xl font-semibold tracking-tight text-[#10131a]">
-                Activity Explorer
-              </h1>
-              <p className="mt-2 max-w-3xl text-sm leading-8 text-[#5f677a]">
+              <p className="mt-4 max-w-3xl text-sm leading-8 text-[#5f677a]">
                 Review session history for the default automation app and inspect individual
                 events without leaving the activity stream.
               </p>
@@ -329,19 +330,13 @@ export default function ActivityExplorer() {
           {isLoading ? (
             <SessionDropdownSkeleton />
           ) : (
-            <div
-              ref={menuContainerRef}
-              className="relative overflow-visible p-5"
-            >
+            <div ref={menuContainerRef} className="relative overflow-visible p-5">
               <div className="grid items-center gap-4 lg:grid-cols-[minmax(0,1fr)_220px]">
-                <div className="min-w-0">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#7a8498]">
-                    Session
-                  </p>
+                <div className="relative min-w-0">
                   <button
                     type="button"
                     onClick={() => setIsSessionMenuOpen((current) => !current)}
-                    className="mt-2 flex w-full items-center justify-between gap-4 px-4 py-4 text-left transition focus-visible:outline-none"
+                    className="mt-2 flex w-full items-center justify-between gap-4 rounded-xl border border-[#dfe6f5] bg-white/80 px-4 py-4 text-left shadow-[0_18px_34px_-28px_rgba(15,23,42,0.35)] transition hover:border-[#cfd8ee] hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#c7d2fe]"
                   >
                     <div className="min-w-0">
                       <p className="truncate text-[15px] font-semibold uppercase tracking-[0.12em] text-[#7a8498]">
@@ -364,6 +359,40 @@ export default function ActivityExplorer() {
                       />
                     </span>
                   </button>
+
+                  {isSessionMenuOpen && sessions.length > 0 ? (
+                    <div className="absolute left-0 right-0 top-[calc(100%+10px)] z-50 rounded-xl border border-[#e4ebf8] bg-white p-3 shadow-[0_28px_60px_-34px_rgba(15,23,42,0.35)]">
+                      <div className="max-h-[320px] overflow-y-auto pr-1">
+                        {sessions.map((session) => {
+                          const isActive = session.id === selectedSessionId;
+                          return (
+                            <button
+                              key={session.id}
+                              type="button"
+                              onClick={() => void handleSessionChange(session.id)}
+                              className={`flex w-full items-center justify-between gap-4 rounded-lg px-4 py-3 text-left transition ${
+                                isActive
+                                  ? "bg-[#eef2ff] text-[#24324a]"
+                                  : "text-[#5f677a] hover:bg-[#f8faff]"
+                              }`}
+                            >
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-semibold text-[#111827]">
+                                  {session.summary}
+                                </p>
+                                <p className="mt-1 text-xs text-[#7a8498]">
+                                  Last updated {session.updatedAtLabel}
+                                </p>
+                              </div>
+                              {isActive ? (
+                                <Check className="h-4 w-4 shrink-0 text-[#4f49e2]" />
+                              ) : null}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
 
                 <div className="flex items-center justify-end gap-3 px-4 py-4 text-sm text-[#5f677a]">
@@ -380,38 +409,6 @@ export default function ActivityExplorer() {
                   </div>
                 </div>
               </div>
-
-              {isSessionMenuOpen && sessions.length > 0 ? (
-                <div className="absolute left-5 top-[calc(100%-6px)] z-20 w-[min(100%-2.5rem,calc(100%-240px-1rem))] rounded-xl border border-[#e4ebf8] bg-white/98 p-3 shadow-[0_28px_60px_-34px_rgba(15,23,42,0.35)] backdrop-blur">
-                  <div className="max-h-[320px] overflow-y-auto pr-1">
-                    {sessions.map((session) => {
-                      const isActive = session.id === selectedSessionId;
-                      return (
-                        <button
-                          key={session.id}
-                          type="button"
-                          onClick={() => void handleSessionChange(session.id)}
-                          className={`flex w-full items-center justify-between gap-4 rounded-lg px-4 py-3 text-left transition ${
-                            isActive
-                              ? "bg-[#eef2ff] text-[#24324a]"
-                              : "text-[#5f677a] hover:bg-[#f8faff]"
-                          }`}
-                        >
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-semibold text-[#111827]">
-                              {session.summary}
-                            </p>
-                            <p className="mt-1 text-xs text-[#7a8498]">
-                              Last updated {session.updatedAtLabel}
-                            </p>
-                          </div>
-                          {isActive ? <Check className="h-4 w-4 shrink-0 text-[#4f49e2]" /> : null}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              ) : null}
             </div>
           )}
         </div>
@@ -448,6 +445,8 @@ export default function ActivityExplorer() {
           </div>
 
           {isLoading ? (
+            <TimelineSkeleton />
+          ) : selectedSessionId && loadingSessionId === selectedSessionId && !selectedDetail ? (
             <TimelineSkeleton />
           ) : !selectedSession ? (
             <div className="py-10 text-sm text-[#687285]">No sessions available.</div>

@@ -243,12 +243,14 @@ export async function fetchAgentSessionDetail(
     });
   });
 
+  const sortedEntries = [...entries].sort((a, b) => b.timestamp - a.timestamp);
+
   return {
     id: getTrimmedText(payload?.id) || sessionId,
     summary,
     updatedAt,
     updatedAtLabel: formatTimestamp(updatedAt),
-    entries,
+    entries: sortedEntries,
   } satisfies AgentSessionDetail;
 }
 
