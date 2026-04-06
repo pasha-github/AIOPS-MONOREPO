@@ -116,7 +116,7 @@ const getAuthorLabel = (author: string, source: AgentLogEntry["source"]) => {
     return "Tool request";
   }
   if (normalized === "user") {
-    return "User message";
+    return "Trigger message";
   }
   if (normalized.includes("agent")) {
     return "Agent response";
