@@ -12,6 +12,7 @@ import {
   Settings2,
   Trash2,
 } from "lucide-react";
+import type { ReactElement } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import SetConnectorConfig from "./SetConnectorConfig";
 import ShowConnectorConfig from "./ShowConnectorConfig";
@@ -280,7 +281,7 @@ export default function DisplayConnectors({ searchTerm }: DisplayConnectorsProps
     </>
   );
 
-  let content: JSX.Element;
+  let content: ReactElement;
 
   if (isLoading && connectors.length === 0) {
     content = (
