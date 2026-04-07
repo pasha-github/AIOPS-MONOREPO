@@ -3,8 +3,8 @@ from types import SimpleNamespace
 
 import pytest
 
-import utils.agent_loader as agent_loader_module
-from utils.agent_loader import DatabaseAgentLoader
+import src.agent_runtime.adk.agent_loader as agent_loader_module
+from src.agent_runtime.adk.agent_loader import DatabaseAgentLoader
 
 
 class _FakeResult:

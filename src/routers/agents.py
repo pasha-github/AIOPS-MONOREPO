@@ -8,13 +8,13 @@ from google.genai import types
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
-from database.database import get_session
-from database.models import Agent, Job, Model, Webhook
-from utils.adk_app import adk_web_server_instance, invalidate_cache
+from src.agent_runtime.adk.adk_app import adk_web_server_instance, invalidate_cache
+from src.database.database import get_session
+from src.database.models import Agent, Job, Model, Webhook
 
 router = APIRouter(prefix="/agent", tags=["agent"])
 TEMPLATES_FILE = (
-    Path(__file__).resolve().parent.parent / "static" / "agent_templates.json"
+    Path(__file__).resolve().parent.parent.parent / "static" / "agent_templates.json"
 )
 
 logger = logging.getLogger(__name__)
@@ -245,7 +245,7 @@ async def create_job(
             detail="Either cron_expression or interval_seconds must be provided",
         )
 
-    from utils.scheduler import build_job_trigger
+    from src.utils.scheduler import build_job_trigger
 
     try:
         build_job_trigger(
@@ -269,7 +269,7 @@ async def create_job(
     session.commit()
     session.refresh(db_job)
 
-    from utils.scheduler import reload_jobs
+    from src.utils.scheduler import reload_jobs
 
     await reload_jobs()
 
@@ -286,8 +286,8 @@ def list_jobs(agent_id: str, session: Session = Depends(get_session)):
 async def delete_job(
     agent_id: str, job_id: UUID, session: Session = Depends(get_session)
 ):
-    from utils.cache import cache
-    from utils.scheduler import scheduler
+    from src.agent_runtime.adk.cache import cache
+    from src.utils.scheduler import scheduler
 
     job = session.get(Job, job_id)
     if not job or job.agent_id != agent_id:
@@ -303,7 +303,7 @@ async def delete_job(
     session.delete(job)
     session.commit()
 
-    from utils.scheduler import reload_jobs
+    from src.utils.scheduler import reload_jobs
 
     await reload_jobs()
     logger.info("AFTER DELETE")

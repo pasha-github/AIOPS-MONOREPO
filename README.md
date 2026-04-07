@@ -45,6 +45,10 @@ ruff check . # check for linting errors
 ruff check --fix . # fix linting errors
 ruff format . # format the code
 pyright . # check for type errors
+python -m pytest # run tests
+```
+```bash
+ruff check . && pyright && python -m pytest # run all checks
 ```
 
 ## Running with Docker

@@ -3,7 +3,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from utils.session_summary_plugin import (
+from src.plugins.session_summary_plugin import (
     FIRST_MESSAGE_SUMMARY_KEY,
     SessionSummaryPlugin,
     _extract_user_text,
@@ -36,7 +36,7 @@ def test_session_summary_plugin_sets_summary_once(monkeypatch: pytest.MonkeyPatc
         ]
     )
     monkeypatch.setattr(
-        "utils.session_summary_plugin.litellm.completion",
+        "src.plugins.session_summary_plugin.litellm.completion",
         lambda **kwargs: fake_response,
     )
 
@@ -69,7 +69,7 @@ def test_session_summary_plugin_skips_when_summary_already_exists(
         return None
 
     monkeypatch.setattr(
-        "utils.session_summary_plugin.litellm.completion", fake_completion
+        "src.plugins.session_summary_plugin.litellm.completion", fake_completion
     )
 
     asyncio.run(
@@ -101,7 +101,7 @@ def test_session_summary_plugin_skips_when_user_text_missing(
         return None
 
     monkeypatch.setattr(
-        "utils.session_summary_plugin.litellm.completion", fake_completion
+        "src.plugins.session_summary_plugin.litellm.completion", fake_completion
     )
 
     asyncio.run(
@@ -125,7 +125,7 @@ def test_session_summary_plugin_falls_back_when_model_returns_none_content(
         choices=[SimpleNamespace(message=SimpleNamespace(content=None))]
     )
     monkeypatch.setattr(
-        "utils.session_summary_plugin.litellm.completion",
+        "src.plugins.session_summary_plugin.litellm.completion",
         lambda **kwargs: fake_response,
     )
 
@@ -153,7 +153,7 @@ def test_session_summary_plugin_falls_back_when_completion_raises(
         raise RuntimeError("provider failure")
 
     monkeypatch.setattr(
-        "utils.session_summary_plugin.litellm.completion", fake_completion
+        "src.plugins.session_summary_plugin.litellm.completion", fake_completion
     )
 
     result = asyncio.run(

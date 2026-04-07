@@ -7,7 +7,7 @@ from importlib.machinery import ModuleSpec
 from pathlib import Path
 from typing import Any
 
-from database.models import ConnectorConfig
+from src.database.models import ConnectorConfig
 
 CONNECTORS_DIR = Path(__file__).parent.parent / "connectors"
 

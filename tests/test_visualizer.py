@@ -2,7 +2,7 @@ from uuid import uuid4
 
 from fastapi.testclient import TestClient
 
-from database.models import Agent, ConnectorConfig, Job, Model, Webhook
+from src.database.models import Agent, ConnectorConfig, Job, Model, Webhook
 
 
 def _create_model(client: TestClient, model_id: str = "viz-model"):
