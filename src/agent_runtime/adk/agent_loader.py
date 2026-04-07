@@ -23,7 +23,6 @@ from src.utils.constants import HARDCODED_FALLBACK_MODELS
 from src.utils.secrets import decrypt_secret
 
 logger = logging.getLogger(__name__)
-MODEL_FALLBACK_MAP = {}
 
 
 def _litellm_model_name(model_config: Model) -> str:
@@ -164,10 +163,8 @@ class DatabaseAgentLoader(BaseAgentLoader):
 
             tools_list.extend(sub_agents)
 
-            # Populate global map for auto-sync with plugins
             model_name = _litellm_model_name(model_config)
             fallbacks = HARDCODED_FALLBACK_MODELS
-            MODEL_FALLBACK_MAP[model_name] = fallbacks
 
             model = LiteLlm(
                 model=model_name,

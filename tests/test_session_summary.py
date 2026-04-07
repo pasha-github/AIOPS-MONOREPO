@@ -3,9 +3,9 @@ from types import SimpleNamespace
 
 import pytest
 
-import src.agent_runtime.adk.agent_loader as agent_loader_module
 from src.plugins.session_summary_plugin import (
     FIRST_MESSAGE_SUMMARY_KEY,
+    SUMMARY_FALLBACKS_KEY,
     SessionSummaryPlugin,
     _extract_user_text,
 )
@@ -59,7 +59,9 @@ def test_session_summary_plugin_uses_request_model_with_shared_fallbacks(
     monkeypatch: pytest.MonkeyPatch,
 ):
     plugin = SessionSummaryPlugin()
-    callback_context = SimpleNamespace(state={})
+    callback_context = SimpleNamespace(
+        state={SUMMARY_FALLBACKS_KEY: HARDCODED_FALLBACK_MODELS}
+    )
     request = _request_with_text("Investigate queue backlog in production")
 
     captured = {}
@@ -71,11 +73,6 @@ def test_session_summary_plugin_uses_request_model_with_shared_fallbacks(
         captured.update(kwargs)
         return fake_response
 
-    monkeypatch.setattr(
-        agent_loader_module,
-        "MODEL_FALLBACK_MAP",
-        {"openai/gpt-4o-mini": HARDCODED_FALLBACK_MODELS},
-    )
     monkeypatch.setattr(
         "src.plugins.session_summary_plugin.litellm.completion",
         fake_completion,
