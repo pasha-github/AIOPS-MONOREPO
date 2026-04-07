@@ -3,8 +3,8 @@ from types import SimpleNamespace
 
 import pytest
 
-import utils.agent_loader as agent_loader_module
-from utils.agent_loader import DatabaseAgentLoader
+import src.agent_runtime.adk.agent_loader as agent_loader_module
+from src.agent_runtime.adk.agent_loader import DatabaseAgentLoader
 
 
 class _FakeResult:
@@ -232,7 +232,8 @@ def test_agent_loader_google_model_path(monkeypatch: pytest.MonkeyPatch):
     agent = loader.load_agent("main")
     assert getattr(agent.kwargs["model"], "model", "") == "gemini/gemini-2.0-flash"
     assert agent.kwargs["model"].kwargs["fallbacks"] == [
-        "gemini/gemini-3-flash-preview"
+        "gemini/gemini-3-flash-preview",
+        "anthropic/claude-haiku-4-5-20251001",
     ]
 
 
@@ -269,7 +270,8 @@ def test_agent_loader_non_google_model_path(monkeypatch: pytest.MonkeyPatch):
     agent = loader.load_agent("main")
     assert getattr(agent.kwargs["model"], "model", "") == "openai/gpt-4.1"
     assert agent.kwargs["model"].kwargs["fallbacks"] == [
-        "gemini/gemini-3-flash-preview"
+        "gemini/gemini-3-flash-preview",
+        "anthropic/claude-haiku-4-5-20251001",
     ]
 
 

@@ -1,4 +1,4 @@
-from utils.db_url import encode_database_url_password
+from src.database.db_url import encode_database_url_password
 
 
 def test_encode_database_url_password_encodes_special_characters():

@@ -1,6 +1,6 @@
 from cryptography.fernet import Fernet, InvalidToken
 
-from utils.constants import ENCRYPTION_KEY
+from src.utils.constants import ENCRYPTION_KEY
 
 
 def _get_cipher() -> Fernet:

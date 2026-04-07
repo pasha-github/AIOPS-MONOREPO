@@ -7,10 +7,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
-from database.database import get_session
-from database.models import Agent, ConnectorConfig
-from utils.adk_app import invalidate_cache
-from utils.helper import cached_connector_info
+from src.agent_runtime.adk.adk_app import invalidate_cache
+from src.connectors.loader import cached_connector_info
+from src.database.database import get_session
+from src.database.models import Agent, ConnectorConfig
 
 
 class ConnectorConfigCreate(BaseModel):
@@ -30,7 +30,7 @@ router = APIRouter(prefix="/connectors", tags=["connectors"])
 @router.get("/", response_model=list[dict[str, str]])
 def list_connectors():
     connectors = []
-    connectors_dir = Path("connectors")
+    connectors_dir = Path("src/connectors")
     if connectors_dir.exists():
         for path_obj in connectors_dir.iterdir():
             filename = path_obj.name
@@ -50,7 +50,7 @@ def get_connector_details(connector_id: str) -> dict[str, Any]:
     if connector_id in ["__init__", "base_connector"]:
         raise HTTPException(status_code=404, detail="Connector not found")
 
-    connectors_dir = Path("connectors")
+    connectors_dir = Path("src/connectors")
     file_path = connectors_dir / f"{connector_id}.py"
 
     if not file_path.exists():
@@ -86,7 +86,7 @@ def set_connector_config(
     if connector_id in {"__init__", "base_connector"}:
         raise HTTPException(status_code=404, detail="Connector not found")
 
-    connector_file = Path("connectors") / f"{connector_id}.py"
+    connector_file = Path("src/connectors") / f"{connector_id}.py"
     if not connector_file.exists():
         raise HTTPException(status_code=404, detail="Connector not found")
 

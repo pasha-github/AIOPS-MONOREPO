@@ -1,6 +1,6 @@
 from sqlmodel import Session, SQLModel, create_engine
 
-from utils.constants import MAIN_SERVER_DATABASE_URL
+from src.utils.constants import MAIN_SERVER_DATABASE_URL
 
 connect_args = (
     {"check_same_thread": False}

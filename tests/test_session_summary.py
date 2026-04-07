@@ -3,13 +3,13 @@ from types import SimpleNamespace
 
 import pytest
 
-import utils.session_summary_plugin as session_summary_plugin_module
-from utils.session_summary_plugin import (
-    HARDCODED_FALLBACK_MODEL,
+import src.agent_runtime.adk.agent_loader as agent_loader_module
+from src.plugins.session_summary_plugin import (
     FIRST_MESSAGE_SUMMARY_KEY,
     SessionSummaryPlugin,
     _extract_user_text,
 )
+from src.utils.constants import HARDCODED_FALLBACK_MODELS
 
 
 def _request_with_text(*texts: str):
@@ -38,7 +38,7 @@ def test_session_summary_plugin_sets_summary_once(monkeypatch: pytest.MonkeyPatc
         ]
     )
     monkeypatch.setattr(
-        "utils.session_summary_plugin.litellm.completion",
+        "src.plugins.session_summary_plugin.litellm.completion",
         lambda **kwargs: fake_response,
     )
 
@@ -55,7 +55,7 @@ def test_session_summary_plugin_sets_summary_once(monkeypatch: pytest.MonkeyPatc
     )
 
 
-def test_session_summary_plugin_uses_request_model_with_shared_fallback_by_default(
+def test_session_summary_plugin_uses_request_model_with_shared_fallbacks(
     monkeypatch: pytest.MonkeyPatch,
 ):
     plugin = SessionSummaryPlugin()
@@ -71,9 +71,13 @@ def test_session_summary_plugin_uses_request_model_with_shared_fallback_by_defau
         captured.update(kwargs)
         return fake_response
 
-    monkeypatch.setattr(session_summary_plugin_module, "SUMMARIZER_MODEL", None)
     monkeypatch.setattr(
-        "utils.session_summary_plugin.litellm.completion",
+        agent_loader_module,
+        "MODEL_FALLBACK_MAP",
+        {"openai/gpt-4o-mini": HARDCODED_FALLBACK_MODELS},
+    )
+    monkeypatch.setattr(
+        "src.plugins.session_summary_plugin.litellm.completion",
         fake_completion,
     )
 
@@ -85,7 +89,7 @@ def test_session_summary_plugin_uses_request_model_with_shared_fallback_by_defau
     )
 
     assert captured["model"] == "openai/gpt-4o-mini"
-    assert captured["fallbacks"] == [HARDCODED_FALLBACK_MODEL]
+    assert captured["fallbacks"] == HARDCODED_FALLBACK_MODELS
 
 
 def test_session_summary_plugin_skips_when_summary_already_exists(
@@ -104,7 +108,7 @@ def test_session_summary_plugin_skips_when_summary_already_exists(
         return None
 
     monkeypatch.setattr(
-        "utils.session_summary_plugin.litellm.completion", fake_completion
+        "src.plugins.session_summary_plugin.litellm.completion", fake_completion
     )
 
     asyncio.run(
@@ -136,7 +140,7 @@ def test_session_summary_plugin_skips_when_user_text_missing(
         return None
 
     monkeypatch.setattr(
-        "utils.session_summary_plugin.litellm.completion", fake_completion
+        "src.plugins.session_summary_plugin.litellm.completion", fake_completion
     )
 
     asyncio.run(
@@ -160,7 +164,7 @@ def test_session_summary_plugin_falls_back_when_model_returns_none_content(
         choices=[SimpleNamespace(message=SimpleNamespace(content=None))]
     )
     monkeypatch.setattr(
-        "utils.session_summary_plugin.litellm.completion",
+        "src.plugins.session_summary_plugin.litellm.completion",
         lambda **kwargs: fake_response,
     )
 
@@ -188,7 +192,7 @@ def test_session_summary_plugin_falls_back_when_completion_raises(
         raise RuntimeError("provider failure")
 
     monkeypatch.setattr(
-        "utils.session_summary_plugin.litellm.completion", fake_completion
+        "src.plugins.session_summary_plugin.litellm.completion", fake_completion
     )
 
     result = asyncio.run(

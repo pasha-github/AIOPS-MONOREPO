@@ -5,7 +5,6 @@ from google.adk.agents.callback_context import CallbackContext
 from google.adk.models.llm_request import LlmRequest
 from google.adk.models.llm_response import LlmResponse
 from google.adk.plugins.base_plugin import BasePlugin
-
 logger = logging.getLogger(__name__)
 
 FIRST_MESSAGE_SUMMARY_KEY = "first_message_summary"
@@ -66,7 +65,7 @@ class SessionSummaryPlugin(BasePlugin):
 
         if summarizer_model:
             try:
-                from utils.agent_loader import MODEL_FALLBACK_MAP
+                from src.agent_runtime.adk.agent_loader import MODEL_FALLBACK_MAP
 
                 sync_fallbacks = MODEL_FALLBACK_MAP.get(summarizer_model, [])
 

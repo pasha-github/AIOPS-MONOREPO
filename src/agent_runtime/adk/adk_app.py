@@ -3,9 +3,9 @@ import inspect
 from google.adk.cli.adk_web_server import AdkWebServer
 from google.adk.cli.fast_api import get_fast_api_app  # as requested
 
-from utils.agent_loader import DatabaseAgentLoader
-from utils.cache import cache
-from utils.constants import A2A, AGENT_SERVER_DATABASE_URL, WEB
+from src.agent_runtime.adk.agent_loader import DatabaseAgentLoader
+from src.agent_runtime.adk.cache import cache
+from src.utils.constants import A2A, AGENT_SERVER_DATABASE_URL, WEB
 
 
 def _get_adk_web_server_instance(fastapi_app) -> AdkWebServer:
@@ -54,7 +54,7 @@ ADK_APP = get_fast_api_app(
     url_prefix="/agent-server",
     logo_text="RC AIOps - DEV",
     logo_image_url="/static/royal_cyber.jpeg",
-    extra_plugins=["utils.session_summary_plugin.plugin"],
+    extra_plugins=["src.plugins.session_summary_plugin.plugin"],
 )
 
 # Retrieve the server instance
