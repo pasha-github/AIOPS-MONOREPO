@@ -203,6 +203,11 @@ const getModalCopy = (mode: "create" | "edit") => ({
   title: mode === "edit" ? "Update Config" : "Set Config",
   action: mode === "edit" ? "Update" : "Set",
   pendingAction: mode === "edit" ? "Updating..." : "Setting...",
+  successAction: mode === "edit" ? "Updated!" : "Saved!",
+  successMessage:
+    mode === "edit"
+      ? "Connector config updated successfully!"
+      : "Connector config saved successfully!",
   submitError:
     mode === "edit"
       ? "Unable to update connector config."
@@ -231,6 +236,7 @@ export default function SetConnectorConfig({
   const [prefillError, setPrefillError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
   const copy = getModalCopy(mode);
 
   const applyFormState = useCallback(
@@ -239,6 +245,7 @@ export default function SetConnectorConfig({
       setInitialFormState(nextState);
       setPrefillError(nextPrefillError);
       setSubmitError("");
+      setSuccessMessage("");
       setIsSubmitting(false);
       setIsPrefilling(false);
     },
@@ -387,7 +394,10 @@ export default function SetConnectorConfig({
         throw new Error(copy.submitError);
       }
 
-      resetAndClose();
+      setSuccessMessage(copy.successMessage);
+      setTimeout(() => {
+        resetAndClose();
+      }, 1500);
     } catch {
       setSubmitError(copy.submitError);
       setIsSubmitting(false);
@@ -539,6 +549,29 @@ export default function SetConnectorConfig({
               {submitError}
             </div>
           ) : null}
+          {successMessage ? (
+            <div className="flex items-start gap-2.5 rounded-xl border border-[#bbf7d0] bg-[#f0fdf4] px-4 py-3 text-sm text-[#166534]">
+              <svg
+                className="mt-0.5 h-4 w-4 shrink-0 text-[#22c55e]"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
+                  clipRule="evenodd"
+                />
+              </svg>
+              <div>
+                <p className="font-medium">
+                  {mode === "edit" ? "Connector config updated" : "Connector config saved"}
+                </p>
+                <p className="mt-0.5 text-[#15803d]">
+                  {successMessage} Closing in a moment...
+                </p>
+              </div>
+            </div>
+          ) : null}
         </div>
 
         <div className="flex items-center justify-end gap-3 border-t border-[#eef1f7] px-6 py-4">
@@ -552,14 +585,50 @@ export default function SetConnectorConfig({
           <button
             type="button"
             onClick={submitConfig}
-            disabled={!isSubmitEnabled}
+            disabled={!isSubmitEnabled || Boolean(successMessage)}
             className={`rounded-xl px-5 py-2 text-sm font-semibold text-white shadow-[0_10px_24px_-18px_rgba(79,73,226,0.9)] ${
-              !isSubmitEnabled
+              !isSubmitEnabled || Boolean(successMessage)
                 ? "cursor-not-allowed bg-[#c7c4f7]"
                 : "bg-[#4f49e2] hover:bg-[#4338ca]"
             }`}
           >
-            {isSubmitting ? copy.pendingAction : copy.action}
+            {isSubmitting ? (
+              <span className="inline-flex items-center gap-2">
+                <svg
+                  className="h-3.5 w-3.5 animate-spin"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                  />
+                </svg>
+                {copy.pendingAction}
+              </span>
+            ) : successMessage ? (
+              <span className="inline-flex items-center gap-2">
+                <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                  <path
+                    fillRule="evenodd"
+                    d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+                {copy.successAction}
+              </span>
+            ) : (
+              copy.action
+            )}
           </button>
         </div>
       </div>
