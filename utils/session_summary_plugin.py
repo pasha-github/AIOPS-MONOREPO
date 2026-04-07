@@ -6,8 +6,6 @@ from google.adk.models.llm_request import LlmRequest
 from google.adk.models.llm_response import LlmResponse
 from google.adk.plugins.base_plugin import BasePlugin
 
-from utils.constants import HARDCODED_FALLBACK_MODEL, SUMMARIZER_MODEL
-
 logger = logging.getLogger(__name__)
 
 FIRST_MESSAGE_SUMMARY_KEY = "first_message_summary"
@@ -64,20 +62,17 @@ class SessionSummaryPlugin(BasePlugin):
             return None
 
         summary = ""
-        summarizer_model = SUMMARIZER_MODEL if SUMMARIZER_MODEL else llm_request.model
-
-        if (
-            isinstance(summarizer_model, str)
-            and summarizer_model
-            and "/" not in summarizer_model
-        ):
-            summarizer_model = f"gemini/{summarizer_model}"
+        summarizer_model = llm_request.model
 
         if summarizer_model:
             try:
+                from utils.agent_loader import MODEL_FALLBACK_MAP
+
+                sync_fallbacks = MODEL_FALLBACK_MAP.get(summarizer_model, [])
+
                 response = litellm.completion(
                     model=summarizer_model,
-                    fallbacks=[HARDCODED_FALLBACK_MODEL],
+                    fallbacks=sync_fallbacks,
                     messages=[
                         {
                             "role": "system",
