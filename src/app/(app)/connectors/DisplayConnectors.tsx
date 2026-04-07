@@ -131,7 +131,7 @@ export default function DisplayConnectors({ searchTerm }: DisplayConnectorsProps
       setConnectors(data);
       setIsLoading(false);
     };
-
+ console.log("data", connectors);
     loadConnectors().catch((error) => {
       if (error instanceof DOMException && error.name === "AbortError") {
         return;

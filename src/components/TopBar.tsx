@@ -111,7 +111,7 @@ export default function TopBar() {
         </button>
 
         {open ? (
-          <div className="absolute right-0 top-full z-50 mt-3 w-52 rounded-2xl border border-[#eef1f7] bg-white p-2 shadow-[0_20px_50px_-30px_rgba(15,17,21,0.6)]">
+          <div className="absolute right-0 top-full z-50 mt-3 w-52 rounded-2xl border border-[#eef1f7] bg-white p-2 shadow-[0_20px_50px_-30px_rgba(15,17,21,0.6)]" role="menu">
             <button
               type="button"
               className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-[#1b1f2a] hover:bg-[#f6f7fb]"

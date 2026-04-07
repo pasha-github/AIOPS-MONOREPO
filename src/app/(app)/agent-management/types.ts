@@ -23,3 +23,39 @@ export type AgentRecord = {
   sub_agents: string[];
   isEnabled: boolean | null;
 };
+export type DropdownOption = {
+  value: string;
+  label: string;
+};
+export interface DynamicDropdownFieldProps {
+  label: string;
+  hint?: string;
+  values: string[];
+  options: { value: string; label: string }[];
+  placeholder?: string;
+  configDataMap?: Record<string, any>;  // ← was: configData?: any
+  onAdd: () => void;
+  onRemove: (i: number) => void;
+  onChange: (i: number, v: string) => void;
+}
+export interface DynamicListFieldProps {
+  label: string;
+  hint?: string;
+  values: string[];
+  placeholder: string;
+  onAdd: () => void;
+  onRemove: (i: number) => void;
+  onChange: (i: number, v: string) => void;
+};
+
+export type CreateNewAgentProps = {
+  onCreateSuccess?: () => void | Promise<void>;
+};
+
+export type ModelTemplate = {
+  template_id: string;
+  name: string;
+  description?: string;
+  instruction?: string;
+  model_id?: string;
+};
