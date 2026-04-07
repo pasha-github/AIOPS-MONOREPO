@@ -132,11 +132,10 @@ const renderMilestones = (
         <div key={step.id} className="flex gap-2">
           <div className="flex w-4 shrink-0 flex-col items-center">
             <span
-              className={`inline-flex h-4 w-4 items-center justify-center rounded-full ${
-                step.status === "done"
+              className={`inline-flex h-4 w-4 items-center justify-center rounded-full ${step.status === "done"
                   ? "bg-[#dcfce7] text-[#16a34a]"
                   : "bg-[#e0e7ff] text-[#4f49e2]"
-              }`}
+                }`}
             >
               {step.status === "done" ? (
                 <Check className="h-2.5 w-2.5" />
@@ -153,14 +152,12 @@ const renderMilestones = (
               type="button"
               onClick={() => onToggle(step.id)}
               disabled={!step.details}
-              className={`flex w-full items-center justify-between gap-2 text-left ${
-                step.details ? "cursor-pointer" : "cursor-default"
-              }`}
+              className={`flex w-full items-center justify-between gap-2 text-left ${step.details ? "cursor-pointer" : "cursor-default"
+                }`}
             >
               <span
-                className={`text-xs ${
-                  step.status === "done" ? "text-[#374151]" : "font-semibold text-[#1f2937]"
-                }`}
+                className={`text-xs ${step.status === "done" ? "text-[#374151]" : "font-semibold text-[#1f2937]"
+                  }`}
               >
                 {step.label}
               </span>
@@ -639,7 +636,6 @@ export default function AgentChatWorkspace({
   const appName = agent.agentId;
   const assistantDisplayName = agent.name?.trim() || appName;
   const userId = DEFAULT_USER_ID;
-
   const [sessions, setSessions] = useState<AdkSession[]>([]);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [isDraftSession, setIsDraftSession] = useState(true);
@@ -759,6 +755,7 @@ export default function AgentChatWorkspace({
       const response = await fetch(getSessionsUrl(adkBaseUrl, appName, userId), {
         headers: { accept: "application/json" },
       });
+      //console.log("Sessions response status:", response);
       const payload = (await response.json()) as AdkSession[];
       if (!response.ok || !Array.isArray(payload)) {
         if (!silent) {
@@ -809,6 +806,7 @@ export default function AgentChatWorkspace({
       }
     }
   }, [appName, userId, loadSessionMessages]);
+  
 
   const resetStreamingText = useCallback(() => {
     if (streamAnimationFrameRef.current) {
@@ -1048,7 +1046,7 @@ export default function AgentChatWorkspace({
         },
       }),
     });
-
+    console.log("SSE response status:", response);
     if (!response.ok || !response.body) {
       return false;
     }
@@ -1374,11 +1372,10 @@ export default function AgentChatWorkspace({
                 return (
                   <div
                     key={session.id}
-                    className={`mb-2 rounded-xl border px-3 py-2 ${
-                      isActive
+                    className={`mb-2 rounded-xl border px-3 py-2 ${isActive
                         ? "border-[#c9d1ff] bg-[#eef2ff]"
                         : "border-[#e8ecf4] bg-white"
-                    }`}
+                      }`}
                   >
                     <div className="flex items-start gap-2">
                       <button
@@ -1393,7 +1390,14 @@ export default function AgentChatWorkspace({
                       >
                         <MessageSquare className="mt-0.5 h-4 w-4 shrink-0 text-[#4f49e2]" />
                         <span className="line-clamp-2 text-xs font-semibold text-[#1f2937]">
-                          {session.state?.first_message_summary || session.id}
+                          {session.state?.first_message_summary ? (
+                            session.state.first_message_summary
+                          ) : (
+                            <span className="flex items-center gap-2 text-[#9ca3af]">
+                              <span className="h-2 w-2 animate-pulse rounded-full bg-[#c7d2fe]" />
+                              thinking...
+                            </span>
+                          )}
                         </span>
                       </button>
                       <div className="relative" data-session-menu="true">
@@ -1456,11 +1460,10 @@ export default function AgentChatWorkspace({
 
           <div
             ref={messageListRef}
-            className={`soft-scrollbar flex-1 ${
-              isInitialSessionView
+            className={`soft-scrollbar flex-1 ${isInitialSessionView
                 ? "overflow-hidden bg-[radial-gradient(120%_120%_at_50%_0%,#eef2ff_0%,#f7f8fc_45%,#f7f8fc_100%)] px-8 py-8"
                 : "space-y-4 overflow-y-auto bg-[#f7f8fc] px-6 py-5"
-            }`}
+              }`}
           >
             {isLoadingMessages ? (
               <div className="space-y-4">
@@ -1469,9 +1472,8 @@ export default function AgentChatWorkspace({
                   return (
                     <div
                       key={`message-skeleton-${index}`}
-                      className={`flex ${
-                        isUserSkeleton ? "justify-end" : "justify-start"
-                      }`}
+                      className={`flex ${isUserSkeleton ? "justify-end" : "justify-start"
+                        }`}
                     >
                       <div className="max-w-[78%] rounded-2xl border border-[#dbe2f0] bg-white px-4 py-3 animate-pulse">
                         <div className="mb-2 flex items-center gap-2">
@@ -1567,11 +1569,10 @@ export default function AgentChatWorkspace({
                       className={`flex ${isUser ? "justify-end" : "justify-start"}`}
                     >
                       <div
-                        className={`max-w-[78%] rounded-2xl px-4 py-3 text-sm shadow-sm ${
-                          isUser
+                        className={`max-w-[78%] rounded-2xl px-4 py-3 text-sm shadow-sm ${isUser
                             ? "border border-[#dbe2f0] bg-white text-[#111827]"
                             : "bg-[#e9edff] text-[#1f2937]"
-                        }`}
+                          }`}
                       >
                         <div className="mb-1 flex items-center gap-2 whitespace-nowrap text-[11px] font-semibold text-[#8a94a6]">
                           {isUser ? <User className="h-3.5 w-3.5" /> : <Bot className="h-3.5 w-3.5" />}
@@ -1581,10 +1582,10 @@ export default function AgentChatWorkspace({
                         </div>
                         {!isUser && milestones.length > 0
                           ? renderMilestones(
-                              milestones,
-                              expandedMilestones,
-                              toggleMilestoneExpansion
-                            )
+                            milestones,
+                            expandedMilestones,
+                            toggleMilestoneExpansion
+                          )
                           : null}
                         <div className="space-y-3 break-words">
                           {renderMarkdownBlocks(message.text)}
@@ -1649,10 +1650,10 @@ export default function AgentChatWorkspace({
 
                       {streamSteps.length > 0
                         ? renderMilestones(
-                            streamSteps,
-                            expandedMilestones,
-                            toggleMilestoneExpansion
-                          )
+                          streamSteps,
+                          expandedMilestones,
+                          toggleMilestoneExpansion
+                        )
                         : null}
 
                       <div className="space-y-3 break-words">
