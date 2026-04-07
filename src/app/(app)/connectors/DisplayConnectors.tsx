@@ -11,6 +11,7 @@ import {
   Plug,
   Settings2,
   Trash2,
+  X,
 } from "lucide-react";
 import type { ReactElement } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -460,7 +461,7 @@ export default function DisplayConnectors({ searchTerm }: DisplayConnectorsProps
                 }}
                 className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-[#b91c1c]"
               >
-                <Trash2 className="h-4 w-4" />
+                <X className="h-4 w-4" />
               </button>
             </div>
             <div className="px-6 py-5">
