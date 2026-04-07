@@ -50,7 +50,7 @@ const navSections: NavSection[] = [
         href: "/activity",
       },
       {
-        label: "ChatOps",
+        label: "Chatops",
         id: "platform-chatops",
         icon: <MessageSquare className="h-5 w-5" />,
         dot: true,
