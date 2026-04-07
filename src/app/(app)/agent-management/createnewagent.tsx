@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Bot, ChevronDown, Plus, LayoutTemplate  } from "lucide-react";
+import { Bot, ChevronDown, Plus, LayoutTemplate } from "lucide-react";
 import { trimTrailingSlash } from "@/config/agent";
 import { useRuntimeConfig } from "@/config/runtime-config";
 import { getProviderIconSrc } from "../llm-management/llmHelpers";
@@ -344,13 +344,12 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
                   onChange={(e) => setSelectedTemplateId(e.target.value)}
                   disabled={isTemplatesLoading || modelTemplates.length === 0}
                   title={templatesLoadError || undefined}
-                  className={`appearance-none rounded-lg pl-8 pr-7 py-1.5 text-xs font-medium outline-none transition focus:ring-2 focus:ring-indigo-500/10 ${
-                    templatesLoadError
+                  className={`appearance-none rounded-lg pl-8 pr-7 py-1.5 text-xs font-medium outline-none transition focus:ring-2 focus:ring-indigo-500/10 ${templatesLoadError
                       ? "cursor-not-allowed border border-red-200 bg-red-50 text-red-500"
                       : isTemplatesLoading || modelTemplates.length === 0
                         ? "cursor-not-allowed border border-indigo-100 bg-indigo-50 text-indigo-300"
                         : "border border-indigo-200 bg-indigo-50 text-indigo-700 hover:border-indigo-300"
-                  }`}
+                    }`}
                 >
                   <option value="">
                     {isTemplatesLoading
@@ -452,15 +451,15 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
               {/* Capabilities */}
               <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">Capabilities</p>
 
-              <div className="space-y-4">
+                <div className="space-y-4">
                 <DynamicListField
                   label="MCP Servers"
                   hint="URLs of Model Context Protocol servers"
                   values={mcpServers}
                   placeholder="https://mcp.example.com/sse"
-                  onAdd={() => addToList(setMcpServers)}
-                  onRemove={(i) => removeFromList(setMcpServers, i)}
-                  onChange={(i, v) => updateMcpServer(i, v)}  // ✅ fixed: string, not string[]
+                  onAdd={(): void => addToList(setMcpServers)}
+                  onRemove={(i: number): void => removeFromList(setMcpServers, i)}
+                  onChange={(i: number, v: string): void => updateMcpServer(i, v)}
                 />
 
                 <DynamicDropdownField
@@ -468,11 +467,13 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
                   values={connectorConfigIds}
                   options={connectorOptions}
                   configDataMap={configDataMap}
-                  onAdd={addConnector}
-                  onRemove={removeConnector}
-                  onChange={(i, v) => updateList(i, v)}  // ✅ correct: string[]
+                  onAdd={(): void => addConnector()}
+                  onRemove={(i: number): void => removeConnector(i)}
+                  onChange={(i: number, v: string[] | string): void =>
+                  updateList(i, Array.isArray(v) ? v : [v])
+                  }
                 />
-              </div>
+                </div>
 
               {/* Error */}
               {submitError && (
@@ -519,9 +520,8 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
                 <button
                   onClick={handleCreate}
                   disabled={!isFormValid || isCreating || !!success}
-                  className={`flex min-w-[132px] items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white transition disabled:cursor-not-allowed disabled:opacity-50 ${
-                    success ? "bg-green-600 hover:bg-green-700" : "bg-indigo-600 hover:bg-indigo-700"
-                  }`}
+                  className={`flex min-w-[132px] items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white transition disabled:cursor-not-allowed disabled:opacity-50 ${success ? "bg-green-600 hover:bg-green-700" : "bg-indigo-600 hover:bg-indigo-700"
+                    }`}
                 >
                   {isCreating ? (
                     <>
@@ -547,7 +547,6 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
           </div>
         </div>
       )}
-      
 
       {/* Toast */}
       {isToastVisible && (
