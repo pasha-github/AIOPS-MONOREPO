@@ -1,26 +1,36 @@
 import inspect
-from google.adk.cli.fast_api import get_fast_api_app # as requested
-from utils.agent_loader import DatabaseAgentLoader
+
 from google.adk.cli.adk_web_server import AdkWebServer
-from utils.constants import AGENT_SERVER_DATABASE_URL, A2A, WEB
-from utils.cache import cache
+from google.adk.cli.fast_api import get_fast_api_app  # as requested
+
+from src.agent_runtime.adk.agent_loader import DatabaseAgentLoader
+from src.agent_runtime.adk.cache import cache
+from src.utils.constants import A2A, AGENT_SERVER_DATABASE_URL, WEB
 
 
-def _get_adk_web_server_instance(fastapi_app):
+def _get_adk_web_server_instance(fastapi_app) -> AdkWebServer:
     """Extracts the internal AdkWebServer instance from route closures."""
     for route in fastapi_app.routes:
         if getattr(route, "name", "") == "run_agent":
             # The route endpoint is a nested function that closes over 'self'
             closure_vars = inspect.getclosurevars(route.endpoint)
-            return closure_vars.nonlocals.get('self')
-    return None
+            adk_web_server_instance: AdkWebServer | None = closure_vars.nonlocals.get(
+                "self"
+            )
+
+            if adk_web_server_instance is None:
+                continue
+
+            return adk_web_server_instance
+    raise Exception("Adk web server instance not found")
 
 
 def _invalidate_runner_cache(app_name: str):
     if adk_web_server_instance:
-        # The next time a request hits this app, it will safely close 
+        # The next time a request hits this app, it will safely close
         # the old runner and load a fresh one via your custom loader.
         adk_web_server_instance.runners_to_clean.add(app_name)
+
 
 def invalidate_cache(agent_id: str):
     """Invalidates the cache for a specific agent."""
@@ -43,9 +53,9 @@ ADK_APP = get_fast_api_app(
     session_service_uri=AGENT_SERVER_DATABASE_URL,
     url_prefix="/agent-server",
     logo_text="RC AIOps - DEV",
-    logo_image_url="/static/royal_cyber.jpeg"
+    logo_image_url="/static/royal_cyber.jpeg",
+    extra_plugins=["src.plugins.session_summary_plugin.plugin"],
 )
 
 # Retrieve the server instance
 adk_web_server_instance: AdkWebServer = _get_adk_web_server_instance(ADK_APP)
-

@@ -1,10 +1,13 @@
-from fastapi.testclient import TestClient
-import pytest
+import sys
 from pathlib import Path
 from uuid import uuid4
 
-from database.models import ConnectorConfig
-from utils.helper import cached_connector_info, resolve_connector_tools
+import pytest
+from fastapi.testclient import TestClient
+
+from src.connectors.loader import cached_connector_info, resolve_connector_tools
+from src.connectors.teams_connector import TeamsConnector
+from src.database.models import ConnectorConfig
 
 
 def test_list_connectors_success(client: TestClient):
@@ -17,6 +20,7 @@ def test_list_connectors_success(client: TestClient):
     assert "datadog_connector" in ids
     assert "ibm_mq_connector" in ids
     assert "servicenow_connector" in ids
+    assert "teams_connector" in ids
 
 
 def test_list_connectors_excludes_reserved_files(client: TestClient):
@@ -370,7 +374,9 @@ def test_resolve_connector_tools_missing_file_raises():
         resolve_connector_tools(cfg)
 
 
-def test_resolve_connector_tools_success(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+def test_resolve_connector_tools_success(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
     connector_source = '''
 from base_connector import BaseConnector, connector_tool
 
@@ -386,57 +392,196 @@ class TempConnector(BaseConnector):
     def get_tools(self):
         return [self.ping]
 '''
-    base_source = '''
+    base_source = """
 def connector_tool(func):
     return func
 
 class BaseConnector:
     pass
-'''
+"""
 
-    temp_connectors = tmp_path / "connectors"
+    temp_connectors = tmp_path / "src" / "connectors"
     temp_connectors.mkdir(parents=True, exist_ok=True)
     (temp_connectors / "base_connector.py").write_text(base_source, encoding="utf-8")
-    (temp_connectors / "temp_connector.py").write_text(connector_source, encoding="utf-8")
+    (temp_connectors / "temp_connector.py").write_text(
+        connector_source, encoding="utf-8"
+    )
 
-    monkeypatch.setattr("utils.helper.CONNECTORS_DIR", str(temp_connectors))
+    monkeypatch.setattr("src.connectors.loader.CONNECTORS_DIR", temp_connectors)
 
     cfg = ConnectorConfig(
         name="ok",
         connector_id="temp_connector",
         config=[{"name": "token", "value": "abc"}],
     )
-    tools = resolve_connector_tools(cfg)
-    assert isinstance(tools, list)
-    assert len(tools) == 1
+    try:
+        tools = resolve_connector_tools(cfg)
+        assert isinstance(tools, list)
+        assert len(tools) == 1
+    finally:
+        sys.modules.pop("base_connector", None)
 
 
 def test_resolve_connector_tools_no_baseconnector_subclass_raises(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ):
-    connector_source = '''
+    connector_source = """
 class NotConnector:
     def __init__(self):
         pass
-'''
-    base_source = '''
+"""
+    base_source = """
 def connector_tool(func):
     return func
 
 class BaseConnector:
     pass
-'''
+"""
     temp_connectors = tmp_path / "connectors"
     temp_connectors.mkdir(parents=True, exist_ok=True)
     (temp_connectors / "base_connector.py").write_text(base_source, encoding="utf-8")
-    (temp_connectors / "bad_connector.py").write_text(connector_source, encoding="utf-8")
+    (temp_connectors / "bad_connector.py").write_text(
+        connector_source, encoding="utf-8"
+    )
 
-    monkeypatch.setattr("utils.helper.CONNECTORS_DIR", str(temp_connectors))
+    monkeypatch.setattr("src.connectors.loader.CONNECTORS_DIR", temp_connectors)
 
     cfg = ConnectorConfig(
         name="bad",
         connector_id="bad_connector",
         config=[],
     )
-    with pytest.raises(ValueError):
-        resolve_connector_tools(cfg)
+    try:
+        with pytest.raises(ValueError):
+            resolve_connector_tools(cfg)
+    finally:
+        sys.modules.pop("base_connector", None)
+
+
+def test_teams_connector_exposes_no_tools_without_targets():
+    connector = TeamsConnector(
+        TEAMS_BOT_BASE_URL="http://localhost:3978",
+        ALERT_API_KEY="secret",
+    )
+
+    assert connector.tool_names == []
+    assert connector.get_tools() == []
+
+
+def test_teams_connector_exposes_email_tool_only_when_email_configured():
+    connector = TeamsConnector(
+        TEAMS_BOT_BASE_URL="http://localhost:3978",
+        ALERT_API_KEY="secret",
+        EMAILS="user@example.com, other@example.com",
+    )
+
+    assert connector.tool_names == ["send_alert_by_email"]
+
+
+def test_teams_connector_exposes_conversation_tool_only_when_conversation_configured():
+    connector = TeamsConnector(
+        TEAMS_BOT_BASE_URL="http://localhost:3978",
+        ALERT_API_KEY="secret",
+        CONVERSATION_IDS="19:test@thread.tacv2,19:other@thread.tacv2",
+    )
+
+    assert connector.tool_names == ["send_alert_by_conversation"]
+
+
+def test_teams_connector_sends_email_alert_with_preconfigured_target(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    connector = TeamsConnector(
+        TEAMS_BOT_BASE_URL="http://localhost:3978/",
+        ALERT_API_KEY="secret",
+        EMAILS="user@example.com,other@example.com",
+    )
+
+    class _Response:
+        status_code = 200
+        text = "ok"
+
+        @staticmethod
+        def json():
+            return {"status": "ok", "message_sent": True}
+
+    captured: dict[str, object] = {}
+
+    def fake_call_api(**kwargs):
+        captured.update(kwargs)
+        return _Response()
+
+    monkeypatch.setattr(connector, "call_api", fake_call_api)
+
+    result = connector.send_alert_by_email("CPU is above 90%")
+
+    assert result["status"] == "success"
+    assert captured["url"] == "http://localhost:3978/api/alerts/by-email"
+    assert captured["method"] == "POST"
+    assert captured["headers"] == {
+        "Content-Type": "application/json",
+        "x-alert-key": "secret",
+    }
+    assert captured["json"] == {
+        "emails": ["user@example.com", "other@example.com"],
+        "message": "CPU is above 90%",
+    }
+
+
+def test_teams_connector_sends_conversation_alert_with_preconfigured_target(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    connector = TeamsConnector(
+        TEAMS_BOT_BASE_URL="http://localhost:3978",
+        ALERT_API_KEY="secret",
+        CONVERSATION_IDS="19:test@thread.tacv2\n19:other@thread.tacv2",
+    )
+
+    class _Response:
+        status_code = 200
+        text = "ok"
+
+        @staticmethod
+        def json():
+            return {"status": "ok", "sent_count": 1}
+
+    captured_calls: list[dict[str, object]] = []
+
+    def fake_call_api(**kwargs):
+        captured_calls.append(kwargs)
+        return _Response()
+
+    monkeypatch.setattr(connector, "call_api", fake_call_api)
+
+    result = connector.send_alert_by_conversation("Queue backlog detected")
+
+    assert result["status"] == "success"
+    assert result["requested_count"] == 2
+    assert len(captured_calls) == 2
+    assert captured_calls[0]["url"] == "http://localhost:3978/api/alerts"
+    assert captured_calls[0]["method"] == "POST"
+    assert captured_calls[0]["json"] == {
+        "conversation_id": "19:test@thread.tacv2",
+        "message": "Queue backlog detected",
+    }
+    assert captured_calls[1]["json"] == {
+        "conversation_id": "19:other@thread.tacv2",
+        "message": "Queue backlog detected",
+    }
+
+
+def test_resolve_connector_tools_teams_connector_filters_tools_by_config():
+    cfg = ConnectorConfig(
+        name="teams-email",
+        connector_id="teams_connector",
+        config=[
+            {"name": "TEAMS_BOT_BASE_URL", "value": "http://localhost:3978"},
+            {"name": "ALERT_API_KEY", "value": "secret"},
+            {"name": "EMAILS", "value": "user@example.com,other@example.com"},
+        ],
+    )
+
+    tools = resolve_connector_tools(cfg)
+
+    assert len(tools) == 1
+    assert tools[0].name == "send_alert_by_email"

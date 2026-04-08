@@ -3,8 +3,8 @@ from types import SimpleNamespace
 
 import pytest
 
-import utils.agent_loader as agent_loader_module
-from utils.agent_loader import DatabaseAgentLoader
+import src.agent_runtime.adk.agent_loader as agent_loader_module
+from src.agent_runtime.adk.agent_loader import DatabaseAgentLoader
 
 
 class _FakeResult:
@@ -20,7 +20,9 @@ class _FakeResult:
 
 
 class _FakeSession:
-    def __init__(self, agent_config=None, model_config=None, list_ids=None, connector_map=None):
+    def __init__(
+        self, agent_config=None, model_config=None, list_ids=None, connector_map=None
+    ):
         self.agent_config = agent_config
         self.model_config = model_config
         self.list_ids = list_ids
@@ -90,12 +92,30 @@ def _model_cfg(**kwargs):
 
 
 def _patch_common_runtime(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(agent_loader_module, "decrypt_secret", lambda _: "decrypted-key")
-    monkeypatch.setattr(agent_loader_module, "resolve_connector_tools", lambda _cfg: ["connector_tool"])
-    monkeypatch.setattr(agent_loader_module, "SseConnectionParams", lambda url: {"url": url, "kind": "sse"})
-    monkeypatch.setattr(agent_loader_module, "StreamableHTTPConnectionParams", lambda url: {"url": url, "kind": "mcp"})
-    monkeypatch.setattr(agent_loader_module, "McpToolset", lambda connection_params: {"mcp": connection_params})
-    monkeypatch.setattr(agent_loader_module, "AgentTool", lambda agent: {"sub_agent": agent})
+    monkeypatch.setattr(
+        agent_loader_module, "decrypt_secret", lambda _: "decrypted-key"
+    )
+    monkeypatch.setattr(
+        agent_loader_module, "resolve_connector_tools", lambda _cfg: ["connector_tool"]
+    )
+    monkeypatch.setattr(
+        agent_loader_module,
+        "SseConnectionParams",
+        lambda url: {"url": url, "kind": "sse"},
+    )
+    monkeypatch.setattr(
+        agent_loader_module,
+        "StreamableHTTPConnectionParams",
+        lambda url: {"url": url, "kind": "mcp"},
+    )
+    monkeypatch.setattr(
+        agent_loader_module,
+        "McpToolset",
+        lambda connection_params: {"mcp": connection_params},
+    )
+    monkeypatch.setattr(
+        agent_loader_module, "AgentTool", lambda agent: {"sub_agent": agent}
+    )
 
     class _FakeLiteLlm:
         def __init__(self, model):
@@ -112,7 +132,9 @@ def _patch_common_runtime(monkeypatch: pytest.MonkeyPatch):
 def test_agent_loader_returns_none_when_agent_missing(monkeypatch: pytest.MonkeyPatch):
     _patch_common_runtime(monkeypatch)
     monkeypatch.setattr(agent_loader_module, "cache", _FakeCache())
-    monkeypatch.setattr(agent_loader_module, "Session", lambda _engine: _FakeSession(agent_config=None))
+    monkeypatch.setattr(
+        agent_loader_module, "Session", lambda _engine: _FakeSession(agent_config=None)
+    )
 
     loader = DatabaseAgentLoader()
     assert loader.load_agent("missing") is None
@@ -122,7 +144,9 @@ def test_agent_loader_returns_none_when_agent_disabled(monkeypatch: pytest.Monke
     _patch_common_runtime(monkeypatch)
     cfg = _agent_cfg(isEnabled=False)
     monkeypatch.setattr(agent_loader_module, "cache", _FakeCache())
-    monkeypatch.setattr(agent_loader_module, "Session", lambda _engine: _FakeSession(agent_config=cfg))
+    monkeypatch.setattr(
+        agent_loader_module, "Session", lambda _engine: _FakeSession(agent_config=cfg)
+    )
 
     loader = DatabaseAgentLoader()
     assert loader.load_agent("main") is None
@@ -133,7 +157,9 @@ def test_agent_loader_returns_none_when_model_missing(monkeypatch: pytest.Monkey
     cfg = _agent_cfg(isEnabled=True)
     monkeypatch.setattr(agent_loader_module, "cache", _FakeCache())
     monkeypatch.setattr(
-        agent_loader_module, "Session", lambda _engine: _FakeSession(agent_config=cfg, model_config=None)
+        agent_loader_module,
+        "Session",
+        lambda _engine: _FakeSession(agent_config=cfg, model_config=None),
     )
 
     loader = DatabaseAgentLoader()
@@ -145,7 +171,9 @@ def test_agent_loader_uses_cache_when_available(monkeypatch: pytest.MonkeyPatch)
     cached = object()
     fake_cache = _FakeCache(initial={"main": cached})
     monkeypatch.setattr(agent_loader_module, "cache", fake_cache)
-    monkeypatch.setattr(agent_loader_module, "Session", lambda _engine: _FakeSession(agent_config=None))
+    monkeypatch.setattr(
+        agent_loader_module, "Session", lambda _engine: _FakeSession(agent_config=None)
+    )
 
     loader = DatabaseAgentLoader()
     assert loader.load_agent("main") is cached
@@ -159,7 +187,9 @@ def test_agent_loader_sets_provider_api_env_var(monkeypatch: pytest.MonkeyPatch)
     fake_cache = _FakeCache()
     monkeypatch.setattr(agent_loader_module, "cache", fake_cache)
     monkeypatch.setattr(
-        agent_loader_module, "Session", lambda _engine: _FakeSession(agent_config=cfg, model_config=model)
+        agent_loader_module,
+        "Session",
+        lambda _engine: _FakeSession(agent_config=cfg, model_config=model),
     )
 
     loader = DatabaseAgentLoader()
@@ -175,7 +205,9 @@ def test_agent_loader_sets_bedrock_env_var(monkeypatch: pytest.MonkeyPatch):
     model = _model_cfg(provider="bedrock")
     monkeypatch.setattr(agent_loader_module, "cache", _FakeCache())
     monkeypatch.setattr(
-        agent_loader_module, "Session", lambda _engine: _FakeSession(agent_config=cfg, model_config=model)
+        agent_loader_module,
+        "Session",
+        lambda _engine: _FakeSession(agent_config=cfg, model_config=model),
     )
 
     loader = DatabaseAgentLoader()
@@ -190,7 +222,9 @@ def test_agent_loader_google_model_path(monkeypatch: pytest.MonkeyPatch):
     model = _model_cfg(provider="google", name="gemini-2.0-flash")
     monkeypatch.setattr(agent_loader_module, "cache", _FakeCache())
     monkeypatch.setattr(
-        agent_loader_module, "Session", lambda _engine: _FakeSession(agent_config=cfg, model_config=model)
+        agent_loader_module,
+        "Session",
+        lambda _engine: _FakeSession(agent_config=cfg, model_config=model),
     )
 
     loader = DatabaseAgentLoader()
@@ -198,28 +232,22 @@ def test_agent_loader_google_model_path(monkeypatch: pytest.MonkeyPatch):
     assert agent.kwargs["model"] == "gemini-2.0-flash"
 
 
-def test_agent_loader_attaches_session_summary_callback(monkeypatch: pytest.MonkeyPatch):
+def test_agent_loader_does_not_attach_session_summary_callback(
+    monkeypatch: pytest.MonkeyPatch,
+):
     _patch_common_runtime(monkeypatch)
     cfg = _agent_cfg()
     model = _model_cfg(provider="google", name="gemini-2.0-flash")
     monkeypatch.setattr(agent_loader_module, "cache", _FakeCache())
     monkeypatch.setattr(
-        agent_loader_module, "Session", lambda _engine: _FakeSession(agent_config=cfg, model_config=model)
+        agent_loader_module,
+        "Session",
+        lambda _engine: _FakeSession(agent_config=cfg, model_config=model),
     )
-
-    callback_models = []
-    callback_sentinel = object()
-
-    def fake_make_session_summary_callback(model_name: str):
-        callback_models.append(model_name)
-        return callback_sentinel
-
-    monkeypatch.setattr(agent_loader_module, "make_session_summary_callback", fake_make_session_summary_callback)
 
     loader = DatabaseAgentLoader()
     agent = loader.load_agent("main")
-    assert agent.kwargs["before_model_callback"] is callback_sentinel
-    assert callback_models == ["gemini/gemini-2.0-flash"]
+    assert "before_model_callback" not in agent.kwargs
 
 
 def test_agent_loader_non_google_model_path(monkeypatch: pytest.MonkeyPatch):
@@ -228,7 +256,9 @@ def test_agent_loader_non_google_model_path(monkeypatch: pytest.MonkeyPatch):
     model = _model_cfg(provider="openai", name="gpt-4.1")
     monkeypatch.setattr(agent_loader_module, "cache", _FakeCache())
     monkeypatch.setattr(
-        agent_loader_module, "Session", lambda _engine: _FakeSession(agent_config=cfg, model_config=model)
+        agent_loader_module,
+        "Session",
+        lambda _engine: _FakeSession(agent_config=cfg, model_config=model),
     )
 
     loader = DatabaseAgentLoader()
@@ -242,12 +272,16 @@ def test_agent_loader_exec_tools_success(monkeypatch: pytest.MonkeyPatch):
     model = _model_cfg()
     monkeypatch.setattr(agent_loader_module, "cache", _FakeCache())
     monkeypatch.setattr(
-        agent_loader_module, "Session", lambda _engine: _FakeSession(agent_config=cfg, model_config=model)
+        agent_loader_module,
+        "Session",
+        lambda _engine: _FakeSession(agent_config=cfg, model_config=model),
     )
 
     loader = DatabaseAgentLoader()
     agent = loader.load_agent("main")
-    tool_names = [getattr(t, "__name__", "") for t in agent.kwargs["tools"] if callable(t)]
+    tool_names = [
+        getattr(t, "__name__", "") for t in agent.kwargs["tools"] if callable(t)
+    ]
     assert "my_tool" in tool_names
 
 
@@ -257,7 +291,9 @@ def test_agent_loader_exec_tools_failure_handled(monkeypatch: pytest.MonkeyPatch
     model = _model_cfg()
     monkeypatch.setattr(agent_loader_module, "cache", _FakeCache())
     monkeypatch.setattr(
-        agent_loader_module, "Session", lambda _engine: _FakeSession(agent_config=cfg, model_config=model)
+        agent_loader_module,
+        "Session",
+        lambda _engine: _FakeSession(agent_config=cfg, model_config=model),
     )
 
     loader = DatabaseAgentLoader()
@@ -271,7 +307,9 @@ def test_agent_loader_mcp_url_validation(monkeypatch: pytest.MonkeyPatch):
     model = _model_cfg()
     monkeypatch.setattr(agent_loader_module, "cache", _FakeCache())
     monkeypatch.setattr(
-        agent_loader_module, "Session", lambda _engine: _FakeSession(agent_config=cfg, model_config=model)
+        agent_loader_module,
+        "Session",
+        lambda _engine: _FakeSession(agent_config=cfg, model_config=model),
     )
 
     loader = DatabaseAgentLoader()
@@ -286,11 +324,17 @@ def test_agent_loader_sub_agent_self_reference_skipped(monkeypatch: pytest.Monke
     model = _model_cfg()
     monkeypatch.setattr(agent_loader_module, "cache", _FakeCache())
     monkeypatch.setattr(
-        agent_loader_module, "Session", lambda _engine: _FakeSession(agent_config=cfg, model_config=model)
+        agent_loader_module,
+        "Session",
+        lambda _engine: _FakeSession(agent_config=cfg, model_config=model),
     )
 
     created_sub_wrappers = []
-    monkeypatch.setattr(agent_loader_module, "AgentTool", lambda agent: created_sub_wrappers.append(agent) or {"a": agent})
+    monkeypatch.setattr(
+        agent_loader_module,
+        "AgentTool",
+        lambda agent: created_sub_wrappers.append(agent) or {"a": agent},
+    )
 
     loader = DatabaseAgentLoader()
     agent = loader.load_agent("main")
@@ -304,7 +348,9 @@ def test_agent_loader_duplicate_sub_agents_skipped(monkeypatch: pytest.MonkeyPat
     model = _model_cfg()
     monkeypatch.setattr(agent_loader_module, "cache", _FakeCache())
     monkeypatch.setattr(
-        agent_loader_module, "Session", lambda _engine: _FakeSession(agent_config=cfg, model_config=model)
+        agent_loader_module,
+        "Session",
+        lambda _engine: _FakeSession(agent_config=cfg, model_config=model),
     )
 
     original_load_agent = DatabaseAgentLoader.load_agent

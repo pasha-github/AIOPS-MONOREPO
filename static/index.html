@@ -6,16 +6,54 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Agent Management Kit</title>
     <style>
+        :root {
+            --bg-color: #ffffff;
+            --text-color: #000000;
+            --heading-color: #333333;
+            --section-border: #dddddd;
+            --status-bg: #f0f0f0;
+            --card-border: #eeeeee;
+            --input-bg: #ffffff;
+            --input-border: #cccccc;
+            --chat-bg: #fafafa;
+            --msg-user-bg: #e3f2fd;
+            --msg-user-text: #000000;
+            --msg-agent-bg: #f1f8e9;
+            --msg-agent-text: #000000;
+            --graph-bg: #fafafa;
+        }
+
+        body.dark-mode {
+            --bg-color: #121212;
+            --text-color: #e0e0e0;
+            --heading-color: #ffffff;
+            --section-border: #444444;
+            --status-bg: #1e1e1e;
+            --card-border: #333333;
+            --input-bg: #2c2c2c;
+            --input-border: #555555;
+            --chat-bg: #1e1e1e;
+            --msg-user-bg: #0d47a1;
+            --msg-user-text: #ffffff;
+            --msg-agent-bg: #1b5e20;
+            --msg-agent-text: #ffffff;
+            --graph-bg: #1e1e1e;
+        }
+
         body {
             font-family: sans-serif;
             margin: 20px;
             line-height: 1.6;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            transition: background-color 0.3s, color 0.3s;
         }
 
         h1,
         h2,
         h3 {
-            color: #333;
+            color: var(--heading-color);
+            transition: color 0.3s;
         }
 
         .container {
@@ -25,16 +63,18 @@
 
         .section {
             margin-bottom: 40px;
-            border: 1px solid #ddd;
+            border: 1px solid var(--section-border);
             padding: 20px;
             border-radius: 8px;
+            transition: border-color 0.3s;
         }
 
         .status {
             padding: 10px;
-            background: #f0f0f0;
+            background: var(--status-bg);
             margin-bottom: 20px;
             border-radius: 4px;
+            transition: background-color 0.3s;
         }
 
         .grid {
@@ -44,10 +84,11 @@
         }
 
         .card {
-            border: 1px solid #eee;
+            border: 1px solid var(--card-border);
             padding: 15px;
             border-radius: 4px;
             margin-bottom: 10px;
+            transition: border-color 0.3s;
         }
 
         .form-group {
@@ -62,11 +103,17 @@
 
         input[type="text"],
         input[type="password"],
+        input[type="number"],
         textarea,
         select {
             width: 100%;
             padding: 8px;
             box-sizing: border-box;
+            background-color: var(--input-bg);
+            color: var(--text-color);
+            border: 1px solid var(--input-border);
+            border-radius: 4px;
+            transition: background-color 0.3s, color 0.3s, border-color 0.3s;
         }
 
         select[multiple] {
@@ -80,6 +127,7 @@
             border: none;
             cursor: pointer;
             border-radius: 4px;
+            transition: background-color 0.3s, color 0.3s;
         }
 
         button:hover {
@@ -97,10 +145,11 @@
         #chat-messages {
             height: 300px;
             overflow-y: scroll;
-            border: 1px solid #ccc;
+            border: 1px solid var(--input-border);
             padding: 10px;
             margin-bottom: 10px;
-            background: #fafafa;
+            background: var(--chat-bg);
+            transition: background-color 0.3s, border-color 0.3s;
         }
 
         .message {
@@ -110,13 +159,17 @@
         }
 
         .message.user {
-            background: #e3f2fd;
+            background: var(--msg-user-bg);
+            color: var(--msg-user-text);
             text-align: right;
+            transition: background-color 0.3s, color 0.3s;
         }
 
         .message.agent {
-            background: #f1f8e9;
+            background: var(--msg-agent-bg);
+            color: var(--msg-agent-text);
             text-align: left;
+            transition: background-color 0.3s, color 0.3s;
         }
 
         /* Connector config fields rendered dynamically */
@@ -150,13 +203,42 @@
         .badge.optional {
             background: #6c757d;
         }
+
+        .connector-help {
+            margin-bottom: 12px;
+            padding: 10px 12px;
+            border-radius: 6px;
+            background: #eef6ff;
+            border: 1px solid #c8def5;
+            color: #214a75;
+            font-size: 0.92em;
+        }
+
+        .connector-help strong {
+            display: block;
+            margin-bottom: 4px;
+        }
+        
+        .theme-toggle {
+            background: var(--status-bg);
+            color: var(--text-color);
+            border: 1px solid var(--section-border);
+        }
+        
+        .theme-toggle:hover {
+            background: var(--card-border);
+            color: var(--text-color);
+        }
     </style>
     <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
 </head>
 
 <body>
     <div class="container">
-        <h1>Agent Management Kit</h1>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h1>Agent Management Kit</h1>
+            <button id="theme-toggle" class="theme-toggle">🌙 Dark Mode</button>
+        </div>
         <div id="health-status" class="status">Checking connection...</div>
 
         <div class="grid">
@@ -404,6 +486,10 @@
 
                     <h3>Create Connector Config</h3>
                     <form id="add-connector-config-form">
+                        <div id="connector-config-edit-state" style="display:none; margin-bottom:10px; padding:8px 10px; background:#fff3cd; border-radius:4px;">
+                            Editing existing connector config
+                            <button type="button" id="connector-config-cancel-edit" style="margin-left:10px;">Cancel</button>
+                        </div>
                         <div class="form-group">
                             <label>Connector</label>
                             <select id="connector-select">
@@ -415,12 +501,13 @@
                             <input type="text" id="connector-config-name" placeholder="e.g. My JSONPlaceholder Config"
                                 required>
                         </div>
+                        <div id="connector-help-text"></div>
                         <div id="connector-config-fields">
                             <!-- Dynamically populated when a connector is selected -->
                         </div>
                         <div id="connector-details-doc" style="margin-bottom:10px; color: #555; font-style: italic;">
                         </div>
-                        <button type="submit">Save Config</button>
+                        <button type="submit" id="connector-config-submit-btn">Save Config</button>
                     </form>
                 </div>
 
@@ -442,7 +529,7 @@
         <div class="section">
             <h2>Architecture Visualizer</h2>
             <button onclick="loadGraph()">Refresh Graph</button>
-            <div id="graph-container" style="width: 100%; height: 600px; border: 1px solid #ccc; margin-top: 10px; background: #fafafa; border-radius: 4px;"></div>
+            <div id="graph-container" style="width: 100%; height: 600px; border: 1px solid var(--input-border); margin-top: 10px; background: var(--graph-bg); border-radius: 4px;"></div>
         </div>
 
         <!-- Chat Section -->
@@ -928,6 +1015,39 @@
 
         // ─── Connectors ───────────────────────────────────────────────────────
 
+        let editingConnectorConfig = null;
+        const connectorFieldPlaceholders = {
+            TEAMS_BOT_BASE_URL: 'http://localhost:3978',
+            ALERT_API_KEY: 'same value configured in teams_bot/.env',
+            EMAILS: 'user1@company.com, user2@company.com',
+            CONVERSATION_IDS: '19:...@thread.tacv2, 19:...@thread.tacv2',
+        };
+
+        function getConnectorHelpHtml(connectorId) {
+            if (connectorId !== 'teams_connector') {
+                return '';
+            }
+
+            return `
+                <div class="connector-help">
+                    <strong>Teams connector setup</strong>
+                    Add <code>TEAMS_BOT_BASE_URL</code> and <code>ALERT_API_KEY</code> for the Teams bot API.
+                    Configure one or more targets using <code>EMAILS</code> / <code>CONVERSATION_IDS</code>.
+                    Only tools with a configured target are exposed to the agent. If both are blank, no Teams tool is exposed.
+                </div>
+            `;
+        }
+
+        function resetConnectorConfigForm() {
+            editingConnectorConfig = null;
+            document.getElementById('add-connector-config-form').reset();
+            document.getElementById('connector-config-fields').innerHTML = '';
+            document.getElementById('connector-help-text').innerHTML = '';
+            document.getElementById('connector-details-doc').textContent = '';
+            document.getElementById('connector-config-edit-state').style.display = 'none';
+            document.getElementById('connector-config-submit-btn').textContent = 'Save Config';
+        }
+
         /** Fetches available connector types and populates selects + list */
         async function loadConnectors() {
             const res = await fetch(`${API_BASE}/connectors/`);
@@ -970,9 +1090,22 @@
             const connectorId = document.getElementById('connector-select').value;
             const fieldsEl = document.getElementById('connector-config-fields');
             const docEl = document.getElementById('connector-details-doc');
+            const helpEl = document.getElementById('connector-help-text');
+
+            if (
+                editingConnectorConfig
+                && connectorId
+                && connectorId !== editingConnectorConfig.connectorId
+            ) {
+                editingConnectorConfig = null;
+                document.getElementById('connector-config-edit-state').style.display = 'none';
+                document.getElementById('connector-config-submit-btn').textContent = 'Save Config';
+                document.getElementById('connector-config-name').value = '';
+            }
 
             fieldsEl.innerHTML = '';
             docEl.textContent = '';
+            helpEl.innerHTML = getConnectorHelpHtml(connectorId);
 
             if (!connectorId) return;
 
@@ -992,6 +1125,7 @@
             // ── Config variable inputs ─────────────────────────────────────
             const configVars = details.config_variables || [];
             configVars.forEach(v => {
+                const placeholder = connectorFieldPlaceholders[v.name] || v.name;
                 const row = document.createElement('div');
                 row.className = 'config-field';
                 row.innerHTML = `
@@ -999,7 +1133,7 @@
                         ${v.name}
                         <span class="badge ${v.required ? '' : 'optional'}">${v.required ? 'required' : 'optional'}</span>
                     </label>
-                    <input type="text" id="cfg-${v.name}" data-config-name="${v.name}" placeholder="${v.name}" ${v.required ? 'required' : ''}>
+                    <input type="text" id="cfg-${v.name}" data-config-name="${v.name}" placeholder="${placeholder}" ${v.required ? 'required' : ''}>
                 `;
                 fieldsEl.appendChild(row);
             });
@@ -1027,7 +1161,64 @@
             }
         }
 
-        /** POST /connectors/{connector_id}/config */
+        function populateConnectorConfigFields(configEntries) {
+            const configMap = new Map((configEntries || []).map(entry => [entry.name, entry.value ?? '']));
+            document.querySelectorAll('#connector-config-fields input[data-config-name]').forEach(inp => {
+                inp.value = configMap.get(inp.dataset.configName) || '';
+            });
+        }
+
+        async function editConnectorConfig(connectorId, connectorConfigId) {
+            const selectEl = document.getElementById('connector-select');
+            selectEl.value = connectorId;
+            await onConnectorSelected();
+
+            const res = await fetch(`${API_BASE}/connectors/${connectorId}/config`);
+            if (!res.ok) {
+                alert('Failed to load connector configs: ' + await res.text());
+                return;
+            }
+
+            const configs = await res.json();
+            const cfg = configs.find(item => item.connector_config_id === connectorConfigId);
+            if (!cfg) {
+                alert('Connector config not found.');
+                return;
+            }
+
+            editingConnectorConfig = {
+                connectorId,
+                connectorConfigId,
+            };
+
+            document.getElementById('connector-config-name').value = cfg.name || '';
+            populateConnectorConfigFields(cfg.config || []);
+            document.getElementById('connector-config-edit-state').style.display = 'block';
+            document.getElementById('connector-config-submit-btn').textContent = 'Update Config';
+        }
+
+        async function deleteConnectorConfig(connectorId, connectorConfigId, connectorName) {
+            if (!confirm(`Delete config from ${connectorName}?`)) {
+                return;
+            }
+
+            const res = await fetch(`${API_BASE}/connectors/${connectorId}/config/${connectorConfigId}`, {
+                method: 'DELETE'
+            });
+
+            if (!res.ok) {
+                alert('Failed to delete config: ' + await res.text());
+                return;
+            }
+
+            if (editingConnectorConfig && editingConnectorConfig.connectorConfigId === connectorConfigId) {
+                resetConnectorConfigForm();
+            }
+
+            await loadAllConnectorConfigs();
+        }
+
+        /** POST or PATCH /connectors/{connector_id}/config */
         async function addConnectorConfig(e) {
             e.preventDefault();
             const connectorId = document.getElementById('connector-select').value;
@@ -1047,20 +1238,31 @@
 
             const payload = { connector_id: connectorId, name, config };
 
-            const res = await fetch(`${API_BASE}/connectors/${connectorId}/config`, {
-                method: 'POST',
+            const isEdit = editingConnectorConfig && editingConnectorConfig.connectorConfigId;
+            if (isEdit && connectorId !== editingConnectorConfig.connectorId) {
+                alert('Connector cannot be changed while editing a saved config.');
+                return;
+            }
+            const url = isEdit
+                ? `${API_BASE}/connectors/${connectorId}/config/${editingConnectorConfig.connectorConfigId}`
+                : `${API_BASE}/connectors/${connectorId}/config`;
+            const method = isEdit ? 'PATCH' : 'POST';
+            const body = isEdit
+                ? JSON.stringify({ name, config })
+                : JSON.stringify(payload);
+
+            const res = await fetch(url, {
+                method,
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+                body
             });
 
             if (!res.ok) {
-                alert('Failed to save config: ' + await res.text());
+                alert(`Failed to ${isEdit ? 'update' : 'save'} config: ` + await res.text());
                 return;
             }
 
-            e.target.reset();
-            document.getElementById('connector-config-fields').innerHTML = '';
-            document.getElementById('connector-details-doc').textContent = '';
+            resetConnectorConfigForm();
 
             // Refresh saved configs list and agent connector select
             await loadAllConnectorConfigs();
@@ -1096,11 +1298,44 @@
                     // Card in config list
                     const div = document.createElement('div');
                     div.className = 'card';
+                    const configMap = new Map((cfg.config || []).map(f => [f.name, f.value]));
+                    const teamsTarget = configMap.get('EMAILS')
+                        || configMap.get('CONVERSATION_IDS')
+                        || 'no target configured';
+                    const teamsSummary = connector.id === 'teams_connector'
+                        ? `<small>Target: ${teamsTarget}</small><br>`
+                        : '';
                     div.innerHTML = `
                         <strong>${cfg.name}</strong><br>
                         <small>Connector: ${connector.name} &bull; ID: ${cfg.connector_config_id}</small><br>
-                        <small>Fields: ${(cfg.config || []).map(f => f.name).join(', ') || '(none)'}</small>
+                        ${teamsSummary}
+                        <small>Fields: ${(cfg.config || []).map(f => f.name).join(', ') || '(none)'}</small><br>
                     `;
+
+                    const editBtn = document.createElement('button');
+                    editBtn.type = 'button';
+                    editBtn.style.marginTop = '8px';
+                    editBtn.textContent = 'Edit';
+                    editBtn.addEventListener('click', () => {
+                        editConnectorConfig(connector.id, cfg.connector_config_id);
+                    });
+                    div.appendChild(editBtn);
+
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.type = 'button';
+                    deleteBtn.className = 'delete';
+                    deleteBtn.style.marginTop = '8px';
+                    deleteBtn.style.marginLeft = '6px';
+                    deleteBtn.textContent = 'Delete';
+                    deleteBtn.addEventListener('click', () => {
+                        deleteConnectorConfig(
+                            connector.id,
+                            cfg.connector_config_id,
+                            connector.name,
+                        );
+                    });
+                    div.appendChild(deleteBtn);
+
                     listEl.appendChild(div);
 
                     // Option in agent multi-select
@@ -1228,8 +1463,27 @@
         document.getElementById('update-agent-form').addEventListener('submit', updateAgent);
         document.getElementById('send-msg-btn').addEventListener('click', sendMessage);
         document.getElementById('add-connector-config-form').addEventListener('submit', addConnectorConfig);
+        document.getElementById('connector-config-cancel-edit').addEventListener('click', resetConnectorConfigForm);
         document.getElementById('connector-select').addEventListener('change', onConnectorSelected);
         document.getElementById('connector-config-filter').addEventListener('change', loadAllConnectorConfigs);
+
+        const themeToggleBtn = document.getElementById('theme-toggle');
+        
+        if (localStorage.getItem('theme') === 'dark' || (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.body.classList.add('dark-mode');
+            themeToggleBtn.textContent = '☀️ Light Mode';
+        }
+
+        themeToggleBtn.addEventListener('click', () => {
+            document.body.classList.toggle('dark-mode');
+            if (document.body.classList.contains('dark-mode')) {
+                localStorage.setItem('theme', 'dark');
+                themeToggleBtn.textContent = '☀️ Light Mode';
+            } else {
+                localStorage.setItem('theme', 'light');
+                themeToggleBtn.textContent = '🌙 Dark Mode';
+            }
+        });
 
         // ─── Visualizer ───────────────────────────────────────────────────────
         async function loadGraph() {

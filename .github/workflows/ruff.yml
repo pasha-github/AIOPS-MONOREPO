@@ -1,0 +1,43 @@
+name: Lint and Type Check
+
+on:
+  push:
+    branches: [ main, master, dev ]
+  pull_request:
+    branches: [ main, master, dev ]
+
+jobs:
+  lint:
+    name: Run Ruff and Pyright
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run Ruff linter
+        uses: astral-sh/ruff-action@v3
+        with:
+          args: "check ."
+
+      - name: Run Ruff formatter
+        uses: astral-sh/ruff-action@v3
+        with:
+          args: "format --check ."
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+      - name: Install dependencies
+        run: |
+          uv pip install --system --upgrade pip
+          if [ -f requirements.txt ]; then uv pip install --system -r requirements.txt; fi
+
+      - name: Run Pyright
+        uses: jakebailey/pyright-action@v2

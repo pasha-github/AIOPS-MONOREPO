@@ -1,7 +1,7 @@
 import pytest
 from cryptography.fernet import Fernet
 
-from utils.secrets import decrypt_secret, encrypt_secret
+from src.utils.secrets import decrypt_secret, encrypt_secret
 
 
 def test_encrypt_secret_roundtrip(monkeypatch: pytest.MonkeyPatch):
@@ -17,7 +17,7 @@ def test_encrypt_secret_roundtrip(monkeypatch: pytest.MonkeyPatch):
 
 
 def test_encrypt_secret_missing_env_key_raises(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.delenv("ENCRYPTION_KEY", raising=False)
+    monkeypatch.setattr("src.utils.secrets.ENCRYPTION_KEY", None)
     with pytest.raises(RuntimeError):
         encrypt_secret("x")
 

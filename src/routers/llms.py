@@ -1,34 +1,39 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlmodel import Session, select
-from database.database import get_session
-from database.models import Agent, Model
-from typing import List, Optional
-from pydantic import BaseModel
-from utils.secrets import encrypt_secret
-from utils.adk_app import invalidate_cache
 from datetime import datetime
 
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from sqlmodel import Session, select
+
+from src.agent_runtime.adk.adk_app import invalidate_cache
+from src.database.database import get_session
+from src.database.models import Agent, Model
+from src.utils.secrets import encrypt_secret
+
 router = APIRouter(prefix="/llms", tags=["llms"])
+
 
 class ModelCreate(BaseModel):
     model_id: str
     provider: str
     name: str
-    description: Optional[str]
+    description: str | None
     api_key: str
+
 
 class ModelRead(BaseModel):
     model_id: str
     provider: str
     name: str
     created_at: datetime
-    description: Optional[str]
+    description: str | None
     # Exclude api_key
 
+
 class ModelUpdate(BaseModel):
-    name: Optional[str] = None
-    description: Optional[str] = None
-    api_key: Optional[str] = None
+    name: str | None = None
+    description: str | None = None
+    api_key: str | None = None
+
 
 @router.post("/", response_model=ModelRead)
 def create_model(model: ModelCreate, session: Session = Depends(get_session)):
@@ -43,13 +48,17 @@ def create_model(model: ModelCreate, session: Session = Depends(get_session)):
     session.refresh(db_model)
     return db_model
 
-@router.get("/", response_model=List[ModelRead])
+
+@router.get("/", response_model=list[ModelRead])
 def list_models(session: Session = Depends(get_session)):
     models = session.exec(select(Model)).all()
     return models
 
+
 @router.patch("/{model_id}", response_model=ModelRead)
-def update_model(model_id: str, model_update: ModelUpdate, session: Session = Depends(get_session)):
+def update_model(
+    model_id: str, model_update: ModelUpdate, session: Session = Depends(get_session)
+):
     model = session.get(Model, model_id)
     if not model:
         raise HTTPException(status_code=404, detail="Model not found")
@@ -60,7 +69,10 @@ def update_model(model_id: str, model_update: ModelUpdate, session: Session = De
             raise HTTPException(status_code=400, detail="name cannot be empty")
         model.name = update_data["name"]
     if "description" in update_data:
-        if isinstance(update_data["description"], str) and not update_data["description"].strip():
+        if (
+            isinstance(update_data["description"], str)
+            and not update_data["description"].strip()
+        ):
             raise HTTPException(status_code=400, detail="description cannot be empty")
         model.description = update_data["description"]
     if "api_key" in update_data:
@@ -79,6 +91,7 @@ def update_model(model_id: str, model_update: ModelUpdate, session: Session = De
         invalidate_cache(agent_id)
 
     return model
+
 
 @router.delete("/{model_id}")
 def delete_model(model_id: str, session: Session = Depends(get_session)):

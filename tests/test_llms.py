@@ -1,6 +1,7 @@
 from fastapi.testclient import TestClient
 from sqlmodel import Session
-from database.models import Model
+
+from src.database.models import Model
 
 
 def test_create_model(client: TestClient):

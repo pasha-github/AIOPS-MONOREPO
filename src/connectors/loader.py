@@ -1,14 +1,15 @@
-from functools import lru_cache
 import ast
 import importlib.util
 import inspect
-import os
 import sys
-from typing import List, Dict
-from database.models import ConnectorConfig
+from functools import lru_cache
+from importlib.machinery import ModuleSpec
+from pathlib import Path
+from typing import Any
 
+from src.database.models import ConnectorConfig
 
-CONNECTORS_DIR = os.path.join(os.path.dirname(__file__), "..", "connectors")
+CONNECTORS_DIR = Path(__file__).parent.parent / "connectors"
 
 
 def resolve_connector_tools(connector_config: ConnectorConfig):
@@ -30,38 +31,43 @@ def resolve_connector_tools(connector_config: ConnectorConfig):
     config = connector_config.config
 
     # --- 1. Locate the connector module file ---
-    module_path = os.path.abspath(
-        os.path.join(CONNECTORS_DIR, f"{connector_id}.py")
-    )
-    if not os.path.isfile(module_path):
+    module_path = (CONNECTORS_DIR / f"{connector_id}.py").resolve()
+    if not module_path.is_file():
         raise FileNotFoundError(
-            f"Connector '{connector_id}' not found. "
-            f"Expected file: {module_path}"
+            f"Connector '{connector_id}' not found. Expected file: {module_path}"
         )
 
     # --- 2. Dynamically import the module ---
     # Add connectors dir to sys.path so relative imports (e.g. base_connector) resolve
-    connectors_abs = os.path.abspath(CONNECTORS_DIR)
+    connectors_abs = str(CONNECTORS_DIR.resolve())
     if connectors_abs not in sys.path:
         sys.path.insert(0, connectors_abs)
 
-    spec = importlib.util.spec_from_file_location(connector_id, module_path)
+    spec: ModuleSpec | None = importlib.util.spec_from_file_location(
+        connector_id, module_path
+    )
+    if spec is None:
+        raise ValueError(f"Could not load module '{connector_id}'.")
     module = importlib.util.module_from_spec(spec)
+    if spec.loader is None:
+        raise ValueError(f"Could not load module '{connector_id}'.")
     spec.loader.exec_module(module)
 
     # --- 3. Find the BaseConnector subclass in the module ---
-    from base_connector import BaseConnector  # imported after sys.path is set
+    from base_connector import BaseConnector
 
     connector_class = None
     for _, obj in inspect.getmembers(module, inspect.isclass):
-        if issubclass(obj, BaseConnector) and obj is not BaseConnector and obj.__module__ == connector_id:
+        if (
+            issubclass(obj, BaseConnector)
+            and obj is not BaseConnector
+            and obj.__module__ == connector_id
+        ):
             connector_class = obj
             break
 
     if connector_class is None:
-        raise ValueError(
-            f"No BaseConnector subclass found in '{connector_id}.py'."
-        )
+        raise ValueError(f"No BaseConnector subclass found in '{connector_id}.py'.")
 
     # --- 4. Convert config list → kwargs dict and instantiate ---
     # config format: [{"name": "API_KEY", "value": "abc123"}, ...]
@@ -71,27 +77,24 @@ def resolve_connector_tools(connector_config: ConnectorConfig):
     return connector.get_tools()
 
 
-
 @lru_cache(maxsize=128)
 def cached_connector_info(source: str, mtime: float):
     # your AST parsing logic here
     tree = ast.parse(source)
-    time = mtime
 
     # -----------------------------
     # Module-level documentation
     # -----------------------------
     module_doc = ast.get_docstring(tree) or ""
 
-    tools: List[Dict[str, str]] = []
-    config_vars: List[str] = []
+    tools: list[dict[str, str]] = []
+    config_vars: list[dict[str, Any]] = []
 
     # -----------------------------
     # Find connector class
     # -----------------------------
     for node in tree.body:
         if isinstance(node, ast.ClassDef):
-
             # Ensure class inherits from BaseConnector
             is_connector = any(
                 (isinstance(base, ast.Name) and base.id == "BaseConnector")
@@ -106,7 +109,6 @@ def cached_connector_info(source: str, mtime: float):
             # Inspect methods inside the class
             # -----------------------------------
             for item in node.body:
-
                 if not isinstance(item, ast.FunctionDef):
                     continue
 
@@ -122,19 +124,19 @@ def cached_connector_info(source: str, mtime: float):
                     for index, arg in enumerate(args):
                         is_required = index < first_default_index
 
-                        config_vars.append({
-                            "name": arg.arg,
-                            "required": is_required
-                        })
+                        config_vars.append({"name": arg.arg, "required": is_required})
 
                 # -------- TOOLS --------
                 else:
                     # Detect @connector_tool decorator
                     has_decorator = False
                     for dec in item.decorator_list:
-                        if isinstance(dec, ast.Name) and dec.id == "connector_tool":
-                            has_decorator = True
-                        elif isinstance(dec, ast.Attribute) and dec.attr == "connector_tool":
+                        if (
+                            isinstance(dec, ast.Name) and dec.id == "connector_tool"
+                        ) or (
+                            isinstance(dec, ast.Attribute)
+                            and dec.attr == "connector_tool"
+                        ):
                             has_decorator = True
 
                     if not has_decorator:
@@ -154,13 +156,10 @@ def cached_connector_info(source: str, mtime: float):
 
                     cleaned_doc = "\n".join(cleaned_lines).strip()
 
-                    tools.append({
-                        "name": item.name,
-                        "documentation": cleaned_doc
-                    })
+                    tools.append({"name": item.name, "documentation": cleaned_doc})
 
     return {
         "documentation": module_doc.strip(),
         "tools": tools,
-        "config_variables": config_vars
+        "config_variables": config_vars,
     }

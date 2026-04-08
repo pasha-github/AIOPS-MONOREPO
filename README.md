@@ -36,6 +36,21 @@ A FastAPI-based application for managing and running agents, featuring SQLite/En
    uvicorn main:app --host 0.0.0.0 --port 8000 --reload
    ```
 
+## Linter and Type Checker
+
+We are using ruff for linting and pyright for type checking.
+
+```bash
+ruff check . # check for linting errors
+ruff check --fix . # fix linting errors
+ruff format . # format the code
+pyright . # check for type errors
+python -m pytest # run tests
+```
+```bash
+ruff check . && pyright && python -m pytest # run all checks
+```
+
 ## Running with Docker
 
 You can easily containerize and run the application using Docker.

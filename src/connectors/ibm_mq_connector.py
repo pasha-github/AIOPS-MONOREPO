@@ -6,12 +6,11 @@ Provides queue manager discovery, MQSC execution, MQ log retrieval,
 and SSH command forwarding through pre-configured HTTP endpoints.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import requests
-from google.adk.tools.tool_context import ToolContext
-
 from base_connector import BaseConnector, connector_tool
+from google.adk.tools.tool_context import ToolContext
 
 
 class IbmMqConnector(BaseConnector):
@@ -48,7 +47,7 @@ class IbmMqConnector(BaseConnector):
             return value
         return str(value).strip().lower() in {"1", "true", "yes", "on"}
 
-    def _mq_headers(self) -> Dict[str, str]:
+    def _mq_headers(self) -> dict[str, str]:
         return {
             "Accept": "application/json",
             "Content-Type": "application/json",
@@ -59,8 +58,8 @@ class IbmMqConnector(BaseConnector):
         self,
         url: str,
         method: str = "GET",
-        headers: Optional[Dict[str, str]] = None,
-        json_data: Optional[Dict[str, Any]] = None,
+        headers: dict[str, str] | None = None,
+        json_data: dict[str, Any] | None = None,
         timeout: float = 30.0,
         basic_auth: bool = False,
     ) -> requests.Response:
@@ -75,8 +74,10 @@ class IbmMqConnector(BaseConnector):
             verify=self.verify_tls,
         )
 
-    def _error_result(self, message: str, response: Optional[requests.Response] = None) -> Dict[str, Any]:
-        result: Dict[str, Any] = {"status": "error", "message": message}
+    def _error_result(
+        self, message: str, response: requests.Response | None = None
+    ) -> dict[str, Any]:
+        result: dict[str, Any] = {"status": "error", "message": message}
         if response is not None:
             result["code"] = response.status_code
             body = response.text.strip()
@@ -88,9 +89,9 @@ class IbmMqConnector(BaseConnector):
         self,
         endpoint: str,
         method: str = "GET",
-        json_data: Optional[Dict[str, Any]] = None,
+        json_data: dict[str, Any] | None = None,
         timeout: float = 30.0,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         url = f"{self.url_base}{endpoint.lstrip('/')}"
         try:
             response = self._request(
@@ -112,7 +113,7 @@ class IbmMqConnector(BaseConnector):
         except ValueError:
             return self._error_result("MQ endpoint did not return valid JSON", response)
 
-    def _format_queue_managers(self, payload: Dict[str, Any]) -> List[Dict[str, str]]:
+    def _format_queue_managers(self, payload: dict[str, Any]) -> list[dict[str, str]]:
         queue_managers = []
         for item in payload.get("qmgr", []):
             queue_managers.append(
@@ -123,8 +124,8 @@ class IbmMqConnector(BaseConnector):
             )
         return queue_managers
 
-    def _format_mqsc_response(self, payload: Dict[str, Any]) -> List[str]:
-        formatted_lines: List[str] = []
+    def _format_mqsc_response(self, payload: dict[str, Any]) -> list[str]:
+        formatted_lines: list[str] = []
 
         for command_response in payload.get("commandResponse", []):
             text_lines = list(command_response.get("text", []))
@@ -140,7 +141,7 @@ class IbmMqConnector(BaseConnector):
 
         return formatted_lines
 
-    def _format_logs(self, payload: Any) -> Dict[str, Any]:
+    def _format_logs(self, payload: Any) -> dict[str, Any]:
         if not isinstance(payload, dict):
             return {
                 "status": "success",
@@ -155,7 +156,7 @@ class IbmMqConnector(BaseConnector):
             "detected_issues": errors if isinstance(errors, list) else [errors],
         }
 
-    def _format_ssh_response(self, payload: Any) -> Dict[str, Any]:
+    def _format_ssh_response(self, payload: Any) -> dict[str, Any]:
         if not isinstance(payload, dict):
             return {
                 "status": "success",
@@ -169,7 +170,7 @@ class IbmMqConnector(BaseConnector):
         }
 
     @connector_tool
-    def dspmq(self, tool_context: Optional[ToolContext] = None) -> Dict[str, Any]:
+    def dspmq(self, tool_context: ToolContext | None = None) -> dict[str, Any]:
         """Lists queue managers available to the configured mqweb server and reports whether each one is running."""
         result = self._perform_mq_request("qmgr/")
         if result["status"] != "success":
@@ -187,8 +188,8 @@ class IbmMqConnector(BaseConnector):
         self,
         qmgr_name: str,
         mqsc_command: str,
-        tool_context: Optional[ToolContext] = None,
-    ) -> Dict[str, Any]:
+        tool_context: ToolContext | None = None,
+    ) -> dict[str, Any]:
         """Runs an MQSC command against a specific queue manager and returns normalized command output."""
         result = self._perform_mq_request(
             endpoint=f"action/qmgr/{qmgr_name}/mqsc",
@@ -211,7 +212,7 @@ class IbmMqConnector(BaseConnector):
         }
 
     @connector_tool
-    def get_mq_logs(self, tool_context: Optional[ToolContext] = None) -> Dict[str, Any]:
+    def get_mq_logs(self, tool_context: ToolContext | None = None) -> dict[str, Any]:
         """Fetches IBM MQ log status and any detected issues such as channel failures or connectivity problems."""
         if not self.logs_url:
             return {"status": "error", "message": "LOGS_URL is not configured."}
@@ -227,7 +228,9 @@ class IbmMqConnector(BaseConnector):
         try:
             payload = response.json()
         except ValueError:
-            return self._error_result("Logs endpoint did not return valid JSON", response)
+            return self._error_result(
+                "Logs endpoint did not return valid JSON", response
+            )
 
         return self._format_logs(payload)
 
@@ -235,8 +238,8 @@ class IbmMqConnector(BaseConnector):
     def run_commands_ssh(
         self,
         command: str,
-        tool_context: Optional[ToolContext] = None,
-    ) -> Dict[str, Any]:
+        tool_context: ToolContext | None = None,
+    ) -> dict[str, Any]:
         """Runs a command through a configured SSH bridge endpoint and returns stdout and stderr from that endpoint."""
         if not self.ssh_url:
             return {"status": "error", "message": "SSH_URL is not configured."}
@@ -257,6 +260,8 @@ class IbmMqConnector(BaseConnector):
         try:
             payload = response.json()
         except ValueError:
-            return self._error_result("SSH endpoint did not return valid JSON", response)
+            return self._error_result(
+                "SSH endpoint did not return valid JSON", response
+            )
 
         return self._format_ssh_response(payload)
