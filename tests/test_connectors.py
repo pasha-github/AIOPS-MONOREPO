@@ -492,7 +492,7 @@ def test_teams_connector_sends_email_alert_with_preconfigured_target(
     monkeypatch: pytest.MonkeyPatch,
 ):
     connector = TeamsConnector(
-        TEAMS_BOT_BASE_URL="http://localhost:3978/",
+        TEAMS_BOT_BASE_URL="http://localhost:3978/  ",
         ALERT_API_KEY="secret",
         EMAILS="user@example.com,other@example.com",
     )
