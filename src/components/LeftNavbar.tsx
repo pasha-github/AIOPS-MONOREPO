@@ -82,7 +82,7 @@ const navSections: NavSection[] = [
         label: "Connectors",
         id: "operations-connectors",
         icon: <Link2 className="h-5 w-5" />,
-        dot: true,
+
         href: "/connectors",
         disabled: !ENABLE_CREDENTIALS_MANAGEMENT,
         reloadOnNavigate: true,
