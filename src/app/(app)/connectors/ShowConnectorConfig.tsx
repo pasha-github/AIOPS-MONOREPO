@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Eye, EyeOff, ListTree, Pencil, X } from "lucide-react";
+import { Check, Eye, EyeOff, ListTree, Pencil, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 type ConfigValue = {
@@ -30,6 +30,11 @@ type EditingTarget = {
   recordId: string;
   fieldName: string;
   value: string;
+};
+
+type DeleteTarget = {
+  recordId: string;
+  recordName: string;
 };
 
 const isSecretField = (fieldName: string) => {
@@ -93,6 +98,10 @@ export default function ShowConnectorConfig({
   const [editingTarget, setEditingTarget] = useState<EditingTarget | null>(null);
   const [savingItemKey, setSavingItemKey] = useState<string | null>(null);
   const [editError, setEditError] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
+  const [deleteError, setDeleteError] = useState("");
+  const [deleteSuccess, setDeleteSuccess] = useState("");
+  const [deletingRecordId, setDeletingRecordId] = useState<string | null>(null);
 
   const configUrl = useMemo(() => {
     if (!connectorId) {
@@ -115,6 +124,9 @@ export default function ShowConnectorConfig({
       setEditingTarget(null);
       setSavingItemKey(null);
       setEditError("");
+      setDeleteTarget(null);
+      setDeleteError("");
+      setDeleteSuccess("");
 
       const response = await fetch(configUrl, {
         method: "GET",
@@ -150,6 +162,24 @@ export default function ShowConnectorConfig({
     setEditingTarget(null);
     setSavingItemKey(null);
     setEditError("");
+  };
+
+  const handleDeleteStart = (record: ConnectorConfigRecord) => {
+    setDeleteError("");
+    setDeleteSuccess("");
+    setDeleteTarget({
+      recordId: record.connector_config_id,
+      recordName: record.name,
+    });
+  };
+
+  const handleDeleteCancel = () => {
+    if (deletingRecordId) {
+      return;
+    }
+    setDeleteTarget(null);
+    setDeleteError("");
+    setDeleteSuccess("");
   };
 
   const handleEditSave = async (record: ConnectorConfigRecord) => {
@@ -244,6 +274,58 @@ export default function ShowConnectorConfig({
     }
   };
 
+  const handleDeleteRecord = async () => {
+    if (!connectorId || !deleteTarget || deletingRecordId) {
+      return;
+    }
+
+    setDeletingRecordId(deleteTarget.recordId);
+    setDeleteError("");
+    setDeleteSuccess("");
+
+    try {
+      const response = await fetch(
+        `${connectorsApiBase}/connectors/${encodeURIComponent(
+          connectorId
+        )}/config/${encodeURIComponent(deleteTarget.recordId)}`,
+        {
+          method: "DELETE",
+          headers: { accept: "application/json" },
+        }
+      );
+
+      if (!response.ok) {
+        let errorPayload: unknown = null;
+        try {
+          errorPayload = await response.json();
+        } catch {
+          errorPayload = null;
+        }
+        throw new Error(
+          getErrorDetail(errorPayload, "Unable to delete connector config.")
+        );
+      }
+
+      setRecords((previous) =>
+        previous.filter((item) => item.connector_config_id !== deleteTarget.recordId)
+      );
+      if (editingTarget?.recordId === deleteTarget.recordId) {
+        setEditingTarget(null);
+      }
+      setDeleteSuccess(`Connector config "${deleteTarget.recordName}" was deleted successfully.`);
+      setTimeout(() => {
+        setDeleteTarget(null);
+        setDeleteSuccess("");
+      }, 1200);
+    } catch (error) {
+      setDeleteError(
+        error instanceof Error ? error.message : "Unable to delete connector config."
+      );
+    } finally {
+      setDeletingRecordId(null);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/35 px-4 py-8 backdrop-blur-sm">
       <div className="flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-[0_20px_60px_-35px_rgba(15,23,42,0.65)]">
@@ -307,9 +389,21 @@ export default function ShowConnectorConfig({
                           Config ID: {record.connector_config_id}
                         </p>
                       </div>
-                      <div className="text-right text-xs text-[#64748b]">
-                        <p>Created: {formatDateTime(record.created_at)}</p>
-                        <p className="mt-1">Updated: {formatDateTime(record.updated_at)}</p>
+                      <div className="flex items-start gap-3">
+                        <div className="text-right text-xs text-[#64748b]">
+                          <p>Created: {formatDateTime(record.created_at)}</p>
+                          <p className="mt-1">Updated: {formatDateTime(record.updated_at)}</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteStart(record)}
+                          disabled={deletingRecordId === record.connector_config_id}
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#fecaca] text-[#dc2626] transition hover:bg-[#fff1f2] disabled:cursor-not-allowed disabled:opacity-60"
+                          aria-label={`Delete config ${record.name}`}
+                          title={`Delete config ${record.name}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -434,6 +528,73 @@ export default function ShowConnectorConfig({
           )}
         </div>
       </div>
+
+      {deleteTarget ? (
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/30 px-4 py-8 backdrop-blur-sm">
+          <div className="w-full max-w-xl overflow-hidden rounded-2xl bg-white shadow-[0_20px_60px_-35px_rgba(15,23,42,0.65)]">
+            <div className="flex items-center justify-between border-b border-[#fee2e2] bg-[#fff5f5] px-6 py-4">
+              <div className="flex items-center gap-3 text-[#dc2626]">
+                <Trash2 className="h-5 w-5" />
+                <div>
+                  <p className="text-xl font-semibold">Delete Config</p>
+                  <p className="text-sm text-[#dc2626]/80">{deleteTarget.recordName}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleDeleteCancel}
+                disabled={Boolean(deletingRecordId)}
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-[#64748b] shadow-sm transition hover:bg-[#f8fafc] disabled:cursor-not-allowed disabled:opacity-60"
+                aria-label="Close delete confirmation"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="space-y-4 px-6 py-5">
+              <p className="text-base text-[#334155]">
+                Delete the current config for{" "}
+                <span className="rounded-md bg-[#fff1f2] px-2 py-1 font-semibold text-[#dc2626]">
+                  {deleteTarget.recordName}
+                </span>
+                ?
+              </p>
+              <p className="text-sm text-[#b91c1c]">This action can not be undone</p>
+
+              {deleteError ? (
+                <div className="rounded-xl border border-[#fee2e2] bg-[#fff5f5] px-4 py-3 text-sm text-[#b91c1c]">
+                  {deleteError}
+                </div>
+              ) : null}
+
+              {deleteSuccess ? (
+                <div className="rounded-xl border border-[#bbf7d0] bg-[#f0fdf4] px-4 py-3 text-sm text-[#166534]">
+                  {deleteSuccess}
+                </div>
+              ) : null}
+            </div>
+
+            <div className="flex items-center justify-end gap-3 border-t border-[#eef1f7] px-6 py-4">
+              <button
+                type="button"
+                onClick={handleDeleteCancel}
+                disabled={Boolean(deletingRecordId)}
+                className="rounded-xl border border-[#d7deea] px-6 py-2.5 text-lg font-semibold text-[#334155] transition hover:bg-[#f8fafc] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleDeleteRecord()}
+                disabled={Boolean(deletingRecordId) || Boolean(deleteSuccess)}
+                className="rounded-xl bg-[#ef4444] px-6 py-2.5 text-lg font-semibold text-white transition hover:bg-[#dc2626] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {deletingRecordId ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
