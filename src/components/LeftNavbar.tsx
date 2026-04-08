@@ -1,8 +1,5 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import type { ReactElement } from "react";
 import {
   Activity,
   Bot,
@@ -13,6 +10,9 @@ import {
   Users,
   Workflow,
 } from "lucide-react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import type { ReactElement } from "react";
 
 type NavItem = {
   id: string;
@@ -44,17 +44,16 @@ const navSections: NavSection[] = [
         href: "/dashboard",
       },
       {
+        label: "Chatops",
+        id: "platform-chatops",
+        icon: <MessageSquare className="h-5 w-5" />,
+        href: "/chatOps",
+      },  
+      {
         label: "Activity",
         id: "core-activity",
         icon: <Activity className="h-5 w-5" />,
         href: "/activity",
-      },
-      {
-        label: "Chatops",
-        id: "platform-chatops",
-        icon: <MessageSquare className="h-5 w-5" />,
-        dot: true,
-        href: "/chatOps",
       },
     ],
   },
@@ -83,7 +82,7 @@ const navSections: NavSection[] = [
         label: "Connectors",
         id: "operations-connectors",
         icon: <Link2 className="h-5 w-5" />,
-        dot: true,
+
         href: "/connectors",
         disabled: !ENABLE_CREDENTIALS_MANAGEMENT,
         reloadOnNavigate: true,
