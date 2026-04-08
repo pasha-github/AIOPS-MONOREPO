@@ -2,6 +2,10 @@
 
 import { Lock, Settings2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  CONNECTOR_CONFIG_SCHEMAS,
+  type ConfigField,
+} from "./connectorSchemas";
 
 type SetConnectorConfigProps = {
   isOpen: boolean;
@@ -10,14 +14,6 @@ type SetConnectorConfigProps = {
   connectorsApiBase: string;
   mode?: "create" | "edit";
   onClose: () => void;
-};
-
-type ConfigField = {
-  name: string;
-  label: string;
-  required: boolean;
-  secret?: boolean;
-  placeholder?: string;
 };
 
 type ConfigValue = {
@@ -39,115 +35,6 @@ type FormState = {
   configName: string;
   fieldsState: Record<string, string>;
   editingConfigId: string | null;
-};
-
-const CONNECTOR_CONFIG_SCHEMAS: Record<string, ConfigField[]> = {
-  datadog_connector: [
-    {
-      name: "DD_API_KEY",
-      label: "DD API Key",
-      required: true,
-      secret: true,
-      placeholder: "Enter DD API key",
-    },
-    {
-      name: "DD_APP_KEY",
-      label: "DD App Key",
-      required: true,
-      secret: true,
-      placeholder: "Enter DD App key",
-    },
-    {
-      name: "DD_SITE",
-      label: "DD Site",
-      required: false,
-      placeholder: "https://api.us5.datadoghq.com",
-    },
-    {
-      name: "prefix",
-      label: "Prefix",
-      required: false,
-      placeholder: "Enter prefix",
-    },
-  ],
-  servicenow_connector: [
-    {
-      name: "SERVICENOW_INSTANCE_URL",
-      label: "ServiceNow Instance URL",
-      required: true,
-      placeholder: "Enter instance URL",
-    },
-    {
-      name: "SERVICENOW_USERNAME",
-      label: "ServiceNow Username",
-      required: true,
-      placeholder: "Enter username",
-    },
-    {
-      name: "SERVICENOW_PASSWORD",
-      label: "ServiceNow Password",
-      required: true,
-      secret: true,
-      placeholder: "Enter password",
-    },
-    {
-      name: "SERVICENOW_AUTH_TYPE",
-      label: "ServiceNow Auth Type",
-      required: false,
-      placeholder: "Enter auth type",
-    },
-    {
-      name: "prefix",
-      label: "Prefix",
-      required: false,
-      placeholder: "Servicenow",
-    },
-  ],
-  ibm_mq_connector: [
-    {
-      name: "URL_BASE",
-      label: "URL Base",
-      required: true,
-      placeholder: "Enter base URL",
-    },
-    {
-      name: "USER_NAME",
-      label: "User Name",
-      required: true,
-      placeholder: "Enter username",
-    },
-    {
-      name: "PASSWORD",
-      label: "Password",
-      required: true,
-      secret: true,
-      placeholder: "Enter password",
-    },
-    {
-      name: "LOGS_URL",
-      label: "Logs URL",
-      required: true,
-      placeholder: "Enter logs URL",
-    },
-    {
-      name: "SSH_URL",
-      label: "SSH URL",
-      required: true,
-      placeholder: "Enter SSH URL",
-    },
-    {
-      name: "VERIFY_TLS",
-      label: "Verify TLS",
-      required: false,
-      placeholder: "true or false",
-    },
-    {
-      name: "prefix",
-      label: "Prefix",
-      required: false,
-      placeholder: "IBM MQ",
-    },
-  ],
 };
 
 const normalizeConnectorSchemaKey = (connectorId: string | null) => {
