@@ -1,6 +1,6 @@
 import { Plus, Trash2 } from "lucide-react";
-import { DynamicListFieldProps } from "./types";
-import { CustomDropdown } from "./CustomDropdown"
+import { DynamicListFieldProps } from "../../types";
+import { CustomDropdown } from "./CustomDropdown";
 
 export const inputClass =
   "w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-900 placeholder-gray-400 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/10";

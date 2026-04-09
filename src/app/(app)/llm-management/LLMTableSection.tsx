@@ -8,20 +8,13 @@ import {
   formatDateTime,
   formatHeaderLabel,
   getProviderIconSrc,
-  type ActionResult,
-  type LLMRecord,
 } from "./llmHelpers";
-import UpdateLlm, { type LlmRecord } from "./updatellm";
+import UpdateLlm from "./updatellm";
+import { LLMTableSectionProps, LlmRecord, LLMRecord } from "./helps/llm.types";
 
 const SORTABLE_HEADERS = ["provider", "created_at", "name"] as const;
-type SortableHeader = (typeof SORTABLE_HEADERS)[number];
+export type SortableHeader = (typeof SORTABLE_HEADERS)[number];
 
-type LLMTableSectionProps = {
-  llms: LLMRecord[];
-  isLoading: boolean;
-  loadError: string;
-  onDeleteModel: (modelId: string) => Promise<ActionResult>;
-};
 
 const isSortableHeader = (header: string): header is SortableHeader =>
   (SORTABLE_HEADERS as readonly string[]).includes(header);
@@ -35,9 +28,7 @@ export default function LLMTableSection({
   const [searchValue, setSearchValue] = useState("");
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [isColumnMenuOpen, setIsColumnMenuOpen] = useState(false);
-  const [hiddenHeaders, setHiddenHeaders] = useState<Record<string, boolean>>(
-    {}
-  );
+  const [hiddenHeaders, setHiddenHeaders] = useState<Record<string, boolean>>({});
   const [sortKey, setSortKey] = useState<SortableHeader>("created_at");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [deleteTarget, setDeleteTarget] = useState<LLMRecord | null>(null);
@@ -511,6 +502,8 @@ export default function LLMTableSection({
               </div>
               <button
                 type="button"
+                aria-label="Close"
+                title="Close"
                 onClick={() => {
                   if (!isDeleting) {
                     setDeleteTarget(null);

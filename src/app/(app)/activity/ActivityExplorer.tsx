@@ -10,13 +10,9 @@ import {
 } from "lucide-react";
 import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import {
-  type AgentSessionDetail,
-  type AgentSessionSummary,
-  fetchAgentSessionDetail,
-  fetchAgentSessions,
-  renderMarkdownBlocks,
-} from "../dashboard/logs";
+import { renderMarkdownBlocks } from "../dashboard/logs";
+import {fetchAgentSessionDetail, fetchAgentSessions} from "../dashboard/dashboard.helper";
+import { AgentSessionDetail,AgentSessionSummary} from "../dashboard/dashboard.types";
 
 const levelStyles = {
   text: "bg-[#eef2ff] text-[#4338ca]",

@@ -1,6 +1,6 @@
-"use client";
+import { ReactNode } from "react";
 
-export type AgentRecord = {
+export interface AgentRecord {
   agentId: number;
   name: string;
   port: number | null;
@@ -23,7 +23,7 @@ export type AgentRecord = {
   sub_agents: string[];
   isEnabled: boolean | null;
 };
-export type DropdownOption = {
+export interface DropdownOption {
   value: string;
   label: string;
 };
@@ -48,14 +48,66 @@ export interface DynamicListFieldProps {
   onChange: (i: number, v: string) => void;
 };
 
-export type CreateNewAgentProps = {
+export interface CreateNewAgentProps {
   onCreateSuccess?: () => void | Promise<void>;
-};
+}
 
-export type ModelTemplate = {
+export interface ModelTemplate {
   template_id: string;
   name: string;
   description?: string;
   instruction?: string;
   model_id?: string;
 };
+export interface OptionItem {
+  label: string;
+  value: string;
+};
+
+export interface Props {
+  value: string[];
+  options: OptionItem[];
+  configDataMap?: Record<string, any>;
+  placeholder?: string;
+  onChange: (val: string[]) => void; // ✅ return all IDs
+};
+export interface UpdateAgentProps {
+    agent: any;
+    isOpen: boolean;
+    onClose: () => void;
+    onUpdateSuccess?: () => void;
+};
+
+export interface ModelOption {
+    value: string;
+    label: string;
+    secondary: string;
+    iconSrc: string | null;
+};
+
+export interface UpdateAgentForm {
+    agentName: string;
+    description: string;
+    instruction: string;
+    modelId: string;
+    tools: string;
+    mcpServers: string;
+    connectorConfigIds: string;
+    subAgents: string;
+    isEnabled: boolean;
+};
+export interface ModelSelectProps {
+  value: string;
+  options: ModelOption[];
+  placeholder: string;
+  disabled?: boolean;
+  loading?: boolean;
+  onChange: (value: string) => void;
+}
+
+export interface FieldProps {
+  label: string;
+  hint?: string;
+  required?: boolean;
+  children: ReactNode;
+}

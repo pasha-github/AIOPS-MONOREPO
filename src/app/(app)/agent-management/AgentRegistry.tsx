@@ -1,3 +1,91 @@
+// "use client";
+
+// import { useMemo, useState } from "react";
+// import type { AgentRecord } from "./types";
+
+// import AgentTable from "./component/agent-components/AgentTable";
+// import AgentCard from "./component/agent-components/AgentCard";
+// import DeleteModal from "./component/agent-components/DeleteModal";
+// import InstructionDialog from "./component/agent-components/InstructionDialog";
+// import SearchFilter from "./component/agent-components/SearchFilter";
+// import UpdateAgent from "./updateagent";
+
+// export default function AgentRegistry({ agents }: { agents: AgentRecord[] }) {
+//   const [search, setSearch] = useState("");
+//   const [filter, setFilter] = useState<"all" | "online" | "offline">("all");
+
+//   const [selectedAgent, setSelectedAgent] = useState<AgentRecord | null>(null);
+//   const [deleteTarget, setDeleteTarget] = useState<AgentRecord | null>(null);
+//   const [instructionDialog, setInstructionDialog] = useState<{
+//     title: string;
+//     content: string;
+//   } | null>(null);
+
+//   const filteredAgents = useMemo(() => {
+//     return agents.filter((a) => {
+//       const match = a.name?.toLowerCase().includes(search.toLowerCase());
+//       if (filter === "all") return match;
+//       if (filter === "online") return match && a.status === "active";
+//       return match && a.status !== "active";
+//     });
+//   }, [agents, search, filter]);
+
+//   return (
+//     <div className="p-6">
+//       <SearchFilter
+//         search={search}
+//         setSearch={setSearch}
+//         filter={filter}
+//         setFilter={setFilter}
+//       />
+
+//       {/* Desktop */}
+//       <div className="hidden md:block">
+//         <AgentTable
+//           agents={filteredAgents}
+//           onDelete={setDeleteTarget}
+//           onUpdate={setSelectedAgent}
+//           onInstruction={setInstructionDialog}
+//         />
+//       </div>
+
+//       {/* Mobile */}
+//       <div className="md:hidden space-y-3">
+//         {filteredAgents.map((agent) => (
+//           <AgentCard
+//             key={agent.agent_id}
+//             agent={agent}
+//             onDelete={setDeleteTarget}
+//             onUpdate={setSelectedAgent}
+//           />
+//         ))}
+//       </div>
+
+//       {/* Modals */}
+//       {deleteTarget && (
+//         <DeleteModal
+//           agent={deleteTarget}
+//           onClose={() => setDeleteTarget(null)}
+//         />
+//       )}
+
+//       {instructionDialog && (
+//         <InstructionDialog
+//           data={instructionDialog}
+//           onClose={() => setInstructionDialog(null)}
+//         />
+//       )}
+
+//       {selectedAgent && (
+//         <UpdateAgent
+//           agent={selectedAgent}
+//           isOpen={true}
+//           onClose={() => setSelectedAgent(null)}
+//         />
+//       )}
+//     </div>
+//   );
+// }
 "use client";
 
 import {
@@ -964,10 +1052,7 @@ export default function AgentRegistry({
                               <div className="my-1 border-t border-[#eef1f7]" />
                               <button
                                 type="button"
-                                onClick={() => {
-                                  setJobsTarget(agent);
-                                  setOpenActionMenuKey(null);
-                                }}
+                                onClick={() => setOpenActionMenuKey(null)}
                                 className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[#2563eb] hover:bg-[#eff6ff]"
                               >
                                 <BriefcaseBusiness className="h-4 w-4" />
@@ -1040,6 +1125,8 @@ export default function AgentRegistry({
               </div>
               <button
                 type="button"
+                title="Close"
+                aria-label="Close"
                 onClick={() => setDeleteTarget(null)}
                 className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-[#b91c1c]"
               >
@@ -1138,6 +1225,8 @@ export default function AgentRegistry({
               </div>
               <button
                 type="button"
+                title="Close"
+                aria-label="Close"
                 onClick={() => setInstructionDialogTarget(null)}
                 className="flex h-9 w-9 items-center justify-center rounded-full border border-[#e5e7eb] text-[#475569] transition hover:bg-[#f8fafc]"
               >

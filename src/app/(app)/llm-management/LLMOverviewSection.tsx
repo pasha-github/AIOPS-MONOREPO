@@ -1,16 +1,11 @@
 "use client";
 
 import { useMemo } from "react";
-import { Bot, CheckCircle2, Loader2, RefreshCw, Zap } from "lucide-react";
-import { formatCellValue, type LLMRecord } from "./llmHelpers";
+import { Loader2, RefreshCw, Zap } from "lucide-react";
+import { formatCellValue } from "./llmHelpers";
+import { LLMOverviewSectionProps } from "./helps/llm.types";
+import { getStatCards } from "./statCards";
 
-type LLMOverviewSectionProps = {
-  llms: LLMRecord[];
-  isLoading: boolean;
-  isRefreshing: boolean;
-  onRefresh: () => void | Promise<void>;
-  onCreateClick: () => void;
-};
 
 export default function LLMOverviewSection({
   llms,
@@ -39,32 +34,15 @@ export default function LLMOverviewSection({
     };
   }, [llms]);
 
-  const statCards = [
-    {
-      title: "Providers",
-      value: providerCount,
-      note: "Model sources",
-      icon: CheckCircle2,
-      tone: "from-[#18c964] to-[#00b56c]",
-      noteColor: "text-[#16a34a]",
-    },
-    {
-      title: "With description",
-      value: describedCount,
-      note: "Documented models",
-      icon: Zap,
-      tone: "from-[#2f80ff] to-[#1aa7ff]",
-      noteColor: "text-[#3b82f6]",
-    },
-    {
-      title: "Total LLMs",
-      value: totalCount,
-      note: "Available now",
-      icon: Bot,
-      tone: "from-[#b45cff] to-[#ff5ac8]",
-      noteColor: "text-[#e11d8d]",
-    },
-  ];
+ const statCards = useMemo(
+  () =>
+    getStatCards({
+      totalCount,
+      providerCount,
+      describedCount,
+    }),
+  [totalCount, providerCount, describedCount]
+);
 
   return (
     <section className="rounded-3xl bg-white px-8 py-7 shadow-[0_18px_50px_-38px_rgba(16,24,40,0.5)]">

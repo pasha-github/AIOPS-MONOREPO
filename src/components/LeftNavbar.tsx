@@ -44,7 +44,7 @@ const navSections: NavSection[] = [
         href: "/dashboard",
       },
       {
-        label: "Chatops",
+        label: "ChatOps",
         id: "platform-chatops",
         icon: <MessageSquare className="h-5 w-5" />,
         href: "/chatOps",

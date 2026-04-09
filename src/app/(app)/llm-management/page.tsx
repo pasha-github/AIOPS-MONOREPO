@@ -5,13 +5,9 @@ import { trimTrailingSlash } from "@/config/agent";
 import { useRuntimeConfig } from "@/config/runtime-config";
 import LLMOverviewSection from "./LLMOverviewSection";
 import LLMTableSection from "./LLMTableSection";
-import CreateLlmModal, { type CreateLlmPayload } from "./createllm";
-import {
-  getErrorMessage,
-  normalizeLlmRecord,
-  type ActionResult,
-  type LLMRecord,
-} from "./llmHelpers";
+import CreateLlmModal from "./createllm";
+import { CreateLlmPayload, LLMRecord, ActionResult } from "./helps/llm.types";
+import { getErrorMessage, normalizeLlmRecord } from "./llmHelpers";
 
 export default function LLMManagementPage() {
   const { llmManagerApiBaseUrl } = useRuntimeConfig();

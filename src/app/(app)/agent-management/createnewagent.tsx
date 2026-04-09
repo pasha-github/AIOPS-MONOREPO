@@ -3,8 +3,8 @@ import { Bot, ChevronDown, Plus, LayoutTemplate } from "lucide-react";
 import { trimTrailingSlash } from "@/config/agent";
 import { useRuntimeConfig } from "@/config/runtime-config";
 import { getProviderIconSrc } from "../llm-management/llmHelpers";
-import { DynamicDropdownField, DynamicListField } from "./DynamicConnector";
-import ModelSelect, { ModelOption } from "./ModelSelect";
+import { DynamicDropdownField, DynamicListField } from "./component/common/DynamicConnector";
+import ModelSelect, { ModelOption } from "./component/common/ModelSelect.create";
 import { CreateNewAgentProps, ModelTemplate } from "./types";
 
 const toSnakeCase = (value: string) =>

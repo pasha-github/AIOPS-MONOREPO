@@ -18,13 +18,10 @@ import {
   useState,
 } from "react";
 
-import {
-  type AgentSessionDetail,
-  type AgentSessionSummary,
-  fetchAgentSessionDetail,
-  fetchAgentSessions,
-  renderMarkdownBlocks,
-} from "./logs";
+import { renderMarkdownBlocks } from "./logs";
+import { AgentSessionDetail, AgentSessionSummary } from "./dashboard.types";
+import { fetchAgentSessionDetail, fetchAgentSessions } from "./dashboard.helper";
+
 
 const levelStyles = {
   text: "bg-[#eef2ff] text-[#4338ca]",
