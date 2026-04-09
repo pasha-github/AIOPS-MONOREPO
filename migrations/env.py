@@ -28,7 +28,7 @@ target_metadata = SQLModel.metadata
 db_url = encode_database_url_password(
     os.getenv("MAIN_SERVER_DATABASE_URL", "sqlite:///agent_management.db")
 )
-config.set_main_option("sqlalchemy.url", db_url)
+config.set_main_option("sqlalchemy.url", db_url.replace("%", "%%"))
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
