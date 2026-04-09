@@ -21,12 +21,20 @@ class _FakeResult:
 
 class _FakeSession:
     def __init__(
-        self, agent_config=None, model_config=None, list_ids=None, connector_map=None
+        self,
+        agent_config=None,
+        model_config=None,
+        list_ids=None,
+        connector_map=None,
+        model_map=None,
+        defaults_config=None,
     ):
         self.agent_config = agent_config
         self.model_config = model_config
         self.list_ids = list_ids
         self.connector_map = connector_map or {}
+        self.model_map = model_map or {}
+        self.defaults_config = defaults_config
 
     def __enter__(self):
         return self
@@ -42,7 +50,11 @@ class _FakeSession:
     def get(self, model_cls, key):
         name = getattr(model_cls, "__name__", "")
         if name == "Model":
+            if key in self.model_map:
+                return self.model_map[key]
             return self.model_config
+        if name == "ModelDefaults":
+            return self.defaults_config
         if name == "ConnectorConfig":
             return self.connector_map.get(str(key))
         return None
@@ -69,6 +81,12 @@ def _agent_cfg(**kwargs):
         "description": "desc",
         "instruction": "instr",
         "model_id": "m1",
+        "primary_use_global": False,
+        "primary_model_id": "m1",
+        "secondary_use_global": False,
+        "secondary_model_id": None,
+        "tertiary_use_global": False,
+        "tertiary_model_id": None,
         "tools": None,
         "mcp_servers": [],
         "connector_config_ids": [],
@@ -231,10 +249,7 @@ def test_agent_loader_google_model_path(monkeypatch: pytest.MonkeyPatch):
     loader = DatabaseAgentLoader()
     agent = loader.load_agent("main")
     assert getattr(agent.kwargs["model"], "model", "") == "gemini/gemini-2.0-flash"
-    assert agent.kwargs["model"].kwargs["fallbacks"] == [
-        "gemini/gemini-3-flash-preview",
-        "anthropic/claude-haiku-4-5-20251001",
-    ]
+    assert agent.kwargs["model"].kwargs["fallbacks"] == []
 
 
 def test_agent_loader_does_not_attach_session_summary_callback(
@@ -269,10 +284,7 @@ def test_agent_loader_non_google_model_path(monkeypatch: pytest.MonkeyPatch):
     loader = DatabaseAgentLoader()
     agent = loader.load_agent("main")
     assert getattr(agent.kwargs["model"], "model", "") == "openai/gpt-4.1"
-    assert agent.kwargs["model"].kwargs["fallbacks"] == [
-        "gemini/gemini-3-flash-preview",
-        "anthropic/claude-haiku-4-5-20251001",
-    ]
+    assert agent.kwargs["model"].kwargs["fallbacks"] == []
 
 
 def test_agent_loader_exec_tools_success(monkeypatch: pytest.MonkeyPatch):
@@ -382,3 +394,44 @@ def test_agent_loader_duplicate_sub_agents_skipped(monkeypatch: pytest.MonkeyPat
     agent = loader.load_agent("main")
     assert agent is not None
     assert len(wrapped_sub_agents) == 1
+
+
+def test_agent_loader_uses_global_defaults_for_model_stack(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    _patch_common_runtime(monkeypatch)
+    cfg = _agent_cfg(
+        model_id=None,
+        primary_use_global=True,
+        primary_model_id=None,
+        secondary_use_global=True,
+        secondary_model_id=None,
+        tertiary_use_global=True,
+        tertiary_model_id=None,
+    )
+    primary = _model_cfg(model_id="m1", provider="google", name="gemini-2.0-flash")
+    secondary = _model_cfg(model_id="m2", provider="openai", name="gpt-4.1-mini")
+    tertiary = _model_cfg(model_id="m3", provider="anthropic", name="claude-haiku")
+    defaults = SimpleNamespace(
+        primary_model_id="m1",
+        secondary_model_id="m2",
+        tertiary_model_id="m3",
+    )
+    monkeypatch.setattr(agent_loader_module, "cache", _FakeCache())
+    monkeypatch.setattr(
+        agent_loader_module,
+        "Session",
+        lambda _engine: _FakeSession(
+            agent_config=cfg,
+            model_map={"m1": primary, "m2": secondary, "m3": tertiary},
+            defaults_config=defaults,
+        ),
+    )
+
+    loader = DatabaseAgentLoader()
+    agent = loader.load_agent("main")
+    assert getattr(agent.kwargs["model"], "model", "") == "gemini/gemini-2.0-flash"
+    assert agent.kwargs["model"].kwargs["fallbacks"] == [
+        "openai/gpt-4.1-mini",
+        "anthropic/claude-haiku",
+    ]

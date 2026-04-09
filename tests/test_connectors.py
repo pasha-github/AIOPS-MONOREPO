@@ -273,7 +273,8 @@ def test_delete_connector_config_in_use_returns_409(client: TestClient):
             "name": "Agent 1",
             "description": "desc",
             "instruction": "instr",
-            "model_id": "gemini-pro",
+            "primary_use_global": False,
+            "primary_model_id": "gemini-pro",
             "connector_config_ids": [connector_config_id],
         },
     )

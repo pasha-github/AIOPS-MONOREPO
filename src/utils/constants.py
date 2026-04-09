@@ -15,13 +15,8 @@ AGENT_SERVER_DATABASE_URL = encode_database_url_password(
 )
 
 ENCRYPTION_KEY = os.getenv("ENCRYPTION_KEY")
-SUMMARIZER_MODEL = os.getenv("SUMMARIZER_MODEL")
 ENV = os.getenv("ENV", "DEV")
 A2A = os.getenv("A2A", False)
-HARDCODED_FALLBACK_MODELS = [
-    "gemini/gemini-3-flash-preview",
-    "anthropic/claude-haiku-4-5-20251001"
-]
 
 # Derived constants
 WEB = ENV == "DEV"

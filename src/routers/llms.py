@@ -1,15 +1,33 @@
 from datetime import datetime
+from typing import Any, cast
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from sqlalchemy import or_
 from sqlmodel import Session, select
 
 from src.agent_runtime.adk.adk_app import invalidate_cache
 from src.database.database import get_session
-from src.database.models import Agent, Model
+from src.database.models import Agent, Model, ModelDefaults
 from src.utils.secrets import encrypt_secret
 
 router = APIRouter(prefix="/llms", tags=["llms"])
+
+
+def _global_slot_condition():
+    return or_(
+        cast(Any, Agent.primary_use_global).is_(True),
+        cast(Any, Agent.secondary_use_global).is_(True),
+        cast(Any, Agent.tertiary_use_global).is_(True),
+    )
+
+
+def _agent_model_link_condition(model_id: str):
+    return or_(
+        cast(Any, Agent.primary_model_id) == model_id,
+        cast(Any, Agent.secondary_model_id) == model_id,
+        cast(Any, Agent.tertiary_model_id) == model_id,
+    )
 
 
 class ModelCreate(BaseModel):
@@ -35,6 +53,35 @@ class ModelUpdate(BaseModel):
     api_key: str | None = None
 
 
+class ModelDefaultsRead(BaseModel):
+    id: int
+    primary_model_id: str | None = None
+    secondary_model_id: str | None = None
+    tertiary_model_id: str | None = None
+
+
+class ModelDefaultsUpdate(BaseModel):
+    primary_model_id: str | None = None
+    secondary_model_id: str | None = None
+    tertiary_model_id: str | None = None
+
+
+def _get_or_create_model_defaults(session: Session) -> ModelDefaults:
+    defaults = session.get(ModelDefaults, 1)
+    if defaults is None:
+        defaults = ModelDefaults()
+        session.add(defaults)
+        session.commit()
+        session.refresh(defaults)
+    return defaults
+
+
+def _invalidate_global_agents(session: Session):
+    agent_ids = list(session.exec(select(Agent.agent_id).where(_global_slot_condition())).all())
+    for agent_id in agent_ids:
+        invalidate_cache(agent_id)
+
+
 @router.post("/", response_model=ModelRead)
 def create_model(model: ModelCreate, session: Session = Depends(get_session)):
     if session.get(Model, model.model_id):
@@ -53,6 +100,29 @@ def create_model(model: ModelCreate, session: Session = Depends(get_session)):
 def list_models(session: Session = Depends(get_session)):
     models = session.exec(select(Model)).all()
     return models
+
+
+@router.get("/defaults", response_model=ModelDefaultsRead)
+def get_model_defaults(session: Session = Depends(get_session)):
+    return _get_or_create_model_defaults(session)
+
+
+@router.patch("/defaults", response_model=ModelDefaultsRead)
+def update_model_defaults(
+    defaults_update: ModelDefaultsUpdate, session: Session = Depends(get_session)
+):
+    defaults = _get_or_create_model_defaults(session)
+    update_data = defaults_update.model_dump(exclude_unset=True)
+    for field_name, model_id in update_data.items():
+        if model_id is not None and session.get(Model, model_id) is None:
+            raise HTTPException(status_code=400, detail=f"Invalid {field_name}")
+        setattr(defaults, field_name, model_id)
+
+    session.add(defaults)
+    session.commit()
+    session.refresh(defaults)
+    _invalidate_global_agents(session)
+    return defaults
 
 
 @router.patch("/{model_id}", response_model=ModelRead)
@@ -84,10 +154,19 @@ def update_model(
     session.commit()
     session.refresh(model)
 
-    agent_ids = session.exec(
-        select(Agent.agent_id).where(Agent.model_id == model_id)
-    ).all()
-    for agent_id in agent_ids:
+    agent_ids = list(
+        session.exec(select(Agent.agent_id).where(_agent_model_link_condition(model_id))).all()
+    )
+    defaults = _get_or_create_model_defaults(session)
+    if model_id in {
+        defaults.primary_model_id,
+        defaults.secondary_model_id,
+        defaults.tertiary_model_id,
+    }:
+        agent_ids.extend(
+            list(session.exec(select(Agent.agent_id).where(_global_slot_condition())).all())
+        )
+    for agent_id in set(agent_ids):
         invalidate_cache(agent_id)
 
     return model
@@ -99,15 +178,22 @@ def delete_model(model_id: str, session: Session = Depends(get_session)):
     if not model:
         raise HTTPException(status_code=404, detail="Model not found")
 
-    linked_agents = session.exec(
-        select(Agent.agent_id).where(Agent.model_id == model_id)
-    ).all()
-    if linked_agents:
+    defaults = _get_or_create_model_defaults(session)
+    linked_agents = list(
+        session.exec(select(Agent.agent_id).where(_agent_model_link_condition(model_id))).all()
+    )
+    used_in_defaults = model_id in {
+        defaults.primary_model_id,
+        defaults.secondary_model_id,
+        defaults.tertiary_model_id,
+    }
+    if linked_agents or used_in_defaults:
         raise HTTPException(
             status_code=409,
             detail={
                 "message": "Model is in use by agents",
                 "agent_ids": sorted(linked_agents),
+                "used_in_defaults": used_in_defaults,
             },
         )
 

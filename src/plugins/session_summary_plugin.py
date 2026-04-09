@@ -6,6 +6,7 @@ from google.adk.agents.callback_context import CallbackContext
 from google.adk.models.llm_request import LlmRequest
 from google.adk.models.llm_response import LlmResponse
 from google.adk.plugins.base_plugin import BasePlugin
+
 logger = logging.getLogger(__name__)
 
 FIRST_MESSAGE_SUMMARY_KEY = "first_message_summary"

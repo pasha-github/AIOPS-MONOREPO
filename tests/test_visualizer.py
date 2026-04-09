@@ -53,7 +53,8 @@ def test_visualizer_returns_expected_nodes_edges_and_masked_data(
             name="Child Agent",
             description="Child agent",
             instruction="Child instructions",
-            model_id="viz-model",
+            primary_use_global=False,
+            primary_model_id="viz-model",
         )
     )
 
@@ -63,7 +64,8 @@ def test_visualizer_returns_expected_nodes_edges_and_masked_data(
             name="Parent Agent",
             description="Parent agent",
             instruction="Parent instructions",
-            model_id="viz-model",
+            primary_use_global=False,
+            primary_model_id="viz-model",
             sub_agents=["child-agent"],
             connector_config_ids=[str(connector_id)],
             mcp_servers=["http://localhost:8000/sse"],
@@ -138,7 +140,8 @@ def test_visualizer_includes_agents_with_no_optional_relationships(client: TestC
             "name": "Solo Agent",
             "description": "No relationships",
             "instruction": "Work alone",
-            "model_id": "solo-model",
+            "primary_use_global": False,
+            "primary_model_id": "solo-model",
         },
     )
     assert create_agent_response.status_code == 200
@@ -187,21 +190,24 @@ def test_visualizer_aggregates_multiple_webhooks_jobs_and_relationships(
                 name="Child One",
                 description="child",
                 instruction="instr",
-                model_id="agg-model",
+                primary_use_global=False,
+                primary_model_id="agg-model",
             ),
             Agent(
                 agent_id="child-two",
                 name="Child Two",
                 description="child",
                 instruction="instr",
-                model_id="agg-model",
+                primary_use_global=False,
+                primary_model_id="agg-model",
             ),
             Agent(
                 agent_id="aggregator",
                 name="Aggregator",
                 description="parent",
                 instruction="instr",
-                model_id="agg-model",
+                primary_use_global=False,
+                primary_model_id="agg-model",
                 sub_agents=["child-one", "child-two"],
                 connector_config_ids=[str(connector_one), str(connector_two)],
                 mcp_servers=["http://localhost:7100/sse", "http://localhost:7200/mcp"],
@@ -260,7 +266,8 @@ def test_visualizer_sets_model_to_none_when_linked_model_missing(
             name="Orphan Model Agent",
             description="missing model",
             instruction="instr",
-            model_id="missing-model-id",
+            primary_use_global=False,
+            primary_model_id="missing-model-id",
         )
     )
     session.commit()
@@ -293,7 +300,8 @@ def test_visualizer_preserves_duplicate_relationship_entries(
             name="Duplicate Agent",
             description="dup",
             instruction="dup",
-            model_id="dup-model",
+            primary_use_global=False,
+            primary_model_id="dup-model",
             sub_agents=["dup-child", "dup-child"],
             connector_config_ids=[str(connector_id), str(connector_id)],
             mcp_servers=["http://localhost:7300/sse", "http://localhost:7300/sse"],
@@ -305,7 +313,8 @@ def test_visualizer_preserves_duplicate_relationship_entries(
             name="Duplicate Child",
             description="child",
             instruction="child",
-            model_id="dup-model",
+            primary_use_global=False,
+            primary_model_id="dup-model",
         )
     )
     session.commit()
@@ -351,7 +360,8 @@ def test_visualizer_masks_only_connector_config_items_with_value_key(
             name="Mask Agent",
             description="mask",
             instruction="mask",
-            model_id="mask-model",
+            primary_use_global=False,
+            primary_model_id="mask-model",
             connector_config_ids=[str(connector_id)],
         )
     )
@@ -389,7 +399,8 @@ def test_visualizer_keeps_non_list_connector_config_unchanged(
             name="Non List Agent",
             description="non-list",
             instruction="non-list",
-            model_id="non-list-model",
+            primary_use_global=False,
+            primary_model_id="non-list-model",
             connector_config_ids=[str(connector_id)],
         )
     )
@@ -420,7 +431,8 @@ def test_visualizer_deduplicates_shared_mcp_nodes(client: TestClient, session):
             name="Agent A",
             description="A",
             instruction="A",
-            model_id="m1",
+            primary_use_global=False,
+            primary_model_id="m1",
             mcp_servers=["http://localhost:9000/sse"],
         )
     )
@@ -430,7 +442,8 @@ def test_visualizer_deduplicates_shared_mcp_nodes(client: TestClient, session):
             name="Agent B",
             description="B",
             instruction="B",
-            model_id="m1",
+            primary_use_global=False,
+            primary_model_id="m1",
             mcp_servers=["http://localhost:9000/sse"],
         )
     )

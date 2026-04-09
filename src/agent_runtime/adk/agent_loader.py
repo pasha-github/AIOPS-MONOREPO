@@ -18,8 +18,7 @@ from sqlmodel import Session, select
 from src.agent_runtime.adk.cache import cache
 from src.connectors.loader import resolve_connector_tools
 from src.database.database import engine
-from src.database.models import Agent, ConnectorConfig, Model
-from src.utils.constants import HARDCODED_FALLBACK_MODELS
+from src.database.models import Agent, ConnectorConfig, Model, ModelDefaults
 from src.utils.secrets import decrypt_secret
 
 logger = logging.getLogger(__name__)
@@ -29,6 +28,54 @@ def _litellm_model_name(model_config: Model) -> str:
     if model_config.provider.lower() == "google":
         return f"gemini/{model_config.name}"
     return f"{model_config.provider}/{model_config.name}"
+
+
+def _set_model_env(model_config: Model):
+    if not model_config.api_key:
+        return
+
+    decrypted_api_key = decrypt_secret(model_config.api_key)
+    if model_config.provider.upper() == "BEDROCK":
+        os.environ["AWS_BEARER_TOKEN_BEDROCK"] = decrypted_api_key
+    else:
+        os.environ[f"{model_config.provider.upper()}_API_KEY"] = decrypted_api_key
+
+
+def _resolve_model_stack(
+    session: Session,
+    agent_config: Agent,
+) -> tuple[Model | None, list[Model]]:
+    defaults = session.get(ModelDefaults, 1)
+
+    def _resolve_slot(
+        use_global: bool,
+        explicit_model_id: str | None,
+        default_model_id: str | None,
+    ) -> Model | None:
+        model_id = default_model_id if use_global else explicit_model_id
+        if model_id is None:
+            return None
+        return session.get(Model, model_id)
+
+    primary_model = _resolve_slot(
+        agent_config.primary_use_global,
+        agent_config.primary_model_id,
+        defaults.primary_model_id if defaults else None,
+    )
+    secondary_model = _resolve_slot(
+        agent_config.secondary_use_global,
+        agent_config.secondary_model_id,
+        defaults.secondary_model_id if defaults else None,
+    )
+    tertiary_model = _resolve_slot(
+        agent_config.tertiary_use_global,
+        agent_config.tertiary_model_id,
+        defaults.tertiary_model_id if defaults else None,
+    )
+    fallbacks = [
+        model for model in (secondary_model, tertiary_model) if model is not None
+    ]
+    return primary_model, fallbacks
 
 
 class DatabaseAgentLoader(BaseAgentLoader):
@@ -63,12 +110,11 @@ class DatabaseAgentLoader(BaseAgentLoader):
                 logger.warning(f"Agent {agent_name} is disabled.")
                 return None
 
-            # Fetch model config
-            model_config = session.get(Model, agent_config.model_id)
+            model_config, fallback_model_configs = _resolve_model_stack(
+                session, agent_config
+            )
             if not model_config:
-                logger.error(
-                    f"Model {agent_config.model_id} for agent {agent_name} not found."
-                )
+                logger.error(f"Primary model for agent {agent_name} not found.")
                 return None
 
             # Initialize Model (LiteLLM)
@@ -76,15 +122,9 @@ class DatabaseAgentLoader(BaseAgentLoader):
             # We might need to set env vars for keys or pass them explicitly if supported.
             # For now, we'll assume LlmAgent handles it or we set it globally/contextually.
             # LiteLLM usually reads from env, so we might need to set os.environ temporarily or globally.
-            if model_config.api_key:
-                decrypted_api_key = decrypt_secret(model_config.api_key)
-                # This is a simple way, might strictly need to be scoped if multiple providers
-                if model_config.provider.upper() == "BEDROCK":
-                    os.environ["AWS_BEARER_TOKEN_BEDROCK"] = decrypted_api_key
-                else:
-                    os.environ[f"{model_config.provider.upper()}_API_KEY"] = (
-                        decrypted_api_key
-                    )
+            _set_model_env(model_config)
+            for fallback_model in fallback_model_configs:
+                _set_model_env(fallback_model)
 
             # Prepare Tools List
             tools_list = []
@@ -164,7 +204,10 @@ class DatabaseAgentLoader(BaseAgentLoader):
             tools_list.extend(sub_agents)
 
             model_name = _litellm_model_name(model_config)
-            fallbacks = HARDCODED_FALLBACK_MODELS
+            fallbacks = [
+                _litellm_model_name(fallback_model)
+                for fallback_model in fallback_model_configs
+            ]
 
             model = LiteLlm(
                 model=model_name,

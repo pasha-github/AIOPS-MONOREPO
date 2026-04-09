@@ -25,7 +25,12 @@ class AgentCreate(BaseModel):
     name: str
     description: str
     instruction: str
-    model_id: str
+    primary_use_global: bool = True
+    primary_model_id: str | None = None
+    secondary_use_global: bool = True
+    secondary_model_id: str | None = None
+    tertiary_use_global: bool = True
+    tertiary_model_id: str | None = None
     tools: str | None = None
     mcp_servers: list[str] = []
     connector_config_ids: list[str] = []
@@ -38,7 +43,12 @@ class AgentPatch(BaseModel):
     name: str | None = None
     description: str | None = None
     instruction: str | None = None
-    model_id: str | None = None
+    primary_use_global: bool | None = None
+    primary_model_id: str | None = None
+    secondary_use_global: bool | None = None
+    secondary_model_id: str | None = None
+    tertiary_use_global: bool | None = None
+    tertiary_model_id: str | None = None
     tools: str | None = None
     mcp_servers: list[str] | None = None
     connector_config_ids: list[str] | None = None
@@ -81,6 +91,35 @@ class AgentTemplate(BaseModel):
     instruction: str
 
 
+def _validate_model_id(session: Session, model_id: str | None, field_name: str):
+    if model_id is None or session.get(Model, model_id) is None:
+        raise HTTPException(status_code=400, detail=f"Invalid {field_name}")
+
+
+def _validate_agent_model_settings(session: Session, payload: dict):
+    slot_fields = (
+        ("primary_use_global", "primary_model_id", "primary_model_id"),
+        ("secondary_use_global", "secondary_model_id", "secondary_model_id"),
+        ("tertiary_use_global", "tertiary_model_id", "tertiary_model_id"),
+    )
+
+    explicit_model_ids: list[str] = []
+    for use_global_field, model_id_field, error_field in slot_fields:
+        use_global = payload.get(use_global_field, True)
+        model_id = payload.get(model_id_field)
+        if use_global:
+            continue
+        _validate_model_id(session, model_id, error_field)
+        assert model_id is not None
+        explicit_model_ids.append(model_id)
+
+    if len(explicit_model_ids) != len(set(explicit_model_ids)):
+        raise HTTPException(
+            status_code=400,
+            detail="Duplicate manual model selections are not allowed",
+        )
+
+
 @router.get("/templates", response_model=list[AgentTemplate])
 def list_agent_templates():
     with TEMPLATES_FILE.open("r", encoding="utf-8") as templates_file:
@@ -93,10 +132,10 @@ def create_agent(agent: AgentCreate, session: Session = Depends(get_session)):
     if session.get(Agent, agent.agent_id):
         raise HTTPException(status_code=409, detail="Agent already exists")
 
-    if not session.get(Model, agent.model_id):
-        raise HTTPException(status_code=400, detail="Invalid model_id")
+    agent_data = agent.model_dump()
+    _validate_agent_model_settings(session, agent_data)
 
-    db_agent = Agent.model_validate(agent)
+    db_agent = Agent.model_validate(agent_data)
     session.add(db_agent)
     session.commit()
     session.refresh(db_agent)
@@ -118,10 +157,9 @@ def update_agent(
         raise HTTPException(status_code=404, detail="Agent not found")
 
     updates = patch_data.model_dump(exclude_unset=True)
-    if "model_id" in updates and (
-        updates["model_id"] is None or not session.get(Model, updates["model_id"])
-    ):
-        raise HTTPException(status_code=400, detail="Invalid model_id")
+    merged = agent.model_dump()
+    merged.update(updates)
+    _validate_agent_model_settings(session, merged)
 
     for key, value in updates.items():
         setattr(agent, key, value)

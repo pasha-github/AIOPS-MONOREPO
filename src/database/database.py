@@ -1,5 +1,6 @@
 from sqlmodel import Session, SQLModel, create_engine
 
+from src.database.models import ModelDefaults
 from src.utils.constants import MAIN_SERVER_DATABASE_URL
 
 connect_args = (
@@ -13,6 +14,10 @@ engine = create_engine(MAIN_SERVER_DATABASE_URL, connect_args=connect_args)
 
 def create_db_and_tables():
     SQLModel.metadata.create_all(engine)
+    with Session(engine) as session:
+        if session.get(ModelDefaults, 1) is None:
+            session.add(ModelDefaults())
+            session.commit()
 
 
 def get_session():

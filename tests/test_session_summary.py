@@ -9,7 +9,6 @@ from src.plugins.session_summary_plugin import (
     SessionSummaryPlugin,
     _extract_user_text,
 )
-from src.utils.constants import HARDCODED_FALLBACK_MODELS
 
 
 def _request_with_text(*texts: str):
@@ -58,10 +57,9 @@ def test_session_summary_plugin_sets_summary_once(monkeypatch: pytest.MonkeyPatc
 def test_session_summary_plugin_uses_request_model_with_shared_fallbacks(
     monkeypatch: pytest.MonkeyPatch,
 ):
+    shared_fallbacks = ["openai/gpt-4.1-mini", "anthropic/claude-haiku"]
     plugin = SessionSummaryPlugin()
-    callback_context = SimpleNamespace(
-        state={SUMMARY_FALLBACKS_KEY: HARDCODED_FALLBACK_MODELS}
-    )
+    callback_context = SimpleNamespace(state={SUMMARY_FALLBACKS_KEY: shared_fallbacks})
     request = _request_with_text("Investigate queue backlog in production")
 
     captured = {}
@@ -86,7 +84,7 @@ def test_session_summary_plugin_uses_request_model_with_shared_fallbacks(
     )
 
     assert captured["model"] == "openai/gpt-4o-mini"
-    assert captured["fallbacks"] == HARDCODED_FALLBACK_MODELS
+    assert captured["fallbacks"] == shared_fallbacks
 
 
 def test_session_summary_plugin_skips_when_summary_already_exists(

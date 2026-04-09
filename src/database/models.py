@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import ClassVar
 from uuid import UUID, uuid4
 
 from sqlmodel import JSON, Column, Field, SQLModel
@@ -9,7 +10,12 @@ class Agent(SQLModel, table=True):
     name: str
     description: str
     instruction: str
-    model_id: str = Field(foreign_key="model.model_id")
+    primary_use_global: bool = True
+    primary_model_id: str | None = Field(default=None, foreign_key="model.model_id")
+    secondary_use_global: bool = True
+    secondary_model_id: str | None = Field(default=None, foreign_key="model.model_id")
+    tertiary_use_global: bool = True
+    tertiary_model_id: str | None = Field(default=None, foreign_key="model.model_id")
     tools: str | None = None  # JSON string of tools code
     isEnabled: bool = True
     connector_config_ids: list[str] = Field(
@@ -35,6 +41,14 @@ class Model(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=datetime.now)
     description: str | None = None
     isEnabled: bool = True
+
+
+class ModelDefaults(SQLModel, table=True):
+    __tablename__: ClassVar[str] = "model_defaults"
+    id: int = Field(default=1, primary_key=True)
+    primary_model_id: str | None = Field(default=None, foreign_key="model.model_id")
+    secondary_model_id: str | None = Field(default=None, foreign_key="model.model_id")
+    tertiary_model_id: str | None = Field(default=None, foreign_key="model.model_id")
 
 
 class ConnectorConfig(SQLModel, table=True):
