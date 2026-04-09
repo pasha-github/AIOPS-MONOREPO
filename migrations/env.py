@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 from sqlalchemy import engine_from_config, pool
 from sqlmodel import SQLModel
 
-from src.database.db_url import encode_database_url_password
+from src.database.db_url import encode_alembic_database_url
 from src.database.models import *  # This imports all models so they are registered with SQLModel.metadata  # noqa: F403
 
 load_dotenv()
@@ -25,10 +25,10 @@ if config.config_file_name is not None:
 target_metadata = SQLModel.metadata
 
 # Set the sqlalchemy.url from the environment variable or use a default
-db_url = encode_database_url_password(
+db_url = encode_alembic_database_url(
     os.getenv("MAIN_SERVER_DATABASE_URL", "sqlite:///agent_management.db")
 )
-config.set_main_option("sqlalchemy.url", db_url.replace("%", "%%"))
+config.set_main_option("sqlalchemy.url", db_url)
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
