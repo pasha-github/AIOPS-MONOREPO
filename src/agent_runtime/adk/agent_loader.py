@@ -213,7 +213,7 @@ class DatabaseAgentLoader(BaseAgentLoader):
                 model=model_name,
                 fallbacks=fallbacks,
                 num_retries=0,
-                timeout=20,
+                timeout=60,
             )
 
             # Create LlmAgent
