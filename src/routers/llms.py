@@ -77,7 +77,9 @@ def _get_or_create_model_defaults(session: Session) -> ModelDefaults:
 
 
 def _invalidate_global_agents(session: Session):
-    agent_ids = list(session.exec(select(Agent.agent_id).where(_global_slot_condition())).all())
+    agent_ids = list(
+        session.exec(select(Agent.agent_id).where(_global_slot_condition())).all()
+    )
     for agent_id in agent_ids:
         invalidate_cache(agent_id)
 
@@ -155,7 +157,9 @@ def update_model(
     session.refresh(model)
 
     agent_ids = list(
-        session.exec(select(Agent.agent_id).where(_agent_model_link_condition(model_id))).all()
+        session.exec(
+            select(Agent.agent_id).where(_agent_model_link_condition(model_id))
+        ).all()
     )
     defaults = _get_or_create_model_defaults(session)
     if model_id in {
@@ -164,7 +168,11 @@ def update_model(
         defaults.tertiary_model_id,
     }:
         agent_ids.extend(
-            list(session.exec(select(Agent.agent_id).where(_global_slot_condition())).all())
+            list(
+                session.exec(
+                    select(Agent.agent_id).where(_global_slot_condition())
+                ).all()
+            )
         )
     for agent_id in set(agent_ids):
         invalidate_cache(agent_id)
@@ -180,7 +188,9 @@ def delete_model(model_id: str, session: Session = Depends(get_session)):
 
     defaults = _get_or_create_model_defaults(session)
     linked_agents = list(
-        session.exec(select(Agent.agent_id).where(_agent_model_link_condition(model_id))).all()
+        session.exec(
+            select(Agent.agent_id).where(_agent_model_link_condition(model_id))
+        ).all()
     )
     used_in_defaults = model_id in {
         defaults.primary_model_id,

@@ -29,9 +29,7 @@ def _column_names(inspector: sa.Inspector, table_name: str) -> set[str]:
 
 def _foreign_key_names(inspector: sa.Inspector, table_name: str) -> set[str]:
     return {
-        fk["name"]
-        for fk in inspector.get_foreign_keys(table_name)
-        if fk.get("name")
+        fk["name"] for fk in inspector.get_foreign_keys(table_name) if fk.get("name")
     }
 
 
