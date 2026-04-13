@@ -1,7 +1,14 @@
+import { trimTrailingSlash } from "@/config/agent";
 import type { ReactNode } from "react";
 
-const DEFAULT_LOGS_API_BASE =
-  "https://agent-manager-428716175586.us-central1.run.app/agent-server";
+const AGENT_ADK_BASE_URL = trimTrailingSlash(
+  process.env.NEXT_PUBLIC_AGENT_ADK_BASE_URL ?? ""
+);
+const DEFAULT_LOGS_API_BASE = AGENT_ADK_BASE_URL
+  ? AGENT_ADK_BASE_URL.endsWith("/agent-server")
+    ? AGENT_ADK_BASE_URL
+    : `${AGENT_ADK_BASE_URL}/agent-server`
+  : "";
 const DEFAULT_APP_NAME = "automation";
 const DEFAULT_USER_ID = "user";
 const TRUNCATED_SUFFIX = ".....";
@@ -21,9 +28,15 @@ type SessionSummaryResponse = {
 type EventPart = {
   text?: string;
   functionCall?: {
+    name?: string;
     args?: {
       request?: string;
+      [key: string]: unknown;
     };
+  };
+  functionResponse?: {
+    name?: string;
+    response?: unknown;
   };
 };
 
@@ -57,6 +70,13 @@ export type AgentLogEntry = {
   preview: string;
   isTruncated: boolean;
   source: "text" | "request";
+  tools: {
+    id: string;
+    name: string;
+    label: string;
+    kind: "call" | "response";
+    payload: unknown;
+  }[];
 };
 
 export type AgentSessionDetail = {
@@ -123,6 +143,12 @@ const getAuthorLabel = (author: string, source: AgentLogEntry["source"]) => {
   }
   return "Agent log";
 };
+
+const normalizeToolName = (value: string) =>
+  value
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 
 const sortSessions = (sessions: AgentSessionSummary[]) =>
   [...sessions].sort((a, b) => b.updatedAt - a.updatedAt);
@@ -195,6 +221,33 @@ export async function fetchAgentSessionDetail(
     const timestamp = getNumber(event?.timestamp);
     const parts = Array.isArray(event?.content?.parts) ? event.content.parts : [];
     const author = getTrimmedText(event?.author) || "agent";
+    const tools = parts.flatMap((part, partIndex) => {
+      const functionCallName = getTrimmedText(part?.functionCall?.name);
+      const functionResponseName = getTrimmedText(part?.functionResponse?.name);
+      const items: AgentLogEntry["tools"] = [];
+
+      if (functionCallName) {
+        items.push({
+          id: `${event?.id ?? eventIndex}-tool-call-${partIndex}`,
+          name: functionCallName,
+          label: `Running ${normalizeToolName(functionCallName)}`,
+          kind: "call",
+          payload: part?.functionCall?.args ?? {},
+        });
+      }
+
+      if (functionResponseName) {
+        items.push({
+          id: `${event?.id ?? eventIndex}-tool-response-${partIndex}`,
+          name: functionResponseName,
+          label: `Received ${normalizeToolName(functionResponseName)} results`,
+          kind: "response",
+          payload: part?.functionResponse?.response ?? {},
+        });
+      }
+
+      return items;
+    });
 
     return parts.flatMap((part, partIndex) => {
       const items: AgentLogEntry[] = [];
@@ -217,6 +270,7 @@ export async function fetchAgentSessionDetail(
           preview,
           isTruncated,
           source: "text",
+          tools,
         });
       }
 
@@ -236,6 +290,7 @@ export async function fetchAgentSessionDetail(
           preview,
           isTruncated,
           source: "request",
+          tools,
         });
       }
 

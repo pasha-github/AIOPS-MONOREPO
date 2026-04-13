@@ -54,6 +54,20 @@ const formatEntryTime = (timestamp: number) => {
   }).format(new Date(timestamp * 1000));
 };
 
+const formatToolPayload = (value: unknown) => {
+  if (value === null || value === undefined) {
+    return "";
+  }
+  if (typeof value === "string") {
+    return value;
+  }
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
+};
+
 function SessionDropdownSkeleton() {
   return (
     <div className="animate-pulse rounded-xl bg-[linear-gradient(135deg,#ffffff_0%,#f7f9ff_100%)] p-5 shadow-[0_24px_60px_-44px_rgba(15,23,42,0.45)]">
@@ -641,6 +655,32 @@ export default function ActivityExplorer() {
               </div>
 
               <div className="soft-scrollbar max-h-[70vh] overflow-y-auto px-7 py-6">
+                {detailMeta.tools.length > 0 ? (
+                  <div className="mb-6 rounded-xl border border-[#e6ebf7] bg-[#f8faff] p-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7a8498]">
+                      Tools used
+                    </p>
+                    <div className="mt-3 space-y-3">
+                      {detailMeta.tools.map((tool) => (
+                        <div
+                          key={tool.id}
+                          className="rounded-xl border border-[#d9e2f3] bg-white px-4 py-3"
+                        >
+                          <div className="flex flex-wrap items-center gap-2 text-sm">
+                            <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#dcfce7] text-[#16a34a]">
+                              <Check className="h-3.5 w-3.5" />
+                            </span>
+                            <span className="font-medium text-[#24324a]">{tool.label}</span>
+                          </div>
+                          <pre className="mt-3 overflow-x-auto rounded-xl border border-[#dbe4f5] bg-[#fbfcff] px-4 py-3 text-xs leading-6 text-[#24324a]">
+                            <code>{formatToolPayload(tool.payload)}</code>
+                          </pre>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+
                 <div className="space-y-4 break-words text-sm leading-7 text-[#5f677a]">
                   {renderMarkdownBlocks(detailMeta.text)}
                 </div>
