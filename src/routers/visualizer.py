@@ -2,7 +2,14 @@ from fastapi import APIRouter, Depends
 from sqlmodel import Session, select
 
 from src.database.database import get_session
-from src.database.models import Agent, ConnectorConfig, Job, Model, Webhook
+from src.database.models import (
+    Agent,
+    ConnectorConfig,
+    Job,
+    Model,
+    ModelDefaults,
+    Webhook,
+)
 
 router = APIRouter(prefix="/visualizer", tags=["visualizer"])
 
@@ -12,6 +19,7 @@ def get_visualizer(session: Session = Depends(get_session)):
     agents = session.exec(select(Agent)).all()
     connectors = session.exec(select(ConnectorConfig)).all()
     models = session.exec(select(Model)).all()
+    defaults = session.get(ModelDefaults, 1)
     webhooks = session.exec(select(Webhook)).all()
     jobs = session.exec(select(Job)).all()
 
@@ -41,7 +49,12 @@ def get_visualizer(session: Session = Depends(get_session)):
 
     for agent in agents:
         agent_data = agent.model_dump()
-        agent_data["model"] = models_map.get(agent.model_id)
+        resolved_primary_model_id = (
+            defaults.primary_model_id
+            if defaults and agent.primary_use_global
+            else agent.primary_model_id
+        )
+        agent_data["model"] = models_map.get(resolved_primary_model_id)
         agent_data["webhooks"] = webhooks_map.get(agent.agent_id, [])
         agent_data["jobs"] = jobs_map.get(agent.agent_id, [])
 

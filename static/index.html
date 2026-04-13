@@ -296,6 +296,29 @@
                     </div>
                     <button type="submit">Update Model</button>
                 </form>
+
+                <h3 style="margin-top: 24px;">Global Model Defaults</h3>
+                <form id="update-model-defaults-form">
+                    <div class="form-group">
+                        <label>Primary Model</label>
+                        <select id="default-primary-model-select">
+                            <option value="">-- None --</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Secondary Model</label>
+                        <select id="default-secondary-model-select">
+                            <option value="">-- None --</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Tertiary Model</label>
+                        <select id="default-tertiary-model-select">
+                            <option value="">-- None --</option>
+                        </select>
+                    </div>
+                    <button type="submit">Save Global Defaults</button>
+                </form>
             </div>
 
             <!-- Agents Section -->
@@ -355,10 +378,44 @@
                             <option disabled>Loading agents...</option>
                         </select>
                     </div>
+                    <h4>Model Stack</h4>
                     <div class="form-group">
-                        <label>Model</label>
-                        <select id="agent-model-select" required>
-                            <option>Loading models...</option>
+                        <label>Primary Source</label>
+                        <select id="agent-primary-source" onchange="toggleAgentModelSlot('agent', 'primary')">
+                            <option value="global">Use Global Primary</option>
+                            <option value="manual">Choose Specific Model</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Primary Model</label>
+                        <select id="agent-primary-model-select" disabled>
+                            <option value="">-- Select model --</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Secondary Source</label>
+                        <select id="agent-secondary-source" onchange="toggleAgentModelSlot('agent', 'secondary')">
+                            <option value="global">Use Global Secondary</option>
+                            <option value="manual">Choose Specific Model</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Secondary Model</label>
+                        <select id="agent-secondary-model-select" disabled>
+                            <option value="">-- Select model --</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Tertiary Source</label>
+                        <select id="agent-tertiary-source" onchange="toggleAgentModelSlot('agent', 'tertiary')">
+                            <option value="global">Use Global Tertiary</option>
+                            <option value="manual">Choose Specific Model</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Tertiary Model</label>
+                        <select id="agent-tertiary-model-select" disabled>
+                            <option value="">-- Select model --</option>
                         </select>
                     </div>
                     <button type="submit">Add Agent</button>
@@ -386,9 +443,46 @@
                         <textarea id="agent-update-instruction" rows="3"
                             placeholder="Leave blank to keep current value"></textarea>
                     </div>
+                    <h4>Model Stack</h4>
                     <div class="form-group">
-                        <label>New Model</label>
-                        <select id="agent-update-model-select">
+                        <label>Primary Source</label>
+                        <select id="agent-update-primary-source" onchange="toggleAgentModelSlot('agent-update', 'primary')">
+                            <option value="">-- Keep current setting --</option>
+                            <option value="global">Use Global Primary</option>
+                            <option value="manual">Choose Specific Model</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Primary Model</label>
+                        <select id="agent-update-primary-model-select" disabled>
+                            <option value="">-- Keep current model --</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Secondary Source</label>
+                        <select id="agent-update-secondary-source" onchange="toggleAgentModelSlot('agent-update', 'secondary')">
+                            <option value="">-- Keep current setting --</option>
+                            <option value="global">Use Global Secondary</option>
+                            <option value="manual">Choose Specific Model</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Secondary Model</label>
+                        <select id="agent-update-secondary-model-select" disabled>
+                            <option value="">-- Keep current model --</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Tertiary Source</label>
+                        <select id="agent-update-tertiary-source" onchange="toggleAgentModelSlot('agent-update', 'tertiary')">
+                            <option value="">-- Keep current setting --</option>
+                            <option value="global">Use Global Tertiary</option>
+                            <option value="manual">Choose Specific Model</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Tertiary Model</label>
+                        <select id="agent-update-tertiary-model-select" disabled>
                             <option value="">-- Keep current model --</option>
                         </select>
                     </div>
@@ -552,6 +646,12 @@
     <script>
         const API_BASE = window.location.origin;
         let agentTemplates = [];
+        let currentModels = [];
+        let currentModelDefaults = {
+            primary_model_id: '',
+            secondary_model_id: '',
+            tertiary_model_id: ''
+        };
 
         // ─── Health ───────────────────────────────────────────────────────────
         async function checkHealth() {
@@ -570,15 +670,30 @@
         async function loadModels() {
             const res = await fetch(`${API_BASE}/llms/`);
             const models = await res.json();
+            currentModels = models;
             const listEl = document.getElementById('model-list');
-            const selectEl = document.getElementById('agent-model-select');
             const updateSelectEl = document.getElementById('model-update-select');
-            const agentUpdateModelSelectEl = document.getElementById('agent-update-model-select');
+            const modelSelectIds = [
+                'agent-primary-model-select',
+                'agent-secondary-model-select',
+                'agent-tertiary-model-select',
+                'agent-update-primary-model-select',
+                'agent-update-secondary-model-select',
+                'agent-update-tertiary-model-select',
+                'default-primary-model-select',
+                'default-secondary-model-select',
+                'default-tertiary-model-select'
+            ];
 
             listEl.innerHTML = '';
-            selectEl.innerHTML = '';
             updateSelectEl.innerHTML = '<option value="">-- Select a model --</option>';
-            agentUpdateModelSelectEl.innerHTML = '<option value="">-- Keep current model --</option>';
+            modelSelectIds.forEach(id => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                const keepText = id.startsWith('agent-update-') ? '-- Keep current model --' : '-- Select model --';
+                const noneText = id.startsWith('default-') ? '-- None --' : keepText;
+                el.innerHTML = `<option value="">${noneText}</option>`;
+            });
 
             models.forEach(m => {
                 const div = document.createElement('div');
@@ -590,20 +705,35 @@
                 `;
                 listEl.appendChild(div);
 
-                const opt = document.createElement('option');
-                opt.value = m.model_id;
-                opt.textContent = m.name;
-                selectEl.appendChild(opt);
-
                 const updateOpt = document.createElement('option');
                 updateOpt.value = m.model_id;
                 updateOpt.textContent = `${m.name} (${m.model_id})`;
                 updateSelectEl.appendChild(updateOpt);
 
-                const agentUpdateOpt = document.createElement('option');
-                agentUpdateOpt.value = m.model_id;
-                agentUpdateOpt.textContent = `${m.name} (${m.model_id})`;
-                agentUpdateModelSelectEl.appendChild(agentUpdateOpt);
+                modelSelectIds.forEach(id => {
+                    const el = document.getElementById(id);
+                    if (!el) return;
+                    const opt = document.createElement('option');
+                    opt.value = m.model_id;
+                    opt.textContent = `${m.name} (${m.model_id})`;
+                    el.appendChild(opt);
+                });
+            });
+
+            await loadModelDefaults();
+        }
+
+        async function loadModelDefaults() {
+            const res = await fetch(`${API_BASE}/llms/defaults`);
+            const defaults = await res.json();
+            currentModelDefaults = defaults;
+            document.getElementById('default-primary-model-select').value = defaults.primary_model_id || '';
+            document.getElementById('default-secondary-model-select').value = defaults.secondary_model_id || '';
+            document.getElementById('default-tertiary-model-select').value = defaults.tertiary_model_id || '';
+            ['agent', 'agent-update'].forEach(prefix => {
+                ['primary', 'secondary', 'tertiary'].forEach(slot => {
+                    syncSlotModelSelection(prefix, slot);
+                });
             });
         }
 
@@ -676,6 +806,64 @@
             loadModels();
         }
 
+        async function updateModelDefaults(e) {
+            e.preventDefault();
+            const data = {
+                primary_model_id: document.getElementById('default-primary-model-select').value || null,
+                secondary_model_id: document.getElementById('default-secondary-model-select').value || null,
+                tertiary_model_id: document.getElementById('default-tertiary-model-select').value || null
+            };
+
+            const res = await fetch(`${API_BASE}/llms/defaults`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            if (!res.ok) {
+                alert('Failed to update global defaults: ' + await res.text());
+                return;
+            }
+            loadModels();
+            loadAgents();
+        }
+
+        function toggleAgentModelSlot(prefix, slot) {
+            const sourceEl = document.getElementById(`${prefix}-${slot}-source`);
+            const modelEl = document.getElementById(`${prefix}-${slot}-model-select`);
+            if (!sourceEl || !modelEl) return;
+            modelEl.disabled = sourceEl.value !== 'manual';
+            syncSlotModelSelection(prefix, slot);
+        }
+
+        function syncSlotModelSelection(prefix, slot) {
+            const sourceEl = document.getElementById(`${prefix}-${slot}-source`);
+            const modelEl = document.getElementById(`${prefix}-${slot}-model-select`);
+            if (!sourceEl || !modelEl) return;
+
+            const isUpdate = prefix.startsWith('agent-update');
+            if (sourceEl.value === 'global') {
+                const globalModelId = currentModelDefaults[`${slot}_model_id`] || '';
+                modelEl.value = globalModelId;
+                modelEl.disabled = true;
+                return;
+            }
+
+            modelEl.disabled = sourceEl.value !== 'manual';
+            if (sourceEl.value !== 'manual' && !isUpdate) {
+                modelEl.value = '';
+            }
+        }
+
+        function addSlotConfig(data, prefix, slot, isUpdate = false) {
+            const sourceValue = document.getElementById(`${prefix}-${slot}-source`).value;
+            const modelValue = document.getElementById(`${prefix}-${slot}-model-select`).value;
+            if (isUpdate && sourceValue === '') {
+                return;
+            }
+            data[`${slot}_use_global`] = sourceValue === 'global';
+            data[`${slot}_model_id`] = sourceValue === 'manual' ? (modelValue || null) : null;
+        }
+
         // ─── Agents ───────────────────────────────────────────────────────────
         async function loadAgentTemplates() {
             const res = await fetch(`${API_BASE}/agent/templates`);
@@ -735,10 +923,15 @@
                 const subAgentBadge = (a.sub_agents || []).length > 0
                     ? `<br><small>Sub-agents: ${(a.sub_agents || []).length} attached</small>`
                     : '';
+                const modelStack = [
+                    `P: ${a.primary_use_global ? 'Global' : (a.primary_model_id || 'None')}`,
+                    `S: ${a.secondary_use_global ? 'Global' : (a.secondary_model_id || 'None')}`,
+                    `T: ${a.tertiary_use_global ? 'Global' : (a.tertiary_model_id || 'None')}`
+                ].join(' | ');
                 div.innerHTML = `
-                    <strong>${a.name}</strong> (${a.type ? a.type : 'agent'} | ${a.model_id})<br>
+                    <strong>${a.name}</strong> (${a.type ? a.type : 'agent'})<br>
                     ${a.description}<br>
-                    <small>Status: ${a.isEnabled ? 'Enabled' : 'Disabled'}</small>${connectorBadges}${subAgentBadge}
+                    <small>Status: ${a.isEnabled ? 'Enabled' : 'Disabled'} | ${modelStack}</small>${connectorBadges}${subAgentBadge}
                     <div style="margin-top:5px;">
                         <button onclick="toggleAgent('${a.agent_id}', ${!a.isEnabled})">${a.isEnabled ? 'Disable' : 'Enable'}</button>
                         <button class="delete" onclick="deleteAgent('${a.agent_id}')">Delete</button>
@@ -799,13 +992,15 @@
                 description: document.getElementById('agent-desc').value,
                 type: document.getElementById('agent-type').value,
                 instruction: document.getElementById('agent-instr').value,
-                model_id: document.getElementById('agent-model-select').value,
                 tools: toolsCode ? toolsCode : null,
                 mcp_servers: mcpServersList,
                 connector_config_ids: connectorConfigIds,
                 sub_agents: subAgentIds,
                 isEnabled: true
             };
+            addSlotConfig(data, 'agent', 'primary');
+            addSlotConfig(data, 'agent', 'secondary');
+            addSlotConfig(data, 'agent', 'tertiary');
             await fetch(`${API_BASE}/agent/`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -824,7 +1019,6 @@
             const name = document.getElementById('agent-update-name').value;
             const description = document.getElementById('agent-update-description').value;
             const instruction = document.getElementById('agent-update-instruction').value;
-            const modelId = document.getElementById('agent-update-model-select').value;
             const statusValue = document.getElementById('agent-update-status').value;
             const toolsCode = document.getElementById('agent-update-tools').value;
             const mcpInput = document.getElementById('agent-update-mcp-sse').value;
@@ -849,9 +1043,6 @@
             if (instruction.trim() !== '') {
                 data.instruction = instruction;
             }
-            if (modelId !== '') {
-                data.model_id = modelId;
-            }
             if (statusValue !== '') {
                 data.isEnabled = statusValue === 'true';
             }
@@ -867,6 +1058,9 @@
             if (subAgentIds.length > 0) {
                 data.sub_agents = subAgentIds;
             }
+            addSlotConfig(data, 'agent-update', 'primary', true);
+            addSlotConfig(data, 'agent-update', 'secondary', true);
+            addSlotConfig(data, 'agent-update', 'tertiary', true);
 
             if (Object.keys(data).length === 0) {
                 alert('Enter at least one value to update.');
@@ -1458,6 +1652,7 @@
 
         document.getElementById('add-model-form').addEventListener('submit', addModel);
         document.getElementById('update-model-form').addEventListener('submit', updateModel);
+        document.getElementById('update-model-defaults-form').addEventListener('submit', updateModelDefaults);
         document.getElementById('add-agent-form').addEventListener('submit', addAgent);
         document.getElementById('agent-template-select').addEventListener('change', applyAgentTemplate);
         document.getElementById('update-agent-form').addEventListener('submit', updateAgent);

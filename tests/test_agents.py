@@ -25,7 +25,8 @@ def _create_agent(
             "name": "Agent 1",
             "description": "desc",
             "instruction": "instr",
-            "model_id": model_id,
+            "primary_use_global": False,
+            "primary_model_id": model_id,
             "isEnabled": True,
             "tools": "def t():\n    return 'x'",
             "mcp_servers": ["http://localhost:8000/sse"],
@@ -54,7 +55,8 @@ def test_create_agent(client: TestClient):
             "name": "Test Agent",
             "description": "A test agent",
             "instruction": "You are a test agent.",
-            "model_id": "gemini-pro",
+            "primary_use_global": False,
+            "primary_model_id": "gemini-pro",
             "isEnabled": True,
         },
     )
@@ -62,6 +64,8 @@ def test_create_agent(client: TestClient):
     data = response.json()
     assert data["name"] == "Test Agent"
     assert data["agent_id"] == "test-agent"
+    assert data["primary_use_global"] is False
+    assert data["primary_model_id"] == "gemini-pro"
 
 
 def test_list_agent_templates(client: TestClient):
@@ -90,7 +94,8 @@ def test_list_agents(client: TestClient):
             "name": "Agent 1",
             "description": "d",
             "instruction": "i",
-            "model_id": "gemini-pro",
+            "primary_use_global": False,
+            "primary_model_id": "gemini-pro",
         },
     )
 
@@ -119,7 +124,8 @@ def test_delete_agent_success(client: TestClient):
             "name": "A1",
             "description": "d",
             "instruction": "i",
-            "model_id": "m1",
+            "primary_use_global": False,
+            "primary_model_id": "m1",
         },
     )
 
@@ -179,7 +185,8 @@ def test_create_agent_missing_required_field_422(client: TestClient):
             "name": "Agent 1",
             "description": "desc",
             # missing instruction
-            "model_id": "gemini-pro",
+            "primary_use_global": False,
+            "primary_model_id": "gemini-pro",
         },
     )
     assert response.status_code == 422
@@ -222,17 +229,23 @@ def test_update_agent_model_id_only(client: TestClient):
     _create_model(client, model_id="gemini-pro")
     _create_model(client, model_id="gemini-flash")
     _create_agent(client, model_id="gemini-pro")
-    response = client.patch("/agent/a1", json={"model_id": "gemini-flash"})
+    response = client.patch(
+        "/agent/a1",
+        json={"primary_use_global": False, "primary_model_id": "gemini-flash"},
+    )
     assert response.status_code == 200
-    assert response.json()["model_id"] == "gemini-flash"
+    assert response.json()["primary_model_id"] == "gemini-flash"
 
 
 def test_update_agent_invalid_model_id_returns_400(client: TestClient):
     _create_model(client, model_id="gemini-pro")
     _create_agent(client, model_id="gemini-pro")
-    response = client.patch("/agent/a1", json={"model_id": "does-not-exist"})
+    response = client.patch(
+        "/agent/a1",
+        json={"primary_use_global": False, "primary_model_id": "does-not-exist"},
+    )
     assert response.status_code == 400
-    assert response.json()["detail"] == "Invalid model_id"
+    assert response.json()["detail"] == "Invalid primary_model_id"
 
 
 def test_update_agent_status_only(client: TestClient):
@@ -316,7 +329,7 @@ def test_update_agent_empty_body_no_change(client: TestClient):
     assert data["name"] == "Agent 1"
     assert data["description"] == "desc"
     assert data["instruction"] == "instr"
-    assert data["model_id"] == "gemini-pro"
+    assert data["primary_model_id"] == "gemini-pro"
     assert data["isEnabled"] is True
 
 
@@ -382,12 +395,70 @@ def test_create_agent_with_invalid_model_id_returns_400(client: TestClient):
             "name": "Invalid Model Agent",
             "description": "desc",
             "instruction": "instr",
-            "model_id": "does-not-exist",
+            "primary_use_global": False,
+            "primary_model_id": "does-not-exist",
             "isEnabled": True,
         },
     )
     assert response.status_code == 400
-    assert response.json()["detail"] == "Invalid model_id"
+    assert response.json()["detail"] == "Invalid primary_model_id"
+
+
+def test_create_agent_with_global_stack_only(client: TestClient):
+    response = client.post(
+        "/agent/",
+        json={
+            "agent_id": "global-agent",
+            "name": "Global Agent",
+            "description": "desc",
+            "instruction": "instr",
+            "primary_use_global": True,
+            "secondary_use_global": True,
+            "tertiary_use_global": True,
+            "isEnabled": True,
+        },
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["primary_use_global"] is True
+    assert data["primary_model_id"] is None
+
+
+def test_create_agent_with_manual_primary_and_global_fallbacks(client: TestClient):
+    _create_model(client, "m1")
+    response = client.post(
+        "/agent/",
+        json={
+            "agent_id": "mixed-agent",
+            "name": "Mixed Agent",
+            "description": "desc",
+            "instruction": "instr",
+            "primary_use_global": False,
+            "primary_model_id": "m1",
+            "secondary_use_global": True,
+            "tertiary_use_global": True,
+        },
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["primary_use_global"] is False
+    assert data["primary_model_id"] == "m1"
+    assert data["secondary_use_global"] is True
+
+
+def test_create_agent_manual_primary_requires_model_id(client: TestClient):
+    response = client.post(
+        "/agent/",
+        json={
+            "agent_id": "invalid-agent",
+            "name": "Invalid Agent",
+            "description": "desc",
+            "instruction": "instr",
+            "primary_use_global": False,
+        },
+    )
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Invalid primary_model_id"
 
 
 def test_update_agent_invalid_isenabled_type_422(client: TestClient):
@@ -447,7 +518,8 @@ def _create_automation_agent(
             "name": "Auto Agent",
             "description": "desc",
             "instruction": "instr",
-            "model_id": model_id,
+            "primary_use_global": False,
+            "primary_model_id": model_id,
             "isEnabled": True,
             "type": "automation",
         },

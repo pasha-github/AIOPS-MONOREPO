@@ -5,6 +5,7 @@ import pytest
 
 from src.plugins.session_summary_plugin import (
     FIRST_MESSAGE_SUMMARY_KEY,
+    SUMMARY_FALLBACKS_KEY,
     SessionSummaryPlugin,
     _extract_user_text,
 )
@@ -51,6 +52,39 @@ def test_session_summary_plugin_sets_summary_once(monkeypatch: pytest.MonkeyPatc
         callback_context.state[FIRST_MESSAGE_SUMMARY_KEY]
         == "Production MQ backlog investigation"
     )
+
+
+def test_session_summary_plugin_uses_request_model_with_shared_fallbacks(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    shared_fallbacks = ["openai/gpt-4.1-mini", "anthropic/claude-haiku"]
+    plugin = SessionSummaryPlugin()
+    callback_context = SimpleNamespace(state={SUMMARY_FALLBACKS_KEY: shared_fallbacks})
+    request = _request_with_text("Investigate queue backlog in production")
+
+    captured = {}
+    fake_response = SimpleNamespace(
+        choices=[SimpleNamespace(message=SimpleNamespace(content="Queue backlog"))]
+    )
+
+    def fake_completion(**kwargs):
+        captured.update(kwargs)
+        return fake_response
+
+    monkeypatch.setattr(
+        "src.plugins.session_summary_plugin.litellm.completion",
+        fake_completion,
+    )
+
+    asyncio.run(
+        plugin.before_model_callback(
+            callback_context=callback_context,
+            llm_request=request,
+        )
+    )
+
+    assert captured["model"] == "openai/gpt-4o-mini"
+    assert captured["fallbacks"] == shared_fallbacks
 
 
 def test_session_summary_plugin_skips_when_summary_already_exists(
