@@ -1,270 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import Image from "next/image";
-import { X, Bot, ChevronDown, Plus, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { X, Bot } from "lucide-react";
 import { trimTrailingSlash } from "@/config/agent";
 import { useRuntimeConfig } from "@/config/runtime-config";
 import { getProviderIconSrc } from "../llm-management/llmHelpers";
+import { UpdateAgentForm, ModelOption, UpdateAgentProps } from "./types";
+import { DynamicListField } from "./component/common/DynamicListField";
+import { Field, SectionLabel } from "./component/common/Update.Field";
+import { ModelSelect } from "./component/common/ModelSelect.update";
+import {getErrorMessage, normalizeString, inputClass} from "./component/common/Update.helpes";
 
-type UpdateAgentProps = {
-    agent: any;
-    isOpen: boolean;
-    onClose: () => void;
-    onUpdateSuccess?: () => void;
-};
-
-type ModelOption = {
-    value: string;
-    label: string;
-    secondary: string;
-    iconSrc: string | null;
-};
-
-type UpdateAgentForm = {
-    agentName: string;
-    description: string;
-    instruction: string;
-    modelId: string;
-    tools: string;
-    mcpServers: string;
-    connectorConfigIds: string;
-    subAgents: string;
-    isEnabled: boolean;
-};
-
-const toSnakeCase = (value: string) =>
-    value
-        .trim()
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "_")
-        .replace(/^_+|_+$/g, "");
-
-const normalizeString = (value: string) => value.trim();
-
-const getErrorMessage = (payload: unknown, fallback: string) => {
-    if (
-        payload &&
-        typeof payload === "object" &&
-        "message" in payload &&
-        typeof (payload as any).message === "string"
-    ) {
-        return String((payload as any).message);
-    }
-    return fallback;
-};
-
-const inputClass =
-    "w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-900 placeholder-gray-400 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/10";
-
-function SectionLabel({ children }: { children: React.ReactNode }) {
-    return (
-        <p className="mt-1 text-[10px] font-semibold uppercase tracking-widest text-gray-400">
-            {children}
-        </p>
-    );
-}
-
-function Field({
-    label,
-    hint,
-    required,
-    children,
-}: {
-    label: string;
-    hint?: string;
-    required?: boolean;
-    children: React.ReactNode;
-}) {
-    return (
-        <div className="flex flex-col gap-1.5">
-            <label className="flex items-center gap-1 text-sm font-medium text-gray-700">
-                {label}
-                {required && <span className="text-red-500">*</span>}
-            </label>
-            {hint && (
-                <p className="text-xs leading-snug text-gray-400">{hint}</p>
-            )}
-            {children}
-        </div>
-    );
-}
-
-function DynamicListField({
-    label,
-    hint,
-    values,
-    placeholder,
-    onAdd,
-    onRemove,
-    onChange,
-}: {
-    label: string;
-    hint?: string;
-    values: string[];
-    placeholder: string;
-    onAdd: () => void;
-    onRemove: (index: number) => void;
-    onChange: (index: number, value: string) => void;
-}) {
-    return (
-        <Field label={label} hint={hint}>
-            <div className="flex flex-col gap-2">
-                {values.map((value, index) => (
-                    <div key={`${label}-${index}`} className="flex items-center gap-2">
-                        <input
-                            type="text"
-                            value={value}
-                            onChange={(e) => onChange(index, e.target.value)}
-                            placeholder={placeholder}
-                            className={inputClass}
-                        />
-                        <button
-                            type="button"
-                            onClick={onAdd}
-                            title="Add"
-                            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-600 transition hover:bg-indigo-100"
-                        >
-                            <Plus size={14} />
-                        </button>
-                        {values.length > 1 && (
-                            <button
-                                type="button"
-                                onClick={() => onRemove(index)}
-                                title="Remove"
-                                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-500 transition hover:bg-red-100"
-                            >
-                                <Trash2 size={14} />
-                            </button>
-                        )}
-                    </div>
-                ))}
-            </div>
-        </Field>
-    );
-}
-
-function ModelSelect({
-    value,
-    options,
-    placeholder,
-    disabled,
-    loading,
-    onChange,
-}: {
-    value: string;
-    options: ModelOption[];
-    placeholder: string;
-    disabled?: boolean;
-    loading?: boolean;
-    onChange: (value: string) => void;
-}) {
-    const [isOpen, setIsOpen] = useState(false);
-    const ref = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-        if (!isOpen) return;
-        const handler = (event: MouseEvent) => {
-            if (ref.current && !ref.current.contains(event.target as Node)) {
-                setIsOpen(false);
-            }
-        };
-        document.addEventListener("mousedown", handler);
-        return () => document.removeEventListener("mousedown", handler);
-    }, [isOpen]);
-
-    const selected = options.find((option) => option.value === value) ?? null;
-
-    return (
-        <div ref={ref} className="relative">
-            <button
-                type="button"
-                onClick={() => {
-                    if (!disabled && !loading) {
-                        setIsOpen((previous) => !previous);
-                    }
-                }}
-                className={`flex w-full items-center justify-between rounded-lg border px-3 py-2.5 text-sm transition ${disabled || loading
-                    ? "cursor-not-allowed border-dashed border-gray-200 bg-gray-100 text-gray-400"
-                    : "border-gray-200 bg-gray-50 text-gray-900 hover:border-gray-300 hover:bg-white focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/10"
-                    }`}
-            >
-                <span className="flex min-w-0 items-center gap-2">
-                    {selected?.iconSrc ? (
-                        <Image
-                            src={selected.iconSrc}
-                            alt=""
-                            width={18}
-                            height={18}
-                            className="shrink-0 rounded-sm object-contain"
-                        />
-                    ) : null}
-                    {loading ? (
-                        <span className="text-gray-400">Loading models...</span>
-                    ) : selected ? (
-                        <span className="min-w-0">
-                            <span className="block truncate">{selected.label}</span>
-                            <span className="block truncate text-xs text-gray-400">
-                                {selected.secondary}
-                            </span>
-                        </span>
-                    ) : (
-                        <span className="text-gray-400">{placeholder}</span>
-                    )}
-                </span>
-                <ChevronDown
-                    size={15}
-                    className={`shrink-0 text-gray-400 transition-transform ${isOpen ? "rotate-180" : ""}`}
-                />
-            </button>
-
-            {isOpen && !disabled && !loading ? (
-                <div className="absolute z-30 mt-1.5 max-h-64 w-full overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-lg">
-                    <button
-                        type="button"
-                        onClick={() => {
-                            onChange("");
-                            setIsOpen(false);
-                        }}
-                        className="w-full px-3 py-2.5 text-left text-sm text-gray-400 hover:bg-gray-50"
-                    >
-                        {placeholder}
-                    </button>
-                    {options.map((option) => (
-                        <button
-                            key={option.value}
-                            type="button"
-                            onClick={() => {
-                                onChange(option.value);
-                                setIsOpen(false);
-                            }}
-                            className={`flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm transition ${option.value === value
-                                ? "bg-indigo-50 font-medium text-indigo-700"
-                                : "text-gray-700 hover:bg-gray-50"
-                                }`}
-                        >
-                            {option.iconSrc ? (
-                                <Image
-                                    src={option.iconSrc}
-                                    alt=""
-                                    width={18}
-                                    height={18}
-                                    className="shrink-0 rounded-sm object-contain"
-                                />
-                            ) : null}
-                            <span className="min-w-0">
-                                <span className="block truncate">{option.label}</span>
-                                <span className="block truncate text-xs text-gray-400">
-                                    {option.secondary}
-                                </span>
-                            </span>
-                        </button>
-                    ))}
-                </div>
-            ) : null}
-        </div>
-    );
-}
 
 export default function UpdateAgent({
     agent,
@@ -294,7 +40,7 @@ export default function UpdateAgent({
     const [error, setError] = useState("");
     const [success, setSuccess] = useState("");
 
-    const agentId = useMemo(() => toSnakeCase(form.agentName), [form.agentName]);
+    //const agentId = useMemo(() => toSnakeCase(form.agentName), [form.agentName]);
 
     const isFormValid =
         form.agentName && form.description && form.instruction && form.modelId;
@@ -529,6 +275,7 @@ export default function UpdateAgent({
                         </div>
                         <button
                             type="button"
+                            title={form.isEnabled ? "Disable Agent" : "Enable Agent"}
                             role="switch"
                             aria-checked={form.isEnabled}
                             onClick={() => updateField("isEnabled", !form.isEnabled)}

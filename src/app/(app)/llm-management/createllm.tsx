@@ -5,36 +5,13 @@ import {
   LLM_PROVIDER_MODELS,
   type LlmProviderKey,
 } from "@/config/agent";
-import { ChevronDown, Eye, EyeOff, Loader2, X } from "lucide-react";
+import { Eye, EyeOff, Loader2, X } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { ActionResult } from "./llmHelpers";
+import { SelectOption, CreateLlmModalProps, CreateLlmPayload } from "./helps/llm.types";
+import RoundedSelect from "./helps/createllm.helps";
 
-type SelectOption = { value: string; label: string; iconSrc?: string };
 type ProviderKey = LlmProviderKey;
-
-type RoundedSelectProps = {
-  value: string;
-  options: SelectOption[];
-  placeholder: string;
-  disabled?: boolean;
-  leadingIconSrc?: string;
-  leadingIconAlt?: string;
-  onChange: (value: string) => void;
-};
-
-export type CreateLlmPayload = {
-  model_id: string;
-  provider: string;
-  name: string;
-  description: string;
-  api_key: string;
-};
-
-type CreateLlmModalProps = {
-  onClose: () => void;
-  onCreate: (payload: CreateLlmPayload) => Promise<ActionResult>;
-};
 
 const DESCRIPTION_MIN_LENGTH = 10;
 
@@ -50,122 +27,6 @@ const toIdentifierPart = (value: string) =>
 
 const buildModelId = (provider: string, name: string) =>
   `${toIdentifierPart(provider)}_${toIdentifierPart(name)}`;
-
-function RoundedSelect({
-  value,
-  options,
-  placeholder,
-  disabled,
-  leadingIconSrc,
-  leadingIconAlt,
-  onChange,
-}: RoundedSelectProps) {
-  const [isOpen, setIsOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(event.target as Node)
-      ) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [isOpen]);
-
-  const selectedLabel =
-    options.find((option) => option.value === value) ?? null;
-  const displayLabel = selectedLabel?.label || placeholder;
-  const displayClass = !value ? "text-[#9ca3af]" : "text-[#111827]";
-
-  return (
-    <div ref={containerRef} className="relative">
-      <button
-        type="button"
-        onClick={() => {
-          if (disabled) {
-            return;
-          }
-          setIsOpen((prev) => !prev);
-        }}
-        className={`flex w-full items-center justify-between rounded-xl border px-4 py-2.5 text-sm outline-none transition focus-within:border-[#4f49e2] focus-within:ring-2 focus-within:ring-[#4f49e2]/20 ${
-          disabled
-            ? "cursor-not-allowed border-[#e0e5f0] bg-white/90"
-            : "border-[#e0e5f0] bg-white"
-        }`}
-      >
-        <span className={`flex items-center gap-2 ${displayClass}`}>
-          {selectedLabel?.iconSrc || leadingIconSrc ? (
-            <Image
-              src={selectedLabel?.iconSrc || leadingIconSrc || ""}
-              alt={
-                selectedLabel
-                  ? `${selectedLabel.label} logo`
-                  : leadingIconAlt || "icon"
-              }
-              width={20}
-              height={20}
-              className="h-5 w-5 object-contain"
-            />
-          ) : null}
-          <span>{displayLabel}</span>
-        </span>
-        <ChevronDown className="h-4 w-4 text-[#9ca3af]" />
-      </button>
-
-      {isOpen && !disabled ? (
-        <div className="absolute z-30 mt-2 w-full overflow-hidden rounded-xl border border-[#e5e7eb] bg-white shadow-[0_12px_24px_-20px_rgba(15,23,42,0.35)]">
-          <button
-            type="button"
-            onClick={() => {
-              onChange("");
-              setIsOpen(false);
-            }}
-            className="w-full px-4 py-2 text-left text-sm text-[#6b7280] hover:bg-[#eef2ff]"
-          >
-            {placeholder}
-          </button>
-          <div className="max-h-56 overflow-auto">
-            {options.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                onClick={() => {
-                  onChange(option.value);
-                  setIsOpen(false);
-                }}
-                className={`w-full px-4 py-2 text-left text-sm ${
-                  option.value === value
-                    ? "bg-[#eef2ff] text-[#4f49e2]"
-                    : "text-[#111827] hover:bg-[#f3f4f6]"
-                }`}
-              >
-                <span className="flex items-center gap-2">
-                  {option.iconSrc ? (
-                    <Image
-                      src={option.iconSrc}
-                      alt={`${option.label} logo`}
-                      width={20}
-                      height={20}
-                      className="h-5 w-5 object-contain"
-                    />
-                  ) : null}
-                  <span>{option.label}</span>
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
-      ) : null}
-    </div>
-  );
-}
 
 export default function CreateLlmModal({
   onClose,
@@ -252,10 +113,10 @@ export default function CreateLlmModal({
 
   const modelOptions: SelectOption[] = selectedProvider
     ? LLM_PROVIDER_MODELS[selectedProvider].map((modelName) => ({
-        value: modelName,
-        label: modelName,
-        iconSrc: getProviderIconPath(selectedProvider),
-      }))
+      value: modelName,
+      label: modelName,
+      iconSrc: getProviderIconPath(selectedProvider),
+    }))
     : [];
 
   const selectedProviderIconSrc = selectedProvider
@@ -324,6 +185,8 @@ export default function CreateLlmModal({
           </h4>
           <button
             type="button"
+            aria-label="Close"
+            title="Close"
             onClick={() => {
               if (!isCreating) {
                 onClose();
@@ -398,29 +261,27 @@ export default function CreateLlmModal({
               onBlur={() => setIsDescriptionTouched(true)}
               placeholder="Describe this LLM usage..."
               rows={2}
-              className={`w-full rounded-xl border bg-white px-4 py-2.5 text-sm text-[#111827] outline-none transition placeholder:text-[#9ca3af] focus:ring-2 ${
-                shouldShowDescriptionError
+              className={`w-full rounded-xl border bg-white px-4 py-2.5 text-sm text-[#111827] outline-none transition placeholder:text-[#9ca3af] focus:ring-2 ${shouldShowDescriptionError
                   ? "border-[#fca5a5] focus:border-[#ef4444] focus:ring-[#ef4444]/20"
                   : "border-[#e0e5f0] focus:border-[#4f49e2] focus:ring-[#4f49e2]/20"
-              }`}
+                }`}
             />
             <p
-              className={`text-xs ${
-                shouldShowDescriptionError
+              className={`text-xs ${shouldShowDescriptionError
                   ? "text-[#dc2626]"
                   : isDescriptionValid
                     ? "text-[#16a34a]"
                     : "text-[#8b95ad]"
-              }`}
+                }`}
             >
               {shouldShowDescriptionError
                 ? `Description must be at least ${DESCRIPTION_MIN_LENGTH} characters.`
                 : isDescriptionValid
                   ? "Looks good."
                   : `Minimum ${DESCRIPTION_MIN_LENGTH} characters (${Math.min(
-                      normalizedDescription.length,
-                      DESCRIPTION_MIN_LENGTH
-                    )}/${DESCRIPTION_MIN_LENGTH}).`}
+                    normalizedDescription.length,
+                    DESCRIPTION_MIN_LENGTH
+                  )}/${DESCRIPTION_MIN_LENGTH}).`}
             </p>
           </div>
 
@@ -436,11 +297,10 @@ export default function CreateLlmModal({
                 onBlur={() => setIsApiKeyTouched(true)}
                 placeholder="Enter provider API key"
                 autoComplete="new-password"
-                className={`w-full rounded-xl border bg-white px-4 py-2.5 pr-12 text-sm text-[#111827] outline-none transition placeholder:text-[#9ca3af] focus:ring-2 ${
-                  shouldShowApiKeyError
+                className={`w-full rounded-xl border bg-white px-4 py-2.5 pr-12 text-sm text-[#111827] outline-none transition placeholder:text-[#9ca3af] focus:ring-2 ${shouldShowApiKeyError
                     ? "border-[#fca5a5] focus:border-[#ef4444] focus:ring-[#ef4444]/20"
                     : "border-[#e0e5f0] focus:border-[#4f49e2] focus:ring-[#4f49e2]/20"
-                }`}
+                  }`}
               />
               <button
                 type="button"
@@ -456,9 +316,8 @@ export default function CreateLlmModal({
               </button>
             </div>
             <p
-              className={`text-xs ${
-                shouldShowApiKeyError ? "text-[#dc2626]" : "text-[#8b95ad]"
-              }`}
+              className={`text-xs ${shouldShowApiKeyError ? "text-[#dc2626]" : "text-[#8b95ad]"
+                }`}
             >
               {shouldShowApiKeyError
                 ? "API key is required."
@@ -487,11 +346,10 @@ export default function CreateLlmModal({
             type="button"
             onClick={handleCreateLlm}
             disabled={isCreateDisabled}
-            className={`inline-flex min-w-[132px] items-center justify-center gap-2 rounded-xl px-5 py-2 text-sm font-semibold text-white ${
-              isCreateDisabled
+            className={`inline-flex min-w-[132px] items-center justify-center gap-2 rounded-xl px-5 py-2 text-sm font-semibold text-white ${isCreateDisabled
                 ? "cursor-not-allowed bg-[#c7c4f7]"
                 : "bg-[#4f49e2] shadow-[0_10px_24px_-18px_rgba(79,73,226,0.9)] hover:bg-[#3f39d6]"
-            }`}
+              }`}
           >
             {isCreating ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
             {isCreating ? "Creating..." : "Create LLM"}

@@ -4,8 +4,6 @@ import { trimTrailingSlash } from "@/config/agent";
 import { useRuntimeConfig } from "@/config/runtime-config";
 import {
   Bot,
-  ChevronDown,
-  ChevronRight,
   Check,
   Copy,
   MessageSquare,
@@ -20,612 +18,26 @@ import {
   User,
   X,
 } from "lucide-react";
-import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-type ChatAgent = {
-  agentId: string;
-  name: string;
-};
+import {
+  AdkSession,
+  StreamStep,
+  ChatMessage,
+  AgentChatWorkspaceProps,
+} from "./dashboard.types";
 
-type AgentChatWorkspaceProps = {
-  agent: ChatAgent;
-  onClose: () => void;
-};
+import {
+  renderMarkdownBlocks,
+  renderMilestones,
+  formatTime,
+} from "../dashboard/help/help.chat";
 
-type AdkFunctionCall = {
-  id?: string | null;
-  name?: string | null;
-  args?: unknown;
-};
-
-type AdkFunctionResponse = {
-  id?: string | null;
-  name?: string | null;
-  response?: unknown;
-};
-
-type AdkPart = {
-  text?: string | null;
-  thought?: boolean | null;
-  functionCall?: AdkFunctionCall | null;
-  functionResponse?: AdkFunctionResponse | null;
-};
-
-type AdkContent = {
-  role?: string | null;
-  parts?: AdkPart[] | null;
-};
-
-type AdkEvent = {
-  id?: string | null;
-  timestamp?: number | null;
-  author?: string | null;
-  content?: AdkContent | null;
-};
-
-type AdkSession = {
-  id: string;
-  appName?: string | null;
-  userId?: string | null;
-  events?: AdkEvent[] | null;
-  lastUpdateTime?: number | null;
-  state?: SessionState | null;
-};
-
-type SessionState = {
-  first_message_summary?: string;
-};
-
-type ChatMessage = {
-  id: string;
-  role: "user" | "agent";
-  text: string;
-  timeLabel: string;
-};
+import { useSessions } from "../dashboard/help/useSessions";
+import { useStreamingChat } from "../dashboard/help/useStreamingChat";
+import { useChatActions } from "../dashboard/help/useChatActions";
 
 const DEFAULT_USER_ID = "user";
-
-const getSessionsUrl = (adkBaseUrl: string, appName: string, userId: string) =>
-  `${adkBaseUrl}/apps/${encodeURIComponent(appName)}/users/${encodeURIComponent(
-    userId
-  )}/sessions`;
-
-const getSessionUrl = (
-  adkBaseUrl: string,
-  appName: string,
-  userId: string,
-  sessionId: string
-) => `${getSessionsUrl(adkBaseUrl, appName, userId)}/${encodeURIComponent(sessionId)}`;
-
-const getRunSseUrl = (adkBaseUrl: string) => `${adkBaseUrl}/run_sse`;
-
-type StreamStep = {
-  id: string;
-  label: string;
-  status: "running" | "done";
-  details?: string;
-};
-
-const formatMilestoneDetails = (value: unknown) => {
-  if (value === undefined || value === null) {
-    return "";
-  }
-  if (typeof value === "string") {
-    return value;
-  }
-  try {
-    return JSON.stringify(value, null, 2);
-  } catch {
-    return String(value);
-  }
-};
-
-const renderMilestones = (
-  steps: StreamStep[],
-  expandedState: Record<string, boolean>,
-  onToggle: (stepId: string) => void
-) => (
-  <div className="mb-3 rounded-xl border border-[#d4dcf6] bg-white/60 px-3 py-2">
-    <div className="space-y-2">
-      {steps.map((step, index) => (
-        <div key={step.id} className="flex gap-2">
-          <div className="flex w-4 shrink-0 flex-col items-center">
-            <span
-              className={`inline-flex h-4 w-4 items-center justify-center rounded-full ${step.status === "done"
-                  ? "bg-[#dcfce7] text-[#16a34a]"
-                  : "bg-[#e0e7ff] text-[#4f49e2]"
-                }`}
-            >
-              {step.status === "done" ? (
-                <Check className="h-2.5 w-2.5" />
-              ) : (
-                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" />
-              )}
-            </span>
-            {index < steps.length - 1 ? (
-              <span className="mt-1 h-4 w-px bg-[#c5d0f5]" />
-            ) : null}
-          </div>
-          <div className="min-w-0 flex-1">
-            <button
-              type="button"
-              onClick={() => onToggle(step.id)}
-              disabled={!step.details}
-              className={`flex w-full items-center justify-between gap-2 text-left ${step.details ? "cursor-pointer" : "cursor-default"
-                }`}
-            >
-              <span
-                className={`text-xs ${step.status === "done" ? "text-[#374151]" : "font-semibold text-[#1f2937]"
-                  }`}
-              >
-                {step.label}
-              </span>
-              {step.details ? (
-                expandedState[step.id] ? (
-                  <ChevronDown className="h-3.5 w-3.5 shrink-0 text-[#64748b]" />
-                ) : (
-                  <ChevronRight className="h-3.5 w-3.5 shrink-0 text-[#64748b]" />
-                )
-              ) : null}
-            </button>
-            {step.details && expandedState[step.id] ? (
-              <pre className="mt-2 max-h-56 overflow-auto rounded-lg border border-[#dbe2f0] bg-white/80 p-2 text-[11px] leading-5 text-[#334155]">
-                {step.details}
-              </pre>
-            ) : null}
-          </div>
-        </div>
-      ))}
-    </div>
-  </div>
-);
-
-const mergeStreamingText = (currentText: string, incomingText: string): string => {
-  if (!incomingText) {
-    return currentText;
-  }
-  if (!currentText) {
-    return incomingText;
-  }
-  if (incomingText.startsWith(currentText)) {
-    return incomingText;
-  }
-  if (currentText.endsWith(incomingText)) {
-    return currentText;
-  }
-  return `${currentText}${incomingText}`;
-};
-
-type AdkSsePayload = {
-  partial?: boolean;
-  error?: string;
-  content?: AdkContent | null;
-  actions?: {
-    requestedToolConfirmations?: Record<string, unknown> | null;
-  } | null;
-};
-
-const parseSsePayload = (rawData: string): AdkSsePayload | null => {
-  try {
-    return JSON.parse(rawData) as AdkSsePayload;
-  } catch {
-    return null;
-  }
-};
-
-const normalizeToolName = (value: string) =>
-  value
-    .replace(/[_-]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-
-const extractVisibleTextFromParts = (parts: AdkPart[]) =>
-  parts
-    .filter((part) => typeof part.text === "string" && !part.thought)
-    .map((part) => part.text ?? "")
-    .join("");
-
-const extractFunctionCalls = (parts: AdkPart[]) =>
-  parts
-    .map((part) => part.functionCall)
-    .filter((call): call is AdkFunctionCall => Boolean(call?.name));
-
-const extractFunctionResponses = (parts: AdkPart[]) =>
-  parts
-    .map((part) => part.functionResponse)
-    .filter((response): response is AdkFunctionResponse => Boolean(response?.name));
-
-const summarizeStreamError = (errorText: string) => {
-  const compact = errorText.replace(/\s+/g, " ").trim();
-  if (compact.toLowerCase().includes("reasoning_content")) {
-    return "Model rejected reasoning content from a prior step. Start a new session and try again.";
-  }
-  if (compact.length <= 180) {
-    return compact;
-  }
-  return "Agent failed while generating a response.";
-};
-
-const formatTime = (timestamp?: number | null) => {
-  if (!timestamp || Number.isNaN(timestamp)) {
-    return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  }
-  const value = timestamp > 9999999999 ? timestamp : timestamp * 1000;
-  return new Date(value).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-};
-
-const normalizeRole = (event: AdkEvent): ChatMessage["role"] | null => {
-  const contentRole = String(event.content?.role ?? "").toLowerCase();
-  if (contentRole === "user") {
-    return "user";
-  }
-  if (contentRole === "model") {
-    return "agent";
-  }
-  const author = String(event.author ?? "").toLowerCase();
-  if (author.includes("user")) {
-    return "user";
-  }
-  if (author) {
-    return "agent";
-  }
-  return null;
-};
-
-const mapEventsToMessages = (events: AdkEvent[] | null | undefined) => {
-  const source = Array.isArray(events) ? events : [];
-  const messages: ChatMessage[] = [];
-  const milestonesByMessageId: Record<string, StreamStep[]> = {};
-  let pendingMilestones: StreamStep[] = [];
-  let stepCounter = 0;
-
-  const addPendingMilestone = (label: string, details?: unknown) => {
-    const cleanLabel = label.trim();
-    if (!cleanLabel) {
-      return;
-    }
-    stepCounter += 1;
-    pendingMilestones.push({
-      id: `history-step-${stepCounter}`,
-      label: cleanLabel,
-      status: "done",
-      details: formatMilestoneDetails(details),
-    });
-  };
-
-  source.forEach((event, index) => {
-    const parts = Array.isArray(event.content?.parts) ? event.content.parts : [];
-    const functionCalls = extractFunctionCalls(parts);
-    const functionResponses = extractFunctionResponses(parts);
-    functionCalls.forEach((toolCall) => {
-      const toolName = String(toolCall.name ?? "");
-      addPendingMilestone(`Running ${normalizeToolName(toolName)}`, {
-        tool: toolName,
-        args: toolCall.args ?? {},
-      });
-    });
-    functionResponses.forEach((toolResponse) => {
-      const toolName = String(toolResponse.name ?? "");
-      addPendingMilestone(`Received ${normalizeToolName(toolName)} results`, {
-        tool: toolName,
-        response: toolResponse.response ?? {},
-      });
-    });
-
-    const text = extractVisibleTextFromParts(parts).trim();
-    const role = normalizeRole(event);
-    if (!text || !role) {
-      return;
-    }
-
-    const messageId = String(event.id ?? `${role}-${index}`);
-    messages.push({
-      id: messageId,
-      role,
-      text,
-      timeLabel: formatTime(event.timestamp),
-    });
-
-    if (role === "agent" && pendingMilestones.length > 0) {
-      milestonesByMessageId[messageId] = pendingMilestones.map((step) => ({
-        ...step,
-        id: `${messageId}-${step.id}`,
-      }));
-      pendingMilestones = [];
-    }
-  });
-
-  return {
-    messages,
-    milestonesByMessageId,
-  };
-};
-
-const renderMarkdownInline = (text: string, keyPrefix = ""): ReactNode[] => {
-  const nodes: ReactNode[] = [];
-  const pattern = /(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`|\[[^\]]+\]\([^)]+\))/g;
-  let cursor = 0;
-  let match: RegExpExecArray | null;
-  let key = 0;
-
-  while ((match = pattern.exec(text)) !== null) {
-    const token = match[0];
-    const start = match.index;
-    if (start > cursor) {
-      nodes.push(text.slice(cursor, start));
-    }
-
-    if (token.startsWith("**") && token.endsWith("**")) {
-      nodes.push(
-        <strong key={`md-${keyPrefix}-${key++}`}>{token.slice(2, -2)}</strong>
-      );
-    } else if (token.startsWith("*") && token.endsWith("*")) {
-      nodes.push(<em key={`md-${keyPrefix}-${key++}`}>{token.slice(1, -1)}</em>);
-    } else if (token.startsWith("`") && token.endsWith("`")) {
-      nodes.push(
-        <code
-          key={`md-${keyPrefix}-${key++}`}
-          className="rounded bg-black/5 px-1 py-0.5 text-[0.95em]"
-        >
-          {token.slice(1, -1)}
-        </code>
-      );
-    } else if (token.startsWith("[") && token.includes("](") && token.endsWith(")")) {
-      const linkMatch = token.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
-      if (linkMatch) {
-        nodes.push(
-          <a
-            key={`md-${keyPrefix}-${key++}`}
-            href={linkMatch[2]}
-            target="_blank"
-            rel="noreferrer"
-            className="text-[#3b5bdb] underline"
-          >
-            {linkMatch[1]}
-          </a>
-        );
-      } else {
-        nodes.push(token);
-      }
-    } else {
-      nodes.push(token);
-    }
-    cursor = start + token.length;
-  }
-
-  if (cursor < text.length) {
-    nodes.push(text.slice(cursor));
-  }
-  return nodes;
-};
-
-const renderInlineWithLineBreaks = (lines: string[], keyPrefix: string): ReactNode[] =>
-  lines.flatMap((line, index) => {
-    const nodes = renderMarkdownInline(line, `${keyPrefix}-line-${index}`);
-    if (index < lines.length - 1) {
-      return [...nodes, <br key={`${keyPrefix}-br-${index}`} />];
-    }
-    return nodes;
-  });
-
-const parseTableRow = (line: string): string[] =>
-  line
-    .trim()
-    .replace(/^\|/, "")
-    .replace(/\|$/, "")
-    .split("|")
-    .map((cell) => cell.trim());
-
-const isTableSeparatorLine = (line: string): boolean => {
-  const cells = parseTableRow(line);
-  return cells.length > 0 && cells.every((cell) => /^:?-{3,}:?$/.test(cell));
-};
-
-const isHeadingLine = (line: string) => /^(#{1,6})\s+.+$/.test(line.trim());
-const isUnorderedListLine = (line: string) => /^[-*]\s+.+$/.test(line.trim());
-const isOrderedListLine = (line: string) => /^\d+\.\s+.+$/.test(line.trim());
-const isHrLine = (line: string) => /^(\*\*\*|---|___)\s*$/.test(line.trim());
-const isCodeFenceLine = (line: string) => line.trim().startsWith("```");
-
-const renderMarkdownBlocks = (text: string): ReactNode[] => {
-  const lines = text.replace(/\r\n/g, "\n").split("\n");
-  const blocks: ReactNode[] = [];
-  let i = 0;
-
-  while (i < lines.length) {
-    const line = lines[i];
-    const trimmed = line.trim();
-
-    if (!trimmed) {
-      i += 1;
-      continue;
-    }
-
-    if (isCodeFenceLine(trimmed)) {
-      const codeLines: string[] = [];
-      i += 1;
-      while (i < lines.length && !isCodeFenceLine(lines[i])) {
-        codeLines.push(lines[i]);
-        i += 1;
-      }
-      if (i < lines.length && isCodeFenceLine(lines[i])) {
-        i += 1;
-      }
-      blocks.push(
-        <pre
-          key={`block-code-${i}`}
-          className="overflow-x-auto rounded-xl bg-black/90 px-3 py-2 text-xs text-white"
-        >
-          <code>{codeLines.join("\n")}</code>
-        </pre>
-      );
-      continue;
-    }
-
-    const headingMatch = trimmed.match(/^(#{1,6})\s+(.+)$/);
-    if (headingMatch) {
-      const hashes = headingMatch[1].length;
-      const headingText = headingMatch[2];
-      const content = renderMarkdownInline(headingText, `heading-${i}`);
-      if (hashes === 1) {
-        blocks.push(
-          <h1 key={`block-h1-${i}`} className="text-xl font-bold leading-8">
-            {content}
-          </h1>
-        );
-      } else if (hashes === 2) {
-        blocks.push(
-          <h2 key={`block-h2-${i}`} className="text-lg font-bold leading-7">
-            {content}
-          </h2>
-        );
-      } else {
-        blocks.push(
-          <h3 key={`block-hx-${i}`} className="text-base font-semibold leading-6">
-            {content}
-          </h3>
-        );
-      }
-      i += 1;
-      continue;
-    }
-
-    if (
-      line.includes("|") &&
-      i + 1 < lines.length &&
-      isTableSeparatorLine(lines[i + 1])
-    ) {
-      const headers = parseTableRow(line);
-      i += 2;
-      const rows: string[][] = [];
-      while (i < lines.length) {
-        const rowLine = lines[i];
-        if (!rowLine.trim() || !rowLine.includes("|")) {
-          break;
-        }
-        rows.push(parseTableRow(rowLine));
-        i += 1;
-      }
-
-      blocks.push(
-        <div key={`block-table-${i}`} className="overflow-x-auto rounded-xl border border-[#dbe2f0] bg-white/70">
-          <table className="min-w-full border-collapse text-left text-xs">
-            <thead className="bg-[#eef2ff] text-[#1f2937]">
-              <tr>
-                {headers.map((header, headerIndex) => (
-                  <th
-                    key={`table-head-${i}-${headerIndex}`}
-                    className="border-b border-[#dbe2f0] px-3 py-2 font-semibold"
-                  >
-                    {renderMarkdownInline(header, `table-head-${i}-${headerIndex}`)}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row, rowIndex) => (
-                <tr key={`table-row-${i}-${rowIndex}`} className="border-b border-[#e8edf7]">
-                  {headers.map((_, colIndex) => (
-                    <td key={`table-col-${i}-${rowIndex}-${colIndex}`} className="px-3 py-2 align-top">
-                      {renderMarkdownInline(
-                        row[colIndex] ?? "",
-                        `table-cell-${i}-${rowIndex}-${colIndex}`
-                      )}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      );
-      continue;
-    }
-
-    if (isUnorderedListLine(line)) {
-      const listItems: string[] = [];
-      while (i < lines.length && isUnorderedListLine(lines[i])) {
-        listItems.push(lines[i].trim().replace(/^[-*]\s+/, ""));
-        i += 1;
-      }
-      blocks.push(
-        <ul key={`block-ul-${i}`} className="list-disc space-y-1 pl-5">
-          {listItems.map((item, itemIndex) => (
-            <li key={`ul-item-${i}-${itemIndex}`}>
-              {renderMarkdownInline(item, `ul-${i}-${itemIndex}`)}
-            </li>
-          ))}
-        </ul>
-      );
-      continue;
-    }
-
-    if (isOrderedListLine(line)) {
-      const listItems: string[] = [];
-      while (i < lines.length && isOrderedListLine(lines[i])) {
-        listItems.push(lines[i].trim().replace(/^\d+\.\s+/, ""));
-        i += 1;
-      }
-      blocks.push(
-        <ol key={`block-ol-${i}`} className="list-decimal space-y-1 pl-5">
-          {listItems.map((item, itemIndex) => (
-            <li key={`ol-item-${i}-${itemIndex}`}>
-              {renderMarkdownInline(item, `ol-${i}-${itemIndex}`)}
-            </li>
-          ))}
-        </ol>
-      );
-      continue;
-    }
-
-    if (isHrLine(line)) {
-      blocks.push(<hr key={`block-hr-${i}`} className="border-[#dbe2f0]" />);
-      i += 1;
-      continue;
-    }
-
-    const paragraphLines: string[] = [];
-    while (i < lines.length) {
-      const current = lines[i];
-      const currentTrim = current.trim();
-      const nextLine = i + 1 < lines.length ? lines[i + 1] : "";
-      if (
-        !currentTrim ||
-        isHeadingLine(current) ||
-        isUnorderedListLine(current) ||
-        isOrderedListLine(current) ||
-        isHrLine(current) ||
-        isCodeFenceLine(current) ||
-        (current.includes("|") && isTableSeparatorLine(nextLine))
-      ) {
-        break;
-      }
-      paragraphLines.push(current);
-      i += 1;
-    }
-
-    if (paragraphLines.length > 0) {
-      blocks.push(
-        <p key={`block-p-${i}`} className="leading-7">
-          {renderInlineWithLineBreaks(paragraphLines, `p-${i}`)}
-        </p>
-      );
-      continue;
-    }
-
-    i += 1;
-  }
-
-  return blocks;
-};
-
-const sortSessions = (sessions: AdkSession[]) =>
-  [...sessions].sort((a, b) => {
-    const aTime = Number(a.lastUpdateTime ?? 0);
-    const bTime = Number(b.lastUpdateTime ?? 0);
-    return bTime - aTime;
-  });
 
 export default function AgentChatWorkspace({
   agent,
@@ -636,6 +48,8 @@ export default function AgentChatWorkspace({
   const appName = agent.agentId;
   const assistantDisplayName = agent.name?.trim() || appName;
   const userId = DEFAULT_USER_ID;
+
+  // ---------------- STATE ----------------
   const [sessions, setSessions] = useState<AdkSession[]>([]);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [isDraftSession, setIsDraftSession] = useState(true);
@@ -646,666 +60,168 @@ export default function AgentChatWorkspace({
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null);
   const [openMenuSessionId, setOpenMenuSessionId] = useState<string | null>(null);
+
   const [isSending, setIsSending] = useState(false);
   const [isStreamingReply, setIsStreamingReply] = useState(false);
   const [streamingText, setStreamingText] = useState("");
   const [streamSteps, setStreamSteps] = useState<StreamStep[]>([]);
-  const [pendingUserMessage, setPendingUserMessage] = useState<ChatMessage | null>(null);
-  const [messageMilestones, setMessageMilestones] = useState<Record<string, StreamStep[]>>({});
-  const [expandedMilestones, setExpandedMilestones] = useState<Record<string, boolean>>({});
+
+  const [pendingUserMessage, setPendingUserMessage] =
+    useState<ChatMessage | null>(null);
+
+  const [messageMilestones, setMessageMilestones] = useState<
+    Record<string, StreamStep[]>
+  >({});
+  const [expandedMilestones, setExpandedMilestones] = useState<
+    Record<string, boolean>
+  >({});
 
   const [sessionsError, setSessionsError] = useState("");
   const [messagesError, setMessagesError] = useState("");
   const [sendError, setSendError] = useState("");
+
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
 
   const messageListRef = useRef<HTMLDivElement | null>(null);
   const selectedSessionIdRef = useRef<string | null>(null);
-  const copyResetTimerRef = useRef<number | null>(null);
-  const streamStepCounterRef = useRef(0);
-  const streamStepsRef = useRef<StreamStep[]>([]);
-  const streamTargetTextRef = useRef("");
-  const streamRenderedTextRef = useRef("");
-  const streamAnimationFrameRef = useRef<number | null>(null);
 
+  // ---------------- HOOKS ----------------
+  const { loadSessions, loadSessionMessages } = useSessions({
+    adkBaseUrl,
+    appName,
+    userId,
+    setSessions,
+    setSelectedSessionId,
+    setIsDraftSession,
+    setMessages,
+    setMessageMilestones,
+    setExpandedMilestones,
+    setSessionsError,
+    setMessagesError,
+    setIsLoadingSessions,
+    setIsLoadingMessages,
+    selectedSessionIdRef,
+  });
+
+  const { runPromptSse, startStreamingState, resetStreamingText } =
+    useStreamingChat({
+      appName,
+      userId,
+      adkBaseUrl,
+      setStreamingText,
+      setStreamSteps,
+      setIsStreamingReply,
+      setSendError,
+    });
+
+  const { createSession, deleteSession, sendPrompt } = useChatActions({
+    adkBaseUrl,
+    appName,
+    userId,
+    sessions,
+    setSessions,
+    selectedSessionId,
+    setSelectedSessionId,
+    setIsDraftSession,
+    setMessages,
+    setMessageMilestones,
+    setExpandedMilestones,
+    setSessionsError,
+    setDeletingSessionId,
+    setOpenMenuSessionId,
+    setPendingUserMessage,
+    setSendError,
+    setIsSending,
+    setIsStreamingReply,
+    setStreamSteps,
+    loadSessionMessages,
+    loadSessions,
+    runPromptSse,
+    startStreamingState,
+    resetStreamingText,
+  });
+
+  // ---------------- EFFECTS ----------------
   useEffect(() => {
     selectedSessionIdRef.current = selectedSessionId;
   }, [selectedSessionId]);
 
   useEffect(() => {
+    loadSessions();
+  }, [loadSessions]);
+
+  useEffect(() => {
+    if (!messageListRef.current) return;
+    messageListRef.current.scrollTop =
+      messageListRef.current.scrollHeight;
+  }, [messages, pendingUserMessage, streamingText]);
+
+  useEffect(() => {
     const handleOutside = (event: MouseEvent) => {
       const target = event.target as HTMLElement | null;
-      if (target?.closest("[data-session-menu='true']")) {
-        return;
-      }
+      if (target?.closest("[data-session-menu='true']")) return;
       setOpenMenuSessionId(null);
     };
     document.addEventListener("mousedown", handleOutside);
     return () => document.removeEventListener("mousedown", handleOutside);
   }, []);
 
-  useEffect(() => {
-    if (!messageListRef.current) {
-      return;
+  // ---------------- ACTIONS ----------------
+  const sendMessage = useCallback(async () => {
+    setSendError("");
+    const prompt = draft.trim();
+    if (!prompt || isSending) return;
+
+    setDraft("");
+    const sent = await sendPrompt(prompt, { optimisticUser: true });
+    if (!sent) setDraft(prompt);
+  }, [draft, isSending, sendPrompt]);
+
+  const lastUserPrompt = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === "user") return messages[i].text;
     }
-    messageListRef.current.scrollTop = messageListRef.current.scrollHeight;
-  }, [messages, pendingUserMessage, streamingText, isSending]);
+    return "";
+  }, [messages]);
 
-  useEffect(() => {
-    return () => {
-      if (copyResetTimerRef.current) {
-        window.clearTimeout(copyResetTimerRef.current);
-      }
-      if (streamAnimationFrameRef.current) {
-        window.cancelAnimationFrame(streamAnimationFrameRef.current);
-      }
-    };
-  }, []);
+  const retryLastPrompt = useCallback(async () => {
+    if (!lastUserPrompt || isSending) return;
+    await sendPrompt(lastUserPrompt);
+  }, [lastUserPrompt, isSending, sendPrompt]);
 
-  const loadSessionMessages = useCallback(
-    async (sessionId: string, options?: { silent?: boolean }) => {
-      const silent = Boolean(options?.silent);
-      if (!silent) {
-        setIsLoadingMessages(true);
-      }
-      setMessagesError("");
-      try {
-        const response = await fetch(getSessionUrl(adkBaseUrl, appName, userId, sessionId), {
-          headers: { accept: "application/json" },
-        });
-        const payload = (await response.json()) as AdkSession;
-        if (!response.ok) {
-          if (!silent) {
-            setMessages([]);
-            setMessageMilestones({});
-            setExpandedMilestones({});
-          }
-          setMessagesError("Unable to load session messages.");
-          return [] as ChatMessage[];
-        }
-        const mapped = mapEventsToMessages(payload.events);
-        setMessages(mapped.messages);
-        setMessageMilestones(mapped.milestonesByMessageId);
-        setExpandedMilestones({});
-        return mapped.messages;
-      } catch {
-        if (!silent) {
-          setMessages([]);
-          setMessageMilestones({});
-          setExpandedMilestones({});
-        }
-        setMessagesError("Unable to load session messages.");
-        return [] as ChatMessage[];
-      } finally {
-        if (!silent) {
-          setIsLoadingMessages(false);
-        }
-      }
-    },
-    [appName, userId]
-  );
+  const copyMessage = async (id: string, text: string) => {
+    await navigator.clipboard.writeText(text);
+    setCopiedMessageId(id);
+    setTimeout(() => setCopiedMessageId(null), 1400);
+  };
 
-  const loadSessions = useCallback(async (options?: { preferredSessionId?: string | null; silent?: boolean }) => {
-    const silent = Boolean(options?.silent);
-    if (!silent) {
-      setIsLoadingSessions(true);
-    }
-    setSessionsError("");
-    try {
-      const response = await fetch(getSessionsUrl(adkBaseUrl, appName, userId), {
-        headers: { accept: "application/json" },
-      });
-      //console.log("Sessions response status:", response);
-      const payload = (await response.json()) as AdkSession[];
-      if (!response.ok || !Array.isArray(payload)) {
-        if (!silent) {
-          setSessions([]);
-          setSelectedSessionId(null);
-          setIsDraftSession(true);
-          setMessages([]);
-          setMessageMilestones({});
-          setExpandedMilestones({});
-        }
-        setSessionsError("Unable to load sessions.");
-        return [] as ChatMessage[];
-      }
-
-      const sorted = sortSessions(payload);
-      setSessions(sorted);
-
-      const selectedIdToKeep = options?.preferredSessionId ?? selectedSessionIdRef.current;
-      const nextSessionId =
-        sorted.find((item) => item.id === selectedIdToKeep)?.id ?? null;
-      setSelectedSessionId(nextSessionId);
-      setIsDraftSession(!nextSessionId);
-
-      if (nextSessionId) {
-        return await loadSessionMessages(nextSessionId, { silent });
-      } else {
-        if (!silent) {
-          setMessages([]);
-          setMessageMilestones({});
-          setExpandedMilestones({});
-        }
-        return [] as ChatMessage[];
-      }
-    } catch {
-      if (!silent) {
-        setSessions([]);
-        setSelectedSessionId(null);
-        setIsDraftSession(true);
-        setMessages([]);
-        setMessageMilestones({});
-        setExpandedMilestones({});
-      }
-      setSessionsError("Unable to load sessions.");
-      return [] as ChatMessage[];
-    } finally {
-      if (!silent) {
-        setIsLoadingSessions(false);
-      }
-    }
-  }, [appName, userId, loadSessionMessages]);
-  
-
-  const resetStreamingText = useCallback(() => {
-    if (streamAnimationFrameRef.current) {
-      window.cancelAnimationFrame(streamAnimationFrameRef.current);
-      streamAnimationFrameRef.current = null;
-    }
-    streamTargetTextRef.current = "";
-    streamRenderedTextRef.current = "";
-    setStreamingText("");
-  }, []);
-
-  const animateStreamingText = useCallback(() => {
-    if (streamAnimationFrameRef.current) {
-      return;
-    }
-
-    const tick = () => {
-      const target = streamTargetTextRef.current;
-      const current = streamRenderedTextRef.current;
-      if (current === target) {
-        streamAnimationFrameRef.current = null;
-        return;
-      }
-
-      const remaining = Math.max(0, target.length - current.length);
-      const step = Math.max(12, Math.min(220, Math.ceil(Math.max(target.length, remaining) / 35)));
-      const next = target.slice(0, current.length + step);
-      streamRenderedTextRef.current = next;
-      setStreamingText(next);
-
-      if (next === target) {
-        streamAnimationFrameRef.current = null;
-        return;
-      }
-      streamAnimationFrameRef.current = window.requestAnimationFrame(tick);
-    };
-
-    streamAnimationFrameRef.current = window.requestAnimationFrame(tick);
-  }, []);
-
-  const updateStreamingTargetText = useCallback(
-    (nextText: string, options?: { immediate?: boolean }) => {
-      streamTargetTextRef.current = nextText;
-
-      if (options?.immediate) {
-        if (streamAnimationFrameRef.current) {
-          window.cancelAnimationFrame(streamAnimationFrameRef.current);
-          streamAnimationFrameRef.current = null;
-        }
-        streamRenderedTextRef.current = nextText;
-        setStreamingText(nextText);
-        return;
-      }
-
-      animateStreamingText();
-    },
-    [animateStreamingText]
-  );
-
-  const startStreamingState = useCallback(() => {
-    streamStepCounterRef.current = 0;
-    resetStreamingText();
-    const initialSteps: StreamStep[] = [];
-    streamStepsRef.current = initialSteps;
-    setStreamSteps(initialSteps);
-    setIsStreamingReply(true);
-  }, [resetStreamingText]);
-
-  const addRunningStep = useCallback((label: string, details?: unknown) => {
-    const cleanLabel = label.trim();
-    if (!cleanLabel) {
-      return;
-    }
-    const formattedDetails = formatMilestoneDetails(details);
-
-    setStreamSteps((prev) => {
-      if (prev.length === 0) {
-        streamStepCounterRef.current += 1;
-        const created: StreamStep[] = [
-          {
-            id: `stream-step-${streamStepCounterRef.current}`,
-            label: cleanLabel,
-            status: "running",
-            details: formattedDetails,
-          },
-        ];
-        streamStepsRef.current = created;
-        return created;
-      }
-
-      const next = [...prev];
-      const lastIndex = next.length - 1;
-      const lastStep = next[lastIndex];
-
-      if (lastStep.label === cleanLabel) {
-        const mergedStep =
-          formattedDetails && !lastStep.details
-            ? { ...lastStep, details: formattedDetails }
-            : lastStep;
-        if (lastStep.status === "done") {
-          next[lastIndex] = { ...mergedStep, status: "running" };
-        } else if (mergedStep !== lastStep) {
-          next[lastIndex] = mergedStep;
-        }
-        return next;
-      }
-
-      if (lastStep.status === "running") {
-        next[lastIndex] = { ...lastStep, status: "done" };
-      }
-
-      streamStepCounterRef.current += 1;
-      next.push({
-        id: `stream-step-${streamStepCounterRef.current}`,
-        label: cleanLabel,
-        status: "running",
-        details: formattedDetails,
-      });
-      streamStepsRef.current = next;
-      return next;
-    });
-  }, []);
-
-  const completeLastRunningStep = useCallback(() => {
-    setStreamSteps((prev) => {
-      if (prev.length === 0) {
-        return prev;
-      }
-      const next = [...prev];
-      const lastIndex = next.length - 1;
-      if (next[lastIndex].status === "running") {
-        next[lastIndex] = { ...next[lastIndex], status: "done" };
-      }
-      streamStepsRef.current = next;
-      return next;
-    });
-  }, []);
-
-  const toggleMilestoneExpansion = useCallback((stepId: string) => {
+  const toggleMilestoneExpansion = useCallback((id: string) => {
     setExpandedMilestones((prev) => ({
       ...prev,
-      [stepId]: !prev[stepId],
+      [id]: !prev[id],
     }));
   }, []);
 
-  const processSseFrame = useCallback((frame: string): boolean => {
-    const lines = frame.split("\n");
-    const dataLines: string[] = [];
+  const visibleMessages = useMemo(() => {
+    if (!pendingUserMessage) return messages;
+    return [...messages, pendingUserMessage];
+  }, [messages, pendingUserMessage]);
 
-    lines.forEach((line) => {
-      if (line.startsWith("data:")) {
-        dataLines.push(line.slice(5).trimStart());
-      }
-    });
-
-    const rawData = dataLines.join("\n").trim();
-    if (!rawData) {
-      return true;
-    }
-    if (rawData === "[DONE]") {
-      completeLastRunningStep();
-      return true;
-    }
-
-    const payload = parseSsePayload(rawData);
-    if (!payload) {
-      return true;
-    }
-
-    if (payload.error) {
-      addRunningStep("Request failed", { error: payload.error });
-      completeLastRunningStep();
-      setSendError(summarizeStreamError(payload.error));
-      return false;
-    }
-
-    const parts = Array.isArray(payload.content?.parts) ? payload.content.parts : [];
-    const visibleText = extractVisibleTextFromParts(parts);
-    const functionCalls = extractFunctionCalls(parts);
-    const functionResponses = extractFunctionResponses(parts);
-
-    functionCalls.forEach((toolCall) => {
-      const toolName = String(toolCall.name ?? "");
-      addRunningStep(`Running ${normalizeToolName(toolName)}`, {
-        tool: toolName,
-        args: toolCall.args ?? {},
-      });
-    });
-
-    const confirmations = payload.actions?.requestedToolConfirmations;
-    if (
-      confirmations &&
-      Object.keys(confirmations).length > 0 &&
-      functionCalls.length === 0
-    ) {
-      addRunningStep("Awaiting tool confirmation");
-    }
-
-    functionResponses.forEach((toolResponse) => {
-      const toolName = String(toolResponse.name ?? "");
-      addRunningStep(`Received ${normalizeToolName(toolName)} results`, {
-        tool: toolName,
-        response: toolResponse.response ?? {},
-      });
-    });
-
-    if (visibleText) {
-      const mergedText = mergeStreamingText(streamTargetTextRef.current, visibleText);
-      if (payload.partial === false) {
-        updateStreamingTargetText(mergedText);
-        completeLastRunningStep();
-      } else {
-        updateStreamingTargetText(mergedText);
-      }
-    } else if (payload.partial === false && functionCalls.length === 0) {
-      completeLastRunningStep();
-    }
-
-    return true;
-  }, [addRunningStep, completeLastRunningStep, updateStreamingTargetText]);
-
-  const runPromptSse = useCallback(async (sessionId: string, prompt: string) => {
-    const response = await fetch(getRunSseUrl(adkBaseUrl), {
-      method: "POST",
-      headers: {
-        accept: "text/event-stream",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        appName,
-        userId,
-        sessionId,
-        streaming: true,
-        newMessage: {
-          role: "user",
-          parts: [{ text: prompt }],
-        },
-      }),
-    });
-    console.log("SSE response status:", response);
-    if (!response.ok || !response.body) {
-      return false;
-    }
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-    let streamOk = true;
-    let shouldStop = false;
-
-    while (!shouldStop) {
-      const { value, done } = await reader.read();
-      if (done) {
-        break;
-      }
-
-      buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, "\n");
-      let separatorIndex = buffer.indexOf("\n\n");
-
-      while (separatorIndex !== -1) {
-        const frame = buffer.slice(0, separatorIndex).trim();
-        buffer = buffer.slice(separatorIndex + 2);
-        if (frame) {
-          const frameOk = processSseFrame(frame);
-          if (!frameOk) {
-            streamOk = false;
-            shouldStop = true;
-            break;
-          }
-        }
-        separatorIndex = buffer.indexOf("\n\n");
-      }
-    }
-
-    if (shouldStop) {
-      try {
-        await reader.cancel();
-      } catch {
-        // no-op
-      }
-    } else {
-      const tail = buffer.trim();
-      if (tail) {
-        const tailOk = processSseFrame(tail);
-        if (!tailOk) {
-          streamOk = false;
-        }
-      }
-    }
-
-    completeLastRunningStep();
-    return streamOk;
-  }, [appName, completeLastRunningStep, processSseFrame, userId]);
-
-  useEffect(() => {
-    void loadSessions();
-  }, [loadSessions]);
-
-  const createSession = useCallback(
-    async () => {
-      setSessionsError("");
-      try {
-        const response = await fetch(getSessionsUrl(adkBaseUrl, appName, userId), {
-          method: "POST",
-          headers: {
-            accept: "application/json",
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({}),
-        });
-        const payload = (await response.json()) as AdkSession;
-        if (!response.ok || !payload?.id) {
-          setSessionsError("Unable to create session.");
-          return null;
-        }
-
-        setSessions((prev) => sortSessions([payload, ...prev.filter((item) => item.id !== payload.id)]));
-        setSelectedSessionId(payload.id);
-        setIsDraftSession(false);
-        const mapped = mapEventsToMessages(payload.events);
-        setMessages(mapped.messages);
-        setMessageMilestones(mapped.milestonesByMessageId);
-        setExpandedMilestones({});
-        return payload.id;
-      } catch {
-        setSessionsError("Unable to create session.");
-        return null;
-      }
-    },
-    [appName, userId]
-  );
+  const isInitialSessionView =
+    !isLoadingMessages && !isStreamingReply && visibleMessages.length === 0;
 
   const startNewChat = () => {
     setSelectedSessionId(null);
     setIsDraftSession(true);
-    setOpenMenuSessionId(null);
     setMessages([]);
     setMessageMilestones({});
     setExpandedMilestones({});
     setPendingUserMessage(null);
     setIsStreamingReply(false);
     resetStreamingText();
-    streamStepsRef.current = [];
     setStreamSteps([]);
-    setMessagesError("");
-    setSendError("");
     setDraft("");
   };
-
-  const deleteSession = useCallback(
-    async (sessionId: string) => {
-      setDeletingSessionId(sessionId);
-      setSessionsError("");
-      try {
-        const response = await fetch(getSessionUrl(adkBaseUrl, appName, userId, sessionId), {
-          method: "DELETE",
-          headers: { accept: "application/json" },
-        });
-        if (!response.ok) {
-          setSessionsError("Unable to delete session.");
-          return;
-        }
-
-        const nextSessions = sessions.filter((item) => item.id !== sessionId);
-        setSessions(nextSessions);
-        setOpenMenuSessionId(null);
-        if (selectedSessionId === sessionId) {
-          const nextId = nextSessions[0]?.id ?? null;
-          setSelectedSessionId(nextId);
-          setIsDraftSession(false);
-          if (nextId) {
-            await loadSessionMessages(nextId);
-          } else {
-            setMessages([]);
-            setMessageMilestones({});
-          }
-        }
-      } catch {
-        setSessionsError("Unable to delete session.");
-      } finally {
-        setDeletingSessionId(null);
-      }
-    },
-    [appName, userId, sessions, selectedSessionId, loadSessionMessages]
-  );
-
-  const sendPrompt = useCallback(
-    async (prompt: string, options?: { optimisticUser?: boolean }) => {
-      const text = prompt.trim();
-      if (!text || isSending) {
-        return false;
-      }
-
-      if (options?.optimisticUser) {
-        setPendingUserMessage({
-          id: `pending-user-${Date.now()}`,
-          role: "user",
-          text,
-          timeLabel: formatTime(),
-        });
-      }
-
-      setSendError("");
-      setIsSending(true);
-      startStreamingState();
-
-      try {
-        let sessionId = selectedSessionId;
-        if (!sessionId) {
-          sessionId = await createSession();
-        }
-        if (!sessionId) {
-          setSendError("No session available. Create a new session first.");
-          setPendingUserMessage(null);
-          return false;
-        }
-
-        const streamed = await runPromptSse(sessionId, text);
-
-        if (!streamed) {
-          setSendError((prev) => prev || "Unable to send message.");
-          setPendingUserMessage(null);
-          return false;
-        }
-
-        await loadSessions({ preferredSessionId: sessionId, silent: true });
-        setPendingUserMessage(null);
-        return true;
-      } catch {
-        setSendError("Unable to send message.");
-        setPendingUserMessage(null);
-        return false;
-      } finally {
-        setIsSending(false);
-        setIsStreamingReply(false);
-        resetStreamingText();
-        streamStepsRef.current = [];
-        setStreamSteps([]);
-      }
-    },
-    [
-      createSession,
-      isSending,
-      loadSessions,
-      resetStreamingText,
-      runPromptSse,
-      selectedSessionId,
-      startStreamingState,
-    ]
-  );
-
-  const sendMessage = useCallback(async () => {
-    setSendError("");
-    const prompt = draft.trim();
-    if (!prompt || isSending) {
-      return;
-    }
-
-    setDraft("");
-    const sent = await sendPrompt(prompt, { optimisticUser: true });
-    if (!sent) {
-      setDraft(prompt);
-    }
-  }, [draft, isSending, sendPrompt]);
-
-  const lastUserPrompt = useMemo(() => {
-    for (let i = messages.length - 1; i >= 0; i -= 1) {
-      if (messages[i].role === "user") {
-        return messages[i].text;
-      }
-    }
-    return "";
-  }, [messages]);
-
-  const retryLastPrompt = useCallback(async () => {
-    if (!lastUserPrompt || isSending) {
-      return;
-    }
-    await sendPrompt(lastUserPrompt);
-  }, [isSending, lastUserPrompt, sendPrompt]);
-
-  const copyMessage = async (messageId: string, text: string) => {
-    if (!navigator?.clipboard) {
-      return;
-    }
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopiedMessageId(messageId);
-      if (copyResetTimerRef.current) {
-        window.clearTimeout(copyResetTimerRef.current);
-      }
-      copyResetTimerRef.current = window.setTimeout(() => {
-        setCopiedMessageId((prev) => (prev === messageId ? null : prev));
-      }, 1400);
-    } catch {
-      // no-op
-    }
-  };
-
   const selectedSessionLabel = useMemo(
     () =>
       selectedSessionId
@@ -1315,20 +231,6 @@ export default function AgentChatWorkspace({
           : "No session selected",
     [selectedSessionId, isDraftSession]
   );
-
-  const visibleMessages = useMemo(() => {
-    if (!pendingUserMessage) {
-      return messages;
-    }
-    const lastMessage = messages[messages.length - 1];
-    if (lastMessage?.role === "user" && lastMessage.text === pendingUserMessage.text) {
-      return messages;
-    }
-    return [...messages, pendingUserMessage];
-  }, [messages, pendingUserMessage]);
-
-  const isInitialSessionView =
-    !isLoadingMessages && !isStreamingReply && visibleMessages.length === 0;
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/35 p-4">
@@ -1373,8 +275,8 @@ export default function AgentChatWorkspace({
                   <div
                     key={session.id}
                     className={`mb-2 rounded-xl border px-3 py-2 ${isActive
-                        ? "border-[#c9d1ff] bg-[#eef2ff]"
-                        : "border-[#e8ecf4] bg-white"
+                      ? "border-[#c9d1ff] bg-[#eef2ff]"
+                      : "border-[#e8ecf4] bg-white"
                       }`}
                   >
                     <div className="flex items-start gap-2">
@@ -1452,6 +354,8 @@ export default function AgentChatWorkspace({
             <button
               type="button"
               onClick={onClose}
+              aria-label="Close chat"
+              title="Close"
               className="flex h-9 w-9 items-center justify-center rounded-full border border-[#e5e7eb] text-[#111827]"
             >
               <X className="h-4 w-4" />
@@ -1461,8 +365,8 @@ export default function AgentChatWorkspace({
           <div
             ref={messageListRef}
             className={`soft-scrollbar flex-1 ${isInitialSessionView
-                ? "overflow-hidden bg-[radial-gradient(120%_120%_at_50%_0%,#eef2ff_0%,#f7f8fc_45%,#f7f8fc_100%)] px-8 py-8"
-                : "space-y-4 overflow-y-auto bg-[#f7f8fc] px-6 py-5"
+              ? "overflow-hidden bg-[radial-gradient(120%_120%_at_50%_0%,#eef2ff_0%,#f7f8fc_45%,#f7f8fc_100%)] px-8 py-8"
+              : "space-y-4 overflow-y-auto bg-[#f7f8fc] px-6 py-5"
               }`}
           >
             {isLoadingMessages ? (
@@ -1570,8 +474,8 @@ export default function AgentChatWorkspace({
                     >
                       <div
                         className={`max-w-[78%] rounded-2xl px-4 py-3 text-sm shadow-sm ${isUser
-                            ? "border border-[#dbe2f0] bg-white text-[#111827]"
-                            : "bg-[#e9edff] text-[#1f2937]"
+                          ? "border border-[#dbe2f0] bg-white text-[#111827]"
+                          : "bg-[#e9edff] text-[#1f2937]"
                           }`}
                       >
                         <div className="mb-1 flex items-center gap-2 whitespace-nowrap text-[11px] font-semibold text-[#8a94a6]">

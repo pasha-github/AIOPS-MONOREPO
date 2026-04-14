@@ -11,25 +11,8 @@ import {
   X
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AgentRecord, AgentListApiResponseItem } from "./dashboard.types";
 
-type AgentRecord = {
-  agentId: string;
-  name: string;
-  port: number | null;
-  status: string;
-  enterprise: string;
-  start_time: string | null;
-  stop_time: string | null;
-  updated_at: string | null;
-};
-
-type AgentListApiResponseItem = {
-  name?: string | null;
-  agent_id?: string | null;
-  updated_at?: string | null;
-  status?: string | null;
-  type?: string | null;
-};
 
 const mapApiStatusToDashboardStatus = (status: string | null | undefined) =>
   String(status ?? "").toLowerCase() === "active" ? "STARTED" : "STOPPED";
@@ -62,14 +45,10 @@ export default function AgentManagementSection() {
   const [agents, setAgents] = useState<AgentRecord[]>([]);
   const [isAgentsLoading, setIsAgentsLoading] = useState(true);
   const [agentsError, setAgentsError] = useState("");
-  const [agentFilter, setAgentFilter] = useState<
-    "all" | "running" | "stopped"
-  >("all");
+  const [agentFilter, setAgentFilter] = useState<"all" | "running" | "stopped">("all");
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isSeeAllOpen, setIsSeeAllOpen] = useState(false);
-  const [activeChatAgent, setActiveChatAgent] = useState<AgentRecord | null>(
-    null
-  );
+  const [activeChatAgent, setActiveChatAgent] = useState<AgentRecord | null>(null);
   const agentsRef = useRef<AgentRecord[]>([]);
   const requestIdRef = useRef(0);
   const firstAgentCardRef = useRef<HTMLDivElement | null>(null);
@@ -257,11 +236,10 @@ export default function AgentManagementSection() {
                     setAgentFilter(option.value as "all" | "running" | "stopped");
                     setIsFilterOpen(false);
                   }}
-                  className={`w-full px-4 py-2 text-left text-sm ${
-                    agentFilter === option.value
+                  className={`w-full px-4 py-2 text-left text-sm ${agentFilter === option.value
                       ? "bg-[#eef2ff] text-[#4f49e2]"
                       : "text-[#111827] hover:bg-[#f3f4f6]"
-                  }`}
+                    }`}
                 >
                   {option.label}
                 </button>
@@ -277,6 +255,8 @@ export default function AgentManagementSection() {
           <button
             type="button"
             onClick={() => setAgentFilter("all")}
+            aria-label="Close"
+            title="Close"
             className="flex h-4 w-4 items-center justify-center rounded-full bg-[#eef2ff] text-[#4f49e2]"
           >
             <X className="h-3 w-3" />
@@ -352,14 +332,12 @@ export default function AgentManagementSection() {
                       type="button"
                       disabled
                       aria-label={`${isRunning ? "Running" : "Stopped"} status`}
-                      className={`relative inline-flex h-5 w-10 cursor-default items-center rounded-full ${
-                        isRunning ? "bg-[#5b4cf0]" : "bg-[#e3e6ee]"
-                      }`}
+                      className={`relative inline-flex h-5 w-10 cursor-default items-center rounded-full ${isRunning ? "bg-[#5b4cf0]" : "bg-[#e3e6ee]"
+                        }`}
                     >
                       <span
-                        className={`absolute h-4 w-4 rounded-full bg-white shadow transition ${
-                          isRunning ? "left-5" : "left-1"
-                        }`}
+                        className={`absolute h-4 w-4 rounded-full bg-white shadow transition ${isRunning ? "left-5" : "left-1"
+                          }`}
                       />
                     </button>
                   </div>
@@ -370,11 +348,10 @@ export default function AgentManagementSection() {
                     type="button"
                     onClick={() => openChat(agent)}
                     disabled={!isRunning}
-                    className={`flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-medium ${
-                      isRunning
+                    className={`flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-medium ${isRunning
                         ? "bg-[#cfefff] text-[#0b7ed9]"
                         : "cursor-not-allowed bg-[#e5e7eb] text-[#9ca3af]"
-                    }`}
+                      }`}
                   >
                     <MessageCircle className="h-4 w-4" />
                     Chat with agent
@@ -382,11 +359,10 @@ export default function AgentManagementSection() {
                   <button
                     type="button"
                     disabled={!isMule}
-                    className={`flex items-center justify-center gap-2 rounded-xl border border-[#e1e5ef] px-4 py-2 text-sm font-medium text-[#3a4355] ${
-                      isMule
+                    className={`flex items-center justify-center gap-2 rounded-xl border border-[#e1e5ef] px-4 py-2 text-sm font-medium text-[#3a4355] ${isMule
                         ? "bg-white hover:bg-[#f3f4f6]"
                         : "bg-[#f9fafb] opacity-60 cursor-not-allowed"
-                    }`}
+                      }`}
                   >
                     View Logs
                     <Eye className="h-4 w-4" />
@@ -451,11 +427,10 @@ export default function AgentManagementSection() {
                           setAgentFilter(option.value as "all" | "running" | "stopped");
                           setIsFilterOpen(false);
                         }}
-                        className={`w-full px-4 py-2 text-left text-sm ${
-                          agentFilter === option.value
+                        className={`w-full px-4 py-2 text-left text-sm ${agentFilter === option.value
                             ? "bg-[#eef2ff] text-[#4f49e2]"
                             : "text-[#111827] hover:bg-[#f3f4f6]"
-                        }`}
+                          }`}
                       >
                         {option.label}
                       </button>
@@ -472,6 +447,8 @@ export default function AgentManagementSection() {
                   <button
                     type="button"
                     onClick={() => setAgentFilter("all")}
+                    aria-label="Close"
+                    title="Close"
                     className="flex h-4 w-4 items-center justify-center rounded-full bg-[#eef2ff] text-[#4f49e2]"
                   >
                     <X className="h-3 w-3" />
@@ -543,14 +520,12 @@ export default function AgentManagementSection() {
                               type="button"
                               disabled
                               aria-label={`${isRunning ? "Running" : "Stopped"} status`}
-                              className={`relative inline-flex h-5 w-10 cursor-default items-center rounded-full ${
-                                isRunning ? "bg-[#5b4cf0]" : "bg-[#e3e6ee]"
-                              }`}
+                              className={`relative inline-flex h-5 w-10 cursor-default items-center rounded-full ${isRunning ? "bg-[#5b4cf0]" : "bg-[#e3e6ee]"
+                                }`}
                             >
                               <span
-                                className={`absolute h-4 w-4 rounded-full bg-white shadow transition ${
-                                  isRunning ? "left-5" : "left-1"
-                                }`}
+                                className={`absolute h-4 w-4 rounded-full bg-white shadow transition ${isRunning ? "left-5" : "left-1"
+                                  }`}
                               />
                             </button>
                           </div>
@@ -561,11 +536,10 @@ export default function AgentManagementSection() {
                             type="button"
                             onClick={() => openChat(agent)}
                             disabled={!isRunning}
-                            className={`flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-medium ${
-                              isRunning
+                            className={`flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-medium ${isRunning
                                 ? "bg-[#cfefff] text-[#0b7ed9]"
                                 : "cursor-not-allowed bg-[#e5e7eb] text-[#9ca3af]"
-                            }`}
+                              }`}
                           >
                             <MessageCircle className="h-4 w-4" />
                             Chat with agent
@@ -573,11 +547,10 @@ export default function AgentManagementSection() {
                           <button
                             type="button"
                             disabled={!isMule}
-                            className={`flex items-center justify-center gap-2 rounded-xl border border-[#e1e5ef] px-4 py-2 text-sm font-medium text-[#3a4355] ${
-                              isMule
+                            className={`flex items-center justify-center gap-2 rounded-xl border border-[#e1e5ef] px-4 py-2 text-sm font-medium text-[#3a4355] ${isMule
                                 ? "bg-white hover:bg-[#f3f4f6]"
                                 : "bg-[#f9fafb] opacity-60 cursor-not-allowed"
-                            }`}
+                              }`}
                           >
                             View Logs
                             <Eye className="h-4 w-4" />

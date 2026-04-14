@@ -3,19 +3,7 @@
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { inputClass } from "./DynamicConnector";
-
-type OptionItem = {
-  label: string;
-  value: string;
-};
-
-type Props = {
-  value: string[]; // ✅ multiple IDs
-  options: OptionItem[];
-  configDataMap?: Record<string, any>;
-  placeholder?: string;
-  onChange: (val: string[]) => void; // ✅ return all IDs
-};
+import { Props } from "../../types";
 
 export function CustomDropdown({
   value,
@@ -52,7 +40,7 @@ export function CustomDropdown({
 
     return selectedId;
   })();
-  // ✅ Get IDs
+  //  Get IDs
   const getConfigIds = (connectorId: string): string[] => {
     const rowConfig = configDataMap?.[connectorId];
 
