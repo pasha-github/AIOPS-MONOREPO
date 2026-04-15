@@ -7,6 +7,7 @@ import type { ReactElement } from "react";
 import { useEffect, useMemo, useState } from "react";
 import SetConnectorConfig from "./SetConnectorConfig";
 import ShowConnectorConfig from "./ShowConnectorConfig";
+import StaticConnectorCards from "./StaticConnectorCards";
 import ViewConnector from "./ViewConnector";
 
 type ConnectorItem = {
@@ -101,6 +102,16 @@ export default function DisplayConnectors({ searchTerm }: DisplayConnectorsProps
         return id.includes(normalizedSearch) || name.includes(normalizedSearch);
       })
     : connectors;
+  const staticConnectorCount = normalizedSearch
+    ? [
+        "elastic search",
+        "ibm ace",
+        "informatica",
+        "dynatrace",
+        "apigee",
+        "mulesoft",
+      ].filter((name) => name.includes(normalizedSearch)).length
+    : 6;
   const showCardShimmer = isLoading && connectors.length > 0;
 
   const openConnectorModal = (
@@ -155,7 +166,7 @@ export default function DisplayConnectors({ searchTerm }: DisplayConnectorsProps
         {loadError}
       </div>
     );
-  } else if (visibleConnectors.length === 0) {
+  } else if (visibleConnectors.length === 0 && staticConnectorCount === 0) {
     content = (
       <div className="mt-6 rounded-2xl border border-[#e6eaf3] bg-white px-6 py-10 text-center">
         <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#eef2ff] text-[#4f49e2]">
@@ -242,6 +253,7 @@ export default function DisplayConnectors({ searchTerm }: DisplayConnectorsProps
             </div>
           );
         })}
+        <StaticConnectorCards searchTerm={searchTerm} />
       </div>
     );
   }

@@ -1,17 +1,17 @@
 "use client";
 
 import { useCallback, useRef } from "react";
+import type { StreamStep } from "../dashboard.types";
 import {
-    mergeStreamingText,
-    parseSsePayload,
-    extractVisibleTextFromParts,
     extractFunctionCalls,
     extractFunctionResponses,
-    normalizeToolName,
-    summarizeStreamError,
+    extractVisibleTextFromParts,
     formatMilestoneDetails,
+    mergeStreamingText,
+    normalizeToolName,
+    parseSsePayload,
+    summarizeStreamError,
 } from "./help.chat";
-import type { StreamStep } from "../dashboard.types";
 
 export function useStreamingChat({
     appName,
@@ -161,7 +161,7 @@ export function useStreamingChat({
 
     // ✅ SSE call
     const runPromptSse = useCallback(async (sessionId: string, prompt: string) => {
-        const res = await fetch(`${adkBaseUrl}/run-sse`, {
+        const res = await fetch(`${adkBaseUrl}/run_sse`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
