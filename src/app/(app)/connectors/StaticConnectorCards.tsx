@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { ChevronRight, Eye, Plug, Settings2 } from "lucide-react";
 
 type StaticConnectorCardsProps = {
@@ -10,6 +11,45 @@ type StaticConnector = {
   id: string;
   name: string;
   logoSrc: string;
+};
+
+const renderStaticLogo = (connector: StaticConnector): ReactNode => {
+  if (connector.id === "elasticsearch_static") {
+    return (
+      <div className="flex h-12 w-24 items-center justify-center">
+        <svg viewBox="0 0 64 64" className="h-14 w-14" aria-hidden="true">
+          <circle cx="32" cy="18" r="12" fill="#f4d13d" />
+          <circle cx="20" cy="30" r="12" fill="#2bb4f3" />
+          <circle cx="44" cy="30" r="12" fill="#ef4e8a" />
+          <circle cx="25" cy="46" r="12" fill="#1ba9a4" />
+          <circle cx="39" cy="46" r="12" fill="#63c74d" />
+        </svg>
+      </div>
+    );
+  }
+
+  if (connector.id === "dynatrace_static") {
+    return (
+      <div className="flex h-12 w-24 items-center justify-center">
+        <svg viewBox="0 0 64 64" className="h-14 w-14" aria-hidden="true">
+          <polygon points="16,14 34,14 26,28 8,28" fill="#8dd400" />
+          <polygon points="36,14 54,14 54,32 36,32" fill="#8dd400" />
+          <polygon points="8,30 26,30 26,48 8,48" fill="#6f2cff" />
+          <polygon points="28,30 46,30 38,50 20,50" fill="#3ac7ff" />
+          <polygon points="48,30 56,18 56,46 40,50" fill="#8dd400" />
+        </svg>
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={connector.logoSrc}
+      alt={`${connector.name} logo`}
+      className="h-12 w-24 object-contain"
+      loading="lazy"
+    />
+  );
 };
 
 const STATIC_CONNECTORS: StaticConnector[] = [
@@ -73,12 +113,7 @@ export default function StaticConnectorCards({
                 </p>
               </div>
             </div>
-            <img
-              src={connector.logoSrc}
-              alt={`${connector.name} logo`}
-              className="h-12 w-24 object-contain"
-              loading="lazy"
-            />
+            {renderStaticLogo(connector)}
           </div>
 
           <div className="mt-6 grid grid-cols-3 gap-2">
