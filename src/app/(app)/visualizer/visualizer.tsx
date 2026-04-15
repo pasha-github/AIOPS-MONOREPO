@@ -222,8 +222,17 @@ function createPositionMap(
       const leftAnchor = getPositionAnchor(leftParents, positionMap, nodeMap);
       const rightAnchor = getPositionAnchor(rightParents, positionMap, nodeMap);
 
-      if (leftAnchor !== rightAnchor) {
-        return leftAnchor - rightAnchor;
+      if (typeof leftAnchor === "number" && typeof rightAnchor === "number") {
+        if (leftAnchor !== rightAnchor) {
+          return leftAnchor - rightAnchor;
+        }
+      } else if (leftAnchor !== rightAnchor) {
+        if (leftAnchor === null) {
+          return 1;
+        }
+        if (rightAnchor === null) {
+          return -1;
+        }
       }
 
       return compareNodes(leftId, rightId, nodeMap);
