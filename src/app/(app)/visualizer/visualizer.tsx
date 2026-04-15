@@ -262,9 +262,12 @@ function placeNodesInRow(
   nodeIds.forEach((nodeId) => {
     const width = getNodeWidth(nodeId, nodeMap);
     const anchor = getAnchor(nodeId);
-    const desiredLeft =
-      typeof anchor === "number" ? anchor - width / 2 : currentLeft;
-    const x = Math.max(currentLeft, desiredLeft);
+    const hasFiniteAnchor =
+      typeof anchor === "number" && Number.isFinite(anchor);
+    const desiredLeft = hasFiniteAnchor ? anchor - width / 2 : currentLeft;
+    const x = Number.isFinite(desiredLeft)
+      ? Math.max(currentLeft, desiredLeft)
+      : currentLeft;
 
     positionMap.set(nodeId, { x, y });
     currentLeft = x + width + SIBLING_GAP;
@@ -275,17 +278,24 @@ function placeNodesInRow(
   }
 
   const leftMost = Math.min(
-    ...nodeIds.map((nodeId) => positionMap.get(nodeId)?.x ?? START_X)
+    ...nodeIds.map((nodeId) => {
+      const x = positionMap.get(nodeId)?.x;
+      return typeof x === "number" && Number.isFinite(x) ? x : START_X;
+    })
   );
   const shift = leftMost - START_X;
 
-  if (shift > 0) {
+  if (Number.isFinite(shift) && shift > 0) {
     nodeIds.forEach((nodeId) => {
       const current = positionMap.get(nodeId);
       if (!current) {
         return;
       }
-      positionMap.set(nodeId, { x: current.x - shift, y: current.y });
+      const nextX = current.x - shift;
+      positionMap.set(nodeId, {
+        x: Number.isFinite(nextX) ? nextX : START_X,
+        y: current.y,
+      });
     });
   }
 }
@@ -319,7 +329,7 @@ function getPositionAnchor(
     .filter((value): value is number => typeof value === "number");
 
   if (centers.length === 0) {
-    return Number.POSITIVE_INFINITY;
+    return null;
   }
 
   return centers.reduce((sum, value) => sum + value, 0) / centers.length;
@@ -331,7 +341,7 @@ function getNodeCenter(
   nodeMap: Map<string, VisualizerNode>
 ) {
   const position = positionMap.get(nodeId);
-  if (!position) {
+  if (!position || !Number.isFinite(position.x)) {
     return null;
   }
 
