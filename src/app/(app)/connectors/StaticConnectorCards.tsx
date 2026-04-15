@@ -1,7 +1,7 @@
 "use client";
 
-import type { ReactNode } from "react";
 import { ChevronRight, Eye, Plug, Settings2 } from "lucide-react";
+import type { ReactNode } from "react";
 
 type StaticConnectorCardsProps = {
   searchTerm?: string;
@@ -82,6 +82,11 @@ const STATIC_CONNECTORS: StaticConnector[] = [
     id: "mulesoft_static",
     name: "Mulesoft",
     logoSrc: "/img/Mule.png",
+  },
+  {
+    id: "JVM",
+    name: "Java Virtual Machine",
+    logoSrc: "/img/JVM.png",
   },
 ];
 
