@@ -2,7 +2,7 @@ from uuid import uuid4
 
 from fastapi.testclient import TestClient
 
-from src.database.models import Agent, ConnectorConfig, Job, Model, Webhook
+from src.database.models import Agent, ConnectorConfig, Job, MCPServer, Model, Webhook
 
 
 def _create_model(client: TestClient, model_id: str = "viz-model"):
@@ -461,3 +461,51 @@ def test_visualizer_deduplicates_shared_mcp_nodes(client: TestClient, session):
     edges = {(edge["source"], edge["target"]) for edge in data["edges"]}
     assert ("agent-a", "http://localhost:9000/sse") in edges
     assert ("agent-b", "http://localhost:9000/sse") in edges
+
+
+def test_visualizer_includes_registered_mcp_server_nodes(client: TestClient, session):
+    session.add(
+        Model(
+            model_id="m2",
+            provider="google",
+            name="gemini-1.5-flash",
+            api_key="encrypted-or-plain",
+            description="shared model",
+        )
+    )
+    mcp_server = MCPServer(
+        name="Registered MCP",
+        server_url="http://localhost:9200/mcp",
+        auth_type="bearer",
+        metadata_json={"transport": "streamable_http"},
+        tools_json=[{"name": "search_docs"}],
+        resources_json=[{"name": "docs://home"}],
+    )
+    session.add(mcp_server)
+    session.commit()
+    session.refresh(mcp_server)
+
+    session.add(
+        Agent(
+            agent_id="agent-with-registered-mcp",
+            name="Agent with MCP",
+            description="A",
+            instruction="A",
+            primary_use_global=False,
+            primary_model_id="m2",
+            mcp_server_ids=[str(mcp_server.mcp_server_id)],
+        )
+    )
+    session.commit()
+
+    response = client.get("/visualizer/")
+
+    assert response.status_code == 200
+    data = response.json()
+    nodes = {node["id"]: node for node in data["nodes"]}
+    edges = {(edge["source"], edge["target"]) for edge in data["edges"]}
+
+    assert str(mcp_server.mcp_server_id) in nodes
+    assert nodes[str(mcp_server.mcp_server_id)]["data"]["mcp"]["name"] == "Registered MCP"
+    assert nodes[str(mcp_server.mcp_server_id)]["data"]["mcp"]["url"] == "http://localhost:9200/mcp"
+    assert ("agent-with-registered-mcp", str(mcp_server.mcp_server_id)) in edges

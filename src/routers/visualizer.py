@@ -6,6 +6,7 @@ from src.database.models import (
     Agent,
     ConnectorConfig,
     Job,
+    MCPServer,
     Model,
     ModelDefaults,
     Webhook,
@@ -18,6 +19,7 @@ router = APIRouter(prefix="/visualizer", tags=["visualizer"])
 def get_visualizer(session: Session = Depends(get_session)):
     agents = session.exec(select(Agent)).all()
     connectors = session.exec(select(ConnectorConfig)).all()
+    mcp_servers = session.exec(select(MCPServer)).all()
     models = session.exec(select(Model)).all()
     defaults = session.get(ModelDefaults, 1)
     webhooks = session.exec(select(Webhook)).all()
@@ -45,7 +47,8 @@ def get_visualizer(session: Session = Depends(get_session)):
     nodes = []
     edges = []
 
-    mcp_set = set()
+    mcp_map = {str(server.mcp_server_id): server for server in mcp_servers}
+    legacy_mcp_set = set()
 
     for agent in agents:
         agent_data = agent.model_dump()
@@ -84,12 +87,22 @@ def get_visualizer(session: Session = Depends(get_session)):
 
         if agent.mcp_servers:
             for mcp_url in agent.mcp_servers:
-                mcp_set.add(mcp_url)
+                legacy_mcp_set.add(mcp_url)
                 edges.append(
                     {
                         "id": f"e-{agent.agent_id}-{mcp_url}",
                         "source": agent.agent_id,
                         "target": mcp_url,
+                    }
+                )
+
+        if agent.mcp_server_ids:
+            for mcp_server_id in agent.mcp_server_ids:
+                edges.append(
+                    {
+                        "id": f"e-{agent.agent_id}-{mcp_server_id}",
+                        "source": agent.agent_id,
+                        "target": mcp_server_id,
                     }
                 )
 
@@ -108,7 +121,28 @@ def get_visualizer(session: Session = Depends(get_session)):
             }
         )
 
-    for mcp_url in mcp_set:
+    for mcp_server in mcp_servers:
+        nodes.append(
+            {
+                "id": str(mcp_server.mcp_server_id),
+                "type": "mcp",
+                "data": {
+                    "mcp": {
+                        "mcp_server_id": str(mcp_server.mcp_server_id),
+                        "name": mcp_server.name,
+                        "url": mcp_server.server_url,
+                        "auth_type": mcp_server.auth_type,
+                        "metadata": mcp_server.metadata_json or {},
+                        "tools": mcp_server.tools_json or [],
+                        "resources": mcp_server.resources_json or [],
+                    }
+                },
+            }
+        )
+
+    for mcp_url in legacy_mcp_set:
+        if any(server.server_url == mcp_url for server in mcp_map.values()):
+            continue
         nodes.append(
             {
                 "id": mcp_url,

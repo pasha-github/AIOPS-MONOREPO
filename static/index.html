@@ -362,9 +362,10 @@
                         <textarea id="agent-tools" rows="5" placeholder="def my_tool(): ..."></textarea>
                     </div>
                     <div class="form-group">
-                        <label>MCP Server URLs (comma-separated)</label>
-                        <input type="text" id="agent-mcp-sse"
-                            placeholder="http://localhost:8000/sse, http://localhost:8001/mcp">
+                        <label>Registered MCP Servers <small>(hold Ctrl/Cmd to select multiple)</small></label>
+                        <select id="agent-mcp-servers" multiple>
+                            <option disabled>Loading MCP servers...</option>
+                        </select>
                     </div>
                     <div class="form-group">
                         <label>Connector Configs <small>(hold Ctrl/Cmd to select multiple)</small></label>
@@ -495,8 +496,10 @@
                         </select>
                     </div>
                     <div class="form-group">
-                        <label>New MCP Server URLs (comma-separated)</label>
-                        <input type="text" id="agent-update-mcp-sse" placeholder="Leave blank to keep current value">
+                        <label>Registered MCP Servers <small>(hold Ctrl/Cmd to select multiple)</small></label>
+                        <select id="agent-update-mcp-servers" multiple>
+                            <option disabled>Loading MCP servers...</option>
+                        </select>
                     </div>
                     <div class="form-group">
                         <label>New Connector Configs <small>(hold Ctrl/Cmd to select multiple)</small></label>
@@ -615,6 +618,50 @@
                         </select>
                     </div>
                     <div id="connector-config-list">Select a connector to view its saved configs.</div>
+
+                    <h3 style="margin-top: 24px;">Registered MCP Servers</h3>
+                    <form id="add-mcp-form">
+                        <div id="mcp-edit-state"
+                            style="display:none; margin-bottom:10px; padding:8px 10px; background:#fff3cd; border-radius:4px;">
+                            Editing existing MCP server
+                            <button type="button" id="mcp-cancel-edit" style="margin-left:10px;">Cancel</button>
+                        </div>
+                        <div class="form-group">
+                            <label>Name</label>
+                            <input type="text" id="mcp-name" placeholder="e.g. Service Desk MCP">
+                        </div>
+                        <div class="form-group">
+                            <label>URL</label>
+                            <input type="text" id="mcp-url" placeholder="http://localhost:8000/sse" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Description</label>
+                            <input type="text" id="mcp-description" placeholder="Optional short note">
+                        </div>
+                        <div class="form-group">
+                            <label>Auth Type</label>
+                            <select id="mcp-auth-type">
+                                <option value="none">None</option>
+                                <option value="bearer">Bearer</option>
+                                <option value="basic">Basic</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Username</label>
+                            <input type="text" id="mcp-auth-username" placeholder="Only for Basic auth">
+                        </div>
+                        <div class="form-group">
+                            <label>Secret</label>
+                            <input type="password" id="mcp-auth-secret"
+                                placeholder="Bearer token or Basic password">
+                        </div>
+                        <div style="display:flex; gap:8px;">
+                            <button type="button" id="mcp-test-btn">Test MCP</button>
+                            <button type="submit" id="mcp-submit-btn">Save MCP</button>
+                        </div>
+                    </form>
+                    <div id="mcp-test-result" style="margin-top: 12px;"></div>
+                    <div id="mcp-list" style="margin-top: 12px;">Loading MCP servers...</div>
                 </div>
             </div>
         </div>
@@ -652,6 +699,7 @@
             secondary_model_id: '',
             tertiary_model_id: ''
         };
+        let currentMcpServers = [];
 
         // ─── Health ───────────────────────────────────────────────────────────
         async function checkHealth() {
@@ -920,6 +968,9 @@
                 const connectorBadges = (a.connector_config_ids || []).length > 0
                     ? `<br><small>Connectors: ${(a.connector_config_ids || []).length} attached</small>`
                     : '';
+                const mcpBadge = ((a.mcp_server_ids || []).length + (a.mcp_servers || []).length) > 0
+                    ? `<br><small>MCPs: ${((a.mcp_server_ids || []).length + (a.mcp_servers || []).length)} attached</small>`
+                    : '';
                 const subAgentBadge = (a.sub_agents || []).length > 0
                     ? `<br><small>Sub-agents: ${(a.sub_agents || []).length} attached</small>`
                     : '';
@@ -931,7 +982,7 @@
                 div.innerHTML = `
                     <strong>${a.name}</strong> (${a.type ? a.type : 'agent'})<br>
                     ${a.description}<br>
-                    <small>Status: ${a.isEnabled ? 'Enabled' : 'Disabled'} | ${modelStack}</small>${connectorBadges}${subAgentBadge}
+                    <small>Status: ${a.isEnabled ? 'Enabled' : 'Disabled'} | ${modelStack}</small>${connectorBadges}${mcpBadge}${subAgentBadge}
                     <div style="margin-top:5px;">
                         <button onclick="toggleAgent('${a.agent_id}', ${!a.isEnabled})">${a.isEnabled ? 'Disable' : 'Enable'}</button>
                         <button class="delete" onclick="deleteAgent('${a.agent_id}')">Delete</button>
@@ -975,8 +1026,8 @@
         async function addAgent(e) {
             e.preventDefault();
             const toolsCode = document.getElementById('agent-tools').value;
-            const mcpInput = document.getElementById('agent-mcp-sse').value;
-            const mcpServersList = mcpInput ? mcpInput.split(',').map(url => url.trim()).filter(url => url.length > 0) : [];
+            const mcpSelect = document.getElementById('agent-mcp-servers');
+            const mcpServerIds = Array.from(mcpSelect.selectedOptions).map(o => o.value);
 
             // Collect selected connector config IDs from multi-select
             const connectorSelect = document.getElementById('agent-connector-configs');
@@ -993,7 +1044,7 @@
                 type: document.getElementById('agent-type').value,
                 instruction: document.getElementById('agent-instr').value,
                 tools: toolsCode ? toolsCode : null,
-                mcp_servers: mcpServersList,
+                mcp_server_ids: mcpServerIds,
                 connector_config_ids: connectorConfigIds,
                 sub_agents: subAgentIds,
                 isEnabled: true
@@ -1021,8 +1072,8 @@
             const instruction = document.getElementById('agent-update-instruction').value;
             const statusValue = document.getElementById('agent-update-status').value;
             const toolsCode = document.getElementById('agent-update-tools').value;
-            const mcpInput = document.getElementById('agent-update-mcp-sse').value;
-            const mcpServersList = mcpInput ? mcpInput.split(',').map(url => url.trim()).filter(url => url.length > 0) : [];
+            const mcpSelect = document.getElementById('agent-update-mcp-servers');
+            const mcpServerIds = Array.from(mcpSelect.selectedOptions).map(o => o.value);
             const connectorSelect = document.getElementById('agent-update-connector-configs');
             const connectorConfigIds = Array.from(connectorSelect.selectedOptions).map(o => o.value);
             const subAgentSelect = document.getElementById('agent-update-sub-agents');
@@ -1049,8 +1100,8 @@
             if (toolsCode.trim() !== '') {
                 data.tools = toolsCode;
             }
-            if (mcpServersList.length > 0) {
-                data.mcp_servers = mcpServersList;
+            if (mcpServerIds.length > 0) {
+                data.mcp_server_ids = mcpServerIds;
             }
             if (connectorConfigIds.length > 0) {
                 data.connector_config_ids = connectorConfigIds;
@@ -1552,6 +1603,215 @@
             }
         }
 
+        // ─── MCP Servers ──────────────────────────────────────────────────────
+
+        let editingMcpServer = null;
+
+        function resetMcpForm() {
+            editingMcpServer = null;
+            document.getElementById('add-mcp-form').reset();
+            document.getElementById('mcp-edit-state').style.display = 'none';
+            document.getElementById('mcp-submit-btn').textContent = 'Save MCP';
+            document.getElementById('mcp-test-result').innerHTML = '';
+        }
+
+        function renderMcpProbeResult(result, isError = false) {
+            const resultEl = document.getElementById('mcp-test-result');
+            if (isError) {
+                resultEl.innerHTML = `<div class="card" style="border-color:#dc3545; color:#842029;">${result}</div>`;
+                return;
+            }
+
+            const tools = result.tools || [];
+            const resources = result.resources || [];
+            resultEl.innerHTML = `
+                <div class="card" style="border-color:#198754;">
+                    <strong>${(result.metadata && result.metadata.name) || result.url}</strong><br>
+                    <small>Transport: ${(result.metadata && result.metadata.transport) || 'unknown'} | Tools: ${tools.length} | Resources: ${resources.length}</small><br>
+                    <small>URL: ${result.url}</small>
+                </div>
+            `;
+        }
+
+        async function testMcpServer() {
+            const payload = {
+                name: document.getElementById('mcp-name').value.trim() || null,
+                server_url: document.getElementById('mcp-url').value.trim(),
+                description: document.getElementById('mcp-description').value.trim() || null,
+                auth_type: document.getElementById('mcp-auth-type').value,
+                auth_username: document.getElementById('mcp-auth-username').value.trim() || null,
+                auth_secret: document.getElementById('mcp-auth-secret').value || null,
+            };
+
+            if (!payload.server_url) {
+                alert('Please enter an MCP URL first.');
+                return;
+            }
+
+            const res = await fetch(`${API_BASE}/mcp/test/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+
+            if (!res.ok) {
+                renderMcpProbeResult(await res.text(), true);
+                return;
+            }
+
+            renderMcpProbeResult(await res.json());
+        }
+
+        async function editMcpServer(mcpId) {
+            const res = await fetch(`${API_BASE}/mcp/${mcpId}`);
+            if (!res.ok) {
+                alert('Failed to load MCP server details.');
+                return;
+            }
+
+            const mcp = await res.json();
+            editingMcpServer = mcp.mcp_server_id;
+            document.getElementById('mcp-name').value = mcp.name || '';
+            document.getElementById('mcp-url').value = mcp.server_url || '';
+            document.getElementById('mcp-description').value = mcp.description || '';
+            document.getElementById('mcp-auth-type').value = mcp.auth_type || 'none';
+            document.getElementById('mcp-auth-username').value = mcp.auth_username || '';
+            document.getElementById('mcp-auth-secret').value = '';
+            document.getElementById('mcp-edit-state').style.display = 'block';
+            document.getElementById('mcp-submit-btn').textContent = 'Update MCP';
+            renderMcpProbeResult({
+                url: mcp.server_url,
+                metadata: mcp.metadata || {},
+                tools: mcp.tools || [],
+                resources: mcp.resources || [],
+            });
+        }
+
+        async function deleteMcpServer(mcpId, mcpName) {
+            if (!confirm(`Delete MCP server ${mcpName}?`)) {
+                return;
+            }
+
+            const res = await fetch(`${API_BASE}/mcp/${mcpId}`, { method: 'DELETE' });
+            if (!res.ok) {
+                alert('Failed to delete MCP server: ' + await res.text());
+                return;
+            }
+
+            if (editingMcpServer === mcpId) {
+                resetMcpForm();
+            }
+            await loadMcpServers();
+            loadAgents();
+            loadGraph();
+        }
+
+        async function saveMcpServer(e) {
+            e.preventDefault();
+            const payload = {
+                name: document.getElementById('mcp-name').value.trim() || null,
+                server_url: document.getElementById('mcp-url').value.trim(),
+                description: document.getElementById('mcp-description').value.trim() || null,
+                auth_type: document.getElementById('mcp-auth-type').value,
+                auth_username: document.getElementById('mcp-auth-username').value.trim() || null,
+                auth_secret: document.getElementById('mcp-auth-secret').value || null,
+            };
+
+            if (!payload.server_url) {
+                alert('Please enter an MCP URL.');
+                return;
+            }
+
+            const isEdit = Boolean(editingMcpServer);
+            const res = await fetch(
+                isEdit ? `${API_BASE}/mcp/${editingMcpServer}` : `${API_BASE}/mcp/`,
+                {
+                    method: isEdit ? 'PATCH' : 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                }
+            );
+
+            if (!res.ok) {
+                alert(`Failed to ${isEdit ? 'update' : 'save'} MCP server: ` + await res.text());
+                return;
+            }
+
+            const saved = await res.json();
+            resetMcpForm();
+            renderMcpProbeResult({
+                url: saved.server_url,
+                metadata: saved.metadata || {},
+                tools: saved.tools || [],
+                resources: saved.resources || [],
+            });
+            await loadMcpServers();
+            loadAgents();
+            loadGraph();
+        }
+
+        async function loadMcpServers() {
+            const listEl = document.getElementById('mcp-list');
+            const addAgentSelect = document.getElementById('agent-mcp-servers');
+            const updateAgentSelect = document.getElementById('agent-update-mcp-servers');
+
+            listEl.innerHTML = 'Loading MCP servers...';
+            addAgentSelect.innerHTML = '';
+            updateAgentSelect.innerHTML = '';
+
+            const res = await fetch(`${API_BASE}/mcp/`);
+            if (!res.ok) {
+                listEl.innerHTML = '<em style="color:red;">Could not load MCP servers.</em>';
+                return;
+            }
+
+            currentMcpServers = await res.json();
+            listEl.innerHTML = '';
+
+            currentMcpServers.forEach(mcp => {
+                const opt = document.createElement('option');
+                opt.value = mcp.mcp_server_id;
+                opt.textContent = `${mcp.name} (${mcp.auth_type})`;
+                addAgentSelect.appendChild(opt);
+
+                const updateOpt = document.createElement('option');
+                updateOpt.value = mcp.mcp_server_id;
+                updateOpt.textContent = `${mcp.name} (${mcp.auth_type})`;
+                updateAgentSelect.appendChild(updateOpt);
+
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.innerHTML = `
+                    <strong>${mcp.name}</strong><br>
+                    <small>${mcp.server_url}</small><br>
+                    <small>Auth: ${mcp.auth_type} | Tools: ${(mcp.tools || []).length} | Resources: ${(mcp.resources || []).length}</small><br>
+                    ${mcp.description ? `<small>${mcp.description}</small><br>` : ''}
+                `;
+
+                const editBtn = document.createElement('button');
+                editBtn.type = 'button';
+                editBtn.style.marginTop = '8px';
+                editBtn.textContent = 'Edit';
+                editBtn.addEventListener('click', () => editMcpServer(mcp.mcp_server_id));
+                card.appendChild(editBtn);
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.type = 'button';
+                deleteBtn.className = 'delete';
+                deleteBtn.style.marginTop = '8px';
+                deleteBtn.style.marginLeft = '6px';
+                deleteBtn.textContent = 'Delete';
+                deleteBtn.addEventListener('click', () => deleteMcpServer(mcp.mcp_server_id, mcp.name));
+                card.appendChild(deleteBtn);
+
+                listEl.appendChild(card);
+            });
+
+            if (currentMcpServers.length === 0) {
+                listEl.textContent = 'No MCP servers registered yet.';
+            }
+        }
+
         // ─── Chat ─────────────────────────────────────────────────────────────
         let currentSessionId = null;
         let currentUserId = 'u_' + Math.floor(Math.random() * 1000);
@@ -1661,6 +1921,9 @@
         document.getElementById('connector-config-cancel-edit').addEventListener('click', resetConnectorConfigForm);
         document.getElementById('connector-select').addEventListener('change', onConnectorSelected);
         document.getElementById('connector-config-filter').addEventListener('change', loadAllConnectorConfigs);
+        document.getElementById('add-mcp-form').addEventListener('submit', saveMcpServer);
+        document.getElementById('mcp-test-btn').addEventListener('click', testMcpServer);
+        document.getElementById('mcp-cancel-edit').addEventListener('click', resetMcpForm);
 
         const themeToggleBtn = document.getElementById('theme-toggle');
         
@@ -1729,6 +1992,7 @@
         loadAgentTemplates();
         loadAgents();
         loadConnectors().then(() => loadAllConnectorConfigs());
+        loadMcpServers();
         loadGraph();
 
         setInterval(checkHealth, 30000);

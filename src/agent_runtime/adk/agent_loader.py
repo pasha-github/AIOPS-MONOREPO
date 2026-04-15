@@ -8,20 +8,35 @@ from google.adk.cli.utils.base_agent_loader import BaseAgentLoader
 from google.adk.models.lite_llm import LiteLlm
 from google.adk.tools.agent_tool import AgentTool
 from google.adk.tools.mcp_tool import McpToolset
-from google.adk.tools.mcp_tool.mcp_session_manager import (
-    SseConnectionParams,
-    StreamableHTTPConnectionParams,
-)
 from google.adk.tools.tool_context import ToolContext
 from sqlmodel import Session, select
 
 from src.agent_runtime.adk.cache import cache
 from src.connectors.loader import resolve_connector_tools
 from src.database.database import engine
-from src.database.models import Agent, ConnectorConfig, Model, ModelDefaults
+from src.database.models import Agent, ConnectorConfig, MCPServer, Model, ModelDefaults
+from src.utils.mcp import build_mcp_auth_headers, build_mcp_connection_params
 from src.utils.secrets import decrypt_secret
 
 logger = logging.getLogger(__name__)
+
+
+def _append_mcp_tool(
+    tools_list: list[Any],
+    *,
+    url: str,
+    auth_type: str = "none",
+    auth_username: str | None = None,
+    auth_secret: str | None = None,
+):
+    headers = build_mcp_auth_headers(
+        auth_type,
+        bearer_token=auth_secret if auth_type == "bearer" else None,
+        username=auth_username if auth_type == "basic" else None,
+        password=auth_secret if auth_type == "basic" else None,
+    )
+    connection_params = build_mcp_connection_params(url, headers=headers)
+    tools_list.append(McpToolset(connection_params=connection_params))
 
 
 def _litellm_model_name(model_config: Model) -> str:
@@ -148,18 +163,35 @@ class DatabaseAgentLoader(BaseAgentLoader):
             if agent_config.mcp_servers:
                 for url in agent_config.mcp_servers:
                     try:
-                        if url.endswith("/sse"):
-                            connection_params = SseConnectionParams(url=url)
-                        elif url.endswith("/mcp"):
-                            connection_params = StreamableHTTPConnectionParams(url=url)
-                        else:
-                            raise ValueError(f"Invalid MCP server URL: {url}")
-
-                        mcp_toolset = McpToolset(connection_params=connection_params)
-                        tools_list.append(mcp_toolset)
+                        _append_mcp_tool(tools_list, url=url)
                     except Exception as e:
                         logger.error(
                             f"Error loading MCP tool '{url}' for agent {agent_name}: {e}"
+                        )
+
+            if agent_config.mcp_server_ids:
+                for mcp_server_id in agent_config.mcp_server_ids:
+                    try:
+                        mcp_server = session.get(MCPServer, UUID(mcp_server_id))
+                        if mcp_server is None:
+                            raise ValueError(
+                                f"MCP server '{mcp_server_id}' not found."
+                            )
+                        auth_secret = (
+                            decrypt_secret(mcp_server.auth_secret)
+                            if mcp_server.auth_secret
+                            else None
+                        )
+                        _append_mcp_tool(
+                            tools_list,
+                            url=mcp_server.server_url,
+                            auth_type=mcp_server.auth_type,
+                            auth_username=mcp_server.auth_username,
+                            auth_secret=auth_secret,
+                        )
+                    except Exception as e:
+                        logger.error(
+                            f"Error loading MCP server '{mcp_server_id}' for agent {agent_name}: {e}"
                         )
 
             if agent_config.connector_config_ids:
