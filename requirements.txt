@@ -1,4 +1,4 @@
-﻿google-adk==1.25.1
+google-adk==1.25.1
 google-adk[a2a]
 fastapi
 uvicorn
