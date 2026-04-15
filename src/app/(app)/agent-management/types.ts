@@ -15,6 +15,18 @@ export type AgentRecord = {
   model_id: string | null;
   modelName: string | null;
   modelProvider: string | null;
+  primary_use_global?: boolean | null;
+  primary_model_id?: string | null;
+  primary_model_name?: string | null;
+  primary_model_provider?: string | null;
+  secondary_use_global?: boolean | null;
+  secondary_model_id?: string | null;
+  secondary_model_name?: string | null;
+  secondary_model_provider?: string | null;
+  tertiary_use_global?: boolean | null;
+  tertiary_model_id?: string | null;
+  tertiary_model_name?: string | null;
+  tertiary_model_provider?: string | null;
   created_at: string | null;
   updated_at: string | null;
   tools: string[] | string;

@@ -1,11 +1,20 @@
-import { useEffect, useMemo, useState } from "react";
-import { Bot, ChevronDown, Plus, LayoutTemplate } from "lucide-react";
 import { trimTrailingSlash } from "@/config/agent";
 import { useRuntimeConfig } from "@/config/runtime-config";
+import { Bot, ChevronDown, LayoutTemplate, Plus } from "lucide-react";
+import Image from "next/image";
+import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import { getProviderIconSrc } from "../llm-management/llmHelpers";
 import { DynamicDropdownField, DynamicListField } from "./DynamicConnector";
 import ModelSelect, { ModelOption } from "./ModelSelect";
 import { CreateNewAgentProps, ModelTemplate } from "./types";
+
+type LlmDefaults = {
+  primary_model_id: string | null;
+  secondary_model_id: string | null;
+  tertiary_model_id: string | null;
+};
+
+type LlmSlotKey = "primary" | "secondary" | "tertiary";
 
 const toSnakeCase = (value: string) =>
   value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
@@ -24,6 +33,27 @@ const getErrorMessage = (payload: unknown, fallback: string) => {
   return fallback;
 };
 
+const normalizeModelId = (value: unknown) => {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+};
+
+const normalizeLlmDefaults = (value: unknown): LlmDefaults | null => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  const payload = value as Record<string, unknown>;
+  return {
+    primary_model_id: normalizeModelId(payload.primary_model_id),
+    secondary_model_id: normalizeModelId(payload.secondary_model_id),
+    tertiary_model_id: normalizeModelId(payload.tertiary_model_id),
+  };
+};
+
 export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps) {
   const { llmManagerApiBaseUrl } = useRuntimeConfig();
   const base = trimTrailingSlash(llmManagerApiBaseUrl);
@@ -32,12 +62,20 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
   const [agentName, setAgentName] = useState("");
   const [description, setDescription] = useState("");
   const [instruction, setInstruction] = useState("");
-  const [modelId, setModelId] = useState("");
+  const [primaryUseCustom, setPrimaryUseCustom] = useState(false);
+  const [secondaryUseCustom, setSecondaryUseCustom] = useState(false);
+  const [tertiaryUseCustom, setTertiaryUseCustom] = useState(false);
+  const [primaryModelId, setPrimaryModelId] = useState("");
+  const [secondaryModelId, setSecondaryModelId] = useState("");
+  const [tertiaryModelId, setTertiaryModelId] = useState("");
   const [mcpServers, setMcpServers] = useState<string[]>([""]);
   const [connectorConfigIds, setConnectorConfigIds] = useState<string[][]>([[]]);
   const [modelOptions, setModelOptions] = useState<ModelOption[]>([]);
   const [isModelsLoading, setIsModelsLoading] = useState(false);
   const [modelsLoadError, setModelsLoadError] = useState("");
+  const [defaultModels, setDefaultModels] = useState<LlmDefaults | null>(null);
+  const [isDefaultsLoading, setIsDefaultsLoading] = useState(false);
+  const [defaultsLoadError, setDefaultsLoadError] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [success, setSuccess] = useState("");
@@ -116,12 +154,45 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
     });
   }, [connectorOptions]);
 
+  const resolveModelOption = (modelId: string | null) => {
+    if (!modelId) {
+      return null;
+    }
+    return (
+      modelOptions.find((option) => option.value === modelId) ?? {
+        value: modelId,
+        label: modelId,
+        secondary: "Model unavailable in current list",
+        iconSrc: null,
+      }
+    );
+  };
+
+  const primaryDefaultOption = resolveModelOption(defaultModels?.primary_model_id ?? null);
+  const secondaryDefaultOption = resolveModelOption(
+    defaultModels?.secondary_model_id ?? null
+  );
+  const tertiaryDefaultOption = resolveModelOption(defaultModels?.tertiary_model_id ?? null);
+
+  const effectivePrimaryModelId = primaryUseCustom
+    ? primaryModelId
+    : defaultModels?.primary_model_id ?? "";
+  const effectiveSecondaryModelId = secondaryUseCustom
+    ? secondaryModelId
+    : defaultModels?.secondary_model_id ?? "";
+  const effectiveTertiaryModelId = tertiaryUseCustom
+    ? tertiaryModelId
+    : defaultModels?.tertiary_model_id ?? "";
+
   const isFormValid =
     normalizeString(agentName).length > 0 &&
     agentId.length > 0 &&
     normalizeString(description).length > 0 &&
     normalizeString(instruction).length > 0 &&
-    modelId.length > 0;
+    effectivePrimaryModelId.length > 0 &&
+    (!primaryUseCustom || primaryModelId.length > 0) &&
+    (!secondaryUseCustom || secondaryModelId.length > 0) &&
+    (!tertiaryUseCustom || tertiaryModelId.length > 0);
 
   // Toast auto hide
   useEffect(() => {
@@ -175,6 +246,45 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
     return () => ctrl.abort();
   }, [base, isModalOpen]);
 
+  useEffect(() => {
+    if (!isModalOpen) return;
+    const ctrl = new AbortController();
+    (async () => {
+      setIsDefaultsLoading(true);
+      setDefaultsLoadError("");
+      try {
+        const res = await fetch(`${base}/llms/defaults`, {
+          headers: { accept: "application/json" },
+          signal: ctrl.signal,
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok) {
+          setDefaultsLoadError(
+            getErrorMessage(data, "Unable to load default LLMs.")
+          );
+          setDefaultModels(null);
+          return;
+        }
+
+        const normalized = normalizeLlmDefaults(data);
+        if (!normalized) {
+          setDefaultsLoadError("Unable to load default LLMs.");
+          setDefaultModels(null);
+          return;
+        }
+
+        setDefaultModels(normalized);
+      } catch (error: unknown) {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        setDefaultsLoadError("Unable to load default LLMs.");
+        setDefaultModels(null);
+      } finally {
+        setIsDefaultsLoading(false);
+      }
+    })();
+    return () => ctrl.abort();
+  }, [base, isModalOpen]);
+
   // Fetch Templates
   useEffect(() => {
     if (!isModalOpen) return;
@@ -212,17 +322,29 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
     setAgentName(t.name || "");
     setDescription(t.description || "");
     setInstruction(t.instruction || "");
-    setModelId(t.model_id?.trim() || "");
+    setPrimaryUseCustom(Boolean(t.model_id?.trim()));
+    setPrimaryModelId(t.model_id?.trim() || "");
+    setSecondaryUseCustom(false);
+    setSecondaryModelId("");
+    setTertiaryUseCustom(false);
+    setTertiaryModelId("");
   }, [selectedTemplateId, modelTemplates]);
 
   const resetForm = () => {
     setAgentName("");
     setDescription("");
     setInstruction("");
-    setModelId("");
+    setPrimaryUseCustom(false);
+    setSecondaryUseCustom(false);
+    setTertiaryUseCustom(false);
+    setPrimaryModelId("");
+    setSecondaryModelId("");
+    setTertiaryModelId("");
     setMcpServers([""]);
     setConnectorConfigIds([[]]);
     setConfigDataMap({});
+    setDefaultModels(null);
+    setDefaultsLoadError("");
     setSubmitError("");
     setSuccess("");
     setSelectedTemplateId("");
@@ -243,10 +365,10 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
     setMcpServers((prev) => prev.map((x, idx) => (idx === i ? val : x)));
   };
 
-  const addToList = (setter: React.Dispatch<React.SetStateAction<string[]>>) =>
+  const addToList = (setter: Dispatch<SetStateAction<string[]>>) =>
     setter((p) => [...p, ""]);
 
-  const removeFromList = (setter: React.Dispatch<React.SetStateAction<string[]>>, i: number) =>
+  const removeFromList = (setter: Dispatch<SetStateAction<string[]>>, i: number) =>
     setter((p) => (p.length <= 1 ? p : p.filter((_, idx) => idx !== i)));
 
   const normalizeList = (vals: string[]) => vals.map((v) => v.trim()).filter(Boolean);
@@ -268,12 +390,18 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
           name: normalizeString(agentName),
           description: normalizeString(description),
           instruction: normalizeString(instruction),
-          model_id: modelId,
+          primary_use_global: !primaryUseCustom,
+          primary_model_id: effectivePrimaryModelId || null,
+          secondary_use_global: !secondaryUseCustom,
+          secondary_model_id: effectiveSecondaryModelId || null,
+          tertiary_use_global: !tertiaryUseCustom,
+          tertiary_model_id: effectiveTertiaryModelId || null,
           tools: "",
           mcp_servers: normalizeList(mcpServers),
           connector_config_ids: connectorConfigIds.flat(),
           isEnabled: true,
           sub_agents: [],
+          type: "agent",
         }),
       });
       const data = await res.json().catch(() => null);
@@ -304,6 +432,44 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
       prev.length <= 1 ? prev : prev.filter((_, i) => i !== index)
     );
   };
+
+  const llmFields: Array<{
+    key: LlmSlotKey;
+    label: string;
+    useCustom: boolean;
+    setUseCustom: Dispatch<SetStateAction<boolean>>;
+    setModelId: Dispatch<SetStateAction<string>>;
+    effectiveModelId: string;
+    defaultOption: ModelOption | null;
+  }> = [
+    {
+      key: "primary",
+      label: "Primary LLM",
+      useCustom: primaryUseCustom,
+      setUseCustom: setPrimaryUseCustom,
+      setModelId: setPrimaryModelId,
+      effectiveModelId: effectivePrimaryModelId,
+      defaultOption: primaryDefaultOption,
+    },
+    {
+      key: "secondary",
+      label: "Secondary LLM",
+      useCustom: secondaryUseCustom,
+      setUseCustom: setSecondaryUseCustom,
+      setModelId: setSecondaryModelId,
+      effectiveModelId: effectiveSecondaryModelId,
+      defaultOption: secondaryDefaultOption,
+    },
+    {
+      key: "tertiary",
+      label: "Tertiary LLM",
+      useCustom: tertiaryUseCustom,
+      setUseCustom: setTertiaryUseCustom,
+      setModelId: setTertiaryModelId,
+      effectiveModelId: effectiveTertiaryModelId,
+      defaultOption: tertiaryDefaultOption,
+    },
+  ];
 
   return (
     <>
@@ -425,25 +591,101 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
               {/* Model */}
               <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">Model</p>
 
-              <div className="flex flex-col gap-1.5">
-                <label className="flex items-center gap-1 text-sm font-medium text-gray-700">
-                  Language Model <span className="text-red-500">*</span>
-                </label>
-                <p className="text-xs leading-snug text-gray-400">The LLM this agent will use to generate responses</p>
-                <ModelSelect
-                  value={modelId}
-                  options={modelOptions}
-                  placeholder="Choose a language model"
-                  loading={isModelsLoading}
-                  disabled={isModelsLoading || modelOptions.length === 0}
-                  onChange={setModelId}
-                />
-                {modelsLoadError && (
+              <div className="grid gap-3">
+                {llmFields.map((field) => {
+                  const selectedOption =
+                    modelOptions.find((option) => option.value === field.effectiveModelId) ??
+                    field.defaultOption;
+                  const dropdownOptions =
+                    !field.useCustom && field.defaultOption
+                      ? [field.defaultOption, ...modelOptions.filter((option) => option.value !== field.defaultOption?.value)]
+                      : modelOptions;
+
+                  return (
+                    <div
+                      key={field.key}
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex flex-col gap-1">
+                          <label className="flex items-center gap-1 text-sm font-medium text-gray-700">
+                            {field.label}
+                            {field.key === "primary" ? (
+                              <span className="text-red-500">*</span>
+                            ) : null}
+                          </label>
+                          <p className="text-xs leading-snug text-gray-400">
+                            {field.useCustom
+                              ? `Choose a specific ${field.label.toLowerCase()} for this agent`
+                              : `Uses the global ${field.label.toLowerCase()} from LLM management`}
+                          </p>
+                        </div>
+
+                        <label className="inline-flex shrink-0 items-center gap-2 py-1.5 text-xs font-medium text-indigo-700">
+                          <input
+                            type="checkbox"
+                            checked={field.useCustom}
+                            onChange={(event) => {
+                              field.setUseCustom(event.target.checked);
+                              if (!event.target.checked) {
+                                field.setModelId("");
+                              }
+                            }}
+                            className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                          />
+                          Custom LLM
+                        </label>
+                      </div>
+
+                      <div className="mt-3">
+                        <ModelSelect
+                          value={field.effectiveModelId}
+                          options={dropdownOptions}
+                          placeholder={
+                            field.useCustom
+                              ? `Choose ${field.label.toLowerCase()}`
+                              : selectedOption
+                                ? "Using global default"
+                                : "No global default configured"
+                          }
+                          loading={isModelsLoading || isDefaultsLoading}
+                          disabled={
+                            !field.useCustom ||
+                            isModelsLoading ||
+                            isDefaultsLoading ||
+                            modelOptions.length === 0
+                          }
+                          onChange={field.setModelId}
+                        />
+                      </div>
+
+                      <div className="mt-2 flex items-start justify-between gap-3">
+                        <p className="text-xs text-gray-400">
+                          {field.useCustom
+                            ? "Checkbox enabled: this agent uses the selected LLM."
+                            : selectedOption
+                              ? `Global default: ${selectedOption.label}`
+                              : "Global default is not configured for this slot."}
+                        </p>
+                        {selectedOption?.iconSrc ? (
+                          <Image
+                            src={selectedOption.iconSrc}
+                            alt=""
+                            width={20}
+                            height={20}
+                            className="h-5 w-5 shrink-0 object-contain"
+                          />
+                        ) : null}
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {(modelsLoadError || defaultsLoadError) && (
                   <p className="flex items-center gap-1.5 text-xs text-red-600">
                     <svg className="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clipRule="evenodd" />
                     </svg>
-                    {modelsLoadError}
+                    {modelsLoadError || defaultsLoadError}
                   </p>
                 )}
               </div>

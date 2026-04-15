@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import Image from "next/image";
-import { X, Bot, ChevronDown, Plus, Trash2 } from "lucide-react";
 import { trimTrailingSlash } from "@/config/agent";
 import { useRuntimeConfig } from "@/config/runtime-config";
+import { Bot, ChevronDown, X } from "lucide-react";
+import Image from "next/image";
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { getProviderIconSrc } from "../llm-management/llmHelpers";
+import { DynamicDropdownField, DynamicListField as SharedDynamicListField } from "./DynamicConnector";
 
 type UpdateAgentProps = {
     agent: any;
@@ -21,24 +22,24 @@ type ModelOption = {
     iconSrc: string | null;
 };
 
+type LlmDefaults = {
+    primary_model_id: string | null;
+    secondary_model_id: string | null;
+    tertiary_model_id: string | null;
+};
+
+type LlmSlotKey = "primary" | "secondary" | "tertiary";
+
 type UpdateAgentForm = {
     agentName: string;
     description: string;
     instruction: string;
-    modelId: string;
     tools: string;
     mcpServers: string;
     connectorConfigIds: string;
     subAgents: string;
     isEnabled: boolean;
 };
-
-const toSnakeCase = (value: string) =>
-    value
-        .trim()
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "_")
-        .replace(/^_+|_+$/g, "");
 
 const normalizeString = (value: string) => value.trim();
 
@@ -52,6 +53,27 @@ const getErrorMessage = (payload: unknown, fallback: string) => {
         return String((payload as any).message);
     }
     return fallback;
+};
+
+const normalizeModelId = (value: unknown) => {
+    if (typeof value !== "string") {
+        return null;
+    }
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
+};
+
+const normalizeLlmDefaults = (value: unknown): LlmDefaults | null => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+        return null;
+    }
+
+    const payload = value as Record<string, unknown>;
+    return {
+        primary_model_id: normalizeModelId(payload.primary_model_id),
+        secondary_model_id: normalizeModelId(payload.secondary_model_id),
+        tertiary_model_id: normalizeModelId(payload.tertiary_model_id),
+    };
 };
 
 const inputClass =
@@ -87,60 +109,6 @@ function Field({
             )}
             {children}
         </div>
-    );
-}
-
-function DynamicListField({
-    label,
-    hint,
-    values,
-    placeholder,
-    onAdd,
-    onRemove,
-    onChange,
-}: {
-    label: string;
-    hint?: string;
-    values: string[];
-    placeholder: string;
-    onAdd: () => void;
-    onRemove: (index: number) => void;
-    onChange: (index: number, value: string) => void;
-}) {
-    return (
-        <Field label={label} hint={hint}>
-            <div className="flex flex-col gap-2">
-                {values.map((value, index) => (
-                    <div key={`${label}-${index}`} className="flex items-center gap-2">
-                        <input
-                            type="text"
-                            value={value}
-                            onChange={(e) => onChange(index, e.target.value)}
-                            placeholder={placeholder}
-                            className={inputClass}
-                        />
-                        <button
-                            type="button"
-                            onClick={onAdd}
-                            title="Add"
-                            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-600 transition hover:bg-indigo-100"
-                        >
-                            <Plus size={14} />
-                        </button>
-                        {values.length > 1 && (
-                            <button
-                                type="button"
-                                onClick={() => onRemove(index)}
-                                title="Remove"
-                                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-500 transition hover:bg-red-100"
-                            >
-                                <Trash2 size={14} />
-                            </button>
-                        )}
-                    </div>
-                ))}
-            </div>
-        </Field>
     );
 }
 
@@ -279,7 +247,6 @@ export default function UpdateAgent({
         agentName: "",
         description: "",
         instruction: "",
-        modelId: "",
         tools: "",
         mcpServers: "",
         connectorConfigIds: "",
@@ -287,17 +254,62 @@ export default function UpdateAgent({
         isEnabled: true,
     });
     const [modelOptions, setModelOptions] = useState<ModelOption[]>([]);
+    const [defaultModels, setDefaultModels] = useState<LlmDefaults | null>(null);
     const [mcpServers, setMcpServers] = useState<string[]>([""]);
-    const [connectorConfigIds, setConnectorConfigIds] = useState<string[]>([""]);
+    const [connectorConfigIds, setConnectorConfigIds] = useState<string[][]>([[]]);
+    const [connectorOptions, setConnectorOptions] = useState<{ value: string; label: string }[]>([]);
+    const [configDataMap, setConfigDataMap] = useState<Record<string, any>>({});
+    const [primaryUseCustom, setPrimaryUseCustom] = useState(false);
+    const [secondaryUseCustom, setSecondaryUseCustom] = useState(false);
+    const [tertiaryUseCustom, setTertiaryUseCustom] = useState(false);
+    const [primaryModelId, setPrimaryModelId] = useState("");
+    const [secondaryModelId, setSecondaryModelId] = useState("");
+    const [tertiaryModelId, setTertiaryModelId] = useState("");
     const [isModelsLoading, setIsModelsLoading] = useState(false);
+    const [isDefaultsLoading, setIsDefaultsLoading] = useState(false);
+    const [defaultsLoadError, setDefaultsLoadError] = useState("");
     const [isUpdating, setIsUpdating] = useState(false);
     const [error, setError] = useState("");
     const [success, setSuccess] = useState("");
 
-    const agentId = useMemo(() => toSnakeCase(form.agentName), [form.agentName]);
+    const resolveModelOption = (modelId: string | null) => {
+        if (!modelId) {
+            return null;
+        }
+        return (
+            modelOptions.find((option) => option.value === modelId) ?? {
+                value: modelId,
+                label: modelId,
+                secondary: "Model unavailable in current list",
+                iconSrc: null,
+            }
+        );
+    };
+
+    const primaryDefaultOption = resolveModelOption(defaultModels?.primary_model_id ?? null);
+    const secondaryDefaultOption = resolveModelOption(
+        defaultModels?.secondary_model_id ?? null
+    );
+    const tertiaryDefaultOption = resolveModelOption(defaultModels?.tertiary_model_id ?? null);
+
+    const effectivePrimaryModelId = primaryUseCustom
+        ? primaryModelId
+        : defaultModels?.primary_model_id ?? "";
+    const effectiveSecondaryModelId = secondaryUseCustom
+        ? secondaryModelId
+        : defaultModels?.secondary_model_id ?? "";
+    const effectiveTertiaryModelId = tertiaryUseCustom
+        ? tertiaryModelId
+        : defaultModels?.tertiary_model_id ?? "";
 
     const isFormValid =
-        form.agentName && form.description && form.instruction && form.modelId;
+        Boolean(form.agentName) &&
+        Boolean(form.description) &&
+        Boolean(form.instruction) &&
+        effectivePrimaryModelId.length > 0 &&
+        (!primaryUseCustom || primaryModelId.length > 0) &&
+        (!secondaryUseCustom || secondaryModelId.length > 0) &&
+        (!tertiaryUseCustom || tertiaryModelId.length > 0);
 
     const updateField = <K extends keyof UpdateAgentForm>(
         key: K,
@@ -306,20 +318,64 @@ export default function UpdateAgent({
         setForm((prev) => ({ ...prev, [key]: value }));
 
     const updateList = (
-        setter: React.Dispatch<React.SetStateAction<string[]>>,
+        setter: Dispatch<SetStateAction<string[]>>,
         index: number,
         value: string
     ) => setter((previous) => previous.map((item, idx) => (idx === index ? value : item)));
 
-    const addToList = (setter: React.Dispatch<React.SetStateAction<string[]>>) =>
+    const addToList = (setter: Dispatch<SetStateAction<string[]>>) =>
         setter((previous) => [...previous, ""]);
 
     const removeFromList = (
-        setter: React.Dispatch<React.SetStateAction<string[]>>,
+        setter: Dispatch<SetStateAction<string[]>>,
         index: number
     ) => setter((previous) => (previous.length <= 1 ? previous : previous.filter((_, idx) => idx !== index)));
 
     const normalizeList = (values: string[]) => values.map((value) => value.trim()).filter(Boolean);
+    const normalizeNestedList = (values: string[][]) =>
+        values.flat().map((value) => value.trim()).filter(Boolean);
+
+    const updateConnectorList = (index: number, value: string[]) => {
+        setConnectorConfigIds((previous) =>
+            previous.map((item, idx) => (idx === index ? value : item))
+        );
+    };
+
+    const addConnector = () => {
+        setConnectorConfigIds((previous) => [...previous, []]);
+    };
+
+    const removeConnector = (index: number) => {
+        setConnectorConfigIds((previous) =>
+            previous.length <= 1 ? previous : previous.filter((_, idx) => idx !== index)
+        );
+    };
+
+    const fetchConnectorConfig = async (value: string) => {
+        if (!value || configDataMap[value] !== undefined) return;
+        setConfigDataMap((previous) => ({ ...previous, [value]: null }));
+        try {
+            const res = await fetch(`${base}/connectors/${value}/config`, {
+                headers: { accept: "application/json" },
+            });
+            const data = await res.json();
+            if (res.ok) {
+                setConfigDataMap((previous) => ({ ...previous, [value]: data }));
+            } else {
+                setConfigDataMap((previous) => {
+                    const next = { ...previous };
+                    delete next[value];
+                    return next;
+                });
+            }
+        } catch {
+            setConfigDataMap((previous) => {
+                const next = { ...previous };
+                delete next[value];
+                return next;
+            });
+        }
+    };
 
     useEffect(() => {
         if (!isOpen || !agent) return;
@@ -327,7 +383,6 @@ export default function UpdateAgent({
             agentName: agent.name || "",
             description: agent.description || "",
             instruction: agent.instruction || "",
-            modelId: agent.model_id || "",
             tools: Array.isArray(agent.tools)
                 ? agent.tools.join(", ")
                 : agent.tools || "",
@@ -336,13 +391,64 @@ export default function UpdateAgent({
             subAgents: (agent.sub_agents || []).join(", "),
             isEnabled: agent.isEnabled ?? true,
         });
+        const initialPrimaryModelId =
+            normalizeModelId(agent.primary_model_id) ??
+            normalizeModelId(agent.model_id) ??
+            "";
+        setPrimaryUseCustom(!(agent.primary_use_global ?? false) && initialPrimaryModelId.length > 0);
+        setSecondaryUseCustom(!(agent.secondary_use_global ?? true) && Boolean(normalizeModelId(agent.secondary_model_id)));
+        setTertiaryUseCustom(!(agent.tertiary_use_global ?? true) && Boolean(normalizeModelId(agent.tertiary_model_id)));
+        setPrimaryModelId(initialPrimaryModelId);
+        setSecondaryModelId(normalizeModelId(agent.secondary_model_id) ?? "");
+        setTertiaryModelId(normalizeModelId(agent.tertiary_model_id) ?? "");
         setMcpServers(agent.mcp_servers?.length ? agent.mcp_servers : [""]);
         setConnectorConfigIds(
-            agent.connector_config_ids?.length ? agent.connector_config_ids : [""]
+            agent.connector_config_ids?.length
+                ? agent.connector_config_ids.map((value: string) => [value])
+                : [[]]
         );
+        setConfigDataMap({});
+        setDefaultModels(null);
+        setDefaultsLoadError("");
         setError("");
         setSuccess("");
     }, [isOpen, agent]);
+
+    useEffect(() => {
+        if (!isOpen) return;
+        const ctrl = new AbortController();
+        (async () => {
+            try {
+                const res = await fetch(`${base}/connectors/`, {
+                    headers: { accept: "application/json" },
+                    signal: ctrl.signal,
+                });
+                const data = await res.json();
+                if (res.ok && Array.isArray(data)) {
+                    setConnectorOptions(
+                        data.map((item: any) => ({
+                            value: item.connector_config_id ?? item.id ?? "",
+                            label: item.name ?? item.connector_config_id ?? item.id ?? "",
+                        }))
+                    );
+                } else {
+                    setConnectorOptions([]);
+                }
+            } catch (error: any) {
+                if (error?.name !== "AbortError") {
+                    setConnectorOptions([]);
+                }
+            }
+        })();
+        return () => ctrl.abort();
+    }, [base, isOpen]);
+
+    useEffect(() => {
+        if (!connectorOptions.length) return;
+        connectorOptions.forEach((option) => {
+            void fetchConnectorConfig(option.value);
+        });
+    }, [connectorOptions]);
 
     useEffect(() => {
         if (!isOpen) return;
@@ -366,7 +472,81 @@ export default function UpdateAgent({
             }
         };
         load();
-    }, [isOpen]);
+    }, [base, isOpen]);
+
+    useEffect(() => {
+        if (!isOpen) return;
+        const load = async () => {
+            setIsDefaultsLoading(true);
+            setDefaultsLoadError("");
+            try {
+                const res = await fetch(`${base}/llms/defaults`, {
+                    headers: { accept: "application/json" },
+                });
+                const data = await res.json().catch(() => null);
+                if (!res.ok) {
+                    setDefaultsLoadError(
+                        getErrorMessage(data, "Unable to load default LLMs.")
+                    );
+                    setDefaultModels(null);
+                    return;
+                }
+
+                const normalized = normalizeLlmDefaults(data);
+                if (!normalized) {
+                    setDefaultsLoadError("Unable to load default LLMs.");
+                    setDefaultModels(null);
+                    return;
+                }
+
+                setDefaultModels(normalized);
+            } catch {
+                setDefaultsLoadError("Unable to load default LLMs.");
+                setDefaultModels(null);
+            } finally {
+                setIsDefaultsLoading(false);
+            }
+        };
+        load();
+    }, [base, isOpen]);
+
+    const llmFields: Array<{
+        key: LlmSlotKey;
+        label: string;
+        useCustom: boolean;
+        setUseCustom: Dispatch<SetStateAction<boolean>>;
+        setModelId: Dispatch<SetStateAction<string>>;
+        effectiveModelId: string;
+        defaultOption: ModelOption | null;
+    }> = [
+        {
+            key: "primary",
+            label: "Primary LLM",
+            useCustom: primaryUseCustom,
+            setUseCustom: setPrimaryUseCustom,
+            setModelId: setPrimaryModelId,
+            effectiveModelId: effectivePrimaryModelId,
+            defaultOption: primaryDefaultOption,
+        },
+        {
+            key: "secondary",
+            label: "Secondary LLM",
+            useCustom: secondaryUseCustom,
+            setUseCustom: setSecondaryUseCustom,
+            setModelId: setSecondaryModelId,
+            effectiveModelId: effectiveSecondaryModelId,
+            defaultOption: secondaryDefaultOption,
+        },
+        {
+            key: "tertiary",
+            label: "Tertiary LLM",
+            useCustom: tertiaryUseCustom,
+            setUseCustom: setTertiaryUseCustom,
+            setModelId: setTertiaryModelId,
+            effectiveModelId: effectiveTertiaryModelId,
+            defaultOption: tertiaryDefaultOption,
+        },
+    ];
 
     const handleUpdate = async () => {
         if (!isFormValid) return;
@@ -382,10 +562,15 @@ export default function UpdateAgent({
                     name: normalizeString(form.agentName),
                     description: normalizeString(form.description),
                     instruction: normalizeString(form.instruction),
-                    model_id: form.modelId,
+                    primary_use_global: !primaryUseCustom,
+                    primary_model_id: effectivePrimaryModelId || null,
+                    secondary_use_global: !secondaryUseCustom,
+                    secondary_model_id: effectiveSecondaryModelId || null,
+                    tertiary_use_global: !tertiaryUseCustom,
+                    tertiary_model_id: effectiveTertiaryModelId || null,
                     tools: form.tools || "",
                     mcp_servers: normalizeList(mcpServers),
-                    connector_config_ids: normalizeList(connectorConfigIds),
+                    connector_config_ids: normalizeNestedList(connectorConfigIds),
                     sub_agents: form.subAgents
                         ? form.subAgents.split(",").map((s) => s.trim())
                         : [],
@@ -478,25 +663,122 @@ export default function UpdateAgent({
                         />
                     </Field>
 
-                    <Field
-                        label="Language Model"
-                        required
-                        hint="The LLM this agent will use to generate responses"
-                    >
-                        <ModelSelect
-                            value={form.modelId}
-                            options={modelOptions}
-                            placeholder="Select a model"
-                            loading={isModelsLoading}
-                            disabled={isModelsLoading || modelOptions.length === 0}
-                            onChange={(value) => updateField("modelId", value)}
-                        />
-                    </Field>
+                    <div className="grid gap-3">
+                        {llmFields.map((field) => {
+                            const selectedOption =
+                                modelOptions.find((option) => option.value === field.effectiveModelId) ??
+                                field.defaultOption;
+                            const dropdownOptions =
+                                !field.useCustom && field.defaultOption
+                                    ? [
+                                        field.defaultOption,
+                                        ...modelOptions.filter(
+                                            (option) => option.value !== field.defaultOption?.value
+                                        ),
+                                    ]
+                                    : modelOptions;
+
+                            return (
+                                <div
+                                    key={field.key}
+                                >
+                                    <div className="flex items-start justify-between gap-4">
+                                        <div className="flex flex-col gap-1">
+                                            <label className="flex items-center gap-1 text-sm font-medium text-gray-700">
+                                                {field.label}
+                                                {field.key === "primary" ? (
+                                                    <span className="text-red-500">*</span>
+                                                ) : null}
+                                            </label>
+                                            <p className="text-xs leading-snug text-gray-400">
+                                                {field.useCustom
+                                                    ? `Choose a specific ${field.label.toLowerCase()} for this agent`
+                                                    : `Uses the global ${field.label.toLowerCase()} from LLM management`}
+                                            </p>
+                                        </div>
+
+                                        <label className="inline-flex shrink-0 items-center gap-2 py-1.5 text-xs font-medium text-indigo-700">
+                                            <input
+                                                type="checkbox"
+                                                checked={field.useCustom}
+                                                onChange={(event) => {
+                                                    field.setUseCustom(event.target.checked);
+                                                    if (!event.target.checked) {
+                                                        field.setModelId("");
+                                                    }
+                                                }}
+                                                className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                            />
+                                            Custom LLM
+                                        </label>
+                                    </div>
+
+                                    <div className="mt-3">
+                                        <ModelSelect
+                                            value={field.effectiveModelId}
+                                            options={dropdownOptions}
+                                            placeholder={
+                                                field.useCustom
+                                                    ? `Choose ${field.label.toLowerCase()}`
+                                                    : selectedOption
+                                                        ? "Using global default"
+                                                        : "No global default configured"
+                                            }
+                                            loading={isModelsLoading || isDefaultsLoading}
+                                            disabled={
+                                                !field.useCustom ||
+                                                isModelsLoading ||
+                                                isDefaultsLoading ||
+                                                modelOptions.length === 0
+                                            }
+                                            onChange={field.setModelId}
+                                        />
+                                    </div>
+
+                                    <div className="mt-2 flex items-start justify-between gap-3">
+                                        <p className="text-xs text-gray-400">
+                                            {field.useCustom
+                                                ? "Checkbox enabled: this agent uses the selected LLM."
+                                                : selectedOption
+                                                    ? `Global default: ${selectedOption.label}`
+                                                    : "Global default is not configured for this slot."}
+                                        </p>
+                                        {selectedOption?.iconSrc ? (
+                                            <Image
+                                                src={selectedOption.iconSrc}
+                                                alt=""
+                                                width={20}
+                                                height={20}
+                                                className="h-5 w-5 shrink-0 object-contain"
+                                            />
+                                        ) : null}
+                                    </div>
+                                </div>
+                            );
+                        })}
+
+                        {defaultsLoadError ? (
+                            <p className="flex items-center gap-1.5 text-xs text-red-600">
+                                <svg
+                                    className="h-3.5 w-3.5 shrink-0"
+                                    viewBox="0 0 20 20"
+                                    fill="currentColor"
+                                >
+                                    <path
+                                        fillRule="evenodd"
+                                        d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z"
+                                        clipRule="evenodd"
+                                    />
+                                </svg>
+                                {defaultsLoadError}
+                            </p>
+                        ) : null}
+                    </div>
 
                     <SectionLabel>Capabilities</SectionLabel>
 
                     <div className="grid grid-cols-2 items-start gap-4">
-                        <DynamicListField
+                        <SharedDynamicListField
                             label="MCP Servers"
                             hint="URLs of MCP servers this agent can connect to"
                             values={mcpServers}
@@ -505,15 +787,17 @@ export default function UpdateAgent({
                             onRemove={(index) => removeFromList(setMcpServers, index)}
                             onChange={(index, value) => updateList(setMcpServers, index, value)}
                         />
-                        <DynamicListField
-                            label="Connector Config IDs"
-                            hint="Identifiers for pre-configured connectors"
+                        <DynamicDropdownField
+                            label="Connector Config"
+                            hint="Choose from pre-configured connectors"
                             values={connectorConfigIds}
-                            placeholder="conn_abc123"
-                            onAdd={() => addToList(setConnectorConfigIds)}
-                            onRemove={(index) => removeFromList(setConnectorConfigIds, index)}
-                            onChange={(index, value) =>
-                                updateList(setConnectorConfigIds, index, value)
+                            options={connectorOptions}
+                            configDataMap={configDataMap}
+                            placeholder="Select connector"
+                            onAdd={addConnector}
+                            onRemove={removeConnector}
+                            onChange={(index: number, value: string[] | string) =>
+                                updateConnectorList(index, Array.isArray(value) ? value : [value])
                             }
                         />
                     </div>

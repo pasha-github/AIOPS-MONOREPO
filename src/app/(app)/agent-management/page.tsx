@@ -155,6 +155,18 @@ export default function AgentManagementPage() {
           const llmRecord = modelId
             ? llmByModelId.get(modelId.toLowerCase())
             : undefined;
+          const primaryModelId = getStringOrNull(record.primary_model_id);
+          const secondaryModelId = getStringOrNull(record.secondary_model_id);
+          const tertiaryModelId = getStringOrNull(record.tertiary_model_id);
+          const primaryLlmRecord = primaryModelId
+            ? llmByModelId.get(primaryModelId.toLowerCase())
+            : undefined;
+          const secondaryLlmRecord = secondaryModelId
+            ? llmByModelId.get(secondaryModelId.toLowerCase())
+            : undefined;
+          const tertiaryLlmRecord = tertiaryModelId
+            ? llmByModelId.get(tertiaryModelId.toLowerCase())
+            : undefined;
           const type = getStringOrNull(record.type) ?? "agent";
 
           return {
@@ -173,6 +185,27 @@ export default function AgentManagementPage() {
             model_id: modelId,
             modelName: llmRecord?.name ?? modelId,
             modelProvider: llmRecord?.provider ?? null,
+            primary_use_global:
+              typeof record.primary_use_global === "boolean"
+                ? record.primary_use_global
+                : null,
+            primary_model_id: primaryModelId,
+            primary_model_name: primaryLlmRecord?.name ?? primaryModelId,
+            primary_model_provider: primaryLlmRecord?.provider ?? null,
+            secondary_use_global:
+              typeof record.secondary_use_global === "boolean"
+                ? record.secondary_use_global
+                : null,
+            secondary_model_id: secondaryModelId,
+            secondary_model_name: secondaryLlmRecord?.name ?? secondaryModelId,
+            secondary_model_provider: secondaryLlmRecord?.provider ?? null,
+            tertiary_use_global:
+              typeof record.tertiary_use_global === "boolean"
+                ? record.tertiary_use_global
+                : null,
+            tertiary_model_id: tertiaryModelId,
+            tertiary_model_name: tertiaryLlmRecord?.name ?? tertiaryModelId,
+            tertiary_model_provider: tertiaryLlmRecord?.provider ?? null,
             created_at: getStringOrNull(record.created_at),
             updated_at: getStringOrNull(record.updated_at),
             tools: Array.isArray(record.tools)

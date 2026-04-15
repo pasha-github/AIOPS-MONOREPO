@@ -1,20 +1,20 @@
 "use client";
 
+import { trimTrailingSlash } from "@/config/agent";
+import { useRuntimeConfig } from "@/config/runtime-config";
 import {
   Bot,
-  ChevronDown,
   BriefcaseBusiness,
+  ChevronDown,
   Pencil,
   Power,
   Search,
-  Webhook,
   Trash2,
+  Webhook,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
-import { trimTrailingSlash } from "@/config/agent";
-import { useRuntimeConfig } from "@/config/runtime-config";
+import { useEffect, useMemo, useState } from "react";
 import { formatDateTime, getProviderIconSrc } from "../llm-management/llmHelpers";
 import JobsAgentManagement from "./JobsAgentManagement";
 import WebhookAgentManagement from "./WebhookAgentManagement";
@@ -151,6 +151,9 @@ export default function AgentRegistry({
         agent.description,
         agent.modelName,
         agent.modelProvider,
+        agent.primary_model_id,
+        agent.secondary_model_id,
+        agent.tertiary_model_id,
         agent.instruction,
         agent.status,
       ]
@@ -246,6 +249,70 @@ export default function AgentRegistry({
       date: formattedValue.slice(0, splitAt),
       time: formattedValue.slice(splitAt + 2),
     };
+  };
+
+  const getAgentLlmSlots = (agent: AgentRecord) => [
+    {
+      label: "Primary",
+      modelId: agent.primary_model_id ?? agent.model_id ?? null,
+      provider:
+        agent.primary_model_provider ?? agent.modelProvider ?? null,
+    },
+    {
+      label: "Secondary",
+      modelId: agent.secondary_model_id ?? null,
+      provider: agent.secondary_model_provider ?? null,
+    },
+    {
+      label: "Tertiary",
+      modelId: agent.tertiary_model_id ?? null,
+      provider: agent.tertiary_model_provider ?? null,
+    },
+  ];
+
+  const renderAgentLlmList = (
+    agent: AgentRecord,
+    options?: { mobile?: boolean }
+  ) => {
+    const slots = getAgentLlmSlots(agent);
+    return (
+      <div className={`grid gap-2 ${options?.mobile ? "" : "w-full"}`}>
+        {slots.map((slot) => {
+          const providerIcon = getProviderIconSrc(slot.provider);
+          const providerLabel = slot.provider?.trim() || "-";
+          const modelLabel = slot.modelId?.trim() || "-";
+          return (
+            <div
+              key={`${agent.agent_id || agent.name}-${slot.label}`}
+              className="flex min-w-0 items-center gap-3"
+            >
+              {providerIcon ? (
+                <Image
+                  src={providerIcon}
+                  alt={`${providerLabel} logo`}
+                  width={18}
+                  height={18}
+                  className="h-4.5 w-4.5 flex-none object-contain"
+                />
+              ) : (
+                <span className="h-4.5 w-4.5 flex-none rounded-full bg-[#e2e8f0]" />
+              )}
+              <span className="min-w-0 text-left">
+                <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-[#64748b]">
+                  {slot.label}
+                </span>
+                <span
+                  className="block break-words whitespace-normal font-semibold leading-snug text-[#0f172a]"
+                  title={modelLabel}
+                >
+                  {modelLabel}
+                </span>
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    );
   };
 
   const pageSize = 6;
@@ -472,7 +539,7 @@ export default function AgentRegistry({
             <div className="hidden grid-cols-[1.1fr_1.2fr_1.5fr_1.4fr_0.9fr_0.9fr_0.8fr_0.9fr] bg-[#eaf0f8] px-4 py-3 text-xs font-semibold uppercase tracking-[0.08em] text-[#0f172a] md:grid">
               <span>Name</span>
               <span>Description</span>
-              <span>Model name</span>
+              <span>Models</span>
               <span>Instructions</span>
               <span>Created at</span>
               <span>Updated at</span>
@@ -563,7 +630,7 @@ export default function AgentRegistry({
                   Description
                 </div>
                 <div className="flex h-full items-center capitalize px-3 text-left leading-tight whitespace-normal break-words">
-                  Model name
+                  Models
                 </div>
                 <div className="flex h-full items-center capitalize px-3 text-left leading-tight whitespace-normal break-words">
                   Instructions
@@ -617,9 +684,6 @@ export default function AgentRegistry({
               <div className="divide-y divide-[#eef1f7] bg-white">
                 {pagedAgents.map((agent, index) => {
                   const rowKey = getAgentRowKey(agent, index);
-                  const modelName = agent.modelName || agent.model_id || "-";
-                  const providerValue = agent.modelProvider || "-";
-                  const providerIcon = getProviderIconSrc(agent.modelProvider);
                   const createdAt = formatDateTime(agent.created_at);
                   const updatedAt = formatDateTime(agent.updated_at);
                   const createdDateParts = splitDateTime(createdAt);
@@ -646,33 +710,7 @@ export default function AgentRegistry({
                         {renderWrappedText(agent.description)}
                       </div>
                       <div className="flex h-full min-w-0 items-start px-3">
-                        <span className="inline-flex max-w-full items-start gap-3">
-                          {providerIcon ? (
-                            <Image
-                              src={providerIcon}
-                              alt={`${providerValue} logo`}
-                              width={20}
-                              height={20}
-                              className="h-5 w-5 flex-none object-contain"
-                            />
-                          ) : (
-                            <span className="h-5 w-5 flex-none rounded-full bg-[#e2e8f0]" />
-                          )}
-                          <span className="min-w-0">
-                            <span
-                              className="block break-words whitespace-normal font-semibold leading-snug text-[#0f172a]"
-                              title={modelName}
-                            >
-                              {modelName}
-                            </span>
-                            <span
-                              className="mt-1 block break-words whitespace-normal text-[11px] uppercase tracking-[0.08em] text-[#64748b]"
-                              title={providerValue}
-                            >
-                              {providerValue}
-                            </span>
-                          </span>
-                        </span>
+                        {renderAgentLlmList(agent)}
                       </div>
                       <div className="flex h-full items-start px-3">
                         <div className="space-y-1">
@@ -823,9 +861,6 @@ export default function AgentRegistry({
             <div className="divide-y divide-[#eef1f7] bg-white md:hidden">
               {pagedAgents.map((agent, index) => {
                 const rowKey = getAgentRowKey(agent, index);
-                const modelName = agent.modelName || agent.model_id || "-";
-                const providerValue = agent.modelProvider || "-";
-                const providerIcon = getProviderIconSrc(agent.modelProvider);
                 const createdAt = formatDateTime(agent.created_at);
                 const updatedAt = formatDateTime(agent.updated_at);
                 const statusLabel = formatStatusLabel(agent.status);
@@ -864,28 +899,10 @@ export default function AgentRegistry({
                     </div>
                     <div className="rounded-xl border border-[#e6ebf5] bg-[#f8fafc] px-3 py-2">
                       <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[#64748b]">
-                        Model
+                        Models
                       </p>
-                      <div className="mt-2 inline-flex max-w-full items-center gap-3">
-                        {providerIcon ? (
-                          <Image
-                            src={providerIcon}
-                            alt={`${providerValue} logo`}
-                            width={20}
-                            height={20}
-                            className="h-5 w-5 flex-none object-contain"
-                          />
-                        ) : (
-                          <span className="h-5 w-5 flex-none rounded-full bg-[#e2e8f0]" />
-                        )}
-                        <span className="min-w-0 text-left">
-                          <span className="block truncate font-semibold text-[#0f172a]">
-                            {modelName}
-                          </span>
-                          <span className="block truncate text-[11px] uppercase tracking-[0.08em] text-[#64748b]">
-                            {providerValue}
-                          </span>
-                        </span>
+                      <div className="mt-2">
+                        {renderAgentLlmList(agent, { mobile: true })}
                       </div>
                     </div>
                     <div>
