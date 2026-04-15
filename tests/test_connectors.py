@@ -361,7 +361,9 @@ def test_ibm_mq_connector_details_include_expected_tools(client: TestClient):
     assert config_vars["USER_NAME"] is True
     assert config_vars["PASSWORD"] is True
     assert config_vars["LOGS_URL"] is True
-    assert config_vars["SSH_URL"] is True
+    assert config_vars["SSH_HOSTNAME"] is True
+    assert config_vars["SSH_USERNAME"] is True
+    assert config_vars["SSH_PASSWORD"] is True
     assert config_vars["VERIFY_TLS"] is False
 
 

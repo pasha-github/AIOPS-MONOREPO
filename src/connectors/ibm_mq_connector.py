@@ -3,11 +3,12 @@ IBM MQ Connector v0.1.0
 -----------------------
 Connector for IBM MQ administrative operations and support endpoints.
 Provides queue manager discovery, MQSC execution, MQ log retrieval,
-and SSH command forwarding through pre-configured HTTP endpoints.
+and SSH command execution via Paramiko.
 """
 
 from typing import Any
 
+import paramiko
 import requests
 from base_connector import BaseConnector, connector_tool
 from google.adk.tools.tool_context import ToolContext
@@ -30,7 +31,9 @@ class IbmMqConnector(BaseConnector):
         USER_NAME: str,
         PASSWORD: str,
         LOGS_URL: str,
-        SSH_URL: str,
+        SSH_HOSTNAME: str,
+        SSH_USERNAME: str,
+        SSH_PASSWORD: str,
         VERIFY_TLS: str = "false",
         prefix: str = "",
     ):
@@ -39,7 +42,9 @@ class IbmMqConnector(BaseConnector):
         self.username = USER_NAME
         self.password = PASSWORD
         self.logs_url = LOGS_URL.strip()
-        self.ssh_url = SSH_URL.strip()
+        self.ssh_hostname = SSH_HOSTNAME.strip()
+        self.ssh_username = SSH_USERNAME.strip()
+        self.ssh_password = SSH_PASSWORD
         self.verify_tls = self._parse_bool(VERIFY_TLS)
 
     def _parse_bool(self, value: Any) -> bool:
@@ -240,28 +245,28 @@ class IbmMqConnector(BaseConnector):
         command: str,
         tool_context: ToolContext | None = None,
     ) -> dict[str, Any]:
-        """Runs a command through a configured SSH bridge endpoint and returns stdout and stderr from that endpoint."""
-        if not self.ssh_url:
-            return {"status": "error", "message": "SSH_URL is not configured."}
+        """Runs a command over SSH using Paramiko and returns stdout/stderr."""
+        if not self.ssh_hostname:
+            return {"status": "error", "message": "SSH_HOSTNAME is not configured."}
+        if not self.ssh_username:
+            return {"status": "error", "message": "SSH_USERNAME is not configured."}
+        if self.ssh_password is None or self.ssh_password == "":
+            return {"status": "error", "message": "SSH_PASSWORD is not configured."}
 
+        client = paramiko.SSHClient()
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         try:
-            response = self._request(
-                url=self.ssh_url,
-                method="POST",
-                json_data={"command": command},
-                timeout=60.0,
+            client.connect(
+                hostname=self.ssh_hostname,
+                username=self.ssh_username,
+                password=self.ssh_password,
+                timeout=10,
             )
-        except requests.RequestException as exc:
+            _stdin, stdout, stderr = client.exec_command(f"sudo -u mqm {command}")
+            output = stdout.read().decode()
+            error = stderr.read().decode()
+            return {"status": "success", "output": output, "error": error}
+        except Exception as exc:
             return {"status": "error", "message": f"Failed to run SSH command: {exc}"}
-
-        if response.status_code >= 400:
-            return self._error_result("Failed to run SSH command", response)
-
-        try:
-            payload = response.json()
-        except ValueError:
-            return self._error_result(
-                "SSH endpoint did not return valid JSON", response
-            )
-
-        return self._format_ssh_response(payload)
+        finally:
+            client.close()
