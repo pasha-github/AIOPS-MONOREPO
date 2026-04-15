@@ -1,15 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
 import { trimTrailingSlash } from "@/config/agent";
 import { useRuntimeConfig } from "@/config/runtime-config";
+import { useCallback, useEffect, useRef, useState } from "react";
 import LLMOverviewSection from "./LLMOverviewSection";
 import LLMTableSection from "./LLMTableSection";
 import CreateLlmModal, { type CreateLlmPayload } from "./createllm";
 import {
   getErrorMessage,
+  normalizeLlmDefaults,
   normalizeLlmRecord,
   type ActionResult,
+  type LlmDefaults,
+  type LlmDefaultSlot,
   type LLMRecord,
 } from "./llmHelpers";
 
@@ -18,10 +21,16 @@ export default function LLMManagementPage() {
   const llmApiBase = trimTrailingSlash(llmManagerApiBaseUrl);
   const llmListUrl = `${llmApiBase}/llms/`;
   const llmCreateUrl = `${llmApiBase}/llms/`;
+  const llmDefaultsUrl = `${llmApiBase}/llms/defaults`;
   const [llms, setLlms] = useState<LLMRecord[]>([]);
+  const [defaults, setDefaults] = useState<LlmDefaults | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isDefaultsLoading, setIsDefaultsLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+  const [defaultsError, setDefaultsError] = useState("");
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [updatingDefaultSlot, setUpdatingDefaultSlot] =
+    useState<LlmDefaultSlot | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
   const [isToastVisible, setIsToastVisible] = useState(false);
@@ -31,6 +40,61 @@ export default function LLMManagementPage() {
   useEffect(() => {
     llmsRef.current = llms;
   }, [llms]);
+
+  const loadDefaults = useCallback(
+    async (options?: { signal?: AbortSignal; silent?: boolean }) => {
+      if (!options?.silent) {
+        setIsDefaultsLoading(true);
+        setDefaultsError("");
+      }
+
+      try {
+        const response = await fetch(llmDefaultsUrl, {
+          headers: { accept: "application/json" },
+          signal: options?.signal,
+        });
+
+        let data: unknown = null;
+        try {
+          data = await response.json();
+        } catch {
+          data = null;
+        }
+
+        if (!response.ok) {
+          if (!options?.silent) {
+            setDefaultsError(
+              getErrorMessage(data, "Unable to load default LLM selection.")
+            );
+          }
+          return;
+        }
+
+        const normalized = normalizeLlmDefaults(data);
+        if (!normalized) {
+          if (!options?.silent) {
+            setDefaultsError("Unable to load default LLM selection.");
+          }
+          return;
+        }
+
+        setDefaults(normalized);
+        setDefaultsError("");
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          return;
+        }
+        if (!options?.silent) {
+          setDefaultsError("Unable to load default LLM selection.");
+        }
+      } finally {
+        if (!options?.silent) {
+          setIsDefaultsLoading(false);
+        }
+      }
+    },
+    [llmDefaultsUrl]
+  );
 
   const loadLlms = useCallback(
     async (options?: { signal?: AbortSignal; refresh?: boolean }) => {
@@ -89,16 +153,21 @@ export default function LLMManagementPage() {
   useEffect(() => {
     const controller = new AbortController();
     loadLlms({ signal: controller.signal });
+    loadDefaults({ signal: controller.signal });
     return () => controller.abort();
-  }, [loadLlms]);
+  }, [loadDefaults, loadLlms]);
 
   useEffect(() => {
     const handleVisibility = () => {
       if (document.visibilityState === "visible") {
         loadLlms({ refresh: true });
+        loadDefaults({ silent: true });
       }
     };
-    const handleFocus = () => loadLlms({ refresh: true });
+    const handleFocus = () => {
+      loadLlms({ refresh: true });
+      loadDefaults({ silent: true });
+    };
 
     window.addEventListener("focus", handleFocus);
     document.addEventListener("visibilitychange", handleVisibility);
@@ -107,7 +176,7 @@ export default function LLMManagementPage() {
       window.removeEventListener("focus", handleFocus);
       document.removeEventListener("visibilitychange", handleVisibility);
     };
-  }, [loadLlms]);
+  }, [loadDefaults, loadLlms]);
 
   useEffect(() => {
     if (!isToastVisible) {
@@ -184,10 +253,82 @@ export default function LLMManagementPage() {
 
       setToastMessage("LLM deleted successfully.");
       setIsToastVisible(true);
-      await loadLlms({ refresh: true });
+      await Promise.all([loadLlms({ refresh: true }), loadDefaults()]);
       return { ok: true };
     } catch {
       return { ok: false, error: "Unable to delete LLM." };
+    }
+  };
+
+  const handleDefaultChange = async (
+    slot: LlmDefaultSlot,
+    modelId: string
+  ): Promise<ActionResult> => {
+    const nextModelId = modelId.trim();
+    if (!nextModelId) {
+      return { ok: false, error: "Please select a model." };
+    }
+
+    const payloadKey = `${slot}_model_id` as const;
+    setUpdatingDefaultSlot(slot);
+    setDefaultsError("");
+
+    try {
+      const response = await fetch(llmDefaultsUrl, {
+        method: "PATCH",
+        headers: {
+          accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ [payloadKey]: nextModelId }),
+      });
+
+      let data: unknown = null;
+      try {
+        data = await response.json();
+      } catch {
+        data = null;
+      }
+
+      if (!response.ok) {
+        const errorMessage = getErrorMessage(
+          data,
+          "Unable to update default LLM."
+        );
+        setDefaultsError(errorMessage);
+        return { ok: false, error: errorMessage };
+      }
+
+      const normalized = normalizeLlmDefaults(data);
+      if (normalized) {
+        setDefaults(normalized);
+      } else {
+        setDefaults((current) =>
+          current
+            ? { ...current, [payloadKey]: nextModelId }
+            : {
+                id: null,
+                primary_model_id:
+                  slot === "primary" ? nextModelId : null,
+                secondary_model_id:
+                  slot === "secondary" ? nextModelId : null,
+                tertiary_model_id:
+                  slot === "tertiary" ? nextModelId : null,
+              }
+        );
+      }
+
+      setToastMessage(
+        `${slot[0].toUpperCase()}${slot.slice(1)} LLM updated successfully.`
+      );
+      setIsToastVisible(true);
+      return { ok: true };
+    } catch {
+      const errorMessage = "Unable to update default LLM.";
+      setDefaultsError(errorMessage);
+      return { ok: false, error: errorMessage };
+    } finally {
+      setUpdatingDefaultSlot(null);
     }
   };
 
@@ -195,10 +336,20 @@ export default function LLMManagementPage() {
     <div className="space-y-8">
       <LLMOverviewSection
         llms={llms}
+        defaults={defaults}
         isLoading={isLoading}
+        isDefaultsLoading={isDefaultsLoading}
         isRefreshing={isRefreshing}
-        onRefresh={() => loadLlms({ refresh: true })}
+        defaultsError={defaultsError}
+        updatingDefaultSlot={updatingDefaultSlot}
+        onRefresh={async () => {
+          await Promise.all([
+            loadLlms({ refresh: true }),
+            loadDefaults(),
+          ]);
+        }}
         onCreateClick={() => setIsCreateOpen(true)}
+        onDefaultChange={handleDefaultChange}
       />
 
       <LLMTableSection

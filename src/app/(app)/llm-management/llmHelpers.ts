@@ -5,6 +5,15 @@ export type ActionResult = {
   error?: string;
 };
 
+export type LlmDefaultSlot = "primary" | "secondary" | "tertiary";
+
+export type LlmDefaults = {
+  id: number | null;
+  primary_model_id: string | null;
+  secondary_model_id: string | null;
+  tertiary_model_id: string | null;
+};
+
 export const formatCellValue = (
   value: string | number | boolean | null | undefined
 ) => {
@@ -57,6 +66,25 @@ export const getErrorMessage = (payload: unknown, fallback: string) => {
     return (payload as { message: string }).message;
   }
   return fallback;
+};
+
+export const normalizeLlmDefaults = (value: unknown): LlmDefaults | null => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  const payload = value as Record<string, unknown>;
+  const getModelId = (key: keyof Omit<LlmDefaults, "id">) => {
+    const rawValue = payload[key];
+    return typeof rawValue === "string" ? rawValue : null;
+  };
+
+  return {
+    id: typeof payload.id === "number" ? payload.id : null,
+    primary_model_id: getModelId("primary_model_id"),
+    secondary_model_id: getModelId("secondary_model_id"),
+    tertiary_model_id: getModelId("tertiary_model_id"),
+  };
 };
 
 export const formatHeaderLabel = (header: string) =>
