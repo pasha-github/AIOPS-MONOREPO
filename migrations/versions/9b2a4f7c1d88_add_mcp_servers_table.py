@@ -33,19 +33,13 @@ def upgrade() -> None:
             "mcpserver",
             sa.Column("mcp_server_id", sa.Uuid(), nullable=False),
             sa.Column("name", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-            sa.Column(
-                "server_url", sqlmodel.sql.sqltypes.AutoString(), nullable=False
-            ),
-            sa.Column(
-                "description", sqlmodel.sql.sqltypes.AutoString(), nullable=True
-            ),
+            sa.Column("server_url", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+            sa.Column("description", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
             sa.Column("auth_type", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
             sa.Column(
                 "auth_username", sqlmodel.sql.sqltypes.AutoString(), nullable=True
             ),
-            sa.Column(
-                "auth_secret", sqlmodel.sql.sqltypes.AutoString(), nullable=True
-            ),
+            sa.Column("auth_secret", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
             sa.Column("metadata_json", sa.JSON(), nullable=False),
             sa.Column("tools_json", sa.JSON(), nullable=False),
             sa.Column("resources_json", sa.JSON(), nullable=False),

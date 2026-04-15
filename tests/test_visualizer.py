@@ -506,6 +506,11 @@ def test_visualizer_includes_registered_mcp_server_nodes(client: TestClient, ses
     edges = {(edge["source"], edge["target"]) for edge in data["edges"]}
 
     assert str(mcp_server.mcp_server_id) in nodes
-    assert nodes[str(mcp_server.mcp_server_id)]["data"]["mcp"]["name"] == "Registered MCP"
-    assert nodes[str(mcp_server.mcp_server_id)]["data"]["mcp"]["url"] == "http://localhost:9200/mcp"
+    assert (
+        nodes[str(mcp_server.mcp_server_id)]["data"]["mcp"]["name"] == "Registered MCP"
+    )
+    assert (
+        nodes[str(mcp_server.mcp_server_id)]["data"]["mcp"]["url"]
+        == "http://localhost:9200/mcp"
+    )
     assert ("agent-with-registered-mcp", str(mcp_server.mcp_server_id)) in edges

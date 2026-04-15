@@ -134,14 +134,16 @@ def _patch_common_runtime(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(
         agent_loader_module,
         "build_mcp_auth_headers",
-        lambda auth_type, bearer_token=None, username=None, password=None: {
-            "auth_type": auth_type,
-            "bearer_token": bearer_token,
-            "username": username,
-            "password": password,
-        }
-        if auth_type != "none"
-        else {},
+        lambda auth_type, bearer_token=None, username=None, password=None: (
+            {
+                "auth_type": auth_type,
+                "bearer_token": bearer_token,
+                "username": username,
+                "password": password,
+            }
+            if auth_type != "none"
+            else {}
+        ),
     )
     monkeypatch.setattr(
         agent_loader_module,
@@ -385,7 +387,9 @@ def test_agent_loader_resolves_registered_mcp_servers(
     agent = loader.load_agent("main")
     assert agent is not None
     registered_mcp_tools = [
-        tool for tool in agent.kwargs["tools"] if isinstance(tool, dict) and "mcp" in tool
+        tool
+        for tool in agent.kwargs["tools"]
+        if isinstance(tool, dict) and "mcp" in tool
     ]
     assert registered_mcp_tools[0]["mcp"]["url"] == "http://localhost:8100/mcp"
     assert registered_mcp_tools[0]["mcp"]["headers"]["auth_type"] == "bearer"

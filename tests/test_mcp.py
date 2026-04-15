@@ -32,9 +32,7 @@ def fake_probe(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr("src.routers.mcp.inspect_mcp_server", _fake_probe)
 
 
-def test_test_mcp_server_returns_live_metadata(
-    client: TestClient, fake_probe: None
-):
+def test_test_mcp_server_returns_live_metadata(client: TestClient, fake_probe: None):
     response = client.post(
         "/mcp/test/",
         json={

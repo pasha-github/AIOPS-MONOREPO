@@ -174,9 +174,7 @@ class DatabaseAgentLoader(BaseAgentLoader):
                     try:
                         mcp_server = session.get(MCPServer, UUID(mcp_server_id))
                         if mcp_server is None:
-                            raise ValueError(
-                                f"MCP server '{mcp_server_id}' not found."
-                            )
+                            raise ValueError(f"MCP server '{mcp_server_id}' not found.")
                         auth_secret = (
                             decrypt_secret(mcp_server.auth_secret)
                             if mcp_server.auth_secret
