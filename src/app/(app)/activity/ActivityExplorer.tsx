@@ -1,5 +1,6 @@
 "use client";
 
+import { useRuntimeConfig } from "@/config/runtime-config";
 import {
   Activity,
   ArrowRight,
@@ -16,6 +17,7 @@ import {
   fetchAgentSessionDetail,
   fetchAgentSessions,
   renderMarkdownBlocks,
+  resolveLogsApiBase,
 } from "../dashboard/logs";
 
 const levelStyles = {
@@ -130,6 +132,8 @@ function DetailSkeleton() {
 }
 
 export default function ActivityExplorer() {
+  const { agentAdkBaseUrl } = useRuntimeConfig();
+  const logsApiBaseUrl = resolveLogsApiBase(agentAdkBaseUrl);
   const [sessions, setSessions] = useState<AgentSessionSummary[]>([]);
   const [sessionDetails, setSessionDetails] = useState<Record<string, AgentSessionDetail>>({});
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
@@ -175,7 +179,11 @@ export default function ActivityExplorer() {
 
       setLoadingSessionId(sessionId);
       try {
-        const detail = await fetchAgentSessionDetail(sessionId, options?.signal);
+        const detail = await fetchAgentSessionDetail(
+          sessionId,
+          options?.signal,
+          logsApiBaseUrl
+        );
         setSessionDetails((current) => {
           const next = { ...current, [sessionId]: detail };
           sessionDetailsRef.current = next;
@@ -186,7 +194,7 @@ export default function ActivityExplorer() {
         setLoadingSessionId((current) => (current === sessionId ? null : current));
       }
     },
-    []
+    [logsApiBaseUrl]
   );
 
   const loadSessions = useCallback(
@@ -199,7 +207,7 @@ export default function ActivityExplorer() {
       setError("");
 
       try {
-        const nextSessions = await fetchAgentSessions(signal);
+        const nextSessions = await fetchAgentSessions(signal, logsApiBaseUrl);
         const nextSelectedSessionId =
           (selectedSessionIdRef.current &&
           nextSessions.some((session) => session.id === selectedSessionIdRef.current)
@@ -239,7 +247,7 @@ export default function ActivityExplorer() {
         setIsRefreshing(false);
       }
     },
-    [loadSessionDetail]
+    [loadSessionDetail, logsApiBaseUrl]
   );
 
   useEffect(() => {
