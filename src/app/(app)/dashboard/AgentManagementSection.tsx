@@ -56,9 +56,18 @@ const formatUpdatedAt = (updatedAt: string | null) => {
   return parsed.toLocaleString();
 };
 
+const resolveLlmManagerBaseUrl = (value: string) => {
+  const trimmed = trimTrailingSlash(value.trim());
+  if (!trimmed) {
+    throw new Error("NEXT_PUBLIC_LLM_MANAGER_API_BASE_URL is not configured.");
+  }
+
+  return trimmed;
+};
+
 export default function AgentManagementSection() {
   const { llmManagerApiBaseUrl } = useRuntimeConfig();
-  const agentListUrl = `${trimTrailingSlash(llmManagerApiBaseUrl)}/agent/`;
+  const agentListUrl = `${resolveLlmManagerBaseUrl(llmManagerApiBaseUrl)}/agent/`;
   const [agents, setAgents] = useState<AgentRecord[]>([]);
   const [isAgentsLoading, setIsAgentsLoading] = useState(true);
   const [agentsError, setAgentsError] = useState("");

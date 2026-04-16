@@ -30,9 +30,18 @@ const EMPTY_COUNTS: OverviewCounts = {
   totalLlms: 0,
 };
 
+const resolveLlmManagerBaseUrl = (value: string) => {
+  const trimmed = trimTrailingSlash(value.trim());
+  if (!trimmed) {
+    throw new Error("NEXT_PUBLIC_LLM_MANAGER_API_BASE_URL is not configured.");
+  }
+
+  return trimmed;
+};
+
 export default function DashboardOverview() {
   const { llmManagerApiBaseUrl } = useRuntimeConfig();
-  const baseUrl = trimTrailingSlash(llmManagerApiBaseUrl);
+  const baseUrl = resolveLlmManagerBaseUrl(llmManagerApiBaseUrl);
   const [counts, setCounts] = useState<OverviewCounts>(EMPTY_COUNTS);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
