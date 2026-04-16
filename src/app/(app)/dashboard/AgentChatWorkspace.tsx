@@ -100,6 +100,17 @@ const getSessionUrl = (
 
 const getRunSseUrl = (adkBaseUrl: string) => `${adkBaseUrl}/run_sse`;
 
+const resolveAdkBaseUrl = (value: string) => {
+  const trimmed = trimTrailingSlash(value.trim());
+  if (!trimmed) {
+    throw new Error("NEXT_PUBLIC_AGENT_ADK_BASE_URL is not configured.");
+  }
+
+  return trimmed.endsWith("/agent-server")
+    ? trimmed
+    : `${trimmed}/agent-server`;
+};
+
 type StreamStep = {
   id: string;
   label: string;
@@ -632,7 +643,7 @@ export default function AgentChatWorkspace({
   onClose,
 }: AgentChatWorkspaceProps) {
   const { agentAdkBaseUrl } = useRuntimeConfig();
-  const adkBaseUrl = trimTrailingSlash(agentAdkBaseUrl);
+  const adkBaseUrl = resolveAdkBaseUrl(agentAdkBaseUrl);
   const appName = agent.agentId;
   const assistantDisplayName = agent.name?.trim() || appName;
   const userId = DEFAULT_USER_ID;

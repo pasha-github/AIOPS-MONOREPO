@@ -82,7 +82,7 @@ export type AgentSessionDetail = {
 export const resolveLogsApiBase = (baseUrl: string) => {
   const trimmed = trimTrailingSlash(baseUrl.trim());
   if (!trimmed) {
-    return "";
+    throw new Error("NEXT_PUBLIC_AGENT_ADK_BASE_URL is not configured.");
   }
 
   return trimmed.endsWith("/agent-server")
