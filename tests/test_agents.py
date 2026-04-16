@@ -1,6 +1,8 @@
 import pytest
 from fastapi.testclient import TestClient
 
+from src.database.models import MCPServer
+
 
 def _create_model(client: TestClient, model_id: str = "gemini-pro"):
     return client.post(
@@ -284,6 +286,57 @@ def test_update_agent_connector_config_ids_only(client: TestClient):
     )
     assert response.status_code == 200
     assert response.json()["connector_config_ids"] == ["cfg-2", "cfg-3"]
+
+
+def test_create_agent_with_registered_mcp_server_ids(client: TestClient, session):
+    _create_model(client)
+    mcp_server = MCPServer(
+        name="Local MCP",
+        server_url="http://localhost:8000/sse",
+        auth_type="none",
+        metadata_json={},
+        tools_json=[],
+        resources_json=[],
+    )
+    session.add(mcp_server)
+    session.commit()
+    session.refresh(mcp_server)
+
+    response = client.post(
+        "/agent/",
+        json={
+            "agent_id": "agent-with-mcp-id",
+            "name": "Agent 1",
+            "description": "desc",
+            "instruction": "instr",
+            "primary_use_global": False,
+            "primary_model_id": "gemini-pro",
+            "mcp_server_ids": [str(mcp_server.mcp_server_id)],
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["mcp_server_ids"] == [str(mcp_server.mcp_server_id)]
+
+
+def test_create_agent_invalid_mcp_server_id_returns_400(client: TestClient):
+    _create_model(client)
+
+    response = client.post(
+        "/agent/",
+        json={
+            "agent_id": "agent-invalid-mcp-id",
+            "name": "Agent 1",
+            "description": "desc",
+            "instruction": "instr",
+            "primary_use_global": False,
+            "primary_model_id": "gemini-pro",
+            "mcp_server_ids": ["not-a-real-mcp-id"],
+        },
+    )
+
+    assert response.status_code == 400
+    assert "Invalid MCP server id" in response.json()["detail"]
 
 
 def test_update_agent_sub_agents_only(client: TestClient):

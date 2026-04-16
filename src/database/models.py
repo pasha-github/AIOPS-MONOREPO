@@ -21,6 +21,7 @@ class Agent(SQLModel, table=True):
     connector_config_ids: list[str] = Field(
         default_factory=list, sa_column=Column(JSON)
     )
+    mcp_server_ids: list[str] = Field(default_factory=list, sa_column=Column(JSON))
     mcp_servers: list[str] = Field(
         default_factory=list, sa_column=Column(JSON)
     )  # JSON List of MCP server URLs
@@ -59,6 +60,21 @@ class ConnectorConfig(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
     connector_id: str
+
+
+class MCPServer(SQLModel, table=True):
+    mcp_server_id: UUID = Field(default_factory=uuid4, primary_key=True)
+    name: str
+    server_url: str
+    description: str | None = None
+    auth_type: str = "none"
+    auth_username: str | None = None
+    auth_secret: str | None = None
+    metadata_json: dict = Field(default_factory=dict, sa_column=Column(JSON))
+    tools_json: list[dict] = Field(default_factory=list, sa_column=Column(JSON))
+    resources_json: list[dict] = Field(default_factory=list, sa_column=Column(JSON))
+    created_at: datetime = Field(default_factory=datetime.now)
+    updated_at: datetime = Field(default_factory=datetime.now)
 
 
 class Webhook(SQLModel, table=True):

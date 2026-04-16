@@ -1,5 +1,6 @@
 import os
 from types import SimpleNamespace
+from uuid import uuid4
 
 import pytest
 
@@ -26,6 +27,7 @@ class _FakeSession:
         model_config=None,
         list_ids=None,
         connector_map=None,
+        mcp_map=None,
         model_map=None,
         defaults_config=None,
     ):
@@ -33,6 +35,7 @@ class _FakeSession:
         self.model_config = model_config
         self.list_ids = list_ids
         self.connector_map = connector_map or {}
+        self.mcp_map = mcp_map or {}
         self.model_map = model_map or {}
         self.defaults_config = defaults_config
 
@@ -57,6 +60,8 @@ class _FakeSession:
             return self.defaults_config
         if name == "ConnectorConfig":
             return self.connector_map.get(str(key))
+        if name == "MCPServer":
+            return self.mcp_map.get(str(key))
         return None
 
 
@@ -89,6 +94,7 @@ def _agent_cfg(**kwargs):
         "tertiary_model_id": None,
         "tools": None,
         "mcp_servers": [],
+        "mcp_server_ids": [],
         "connector_config_ids": [],
         "sub_agents": [],
         "isEnabled": True,
@@ -118,13 +124,26 @@ def _patch_common_runtime(monkeypatch: pytest.MonkeyPatch):
     )
     monkeypatch.setattr(
         agent_loader_module,
-        "SseConnectionParams",
-        lambda url: {"url": url, "kind": "sse"},
+        "build_mcp_connection_params",
+        lambda url, headers=None: {
+            "url": url,
+            "headers": headers or {},
+            "kind": "sse" if url.endswith("/sse") else "mcp",
+        },
     )
     monkeypatch.setattr(
         agent_loader_module,
-        "StreamableHTTPConnectionParams",
-        lambda url: {"url": url, "kind": "mcp"},
+        "build_mcp_auth_headers",
+        lambda auth_type, bearer_token=None, username=None, password=None: (
+            {
+                "auth_type": auth_type,
+                "bearer_token": bearer_token,
+                "username": username,
+                "password": password,
+            }
+            if auth_type != "none"
+            else {}
+        ),
     )
     monkeypatch.setattr(
         agent_loader_module,
@@ -337,6 +356,43 @@ def test_agent_loader_mcp_url_validation(monkeypatch: pytest.MonkeyPatch):
     agent = loader.load_agent("main")
     # Invalid MCP URL should be ignored, not crash agent creation.
     assert agent is not None
+
+
+def test_agent_loader_resolves_registered_mcp_servers(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    _patch_common_runtime(monkeypatch)
+    mcp_server_id = str(uuid4())
+    cfg = _agent_cfg(mcp_server_ids=[mcp_server_id])
+    model = _model_cfg()
+    mcp_server = SimpleNamespace(
+        mcp_server_id=mcp_server_id,
+        server_url="http://localhost:8100/mcp",
+        auth_type="bearer",
+        auth_username=None,
+        auth_secret="encrypted-token",
+    )
+    monkeypatch.setattr(agent_loader_module, "cache", _FakeCache())
+    monkeypatch.setattr(
+        agent_loader_module,
+        "Session",
+        lambda _engine: _FakeSession(
+            agent_config=cfg,
+            model_config=model,
+            mcp_map={mcp_server_id: mcp_server},
+        ),
+    )
+
+    loader = DatabaseAgentLoader()
+    agent = loader.load_agent("main")
+    assert agent is not None
+    registered_mcp_tools = [
+        tool
+        for tool in agent.kwargs["tools"]
+        if isinstance(tool, dict) and "mcp" in tool
+    ]
+    assert registered_mcp_tools[0]["mcp"]["url"] == "http://localhost:8100/mcp"
+    assert registered_mcp_tools[0]["mcp"]["headers"]["auth_type"] == "bearer"
 
 
 def test_agent_loader_sub_agent_self_reference_skipped(monkeypatch: pytest.MonkeyPatch):
