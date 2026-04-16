@@ -1,14 +1,6 @@
 import { trimTrailingSlash } from "@/config/agent";
 import type { ReactNode } from "react";
 
-const AGENT_ADK_BASE_URL = trimTrailingSlash(
-  process.env.NEXT_PUBLIC_AGENT_ADK_BASE_URL ?? ""
-);
-const DEFAULT_LOGS_API_BASE = AGENT_ADK_BASE_URL
-  ? AGENT_ADK_BASE_URL.endsWith("/agent-server")
-    ? AGENT_ADK_BASE_URL
-    : `${AGENT_ADK_BASE_URL}/agent-server`
-  : "";
 const DEFAULT_APP_NAME = "automation";
 const DEFAULT_USER_ID = "user";
 const TRUNCATED_SUFFIX = ".....";
@@ -87,12 +79,23 @@ export type AgentSessionDetail = {
   entries: AgentLogEntry[];
 };
 
-const getSessionsUrl = (baseUrl = DEFAULT_LOGS_API_BASE) =>
+export const resolveLogsApiBase = (baseUrl: string) => {
+  const trimmed = trimTrailingSlash(baseUrl.trim());
+  if (!trimmed) {
+    return "";
+  }
+
+  return trimmed.endsWith("/agent-server")
+    ? trimmed
+    : `${trimmed}/agent-server`;
+};
+
+const getSessionsUrl = (baseUrl: string) =>
   `${baseUrl}/apps/${encodeURIComponent(DEFAULT_APP_NAME)}/users/${encodeURIComponent(
     DEFAULT_USER_ID
   )}/sessions`;
 
-const getSessionDetailUrl = (sessionId: string, baseUrl = DEFAULT_LOGS_API_BASE) =>
+const getSessionDetailUrl = (sessionId: string, baseUrl: string) =>
   `${getSessionsUrl(baseUrl)}/${encodeURIComponent(sessionId)}`;
 
 const getNumber = (value: unknown) =>
@@ -170,8 +173,12 @@ async function fetchJson<T>(url: string, signal?: AbortSignal): Promise<T> {
 
 export async function fetchAgentSessions(
   signal?: AbortSignal,
-  baseUrl = DEFAULT_LOGS_API_BASE
+  baseUrl = ""
 ) {
+  if (!baseUrl) {
+    throw new Error("Agent logs API base URL is not configured.");
+  }
+
   const payload = await fetchJson<SessionSummaryResponse[]>(
     getSessionsUrl(baseUrl),
     signal
@@ -205,8 +212,12 @@ export async function fetchAgentSessions(
 export async function fetchAgentSessionDetail(
   sessionId: string,
   signal?: AbortSignal,
-  baseUrl = DEFAULT_LOGS_API_BASE
+  baseUrl = ""
 ) {
+  if (!baseUrl) {
+    throw new Error("Agent logs API base URL is not configured.");
+  }
+
   const payload = await fetchJson<SessionDetailResponse>(
     getSessionDetailUrl(sessionId, baseUrl),
     signal
