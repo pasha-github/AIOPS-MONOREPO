@@ -76,7 +76,7 @@ export function createVisualizerGraph(response: VisualizerResponse) {
   const nodes: GraphFlowNode[] = response.nodes.map((node, index) => ({
     id: node.id,
     type: "visualizer",
-    position: positionMap.get(node.id) ?? fallbackPosition(index),
+    position: sanitizePosition(positionMap.get(node.id), fallbackPosition(index)),
     sourcePosition: Position.Bottom,
     targetPosition: Position.Top,
     data: buildNodeData(node),
@@ -222,8 +222,17 @@ function createPositionMap(
       const leftAnchor = getPositionAnchor(leftParents, positionMap, nodeMap);
       const rightAnchor = getPositionAnchor(rightParents, positionMap, nodeMap);
 
-      if (leftAnchor !== rightAnchor) {
-        return leftAnchor - rightAnchor;
+      if (typeof leftAnchor === "number" && typeof rightAnchor === "number") {
+        if (leftAnchor !== rightAnchor) {
+          return leftAnchor - rightAnchor;
+        }
+      } else if (leftAnchor !== rightAnchor) {
+        if (leftAnchor === null) {
+          return 1;
+        }
+        if (rightAnchor === null) {
+          return -1;
+        }
       }
 
       return compareNodes(leftId, rightId, nodeMap);
@@ -239,7 +248,7 @@ function createPositionMap(
 
   response.nodes.forEach((node, index) => {
     if (!positionMap.has(node.id)) {
-      positionMap.set(node.id, fallbackPosition(index));
+      positionMap.set(node.id, sanitizePosition(null, fallbackPosition(index)));
     }
   });
 
@@ -248,6 +257,18 @@ function createPositionMap(
 
 function fallbackPosition(index: number) {
   return { x: 80 + index * 280, y: 940 };
+}
+
+function sanitizePosition(
+  position: { x: number; y: number } | undefined | null,
+  fallback: { x: number; y: number }
+) {
+  const x =
+    position && Number.isFinite(position.x) ? position.x : fallback.x;
+  const y =
+    position && Number.isFinite(position.y) ? position.y : fallback.y;
+
+  return { x, y };
 }
 
 function placeNodesInRow(
@@ -262,9 +283,12 @@ function placeNodesInRow(
   nodeIds.forEach((nodeId) => {
     const width = getNodeWidth(nodeId, nodeMap);
     const anchor = getAnchor(nodeId);
-    const desiredLeft =
-      typeof anchor === "number" ? anchor - width / 2 : currentLeft;
-    const x = Math.max(currentLeft, desiredLeft);
+    const hasFiniteAnchor =
+      typeof anchor === "number" && Number.isFinite(anchor);
+    const desiredLeft = hasFiniteAnchor ? anchor - width / 2 : currentLeft;
+    const x = Number.isFinite(desiredLeft)
+      ? Math.max(currentLeft, desiredLeft)
+      : currentLeft;
 
     positionMap.set(nodeId, { x, y });
     currentLeft = x + width + SIBLING_GAP;
@@ -275,17 +299,24 @@ function placeNodesInRow(
   }
 
   const leftMost = Math.min(
-    ...nodeIds.map((nodeId) => positionMap.get(nodeId)?.x ?? START_X)
+    ...nodeIds.map((nodeId) => {
+      const x = positionMap.get(nodeId)?.x;
+      return typeof x === "number" && Number.isFinite(x) ? x : START_X;
+    })
   );
   const shift = leftMost - START_X;
 
-  if (shift > 0) {
+  if (Number.isFinite(shift) && shift > 0) {
     nodeIds.forEach((nodeId) => {
       const current = positionMap.get(nodeId);
       if (!current) {
         return;
       }
-      positionMap.set(nodeId, { x: current.x - shift, y: current.y });
+      const nextX = current.x - shift;
+      positionMap.set(nodeId, {
+        x: Number.isFinite(nextX) ? nextX : START_X,
+        y: current.y,
+      });
     });
   }
 }
@@ -319,7 +350,7 @@ function getPositionAnchor(
     .filter((value): value is number => typeof value === "number");
 
   if (centers.length === 0) {
-    return Number.POSITIVE_INFINITY;
+    return null;
   }
 
   return centers.reduce((sum, value) => sum + value, 0) / centers.length;
@@ -331,7 +362,7 @@ function getNodeCenter(
   nodeMap: Map<string, VisualizerNode>
 ) {
   const position = positionMap.get(nodeId);
-  if (!position) {
+  if (!position || !Number.isFinite(position.x)) {
     return null;
   }
 
