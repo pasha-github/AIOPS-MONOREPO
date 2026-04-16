@@ -3,13 +3,6 @@
 import { trimTrailingSlash } from "@/config/agent";
 import { useRuntimeConfig } from "@/config/runtime-config";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type {
-    AgentChatWorkspaceProps,
-    AdkSession,
-    ChatMessage,
-    StreamStep,
-    AppItem,
-} from "./types";
 import {
     DEFAULT_USER_ID,
     extractFunctionCalls,
@@ -24,16 +17,22 @@ import {
     mergeStreamingText,
     normalizeToolName,
     parseSsePayload,
-    renderMilestones,
     sortSessions,
-    summarizeStreamError,
+    summarizeStreamError
 } from "./chat_helpers";
+import type {
+    AdkSession,
+    AgentChatWorkspaceProps,
+    AppItem,
+    ChatMessage,
+    StreamStep,
+} from "./types";
 
-import ChatSidebar from "./components/ChatSidebar";
-import ChatHeader from "./components/ChatHeader";
-import ChatMessages from "./components/ChatMessages";
-import ChatInput from "./components/ChatInput";
 import AgentSidebar from "./components/AgentSidebar";
+import ChatHeader from "./components/ChatHeader";
+import ChatInput from "./components/ChatInput";
+import ChatMessages from "./components/ChatMessages";
+import ChatSidebar from "./components/ChatSidebar";
 
 export default function chatOps({
     agent,
@@ -187,7 +186,7 @@ export default function chatOps({
                 });
 
                 if (!response.ok) {
-                    throw new Error(`Failed to load messages: ${response.status}`);
+                    throw new Error(`Failed to load message: ${response.status}`);
                 }
 
                 const payload = (await response.json()) as AdkSession;
