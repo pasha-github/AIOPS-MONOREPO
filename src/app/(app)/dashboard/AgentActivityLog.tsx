@@ -1,5 +1,6 @@
 "use client";
 
+import { useRuntimeConfig } from "@/config/runtime-config";
 import {
   Activity,
   Bell,
@@ -24,6 +25,7 @@ import {
   fetchAgentSessionDetail,
   fetchAgentSessions,
   renderMarkdownBlocks,
+  resolveLogsApiBase,
 } from "./logs";
 
 const levelStyles = {
@@ -39,6 +41,8 @@ const entryIconStyles = {
 const REVEAL_INTERVAL_MS = 140;
 
 export default function AgentActivityLog() {
+  const { agentAdkBaseUrl } = useRuntimeConfig();
+  const logsApiBaseUrl = resolveLogsApiBase(agentAdkBaseUrl);
   const [sessions, setSessions] = useState<AgentSessionSummary[]>([]);
   const [sessionDetails, setSessionDetails] = useState<Record<string, AgentSessionDetail>>(
     {}
@@ -69,7 +73,11 @@ export default function AgentActivityLog() {
 
       setLoadingSessionId(sessionId);
       try {
-        const detail = await fetchAgentSessionDetail(sessionId, options?.signal);
+        const detail = await fetchAgentSessionDetail(
+          sessionId,
+          options?.signal,
+          logsApiBaseUrl
+        );
         setSessionDetails((current) => {
           const next = {
             ...current,
@@ -83,7 +91,7 @@ export default function AgentActivityLog() {
         setLoadingSessionId((current) => (current === sessionId ? null : current));
       }
     },
-    []
+    [logsApiBaseUrl]
   );
 
   const loadSessions = useCallback(
@@ -96,7 +104,7 @@ export default function AgentActivityLog() {
       setError("");
 
       try {
-        const nextSessions = await fetchAgentSessions(signal);
+        const nextSessions = await fetchAgentSessions(signal, logsApiBaseUrl);
         const nextSelectedSessionId =
           (selectedSessionIdRef.current &&
           nextSessions.some((session) => session.id === selectedSessionIdRef.current)
@@ -130,7 +138,7 @@ export default function AgentActivityLog() {
         setIsRefreshing(false);
       }
     },
-    [loadSessionDetail]
+    [loadSessionDetail, logsApiBaseUrl]
   );
 
   useEffect(() => {
