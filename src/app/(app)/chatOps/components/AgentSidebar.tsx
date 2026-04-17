@@ -64,15 +64,6 @@ export default function AgentSidebar({
           </div>
         )}
       </div>
-
-      {/* Footer */}
-      <div className="border-t border-gray-200 p-5 bg-white mt-auto">
-        <div className="flex items-center gap-3 text-sm">
-          <div className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse ring-2 ring-emerald-100" />
-          <span className="text-emerald-700 font-medium">Connected</span>
-        </div>
-        <p className="text-[10px] text-gray-400 mt-1 pl-5">Always ready</p>
-      </div>
     </aside>
   );
 }

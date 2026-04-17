@@ -805,8 +805,7 @@ export default function chatOps({
     // ============ RENDER ============
 
     return (
-        // <div className="flex w-full -m-10 h-[calc(100vh-64px)] overflow-hidden bg-white">
-        <div className="-m-10 flex h-screen overflow-hidden bg-white">
+        <div className="-m-10 flex h-[calc(100vh-73px)] min-h-0 overflow-hidden bg-white">
             {/* Left Sidebar - Sessions */}
             <ChatSidebar
                 sessions={sessions}
@@ -824,7 +823,7 @@ export default function chatOps({
             />
 
             {/* Center - Chat Area */}
-            <section className="flex min-w-0 flex-1 flex-col overflow-hidden">
+            <section className="flex min-w-0 flex-1 min-h-0 flex-col overflow-hidden">
                 <ChatHeader
                     assistantDisplayName={assistantDisplayName}
                     appName={appName}
