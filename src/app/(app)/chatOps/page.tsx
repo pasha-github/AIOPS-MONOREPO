@@ -112,10 +112,15 @@ export default function chatOps({
                 const data: AppItem[] = await response.json();
 
                 if (Array.isArray(data) && data.length > 0) {
-                    setApps(data);
+                    const visibleApps = data.filter(
+                        (app) =>
+                            String(app.type ?? "").trim().toLowerCase() !== "automation"
+                    );
+
+                    setApps(visibleApps);
 
                     const defaultApp =
-                        data.find((a) => a.agent_id === "supervisor") || data[0];
+                        visibleApps.find((a) => a.agent_id === "supervisor") || visibleApps[0] || null;
 
                     setSelectedApp(defaultApp);
                 }
