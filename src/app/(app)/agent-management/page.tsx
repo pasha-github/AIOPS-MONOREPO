@@ -49,11 +49,18 @@ const getLoadErrorMessage = (payload: unknown, fallback: string) => {
   return fallback;
 };
 
+type LlmDefaults = {
+  primary_model_id: string | null;
+  secondary_model_id: string | null;
+  tertiary_model_id: string | null;
+};
+
 export default function AgentManagementPage() {
   const { llmManagerApiBaseUrl } = useRuntimeConfig();
   const agentManagerApiBase = trimTrailingSlash(llmManagerApiBaseUrl);
   const agentListUrl = `${agentManagerApiBase}/agent/`;
   const llmListUrl = `${agentManagerApiBase}/llms/`;
+  const llmDefaultsUrl = `${agentManagerApiBase}/llms/defaults`;
   const [agents, setAgents] = useState<AgentRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -79,7 +86,7 @@ export default function AgentManagementPage() {
       }
 
       try {
-        const [agentResponse, llmResponse] = await Promise.all([
+        const [agentResponse, llmResponse, llmDefaultsResponse] = await Promise.all([
           fetch(agentListUrl, {
             headers: { accept: "application/json" },
             signal: options?.signal,
@@ -88,10 +95,15 @@ export default function AgentManagementPage() {
             headers: { accept: "application/json" },
             signal: options?.signal,
           }),
+          fetch(llmDefaultsUrl, {
+            headers: { accept: "application/json" },
+            signal: options?.signal,
+          }),
         ]);
-        const [agentPayload, llmPayload] = await Promise.all([
+        const [agentPayload, llmPayload, llmDefaultsPayload] = await Promise.all([
           agentResponse.json(),
           llmResponse.json(),
+          llmDefaultsResponse.json().catch(() => null),
         ]);
 
         // console.log("Agent list response:", {
@@ -136,6 +148,24 @@ export default function AgentManagementPage() {
           });
         }
 
+        const llmDefaults: LlmDefaults | null =
+          llmDefaultsResponse.ok &&
+          llmDefaultsPayload &&
+          typeof llmDefaultsPayload === "object" &&
+          !Array.isArray(llmDefaultsPayload)
+            ? {
+                primary_model_id: getStringOrNull(
+                  (llmDefaultsPayload as Record<string, unknown>).primary_model_id
+                ),
+                secondary_model_id: getStringOrNull(
+                  (llmDefaultsPayload as Record<string, unknown>).secondary_model_id
+                ),
+                tertiary_model_id: getStringOrNull(
+                  (llmDefaultsPayload as Record<string, unknown>).tertiary_model_id
+                ),
+              }
+            : null;
+
         const normalizedAgents = agentPayload.map((item, index) => {
           const record =
             item && typeof item === "object" && !Array.isArray(item)
@@ -155,9 +185,27 @@ export default function AgentManagementPage() {
           const llmRecord = modelId
             ? llmByModelId.get(modelId.toLowerCase())
             : undefined;
-          const primaryModelId = getStringOrNull(record.primary_model_id);
-          const secondaryModelId = getStringOrNull(record.secondary_model_id);
-          const tertiaryModelId = getStringOrNull(record.tertiary_model_id);
+          const primaryUseGlobal =
+            typeof record.primary_use_global === "boolean"
+              ? record.primary_use_global
+              : null;
+          const secondaryUseGlobal =
+            typeof record.secondary_use_global === "boolean"
+              ? record.secondary_use_global
+              : null;
+          const tertiaryUseGlobal =
+            typeof record.tertiary_use_global === "boolean"
+              ? record.tertiary_use_global
+              : null;
+          const primaryModelId =
+            getStringOrNull(record.primary_model_id) ??
+            (primaryUseGlobal ? llmDefaults?.primary_model_id ?? null : null);
+          const secondaryModelId =
+            getStringOrNull(record.secondary_model_id) ??
+            (secondaryUseGlobal ? llmDefaults?.secondary_model_id ?? null : null);
+          const tertiaryModelId =
+            getStringOrNull(record.tertiary_model_id) ??
+            (tertiaryUseGlobal ? llmDefaults?.tertiary_model_id ?? null : null);
           const primaryLlmRecord = primaryModelId
             ? llmByModelId.get(primaryModelId.toLowerCase())
             : undefined;
@@ -185,24 +233,15 @@ export default function AgentManagementPage() {
             model_id: modelId,
             modelName: llmRecord?.name ?? modelId,
             modelProvider: llmRecord?.provider ?? null,
-            primary_use_global:
-              typeof record.primary_use_global === "boolean"
-                ? record.primary_use_global
-                : null,
+            primary_use_global: primaryUseGlobal,
             primary_model_id: primaryModelId,
             primary_model_name: primaryLlmRecord?.name ?? primaryModelId,
             primary_model_provider: primaryLlmRecord?.provider ?? null,
-            secondary_use_global:
-              typeof record.secondary_use_global === "boolean"
-                ? record.secondary_use_global
-                : null,
+            secondary_use_global: secondaryUseGlobal,
             secondary_model_id: secondaryModelId,
             secondary_model_name: secondaryLlmRecord?.name ?? secondaryModelId,
             secondary_model_provider: secondaryLlmRecord?.provider ?? null,
-            tertiary_use_global:
-              typeof record.tertiary_use_global === "boolean"
-                ? record.tertiary_use_global
-                : null,
+            tertiary_use_global: tertiaryUseGlobal,
             tertiary_model_id: tertiaryModelId,
             tertiary_model_name: tertiaryLlmRecord?.name ?? tertiaryModelId,
             tertiary_model_provider: tertiaryLlmRecord?.provider ?? null,
@@ -244,7 +283,7 @@ export default function AgentManagementPage() {
         }
       }
     },
-    [agentListUrl, llmListUrl]
+    [agentListUrl, llmDefaultsUrl, llmListUrl]
   );
 
   useEffect(() => {

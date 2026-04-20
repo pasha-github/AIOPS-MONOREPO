@@ -254,18 +254,19 @@ export default function AgentRegistry({
   const getAgentLlmSlots = (agent: AgentRecord) => [
     {
       label: "Primary",
-      modelId: agent.primary_model_id ?? agent.model_id ?? null,
+      modelLabel:
+        agent.primary_model_name ?? agent.modelName ?? agent.primary_model_id ?? agent.model_id ?? null,
       provider:
         agent.primary_model_provider ?? agent.modelProvider ?? null,
     },
     {
       label: "Secondary",
-      modelId: agent.secondary_model_id ?? null,
+      modelLabel: agent.secondary_model_name ?? agent.secondary_model_id ?? null,
       provider: agent.secondary_model_provider ?? null,
     },
     {
       label: "Tertiary",
-      modelId: agent.tertiary_model_id ?? null,
+      modelLabel: agent.tertiary_model_name ?? agent.tertiary_model_id ?? null,
       provider: agent.tertiary_model_provider ?? null,
     },
   ];
@@ -280,7 +281,7 @@ export default function AgentRegistry({
         {slots.map((slot) => {
           const providerIcon = getProviderIconSrc(slot.provider);
           const providerLabel = slot.provider?.trim() || "-";
-          const modelLabel = slot.modelId?.trim() || "-";
+          const modelLabel = slot.modelLabel?.trim() || "-";
           return (
             <div
               key={`${agent.agent_id || agent.name}-${slot.label}`}
