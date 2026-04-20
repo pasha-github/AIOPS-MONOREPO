@@ -1,5 +1,6 @@
 "use client";
 
+import { buildSpinnerLabel } from "@/Spinnerverb";
 import { trimTrailingSlash } from "@/config/agent";
 import { useRuntimeConfig } from "@/config/runtime-config";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -454,10 +455,17 @@ export default function chatOps({
 
             functionCalls.forEach((toolCall) => {
                 const toolName = String(toolCall.name ?? "");
-                addRunningStep(`Running ${normalizeToolName(toolName)}`, {
+                addRunningStep(
+                    buildSpinnerLabel({
+                        kind: "running",
+                        subject: normalizeToolName(toolName),
+                        sequence: streamStepCounterRef.current,
+                    }),
+                    {
                     tool: toolName,
                     args: toolCall.args ?? {},
-                });
+                    }
+                );
             });
 
             const confirmations = payload.actions?.requestedToolConfirmations;
@@ -471,10 +479,18 @@ export default function chatOps({
 
             functionResponses.forEach((toolResponse) => {
                 const toolName = String(toolResponse.name ?? "");
-                addRunningStep(`Received ${normalizeToolName(toolName)} results`, {
+                addRunningStep(
+                    buildSpinnerLabel({
+                        kind: "received",
+                        subject: normalizeToolName(toolName),
+                        suffix: "results",
+                        sequence: streamStepCounterRef.current,
+                    }),
+                    {
                     tool: toolName,
                     response: toolResponse.response ?? {},
-                });
+                    }
+                );
             });
 
             if (visibleText) {
