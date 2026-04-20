@@ -60,21 +60,18 @@ export default function ChatSidebar({
                         return (
                             <div
                                 key={session.id}
-                                className={`mb-2 rounded-xl border px-3 py-2 transition ${isActive
+                                onClick={() => {
+                                    onSelectSession(session.id);
+                                    setOpenMenuSessionId(null);
+                                }}
+                                className={`mb-2 cursor-pointer rounded-xl border px-3 py-2 transition ${isActive
                                         ? "border-[#c9d1ff] bg-[#eef2ff]"
                                         : "border-[#e8ecf4] bg-white hover:bg-[#fafbfc]"
                                     }`}
                             >
                                 <div className="flex items-start gap-2">
                                     {/* Select Session Button */}
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            onSelectSession(session.id);
-                                            setOpenMenuSessionId(null);
-                                        }}
-                                        className="flex min-w-0 flex-1 items-start gap-2 text-left"
-                                    >
+                                    <div className="flex min-w-0 flex-1 items-start gap-2 text-left">
                                         <MessageSquare className="mt-0.5 h-4 w-4 shrink-0 text-[#4f49e2]" />
                                         <span className="line-clamp-2 text-xs font-semibold text-[#1f2937]">
                                             {session.state?.first_message_summary ? (
@@ -86,7 +83,7 @@ export default function ChatSidebar({
                                                 </span>
                                             )}
                                         </span>
-                                    </button>
+                                    </div>
 
                                     {/* Menu Button */}
                                     <div className="relative" data-session-menu="true">
