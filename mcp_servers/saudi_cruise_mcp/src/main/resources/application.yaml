@@ -1,0 +1,27 @@
+server:
+  port: 9095
+
+spring:
+  application:
+    name: aroya-cruise-service
+  ai:
+    mcp:
+      server:
+        name: aroya-cruise-mcp
+        version: 0.0.1
+        type: SYNC
+        protocol: STATELESS
+        instructions: Aroya Cruise MCP server for login, ports, destinations, and available voyages.
+        annotation-scanner:
+          enabled: true
+        stateless:
+          mcp-endpoint: /mcp
+
+aroya:
+  api:
+    base-url: https://uat-api.aroyacruises.com
+    integration-tasks-path: /reservation-mgr-exp-api-uat/v1/integration-tasks
+    client-id: 5dafd9ad8cc64273bc3d50c5ef2034db
+    client-secret: E4BD1B603Bc44c9abf6109802F778820
+    connect-timeout-seconds: 30
+    read-timeout-seconds: 60
