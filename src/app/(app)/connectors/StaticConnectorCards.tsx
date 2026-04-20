@@ -48,6 +48,11 @@ const STATIC_CONNECTORS: StaticConnector[] = [
     name: "Java Virtual Machine",
     logoSrc: "/img/JVM.png",
   },
+  {
+    id: "Apache-Kafka",
+    name: "Apache Kafka",
+    logoSrc: "/img/apache-kafka.png",
+  },
 ];
 
 export default function StaticConnectorCards({

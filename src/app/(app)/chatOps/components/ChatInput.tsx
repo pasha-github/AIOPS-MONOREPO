@@ -12,7 +12,7 @@ export default function ChatInput({
   onSend,
 }: ChatInputProps) {
   return (
-    <footer className="border-t border-[#eef1f7] bg-white px-6 py-4">
+    <footer className="shrink-0 border-t border-[#eef1f7] bg-white px-6 py-4">
       {messagesError ? (
         <p className="mb-2 text-xs font-semibold text-[#b91c1c]">{messagesError}</p>
       ) : null}

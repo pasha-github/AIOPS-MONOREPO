@@ -254,18 +254,19 @@ export default function AgentRegistry({
   const getAgentLlmSlots = (agent: AgentRecord) => [
     {
       label: "Primary",
-      modelId: agent.primary_model_id ?? agent.model_id ?? null,
+      modelLabel:
+        agent.primary_model_name ?? agent.modelName ?? agent.primary_model_id ?? agent.model_id ?? null,
       provider:
         agent.primary_model_provider ?? agent.modelProvider ?? null,
     },
     {
       label: "Secondary",
-      modelId: agent.secondary_model_id ?? null,
+      modelLabel: agent.secondary_model_name ?? agent.secondary_model_id ?? null,
       provider: agent.secondary_model_provider ?? null,
     },
     {
       label: "Tertiary",
-      modelId: agent.tertiary_model_id ?? null,
+      modelLabel: agent.tertiary_model_name ?? agent.tertiary_model_id ?? null,
       provider: agent.tertiary_model_provider ?? null,
     },
   ];
@@ -280,7 +281,7 @@ export default function AgentRegistry({
         {slots.map((slot) => {
           const providerIcon = getProviderIconSrc(slot.provider);
           const providerLabel = slot.provider?.trim() || "-";
-          const modelLabel = slot.modelId?.trim() || "-";
+          const modelLabel = slot.modelLabel?.trim() || "-";
           return (
             <div
               key={`${agent.agent_id || agent.name}-${slot.label}`}
@@ -536,7 +537,7 @@ export default function AgentRegistry({
       <div className="mt-5 overflow-visible rounded-2xl border border-[#eef1f7]">
         {isLoading ? (
           <div className="bg-white">
-            <div className="hidden grid-cols-[1.1fr_1.2fr_1.5fr_1.4fr_0.9fr_0.9fr_0.8fr_0.9fr] bg-[#eaf0f8] px-4 py-3 text-xs font-semibold uppercase tracking-[0.08em] text-[#0f172a] md:grid">
+            <div className="hidden grid-cols-[1.1fr_1.2fr_1.5fr_1.4fr_0.9fr_0.9fr_0.8fr_0.62fr] bg-[#eaf0f8] px-4 py-3 text-xs font-semibold uppercase tracking-[0.08em] text-[#0f172a] md:grid">
               <span>Name</span>
               <span>Description</span>
               <span>Models</span>
@@ -550,7 +551,7 @@ export default function AgentRegistry({
               {Array.from({ length: 4 }).map((_, index) => (
                 <div
                   key={`desktop-skeleton-${index}`}
-                  className="grid animate-pulse grid-cols-[1.1fr_1.2fr_1.5fr_1.4fr_0.9fr_0.9fr_0.8fr_0.9fr] items-center px-4 py-3"
+                  className="grid animate-pulse grid-cols-[1.1fr_1.2fr_1.5fr_1.4fr_0.9fr_0.9fr_0.8fr_0.62fr] items-center px-4 py-3"
                 >
                   {Array.from({ length: 7 }).map((__, cellIndex) => (
                     <span
@@ -611,7 +612,7 @@ export default function AgentRegistry({
         ) : (
           <>
             <div className="hidden md:block">
-              <div className="grid grid-cols-[1.1fr_1.2fr_1.5fr_1.4fr_0.9fr_0.9fr_0.8fr_0.9fr] items-stretch divide-x divide-[#d7e0ee] bg-[#eaf0f8] px-4 py-3 text-xs font-semibold uppercase tracking-[0.08em] text-[#0f172a]">
+              <div className="grid grid-cols-[1.1fr_1.2fr_1.5fr_1.4fr_0.9fr_0.9fr_0.8fr_0.62fr] items-stretch divide-x divide-[#d7e0ee] bg-[#eaf0f8] px-4 py-3 text-xs font-semibold uppercase tracking-[0.08em] text-[#0f172a]">
                 <button
                   type="button"
                   onClick={() => handleSort("name")}
@@ -696,7 +697,7 @@ export default function AgentRegistry({
                   return (
                     <div
                       key={`desktop-row-${rowKey}`}
-                      className="grid grid-cols-[1.1fr_1.2fr_1.5fr_1.4fr_0.9fr_0.9fr_0.8fr_0.9fr] items-stretch divide-x divide-[#e8eef7] px-4 py-3 text-sm text-[#2b3341] transition-colors hover:bg-[#f8fbff]"
+                      className="grid grid-cols-[1.1fr_1.2fr_1.5fr_1.4fr_0.9fr_0.9fr_0.8fr_0.62fr] items-stretch divide-x divide-[#e8eef7] px-4 py-3 text-sm text-[#2b3341] transition-colors hover:bg-[#f8fbff]"
                     >
                       <div className="flex h-full items-start px-3">
                         <span
