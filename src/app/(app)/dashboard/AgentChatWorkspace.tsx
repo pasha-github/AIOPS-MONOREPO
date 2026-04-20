@@ -1299,6 +1299,16 @@ export default function AgentChatWorkspace({
     await sendPrompt(lastUserPrompt);
   }, [isSending, lastUserPrompt, sendPrompt]);
 
+  const selectSession = useCallback(
+    (sessionId: string) => {
+      setSelectedSessionId(sessionId);
+      setIsDraftSession(false);
+      setOpenMenuSessionId(null);
+      void loadSessionMessages(sessionId);
+    },
+    [loadSessionMessages]
+  );
+
   const copyMessage = async (messageId: string, text: string) => {
     if (!navigator?.clipboard) {
       return;
@@ -1383,22 +1393,14 @@ export default function AgentChatWorkspace({
                 return (
                   <div
                     key={session.id}
+                    onClick={() => selectSession(session.id)}
                     className={`mb-2 rounded-xl border px-3 py-2 ${isActive
                         ? "border-[#c9d1ff] bg-[#eef2ff]"
                         : "border-[#e8ecf4] bg-white"
-                      }`}
+                      } cursor-pointer`}
                   >
                     <div className="flex items-start gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedSessionId(session.id);
-                          setIsDraftSession(false);
-                          setOpenMenuSessionId(null);
-                          void loadSessionMessages(session.id);
-                        }}
-                        className="flex min-w-0 flex-1 items-start gap-2 text-left"
-                      >
+                      <div className="flex min-w-0 flex-1 items-start gap-2 text-left">
                         <MessageSquare className="mt-0.5 h-4 w-4 shrink-0 text-[#4f49e2]" />
                         <span className="line-clamp-2 text-xs font-semibold text-[#1f2937]">
                           {session.state?.first_message_summary ? (
@@ -1410,15 +1412,16 @@ export default function AgentChatWorkspace({
                             </span>
                           )}
                         </span>
-                      </button>
+                      </div>
                       <div className="relative" data-session-menu="true">
                         <button
                           type="button"
-                          onClick={() =>
+                          onClick={(event) => {
+                            event.stopPropagation();
                             setOpenMenuSessionId((prev) =>
                               prev === session.id ? null : session.id
-                            )
-                          }
+                            );
+                          }}
                           className="inline-flex h-7 w-7 items-center justify-center rounded-full text-[#6b7280] hover:bg-[#eef2ff] hover:text-[#4f49e2]"
                           aria-label="Session actions"
                           title="Session actions"
@@ -1429,7 +1432,10 @@ export default function AgentChatWorkspace({
                           <div className="absolute right-0 z-20 mt-1 w-28 overflow-hidden rounded-lg border border-[#e5e7eb] bg-white shadow-[0_12px_24px_-20px_rgba(15,23,42,0.35)]">
                             <button
                               type="button"
-                              onClick={() => void deleteSession(session.id)}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                void deleteSession(session.id);
+                              }}
                               disabled={deletingSessionId === session.id}
                               className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-[#b91c1c] hover:bg-[#fff1f2] disabled:cursor-not-allowed disabled:opacity-70"
                             >
