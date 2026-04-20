@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import Image from "next/image";
 import { Bot, ChevronDown, Loader2, Pencil, Search, Trash2, X } from "lucide-react";
 import {
@@ -34,16 +34,11 @@ export default function LLMTableSection({
 }: LLMTableSectionProps) {
   const [searchValue, setSearchValue] = useState("");
   const [isSearchFocused, setIsSearchFocused] = useState(false);
-  const [isColumnMenuOpen, setIsColumnMenuOpen] = useState(false);
-  const [hiddenHeaders, setHiddenHeaders] = useState<Record<string, boolean>>(
-    {}
-  );
   const [sortKey, setSortKey] = useState<SortableHeader>("created_at");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [deleteTarget, setDeleteTarget] = useState<LLMRecord | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
-  const columnMenuRef = useRef<HTMLDivElement | null>(null);
   const [updateTarget, setUpdateTarget] = useState<LlmRecord | null>(null);
   const isUpdateModalOpen = updateTarget !== null;
   const getHeaderLabel = (header: string) =>
@@ -65,41 +60,11 @@ export default function LLMTableSection({
     return [...ordered, ...extras];
   }, [llms]);
 
-  useEffect(() => {
-    if (!isColumnMenuOpen) {
-      return;
-    }
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        columnMenuRef.current &&
-        !columnMenuRef.current.contains(event.target as Node)
-      ) {
-        setIsColumnMenuOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [isColumnMenuOpen]);
-
-  const visibleHeaders = useMemo(
-    () => tableHeaders.filter((header) => !hiddenHeaders[header]),
-    [tableHeaders, hiddenHeaders]
-  );
+  const visibleHeaders = tableHeaders;
   const loadingHeaders =
     visibleHeaders.length > 0
       ? visibleHeaders
       : ["name", "provider", "created_at", "description"];
-
-  const handleToggleHeader = (header: string) => {
-    const currentlyVisible = visibleHeaders.includes(header);
-    if (currentlyVisible && visibleHeaders.length === 1) {
-      return;
-    }
-    setHiddenHeaders((previous) => ({
-      ...previous,
-      [header]: !previous[header],
-    }));
-  };
 
   const handleSort = (header: SortableHeader) => {
     if (sortKey === header) {
@@ -213,46 +178,6 @@ export default function LLMTableSection({
               onBlur={() => setIsSearchFocused(false)}
               className="w-full bg-transparent text-sm text-[#4f49e2] placeholder:text-[#4f49e2] focus:outline-none"
             />
-          </div>
-          <div ref={columnMenuRef} className="relative">
-            <button
-              type="button"
-              onClick={() => setIsColumnMenuOpen((previous) => !previous)}
-              className="inline-flex items-center gap-2 rounded-xl border border-[#e0e5f0] bg-white px-4 py-2 text-sm font-semibold text-[#4f49e2] transition hover:bg-[#eef2ff]"
-            >
-              Columns
-              <ChevronDown className="h-4 w-4" />
-            </button>
-            {isColumnMenuOpen ? (
-              <div className="absolute right-0 z-30 mt-2 w-52 overflow-hidden rounded-xl border border-[#e5e7eb] bg-white shadow-[0_12px_24px_-20px_rgba(15,23,42,0.35)]">
-                <div className="max-h-64 overflow-auto p-2">
-                  {tableHeaders.map((header) => {
-                    const isVisible = visibleHeaders.includes(header);
-                    const isOnlyVisible = isVisible && visibleHeaders.length === 1;
-                    return (
-                      <label
-                        key={header}
-                        className={`flex items-center gap-2 rounded-lg px-2 py-2 text-sm ${isOnlyVisible
-                          ? "cursor-not-allowed text-[#9ca3af]"
-                          : "cursor-pointer text-[#111827] hover:bg-[#f3f4f6]"
-                          }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isVisible}
-                          disabled={isOnlyVisible}
-                          onChange={() => handleToggleHeader(header)}
-                          className="h-4 w-4 rounded border-[#d1d5db] text-[#4f49e2] focus:ring-[#c7c4f7]"
-                        />
-                        <span className="break-words whitespace-normal font-medium uppercase tracking-[0.06em]">
-                          {getHeaderLabel(header)}
-                        </span>
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
-            ) : null}
           </div>
         </div>
       </div>

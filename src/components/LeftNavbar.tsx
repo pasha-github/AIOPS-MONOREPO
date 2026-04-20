@@ -30,8 +30,6 @@ type NavSection = {
   items: NavItem[];
 };
 
-const ENABLE_CREDENTIALS_MANAGEMENT = true;
-
 const navSections: NavSection[] = [
   {
     title: "Core",
@@ -73,25 +71,28 @@ const navSections: NavSection[] = [
         icon: <Workflow className="h-5 w-5" />,
         href: "/llm-management",
       },
+      {
+        label: "User Management",
+        id: "platform-user-management",
+        icon: <Users className="h-5 w-5" />,
+        href: "/user-management",
+      },
     ],
   },
   {
-    title: "Operations",
+    title: "Integrations",
     items: [
       {
         label: "Connectors",
-        id: "operations-connectors",
+        id: "integrations-connectors",
         icon: <Link2 className="h-5 w-5" />,
-
         href: "/connectors",
-        disabled: !ENABLE_CREDENTIALS_MANAGEMENT,
         reloadOnNavigate: true,
       },
       {
-        label: "User Management",
-        id: "operations-user-management",
-        icon: <Users className="h-5 w-5" />,
-        href: "/user-management",
+        label: "Model Context Protocol",
+        id: "integrations-model-context-protocol",
+        icon: <Link2 className="h-5 w-5" />,
       },
     ],
   },
@@ -185,12 +186,12 @@ export default function LeftNavbar() {
                   </>
                 );
 
-                if (isDisabled) {
+                if (isDisabled || !item.href) {
                   return (
                     <div
                       key={item.id}
                       title={item.label}
-                      aria-disabled="true"
+                      aria-disabled={isDisabled ? "true" : undefined}
                       className={`${baseClasses} ${stateClasses}`}
                     >
                       {itemContent}

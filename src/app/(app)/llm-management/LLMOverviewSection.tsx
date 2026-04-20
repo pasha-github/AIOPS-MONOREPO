@@ -324,26 +324,6 @@ export default function LLMOverviewSection({
           </div>
         </div>
 
-        <div className="grid gap-4 xl:grid-cols-3">
-          {defaultSelectors.map((selector) => (
-            <DefaultSelector
-              key={selector.slot}
-              title={selector.title}
-              value={selector.value}
-              options={modelOptions}
-              isLoading={isDefaultsLoading || isLoading}
-              isUpdating={updatingDefaultSlot === selector.slot}
-              onChange={(modelId) => {
-                void onDefaultChange(selector.slot, modelId);
-              }}
-            />
-          ))}
-        </div>
-
-        {defaultsError ? (
-          <p className="text-sm font-medium text-[#dc2626]">{defaultsError}</p>
-        ) : null}
-
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {statCards.map((card) => {
             const Icon = card.icon;
@@ -376,6 +356,26 @@ export default function LLMOverviewSection({
             );
           })}
         </div>
+
+        <div className="grid gap-4 xl:grid-cols-3">
+          {defaultSelectors.map((selector) => (
+            <DefaultSelector
+              key={selector.slot}
+              title={selector.title}
+              value={selector.value}
+              options={modelOptions}
+              isLoading={isDefaultsLoading || isLoading}
+              isUpdating={updatingDefaultSlot === selector.slot}
+              onChange={(modelId) => {
+                void onDefaultChange(selector.slot, modelId);
+              }}
+            />
+          ))}
+        </div>
+
+        {defaultsError ? (
+          <p className="text-sm font-medium text-[#dc2626]">{defaultsError}</p>
+        ) : null}
       </div>
     </section>
   );

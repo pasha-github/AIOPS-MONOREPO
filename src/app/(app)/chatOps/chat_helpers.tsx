@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Check, ChevronDown, ChevronRight } from "lucide-react";
+import { buildSpinnerLabel } from "@/Spinnerverb";
 import {
     AdkSsePayload,
     StreamStep,
@@ -147,18 +148,33 @@ export const mapEventsToMessages = (events: AdkEvent[] | null | undefined) => {
 
         functionCalls.forEach((toolCall) => {
             const toolName = String(toolCall.name ?? "");
-            addPendingMilestone(`Running ${normalizeToolName(toolName)}`, {
+            addPendingMilestone(
+                buildSpinnerLabel({
+                    kind: "running",
+                    subject: normalizeToolName(toolName),
+                    sequence: stepCounter,
+                }),
+                {
                 tool: toolName,
                 args: toolCall.args ?? {},
-            });
+                }
+            );
         });
 
         functionResponses.forEach((toolResponse) => {
             const toolName = String(toolResponse.name ?? "");
-            addPendingMilestone(`Received ${normalizeToolName(toolName)} results`, {
+            addPendingMilestone(
+                buildSpinnerLabel({
+                    kind: "received",
+                    subject: normalizeToolName(toolName),
+                    suffix: "results",
+                    sequence: stepCounter,
+                }),
+                {
                 tool: toolName,
                 response: toolResponse.response ?? {},
-            });
+                }
+            );
         });
 
         const text = extractVisibleTextFromParts(parts).trim();

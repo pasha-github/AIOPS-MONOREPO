@@ -1,5 +1,6 @@
 "use client";
 
+import { buildSpinnerLabel } from "@/Spinnerverb";
 import { trimTrailingSlash } from "@/config/agent";
 import { useRuntimeConfig } from "@/config/runtime-config";
 import {
@@ -311,17 +312,32 @@ const mapEventsToMessages = (events: AdkEvent[] | null | undefined) => {
     const functionResponses = extractFunctionResponses(parts);
     functionCalls.forEach((toolCall) => {
       const toolName = String(toolCall.name ?? "");
-      addPendingMilestone(`Running ${normalizeToolName(toolName)}`, {
-        tool: toolName,
-        args: toolCall.args ?? {},
-      });
+      addPendingMilestone(
+        buildSpinnerLabel({
+          kind: "running",
+          subject: normalizeToolName(toolName),
+          sequence: stepCounter,
+        }),
+        {
+          tool: toolName,
+          args: toolCall.args ?? {},
+        }
+      );
     });
     functionResponses.forEach((toolResponse) => {
       const toolName = String(toolResponse.name ?? "");
-      addPendingMilestone(`Received ${normalizeToolName(toolName)} results`, {
-        tool: toolName,
-        response: toolResponse.response ?? {},
-      });
+      addPendingMilestone(
+        buildSpinnerLabel({
+          kind: "received",
+          subject: normalizeToolName(toolName),
+          suffix: "results",
+          sequence: stepCounter,
+        }),
+        {
+          tool: toolName,
+          response: toolResponse.response ?? {},
+        }
+      );
     });
 
     const text = extractVisibleTextFromParts(parts).trim();
@@ -1001,10 +1017,17 @@ export default function AgentChatWorkspace({
 
     functionCalls.forEach((toolCall) => {
       const toolName = String(toolCall.name ?? "");
-      addRunningStep(`Running ${normalizeToolName(toolName)}`, {
-        tool: toolName,
-        args: toolCall.args ?? {},
-      });
+      addRunningStep(
+        buildSpinnerLabel({
+          kind: "running",
+          subject: normalizeToolName(toolName),
+          sequence: streamStepCounterRef.current,
+        }),
+        {
+          tool: toolName,
+          args: toolCall.args ?? {},
+        }
+      );
     });
 
     const confirmations = payload.actions?.requestedToolConfirmations;
@@ -1018,10 +1041,18 @@ export default function AgentChatWorkspace({
 
     functionResponses.forEach((toolResponse) => {
       const toolName = String(toolResponse.name ?? "");
-      addRunningStep(`Received ${normalizeToolName(toolName)} results`, {
-        tool: toolName,
-        response: toolResponse.response ?? {},
-      });
+      addRunningStep(
+        buildSpinnerLabel({
+          kind: "received",
+          subject: normalizeToolName(toolName),
+          suffix: "results",
+          sequence: streamStepCounterRef.current,
+        }),
+        {
+          tool: toolName,
+          response: toolResponse.response ?? {},
+        }
+      );
     });
 
     if (visibleText) {

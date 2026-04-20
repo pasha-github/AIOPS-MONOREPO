@@ -133,4 +133,5 @@ export interface ChatSidebarProps {
 export interface AppItem {
   agent_id: string;
   name: string;
+  type?: string | null;
 };

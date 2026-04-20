@@ -1,5 +1,6 @@
 "use client";
 
+import { buildSpinnerLabel } from "@/Spinnerverb";
 import { trimTrailingSlash } from "@/config/agent";
 import { useRuntimeConfig } from "@/config/runtime-config";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -111,10 +112,15 @@ export default function chatOps({
                 const data: AppItem[] = await response.json();
 
                 if (Array.isArray(data) && data.length > 0) {
-                    setApps(data);
+                    const visibleApps = data.filter(
+                        (app) =>
+                            String(app.type ?? "").trim().toLowerCase() !== "automation"
+                    );
+
+                    setApps(visibleApps);
 
                     const defaultApp =
-                        data.find((a) => a.agent_id === "supervisor") || data[0];
+                        visibleApps.find((a) => a.agent_id === "supervisor") || visibleApps[0] || null;
 
                     setSelectedApp(defaultApp);
                 }
@@ -448,10 +454,17 @@ export default function chatOps({
 
             functionCalls.forEach((toolCall) => {
                 const toolName = String(toolCall.name ?? "");
-                addRunningStep(`Running ${normalizeToolName(toolName)}`, {
+                addRunningStep(
+                    buildSpinnerLabel({
+                        kind: "running",
+                        subject: normalizeToolName(toolName),
+                        sequence: streamStepCounterRef.current,
+                    }),
+                    {
                     tool: toolName,
                     args: toolCall.args ?? {},
-                });
+                    }
+                );
             });
 
             const confirmations = payload.actions?.requestedToolConfirmations;
@@ -465,10 +478,18 @@ export default function chatOps({
 
             functionResponses.forEach((toolResponse) => {
                 const toolName = String(toolResponse.name ?? "");
-                addRunningStep(`Received ${normalizeToolName(toolName)} results`, {
+                addRunningStep(
+                    buildSpinnerLabel({
+                        kind: "received",
+                        subject: normalizeToolName(toolName),
+                        suffix: "results",
+                        sequence: streamStepCounterRef.current,
+                    }),
+                    {
                     tool: toolName,
                     response: toolResponse.response ?? {},
-                });
+                    }
+                );
             });
 
             if (visibleText) {
