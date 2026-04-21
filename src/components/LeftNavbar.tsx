@@ -93,6 +93,7 @@ const navSections: NavSection[] = [
         label: "Model Context Protocol",
         id: "integrations-model-context-protocol",
         icon: <Link2 className="h-5 w-5" />,
+        href: "/mcp",
       },
     ],
   },
