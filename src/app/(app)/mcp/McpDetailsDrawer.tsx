@@ -213,9 +213,9 @@ export default function McpDetailsDrawer({
   onClose,
 }: McpDetailsDrawerProps) {
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
-    overview: true,
-    metadata: true,
-    tools: true,
+    overview: false,
+    metadata: false,
+    tools: false,
     resources: false,
   });
   const [openTools, setOpenTools] = useState<Record<string, boolean>>({});
@@ -238,8 +238,8 @@ export default function McpDetailsDrawer({
   };
 
   return (
-    <div className="fixed inset-0 z-[90] flex justify-end bg-black/30 backdrop-blur-[1px]">
-      <div className="flex h-full w-full max-w-[760px] flex-col overflow-hidden border-l border-[#e5e7eb] bg-[#fcfdff] shadow-[-24px_0_60px_-34px_rgba(15,23,42,0.55)]">
+    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/30 p-4 backdrop-blur-[1px]">
+      <div className="flex h-[88vh] w-full max-w-[960px] flex-col overflow-hidden rounded-[32px] border border-[#e5e7eb] bg-[#fcfdff] shadow-[0_24px_70px_-34px_rgba(15,23,42,0.6)]">
         <div className="border-b border-[#eef1f7] bg-white px-7 py-6">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
