@@ -74,7 +74,7 @@ export default function TopBar() {
   return (
     <header className="flex items-center justify-between border-b border-[#e6e9f2] bg-white px-8 py-4">
       <div className="flex items-center gap-4">
-        <h1 className="text-xl font-semibold text-[#10131a]">{title}</h1>
+        <h1 className="text-xl font-semibold text-[#10131a]">{title === "Mcp" ? title.toUpperCase() : title}</h1>
       </div>
 
       <div className="relative flex items-center gap-4" ref={menuRef}>
