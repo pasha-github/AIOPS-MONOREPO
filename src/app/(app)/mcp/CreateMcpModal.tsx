@@ -1,7 +1,13 @@
 "use client";
 
-import { ChevronDown, Loader2, X } from "lucide-react";
+import { ChevronDown, Loader2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import McpDetailsDrawer from "./McpDetailsDrawer";
+import {
+  normalizeTestMcpServer,
+  type McpServer,
+} from "./mcpHelpers";
+import TestMcp from "./testmcp";
 
 export type McpAuthType = "none" | "bearer" | "basic";
 
@@ -20,8 +26,10 @@ export type McpActionResult = {
 };
 
 type CreateMcpModalProps = {
+  mcpApiBase: string;
   onClose: () => void;
   onCreate: (payload: CreateMcpPayload) => Promise<McpActionResult>;
+  onCreateSuccess: () => void;
 };
 
 type SelectOption = {
@@ -103,8 +111,10 @@ function RoundedSelect({
 }
 
 export default function CreateMcpModal({
+  mcpApiBase,
   onClose,
   onCreate,
+  onCreateSuccess,
 }: CreateMcpModalProps) {
   const modalRef = useRef<HTMLDivElement | null>(null);
   const [name, setName] = useState("");
@@ -116,6 +126,7 @@ export default function CreateMcpModal({
   const [submitError, setSubmitError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitAttempted, setIsSubmitAttempted] = useState(false);
+  const [testedServer, setTestedServer] = useState<McpServer | null>(null);
 
   useEffect(() => {
     const modalElement = modalRef.current;
@@ -158,6 +169,11 @@ export default function CreateMcpModal({
     (!needsAuthUsername || trimmedAuthUsername.length > 0) &&
     (!needsAuthSecret || trimmedAuthSecret.length > 0);
 
+  const isTestFormValid =
+    trimmedServerUrl.length > 0 &&
+    (!needsAuthUsername || trimmedAuthUsername.length > 0) &&
+    (!needsAuthSecret || trimmedAuthSecret.length > 0);
+
   const shouldShowError = (valid: boolean) => isSubmitAttempted && !valid;
 
   const handleSubmit = async () => {
@@ -187,6 +203,18 @@ export default function CreateMcpModal({
 
     setIsSubmitting(false);
     onClose();
+    window.setTimeout(() => {
+      onCreateSuccess();
+    }, 0);
+  };
+
+  const currentPayload: CreateMcpPayload = {
+    name: trimmedName,
+    server_url: trimmedServerUrl,
+    description: trimmedDescription,
+    auth_type: authType,
+    auth_username: needsAuthUsername ? trimmedAuthUsername : "",
+    auth_secret: needsAuthSecret ? trimmedAuthSecret : "",
   };
 
   return (
@@ -196,31 +224,22 @@ export default function CreateMcpModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="create-mcp-title"
-        className="w-full max-w-xl overflow-hidden rounded-2xl bg-white shadow-[0_18px_50px_-30px_rgba(15,23,42,0.6)]"
+        className="flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl bg-white shadow-[0_18px_50px_-30px_rgba(15,23,42,0.6)]"
       >
-        <div className="flex items-center justify-between border-b border-[#eef1f7] px-6 py-4">
+        <div className="flex items-center justify-between bg-[#4f49e2] px-6 py-4 text-white">
           <div>
-            <h4 id="create-mcp-title" className="text-lg font-semibold text-[#111827]">
+            <h4 id="create-mcp-title" className="text-lg font-semibold text-white">
               Create MCP Server
             </h4>
-            <p className="mt-1 text-sm text-[#8b95ad]">
+            <p className="mt-1 text-sm text-white/80">
               Register a new Model Context Protocol endpoint.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => {
-              if (!isSubmitting) {
-                onClose();
-              }
-            }}
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-[#f3f4f6] text-[#111827]"
-          >
-            <X className="h-4 w-4" />
-          </button>
+          
         </div>
 
-        <div className="space-y-4 px-6 py-5">
+        <div className="flex-1 overflow-y-auto px-6 py-5">
+          <div className="space-y-4">
           <div className="space-y-2">
             <label className="text-sm font-semibold text-[#111827]">
               Name <span className="text-[#ef4444]">*</span>
@@ -333,35 +352,55 @@ export default function CreateMcpModal({
           {submitError ? (
             <p className="text-sm font-medium text-[#dc2626]">{submitError}</p>
           ) : null}
+          </div>
         </div>
 
-        <div className="flex items-center justify-end gap-3 border-t border-[#eef1f7] px-6 py-4">
-          <button
-            type="button"
-            onClick={() => {
-              if (!isSubmitting) {
-                onClose();
+        <div className="flex items-center justify-between gap-3 border-t border-[#eef1f7] px-6 py-4">
+          <TestMcp
+            mcpApiBase={mcpApiBase}
+            payload={currentPayload}
+            disabled={!isTestFormValid || isSubmitting}
+            onTestSuccess={(response) => {
+              const normalized = normalizeTestMcpServer(response, currentPayload);
+              if (normalized) {
+                setTestedServer(normalized);
               }
             }}
-            className="rounded-xl border border-[#e5e7eb] px-5 py-2 text-sm font-semibold text-[#374151] hover:bg-[#f8fafc]"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={!isFormValid || isSubmitting}
-            className={`inline-flex min-w-[170px] items-center justify-center gap-2 rounded-xl px-5 py-2 text-sm font-semibold text-white ${
-              !isFormValid || isSubmitting
-                ? "cursor-not-allowed bg-[#c7c4f7]"
-                : "bg-[#4f49e2] shadow-[0_10px_24px_-18px_rgba(79,73,226,0.9)] hover:bg-[#3f39d6]"
-            }`}
-          >
-            {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            {isSubmitting ? "Creating..." : "Create MCP Server"}
-          </button>
+          />
+
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                if (!isSubmitting) {
+                  onClose();
+                }
+              }}
+              className="rounded-xl border border-[#e5e7eb] px-5 py-2 text-sm font-semibold text-[#374151] hover:bg-[#f8fafc]"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={!isFormValid || isSubmitting}
+              className={`inline-flex min-w-[170px] items-center justify-center gap-2 rounded-xl px-5 py-2 text-sm font-semibold text-white ${
+                !isFormValid || isSubmitting
+                  ? "cursor-not-allowed bg-[#c7c4f7]"
+                  : "bg-[#4f49e2] shadow-[0_10px_24px_-18px_rgba(79,73,226,0.9)] hover:bg-[#3f39d6]"
+              }`}
+            >
+              {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              {isSubmitting ? "Creating..." : "Create MCP Server"}
+            </button>
+          </div>
         </div>
       </div>
+
+      <McpDetailsDrawer
+        server={testedServer}
+        onClose={() => setTestedServer(null)}
+      />
     </div>
   );
 }

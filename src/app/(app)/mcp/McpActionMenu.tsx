@@ -32,6 +32,7 @@ export default function McpActionMenu({
   const buttonRef = useRef<HTMLButtonElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
+  const [openUpward, setOpenUpward] = useState(false);
 
   useEffect(() => {
     if (!isOpen) {
@@ -45,16 +46,24 @@ export default function McpActionMenu({
 
       const rect = buttonRef.current.getBoundingClientRect();
       const menuWidth = 176;
+      const estimatedMenuHeight = 120;
       const viewportPadding = 16;
       const nextLeft = Math.min(
         Math.max(viewportPadding, rect.right - menuWidth),
         window.innerWidth - menuWidth - viewportPadding
       );
+      const shouldOpenUpward =
+        rect.bottom + 8 + estimatedMenuHeight >
+        window.innerHeight - viewportPadding;
+      const nextTop = shouldOpenUpward
+        ? Math.max(viewportPadding, rect.top - estimatedMenuHeight - 8)
+        : rect.bottom + 8;
 
       setMenuPosition({
-        top: rect.bottom + 8,
+        top: nextTop,
         left: nextLeft,
       });
+      setOpenUpward(shouldOpenUpward);
     };
 
     updatePosition();
@@ -136,6 +145,7 @@ export default function McpActionMenu({
               style={{
                 top: `${menuPosition.top}px`,
                 left: `${menuPosition.left}px`,
+                transformOrigin: openUpward ? "bottom right" : "top right",
               }}
             >
               {actions.map((action) => {

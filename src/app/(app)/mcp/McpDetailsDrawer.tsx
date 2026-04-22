@@ -240,23 +240,23 @@ export default function McpDetailsDrawer({
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/30 p-4 backdrop-blur-[1px]">
       <div className="flex h-[88vh] w-full max-w-[960px] flex-col overflow-hidden rounded-[32px] border border-[#e5e7eb] bg-[#fcfdff] shadow-[0_24px_70px_-34px_rgba(15,23,42,0.6)]">
-        <div className="border-b border-[#eef1f7] bg-white px-7 py-6">
+        <div className="bg-[#4f49e2] px-7 py-6 text-white">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
               <div className="flex items-center gap-3">
-                <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#eef2ff] text-[#4f49e2]">
+                <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/15 text-white">
                   <Server className="h-5 w-5" />
                 </span>
                 <div className="min-w-0">
-                  <h3 className="truncate text-xl font-semibold text-[#111827]">
+                  <h3 className="truncate text-xl font-semibold text-white">
                     {server.name}
                   </h3>
-                  <p className="mt-1 break-all text-sm text-[#5b6476]">
+                  <p className="mt-1 break-all text-sm text-white/80">
                     {server.server_url}
                   </p>
                 </div>
               </div>
-              <p className="mt-4 text-sm leading-6 text-[#4b5563]">
+              <p className="mt-4 text-sm leading-6 text-white/85">
                 {server.description}
               </p>
             </div>
@@ -264,7 +264,7 @@ export default function McpDetailsDrawer({
             <button
               type="button"
               onClick={onClose}
-              className="flex h-11 w-11 items-center justify-center rounded-full border border-[#e5e7eb] bg-white text-[#64748b] transition hover:bg-[#f8fafc]"
+              className="flex h-11 w-11 items-center justify-center rounded-full border border-white/25 bg-white/10 text-white transition hover:bg-white/20"
             >
               <X className="h-4 w-4" />
             </button>

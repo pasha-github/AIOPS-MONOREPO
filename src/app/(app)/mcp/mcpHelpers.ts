@@ -34,6 +34,11 @@ export type McpServer = {
   updated_at: string | null;
 };
 
+type TestMcpPayloadShape = {
+  auth_secret?: string;
+  description?: string;
+};
+
 const formatText = (value: unknown) => {
   const text = String(value ?? "").trim();
   return text || "-";
@@ -100,6 +105,30 @@ export const normalizeMcpServer = (input: unknown): McpServer | null => {
         ? null
         : String(record.updated_at),
   };
+};
+
+export const normalizeTestMcpServer = (
+  input: unknown,
+  payload?: TestMcpPayloadShape
+): McpServer | null => {
+  if (!input || typeof input !== "object") {
+    return null;
+  }
+
+  const record = input as Record<string, unknown>;
+  const nextRecord: Record<string, unknown> = {
+    ...record,
+    mcp_server_id: record.mcp_server_id ?? "test-mcp-server",
+    server_url: record.server_url ?? record.url,
+    description: record.description ?? payload?.description ?? "-",
+    has_auth_secret:
+      record.has_auth_secret ??
+      Boolean(payload?.auth_secret && String(payload.auth_secret).trim()),
+    created_at: record.created_at ?? null,
+    updated_at: record.updated_at ?? null,
+  };
+
+  return normalizeMcpServer(nextRecord);
 };
 
 export const formatDateTime = (value: string | null) => {

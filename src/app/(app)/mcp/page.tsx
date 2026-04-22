@@ -2,7 +2,7 @@
 
 import { trimTrailingSlash } from "@/config/agent";
 import { useRuntimeConfig } from "@/config/runtime-config";
-import { Loader2, Plus, RefreshCw, Trash2, X } from "lucide-react";
+import { Loader2, Plus, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import CreateMcpModal, {
   type CreateMcpPayload,
@@ -33,7 +33,6 @@ export default function McpPage() {
 
   const [servers, setServers] = useState<McpServer[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [selectedServer, setSelectedServer] = useState<McpServer | null>(null);
   const [updateTargetId, setUpdateTargetId] = useState<string | null>(null);
@@ -51,17 +50,10 @@ export default function McpPage() {
   }, [servers]);
 
   const loadServers = useCallback(
-    async (options?: { signal?: AbortSignal; refresh?: boolean }) => {
+    async (options?: { signal?: AbortSignal }) => {
       const requestId = ++requestIdRef.current;
-      const hasData = serversRef.current.length > 0;
-      const shouldRefresh = Boolean(options?.refresh && hasData);
-
-      if (shouldRefresh) {
-        setIsRefreshing(true);
-      } else {
-        setIsLoading(true);
-        setLoadError("");
-      }
+      setIsLoading(true);
+      setLoadError("");
 
       try {
         const response = await fetch(mcpListUrl, {
@@ -81,16 +73,12 @@ export default function McpPage() {
         }
 
         if (!response.ok) {
-          if (!shouldRefresh) {
-            setLoadError(getMcpErrorMessage(data, "Unable to load MCP servers."));
-          }
+          setLoadError(getMcpErrorMessage(data, "Unable to load MCP servers."));
           return;
         }
 
         if (!Array.isArray(data)) {
-          if (!shouldRefresh) {
-            setLoadError("Unable to load MCP servers.");
-          }
+          setLoadError("Unable to load MCP servers.");
           return;
         }
 
@@ -111,19 +99,12 @@ export default function McpPage() {
         if (error instanceof DOMException && error.name === "AbortError") {
           return;
         }
-        if (!shouldRefresh) {
-          setLoadError("Unable to load MCP servers.");
-        }
+        setLoadError("Unable to load MCP servers.");
       } finally {
         if (requestId !== requestIdRef.current) {
           return;
         }
-
-        if (shouldRefresh) {
-          setIsRefreshing(false);
-        } else {
-          setIsLoading(false);
-        }
+        setIsLoading(false);
       }
     },
     [mcpListUrl]
@@ -138,11 +119,11 @@ export default function McpPage() {
   useEffect(() => {
     const handleVisibility = () => {
       if (document.visibilityState === "visible") {
-        loadServers({ refresh: true });
+        loadServers();
       }
     };
 
-    const handleFocus = () => loadServers({ refresh: true });
+    const handleFocus = () => loadServers();
     window.addEventListener("focus", handleFocus);
     document.addEventListener("visibilitychange", handleVisibility);
 
@@ -212,9 +193,7 @@ export default function McpPage() {
         };
       }
 
-      setToastMessage("MCP server created successfully.");
-      setIsToastVisible(true);
-      await loadServers({ refresh: true });
+      await loadServers();
       return { ok: true };
     } catch {
       return { ok: false, error: "Unable to create MCP server." };
@@ -254,7 +233,7 @@ export default function McpPage() {
       setDeleteTarget(null);
       setToastMessage("MCP server deleted successfully.");
       setIsToastVisible(true);
-      await loadServers({ refresh: true });
+      await loadServers();
     } catch {
       setDeleteError("Unable to delete MCP server.");
     } finally {
@@ -307,26 +286,14 @@ export default function McpPage() {
               ))}
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center">
               <button
                 type="button"
                 onClick={() => setIsCreateOpen(true)}
                 className="inline-flex items-center gap-2 rounded-xl bg-[#4f49e2] px-5 py-3 text-sm font-semibold text-white shadow-[0_12px_24px_-14px_rgba(79,73,226,0.6)] transition hover:bg-[#3f39d6] active:scale-95"
               >
                 <Plus className="h-4 w-4" />
-                Create and Test MCP Server
-              </button>
-
-              <button
-                type="button"
-                onClick={() => void loadServers({ refresh: true })}
-                disabled={isRefreshing || isLoading}
-                className="inline-flex items-center gap-2 rounded-xl border border-[#e3e7f2] bg-white px-4 py-2 text-sm font-semibold text-[#4f49e2] shadow-[0_10px_20px_-16px_rgba(79,73,226,0.5)] transition hover:bg-[#eef2ff] disabled:cursor-not-allowed disabled:opacity-70"
-              >
-                <RefreshCw
-                  className={`h-4 w-4 ${isRefreshing || isLoading ? "animate-spin" : ""}`}
-                />
-                Refresh MCP
+                Register MCP Server
               </button>
             </div>
           </div>
@@ -367,8 +334,13 @@ export default function McpPage() {
 
       {isCreateOpen ? (
         <CreateMcpModal
+          mcpApiBase={mcpApiBase}
           onClose={() => setIsCreateOpen(false)}
           onCreate={handleCreateServer}
+          onCreateSuccess={() => {
+            setToastMessage("MCP server created successfully.");
+            setIsToastVisible(true);
+          }}
         />
       ) : null}
 
@@ -378,9 +350,7 @@ export default function McpPage() {
           mcpApiBase={mcpApiBase}
           onClose={() => setUpdateTargetId(null)}
           onUpdated={async () => {
-            setToastMessage("MCP server updated successfully.");
-            setIsToastVisible(true);
-            await loadServers({ refresh: true });
+            await loadServers();
           }}
         />
       ) : null}

@@ -39,6 +39,7 @@ export default function McpInventoryTable({
               }}
             >
               <span className="px-4">Server</span>
+              
               <span className="px-4">Description</span>
               <span className="px-4">Auth</span>
               <span className="px-4 text-center">Secret</span>
@@ -97,7 +98,7 @@ export default function McpInventoryTable({
                 No MCP servers found
               </p>
               <p className="mt-2 text-sm text-[#64748b]">
-                Register a server in the backend to see it here.
+                Register a server to see it here.
               </p>
             </div>
           </div>
@@ -131,6 +132,7 @@ export default function McpInventoryTable({
                       gridTemplateColumns: COLUMN_TEMPLATE,
                     }}
                   >
+                    
                     <div className="px-4">
                       <p className="font-semibold text-[#111827]">{server.name}</p>
                       <a
