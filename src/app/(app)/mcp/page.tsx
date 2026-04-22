@@ -29,7 +29,7 @@ const resolveMcpApiBaseUrl = (value: string) => {
 export default function McpPage() {
   const { llmManagerApiBaseUrl } = useRuntimeConfig();
   const mcpApiBase = resolveMcpApiBaseUrl(llmManagerApiBaseUrl);
-  const mcpListUrl = `${mcpApiBase}/mcp`;
+  const mcpListUrl = `${mcpApiBase}/mcp/`;
 
   const [servers, setServers] = useState<McpServer[]>([]);
   const [isLoading, setIsLoading] = useState(true);
