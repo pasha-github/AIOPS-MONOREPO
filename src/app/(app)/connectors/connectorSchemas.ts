@@ -159,4 +159,64 @@ export const CONNECTOR_CONFIG_SCHEMAS: Record<string, ConfigField[]> = {
       placeholder: "Teams",
     },
   ],
+  outlook_connector: [
+  {
+    name: "TENANT_ID",
+    label: "Tenant ID",
+    required: true,
+    placeholder: "Enter Microsoft Entra tenant ID",
+  },
+  {
+    name: "CLIENT_ID",
+    label: "Client ID",
+    required: true,
+    placeholder: "Enter application client ID",
+  },
+  {
+    name: "CLIENT_SECRET",
+    label: "Client Secret",
+    required: true,
+    secret: true,
+    placeholder: "Enter client secret",
+  },
+  {
+    name: "MAILBOX_USER",
+    label: "Mailbox User",
+    required: true,
+    placeholder: "Enter mailbox email or user principal name",
+  },
+  {
+    name: "prefix",
+    label: "Prefix",
+    required: false,
+    placeholder: "Outlook",
+  },
+],
+  microsoft_entra_connector: [
+  {
+    name: "TENANT_ID",
+    label: "Tenant ID",
+    required: true,
+    placeholder: "Enter Microsoft Entra tenant ID",
+  },
+  {
+    name: "CLIENT_ID",
+    label: "Client ID",
+    required: true,
+    placeholder: "Enter application client ID",
+  },
+  {
+    name: "CLIENT_SECRET",
+    label: "Client Secret",
+    required: true,
+    secret: true,
+    placeholder: "Enter client secret",
+  },
+  {
+    name: "prefix",
+    label: "Prefix",
+    required: false,
+    placeholder: "Entra",
+  },
+]
 };

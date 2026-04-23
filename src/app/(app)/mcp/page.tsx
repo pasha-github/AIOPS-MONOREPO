@@ -241,24 +241,21 @@ export default function McpPage() {
     }
   };
 
-  const mcpLogoSrc = "/img/mcp.webp";
+  const mcpLogoSrc = "/img/mcp.png";
   return (
     <div className="space-y-8">
-      <section>
+      <section className="rounded-3xl bg-white px-8 py-7 shadow-[0_18px_50px_-38px_rgba(16,24,40,0.5)]">
         <div className="flex flex-wrap items-start justify-between gap-6">
-          <div>
+          <div className="max-w-3xl space-y-4">
             <h2 className="flex items-center gap-3 text-2xl font-semibold text-[#111827]">
-              <span className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-2xl bg-[#eef2ff] text-[#4f49e2]">
+              <span className="flex h-11 w-11">
                 <img
                   src={mcpLogoSrc}
-                  className="h-12 w-24 rounded-xl object-contain"
-                  loading="lazy"
-                  alt="MCP logo"
                 />
               </span>
               Model Context Protocol
             </h2>
-            <p className="mt-3 max-w-3xl text-sm leading-6 text-[#5b6476]">
+            <p className="text-sm leading-6 text-[#5b6476]">
               Maintain a professional inventory of MCP servers, authentication setup,
               transport metadata, tools, resources, and full input schemas through a
               single master-detail view.
@@ -300,8 +297,9 @@ export default function McpPage() {
         </div>
       </section>
 
-      <div className="space-y-6">
-        <div>
+      <section className="rounded-3xl bg-white px-8 py-7 shadow-[0_18px_50px_-38px_rgba(16,24,40,0.5)]">
+        <div className="space-y-6">
+        <div className="max-w-3xl">
           <h3 className="flex items-center gap-3 text-lg font-semibold text-[#111827]">
             <img
               src={mcpLogoSrc}
@@ -325,7 +323,8 @@ export default function McpPage() {
           onUpdateServer={(server) => setUpdateTargetId(server.mcp_server_id)}
           onDeleteServer={setDeleteTarget}
         />
-      </div>
+        </div>
+      </section>
 
       <McpDetailsDrawer
         server={selectedServer}
