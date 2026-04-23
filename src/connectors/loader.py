@@ -54,7 +54,10 @@ def resolve_connector_tools(connector_config: ConnectorConfig):
     spec.loader.exec_module(module)
 
     # --- 3. Find the BaseConnector subclass in the module ---
-    from base_connector import BaseConnector
+    try:
+        from src.connectors.base_connector import BaseConnector
+    except ModuleNotFoundError:
+        from base_connector import BaseConnector
 
     connector_class = None
     for _, obj in inspect.getmembers(module, inspect.isclass):
