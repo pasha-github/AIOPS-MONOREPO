@@ -6,6 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from src.connectors.loader import cached_connector_info, resolve_connector_tools
+from src.connectors.outlook_connector import OutlookConnector
 from src.connectors.teams_connector import TeamsConnector
 from src.database.models import ConnectorConfig
 
@@ -19,6 +20,7 @@ def test_list_connectors_success(client: TestClient):
     # Based on current repository connector files
     assert "datadog_connector" in ids
     assert "ibm_mq_connector" in ids
+    assert "outlook_connector" in ids
     assert "servicenow_connector" in ids
     assert "teams_connector" in ids
 
@@ -448,6 +450,23 @@ def test_resolve_connector_tools_microsoft_entra_connector_exposes_account_tools
     ]
 
 
+def test_resolve_connector_tools_outlook_connector_exposes_reply_tool():
+    cfg = ConnectorConfig(
+        connector_id="outlook_connector",
+        name="Outlook Config",
+        config=[
+            {"name": "TENANT_ID", "value": "tenant"},
+            {"name": "CLIENT_ID", "value": "client"},
+            {"name": "CLIENT_SECRET", "value": "secret"},
+            {"name": "MAILBOX_USER", "value": "noc_rcaiops@ai.royalcyber.org"},
+        ],
+    )
+
+    tools = resolve_connector_tools(cfg)
+
+    assert [tool.name for tool in tools] == ["reply_to_email"]
+
+
 def test_resolve_connector_tools_no_baseconnector_subclass_raises(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ):
@@ -495,6 +514,70 @@ def test_teams_connector_exposes_no_tools_without_targets():
 
     assert connector.tool_names == []
     assert connector.get_tools() == []
+
+
+def test_outlook_connector_exposes_reply_tool():
+    connector = OutlookConnector(
+        TENANT_ID="tenant",
+        CLIENT_ID="client",
+        CLIENT_SECRET="secret",
+        MAILBOX_USER="noc_rcaiops@ai.royalcyber.org",
+    )
+
+    assert connector.tool_names == ["reply_to_email"]
+
+
+def test_outlook_connector_replies_to_email(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    connector = OutlookConnector(
+        TENANT_ID="tenant",
+        CLIENT_ID="client",
+        CLIENT_SECRET="secret",
+        MAILBOX_USER="noc_rcaiops@ai.royalcyber.org",
+    )
+
+    captured: dict[str, object] = {}
+
+    def fake_make_graph_request(**kwargs):
+        captured.update(kwargs)
+        return {"status": "success", "data": None}
+
+    monkeypatch.setattr(connector, "_make_graph_request", fake_make_graph_request)
+
+    result = connector.reply_to_email(
+        "AAMkExampleMessageId",
+        "Your password reset request has been received.",
+    )
+
+    assert result == {
+        "status": "success",
+        "mailbox_user": "noc_rcaiops@ai.royalcyber.org",
+        "message_id": "AAMkExampleMessageId",
+        "message": "Reply sent successfully.",
+    }
+    assert captured == {
+        "endpoint": "/users/noc_rcaiops@ai.royalcyber.org/messages/AAMkExampleMessageId/reply",
+        "method": "POST",
+        "data": {"comment": "Your password reset request has been received."},
+    }
+
+
+def test_outlook_connector_requires_message_id_and_comment():
+    connector = OutlookConnector(
+        TENANT_ID="tenant",
+        CLIENT_ID="client",
+        CLIENT_SECRET="secret",
+        MAILBOX_USER="noc_rcaiops@ai.royalcyber.org",
+    )
+
+    result = connector.reply_to_email("   ", "   ")
+
+    assert result == {
+        "status": "error",
+        "code": 400,
+        "message": "MAILBOX_USER, message_id, and comment are required.",
+    }
 
 
 def test_teams_connector_exposes_email_tool_only_when_email_configured():
