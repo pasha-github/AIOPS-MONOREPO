@@ -171,6 +171,19 @@ async function fetchJson<T>(url: string, signal?: AbortSignal): Promise<T> {
   return (await response.json()) as T;
 }
 
+async function deleteJson(url: string, signal?: AbortSignal) {
+  const response = await fetch(url, {
+    method: "DELETE",
+    headers: { accept: "application/json" },
+    cache: "no-store",
+    signal,
+  });
+
+  if (!response.ok) {
+    throw new Error(`Request failed with status ${response.status}`);
+  }
+}
+
 export async function fetchAgentSessions(
   signal?: AbortSignal,
   baseUrl = ""
@@ -318,6 +331,18 @@ export async function fetchAgentSessionDetail(
     updatedAtLabel: formatTimestamp(updatedAt),
     entries: sortedEntries,
   } satisfies AgentSessionDetail;
+}
+
+export async function deleteAgentSession(
+  sessionId: string,
+  signal?: AbortSignal,
+  baseUrl = ""
+) {
+  if (!baseUrl) {
+    throw new Error("Agent logs API base URL is not configured.");
+  }
+
+  await deleteJson(getSessionDetailUrl(sessionId, baseUrl), signal);
 }
 
 const renderMarkdownInline = (text: string, keyPrefix = ""): ReactNode[] => {

@@ -8,12 +8,14 @@ import {
   ChevronDown,
   Loader2,
   RefreshCw,
+  Trash2,
 } from "lucide-react";
 import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   type AgentSessionDetail,
   type AgentSessionSummary,
+  deleteAgentSession,
   fetchAgentSessionDetail,
   fetchAgentSessions,
   renderMarkdownBlocks,
@@ -144,6 +146,7 @@ export default function ActivityExplorer() {
   const [error, setError] = useState("");
   const [isSessionMenuOpen, setIsSessionMenuOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null);
   const sessionDetailsRef = useRef<Record<string, AgentSessionDetail>>({});
   const selectedSessionIdRef = useRef<string | null>(null);
   const menuContainerRef = useRef<HTMLDivElement | null>(null);
@@ -260,6 +263,29 @@ export default function ActivityExplorer() {
     const controller = new AbortController();
     void loadSessions(true, controller.signal);
   }, [loadSessions]);
+
+  const handleDeleteSession = useCallback(
+    async (sessionId: string) => {
+      setDeletingSessionId(sessionId);
+      setError("");
+
+      try {
+        await deleteAgentSession(sessionId, undefined, logsApiBaseUrl);
+        setSessionDetails((current) => {
+          const next = { ...current };
+          delete next[sessionId];
+          sessionDetailsRef.current = next;
+          return next;
+        });
+        await loadSessions(true);
+      } catch {
+        setError("Unable to delete the selected session right now.");
+      } finally {
+        setDeletingSessionId((current) => (current === sessionId ? null : current));
+      }
+    },
+    [loadSessions, logsApiBaseUrl]
+  );
 
   const handleSessionChange = useCallback(
     async (sessionId: string) => {
@@ -388,28 +414,47 @@ export default function ActivityExplorer() {
                         {sessions.map((session) => {
                           const isActive = session.id === selectedSessionId;
                           return (
-                            <button
+                            <div
                               key={session.id}
-                              type="button"
-                              onClick={() => void handleSessionChange(session.id)}
-                              className={`flex w-full items-center justify-between gap-4 rounded-lg px-4 py-3 text-left transition ${
+                              className={`flex w-full items-center justify-between gap-4 rounded-lg px-4 py-3 transition ${
                                 isActive
                                   ? "bg-[#eef2ff] text-[#24324a]"
                                   : "text-[#5f677a] hover:bg-[#f8faff]"
                               }`}
                             >
-                              <div className="min-w-0">
+                              <button
+                                type="button"
+                                onClick={() => void handleSessionChange(session.id)}
+                                className="min-w-0 flex-1 text-left"
+                              >
                                 <p className="truncate text-sm font-semibold text-[#111827]">
                                   {session.summary}
                                 </p>
                                 <p className="mt-1 text-xs text-[#7a8498]">
                                   Last updated {session.updatedAtLabel}
                                 </p>
+                              </button>
+                              <div className="flex shrink-0 items-center gap-3">
+                                {isActive ? (
+                                  <Check className="h-4 w-4 text-[#4f49e2]" />
+                                ) : (
+                                  <span className="h-4 w-4" aria-hidden="true" />
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => void handleDeleteSession(session.id)}
+                                  disabled={deletingSessionId === session.id}
+                                  className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[#ef4444] transition hover:bg-[#fff1f2] disabled:cursor-not-allowed disabled:opacity-50"
+                                  aria-label={`Delete ${session.summary}`}
+                                >
+                                  {deletingSessionId === session.id ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <Trash2 className="h-4 w-4" />
+                                  )}
+                                </button>
                               </div>
-                              {isActive ? (
-                                <Check className="h-4 w-4 shrink-0 text-[#4f49e2]" />
-                              ) : null}
-                            </button>
+                            </div>
                           );
                         })}
                       </div>
