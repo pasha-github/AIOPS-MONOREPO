@@ -68,7 +68,13 @@ const navSections: NavSection[] = [
       {
         label: "Model Context Protocol",
         id: "integrations-model-context-protocol",
-        icon: <Link2 className="h-5 w-5" />,
+        icon: (
+          <img
+            src="/img/mcp.png"
+            alt="MCP"
+            className="block h-5 w-5 object-contain"
+          />
+        ),
         href: "/mcp",
       },
     ],
@@ -138,14 +144,17 @@ export default function LeftNavbar() {
         </div>
       </div>
 
-      <nav className="no-scrollbar mt-6 flex-1 space-y-4 overflow-y-hidden pr-1">
+      <nav className="no-scrollbar mt-6 flex-1 space-y-1 overflow-y-hidden pr-1 transition-all duration-300 group-hover:space-y-4">
         {navSections.map((section) => (
-          <div key={section.title} className="space-y-2.5">
-            <div className="flex items-center gap-3">
-              <p className="whitespace-nowrap text-xs font-semibold uppercase tracking-[0.18em] text-[#6b7280] opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+          <div
+            key={section.title}
+            className="space-y-1 transition-all duration-300 group-hover:space-y-2.5"
+          >
+            <div className="flex max-h-0 items-center gap-3 overflow-hidden opacity-0 transition-all duration-300 group-hover:max-h-8 group-hover:opacity-100">
+              <p className="whitespace-nowrap text-xs font-semibold uppercase tracking-[0.18em] text-[#6b7280]">
                 {section.title}
               </p>
-              <span className="h-px flex-1 bg-[#d6dcea] opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+              <span className="h-px flex-1 bg-[#d6dcea]" />
             </div>
             <div className="space-y-0.5">
               {section.items.map((item) => {
