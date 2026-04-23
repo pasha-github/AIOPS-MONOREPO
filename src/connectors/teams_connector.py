@@ -7,9 +7,9 @@ from collections.abc import Mapping
 from typing import Any, cast
 
 try:
-    from src.connectors.base_connector import BaseConnector, connector_tool
-except ModuleNotFoundError:
     from base_connector import BaseConnector, connector_tool
+except ModuleNotFoundError:
+    from src.connectors.base_connector import BaseConnector, connector_tool
 from google.adk.tools.tool_context import ToolContext
 
 

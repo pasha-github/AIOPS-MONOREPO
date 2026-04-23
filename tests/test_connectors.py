@@ -417,11 +417,14 @@ class BaseConnector:
         connector_id="temp_connector",
         config=[{"name": "token", "value": "abc"}],
     )
+    temp_connectors_abs = str(temp_connectors.resolve())
     try:
         tools = resolve_connector_tools(cfg)
         assert isinstance(tools, list)
         assert len(tools) == 1
     finally:
+        while temp_connectors_abs in sys.path:
+            sys.path.remove(temp_connectors_abs)
         sys.modules.pop("base_connector", None)
 
 
@@ -474,10 +477,13 @@ class BaseConnector:
         connector_id="bad_connector",
         config=[],
     )
+    temp_connectors_abs = str(temp_connectors.resolve())
     try:
         with pytest.raises(ValueError):
             resolve_connector_tools(cfg)
     finally:
+        while temp_connectors_abs in sys.path:
+            sys.path.remove(temp_connectors_abs)
         sys.modules.pop("base_connector", None)
 
 
