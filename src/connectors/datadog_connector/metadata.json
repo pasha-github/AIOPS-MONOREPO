@@ -1,0 +1,42 @@
+{
+  "id": "datadog_connector",
+  "name": "Datadog",
+  "description": "Query and filter logs from Datadog Log Management.",
+  "version": "0.0.1",
+  "config_variables": [
+    {
+      "name": "DD_API_KEY",
+      "label": "API Key",
+      "required": true,
+      "secret": true,
+      "placeholder": "Enter Datadog API key"
+    },
+    {
+      "name": "DD_APP_KEY",
+      "label": "Application Key",
+      "required": true,
+      "secret": true,
+      "placeholder": "Enter Datadog application key"
+    },
+    {
+      "name": "DD_SITE",
+      "label": "Site",
+      "required": false,
+      "secret": false,
+      "placeholder": "datadoghq.com"
+    },
+    {
+      "name": "prefix",
+      "label": "Prefix",
+      "required": false,
+      "secret": false,
+      "placeholder": "Datadog"
+    }
+  ],
+  "tools": [
+    {
+      "name": "fetch_logs",
+      "documentation": "Fetches logs from Datadog with optional filters for app, log level, and custom query."
+    }
+  ]
+}

@@ -1,6 +1,7 @@
 import ast
 import importlib.util
 import inspect
+import json
 import sys
 from functools import lru_cache
 from importlib.machinery import ModuleSpec
@@ -10,6 +11,52 @@ from typing import Any
 from src.database.models import ConnectorConfig
 
 CONNECTORS_DIR = Path(__file__).parent.parent / "connectors"
+
+
+def get_connector_dir(connector_id: str) -> Path:
+    return (CONNECTORS_DIR / connector_id).resolve()
+
+
+def get_connector_module_path(connector_id: str) -> Path:
+    return get_connector_dir(connector_id) / "connector.py"
+
+
+def get_connector_metadata_path(connector_id: str) -> Path:
+    return get_connector_dir(connector_id) / "metadata.json"
+
+
+def get_connector_readme_path(connector_id: str) -> Path:
+    return get_connector_dir(connector_id) / "README.md"
+
+
+def load_connector_metadata(connector_id: str) -> dict[str, Any]:
+    metadata_path = get_connector_metadata_path(connector_id)
+    if not metadata_path.is_file():
+        raise FileNotFoundError(
+            f"Connector metadata not found. Expected file: {metadata_path}"
+        )
+
+    with metadata_path.open(encoding="utf-8") as f:
+        return json.load(f)
+
+
+def load_connector_documentation(connector_id: str) -> str:
+    readme_path = get_connector_readme_path(connector_id)
+    if not readme_path.is_file():
+        raise FileNotFoundError(
+            f"Connector documentation not found. Expected file: {readme_path}"
+        )
+
+    return readme_path.read_text(encoding="utf-8").strip()
+
+
+def load_connector_info(connector_id: str) -> dict[str, Any]:
+    metadata = load_connector_metadata(connector_id)
+    return {
+        "documentation": load_connector_documentation(connector_id),
+        "tools": metadata.get("tools", []),
+        "config_variables": metadata.get("config_variables", []),
+    }
 
 
 def resolve_connector_tools(connector_config: ConnectorConfig):
@@ -31,7 +78,7 @@ def resolve_connector_tools(connector_config: ConnectorConfig):
     config = connector_config.config
 
     # --- 1. Locate the connector module file ---
-    module_path = (CONNECTORS_DIR / f"{connector_id}.py").resolve()
+    module_path = get_connector_module_path(connector_id)
     if not module_path.is_file():
         raise FileNotFoundError(
             f"Connector '{connector_id}' not found. Expected file: {module_path}"
