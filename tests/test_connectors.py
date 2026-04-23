@@ -417,12 +417,35 @@ class BaseConnector:
         connector_id="temp_connector",
         config=[{"name": "token", "value": "abc"}],
     )
+    temp_connectors_abs = str(temp_connectors.resolve())
     try:
         tools = resolve_connector_tools(cfg)
         assert isinstance(tools, list)
         assert len(tools) == 1
     finally:
+        while temp_connectors_abs in sys.path:
+            sys.path.remove(temp_connectors_abs)
         sys.modules.pop("base_connector", None)
+
+
+def test_resolve_connector_tools_microsoft_entra_connector_exposes_account_tools():
+    cfg = ConnectorConfig(
+        connector_id="microsoft_entra_connector",
+        name="Entra Config",
+        config=[
+            {"name": "TENANT_ID", "value": "tenant"},
+            {"name": "CLIENT_ID", "value": "client"},
+            {"name": "CLIENT_SECRET", "value": "secret"},
+        ],
+    )
+
+    tools = resolve_connector_tools(cfg)
+
+    assert [tool.name for tool in tools] == [
+        "disable_user",
+        "enable_user",
+        "reset_user_password",
+    ]
 
 
 def test_resolve_connector_tools_no_baseconnector_subclass_raises(
@@ -454,10 +477,13 @@ class BaseConnector:
         connector_id="bad_connector",
         config=[],
     )
+    temp_connectors_abs = str(temp_connectors.resolve())
     try:
         with pytest.raises(ValueError):
             resolve_connector_tools(cfg)
     finally:
+        while temp_connectors_abs in sys.path:
+            sys.path.remove(temp_connectors_abs)
         sys.modules.pop("base_connector", None)
 
 
