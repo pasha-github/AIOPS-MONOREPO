@@ -108,12 +108,36 @@ public class AroyaService {
 
     private String resolveToken(String bearerToken) {
         if (StringUtils.hasText(bearerToken)) {
-            return bearerToken.startsWith("Bearer ")
-                    ? bearerToken.substring(7)
-                    : bearerToken;
+            return stripBearerPrefix(bearerToken);
         }
 
         return tokenStore.get()
-                .orElseThrow(() -> new AroyaClientException("No bearer token provided and no stored token available"));
+                .filter(StringUtils::hasText)
+                .orElseGet(this::loginAndStoreToken);
+    }
+
+    private String loginAndStoreToken() {
+        AroyaLoginResponse loginResponse = login(new AroyaLoginRequest(
+                "ResAgent",
+                "LSHANKAR",
+                "LSH654@@UAT",
+                "PT10H",
+                "PT10H"
+        ));
+
+        String token = StringUtils.hasText(loginResponse.accessToken())
+                ? loginResponse.accessToken()
+                : loginResponse.token();
+
+        if (!StringUtils.hasText(token)) {
+            throw new AroyaClientException("Login succeeded but no token was returned");
+        }
+
+        tokenStore.save(token);
+        return token;
+    }
+
+    private String stripBearerPrefix(String token) {
+        return token.startsWith("Bearer ") ? token.substring(7) : token;
     }
 }
