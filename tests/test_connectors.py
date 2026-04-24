@@ -535,10 +535,12 @@ def test_outlook_connector_replies_to_email(
         MAILBOX_USER="noc_rcaiops@ai.royalcyber.org",
     )
 
-    captured: dict[str, object] = {}
+    captured_calls: list[dict[str, object]] = []
 
     def fake_make_graph_request(**kwargs):
-        captured.update(kwargs)
+        captured_calls.append(kwargs)
+        if kwargs["endpoint"].endswith("/createReply"):
+            return {"status": "success", "data": {"id": "draft-123"}}
         return {"status": "success", "data": None}
 
     monkeypatch.setattr(connector, "_make_graph_request", fake_make_graph_request)
@@ -552,13 +554,29 @@ def test_outlook_connector_replies_to_email(
         "status": "success",
         "mailbox_user": "noc_rcaiops@ai.royalcyber.org",
         "message_id": "AAMkExampleMessageId",
+        "draft_id": "draft-123",
         "message": "Reply sent successfully.",
     }
-    assert captured == {
-        "endpoint": "/users/noc_rcaiops@ai.royalcyber.org/messages/AAMkExampleMessageId/reply",
-        "method": "POST",
-        "data": {"comment": "Your password reset request has been received."},
-    }
+    assert captured_calls == [
+        {
+            "endpoint": "/users/noc_rcaiops@ai.royalcyber.org/messages/AAMkExampleMessageId/createReply",
+            "method": "POST",
+        },
+        {
+            "endpoint": "/users/noc_rcaiops@ai.royalcyber.org/messages/draft-123",
+            "method": "PATCH",
+            "data": {
+                "body": {
+                    "contentType": "HTML",
+                    "content": "<p>Your password reset request has been received.</p>",
+                }
+            },
+        },
+        {
+            "endpoint": "/users/noc_rcaiops@ai.royalcyber.org/messages/draft-123/send",
+            "method": "POST",
+        },
+    ]
 
 
 def test_outlook_connector_requires_message_id_and_comment():
