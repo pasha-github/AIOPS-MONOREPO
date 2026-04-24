@@ -56,8 +56,6 @@ export default function TestMcp({
         });
         return;
       }
-
-      console.log("MCP test response:", data);
       onTestSuccess(data);
     } catch (error) {
       console.error("MCP test request failed:", error);
