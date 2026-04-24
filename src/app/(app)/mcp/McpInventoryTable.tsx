@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ExternalLink } from "lucide-react";
+import { Check, ExternalLink, X } from "lucide-react";
 
 import McpActionMenu from "./McpActionMenu";
 import { formatDateTime, type McpServer } from "./mcpHelpers";
@@ -163,7 +163,7 @@ export default function McpInventoryTable({
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1.5 text-sm font-medium text-[#64748b]">
-                          <Check className="h-4 w-4" />
+                          <X className="h-4 w-4 text-[#ef4444]" />
                           Not set
                         </span>
                       )}
