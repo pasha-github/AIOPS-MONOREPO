@@ -72,7 +72,7 @@ const navSections: NavSection[] = [
           <img
             src="/img/mcp.png"
             alt="MCP"
-            className="block h-5 w-5 object-contain"
+            className="block h-5 w-5"
           />
         ),
         href: "/mcp",
@@ -159,21 +159,27 @@ export default function LeftNavbar() {
             <div className="space-y-0.5">
               {section.items.map((item) => {
                 const isDisabled = Boolean(item.disabled);
+                const isMcpItem =
+                  item.id === "integrations-model-context-protocol";
                 const isActive =
                   !isDisabled && item.href && item.href !== "#"
                     ? pathname === item.href ||
                       pathname?.startsWith(`${item.href}/`)
                     : item.active;
                 const baseClasses =
-                  "group/item relative flex w-full items-center gap-3 rounded-2xl px-3 py-1.5 text-left text-sm font-medium transition";
+                  "group/item relative flex w-full items-center gap-3 rounded-2xl px-1 py-1.5 text-left text-sm font-medium transition";
                 const stateClasses = isDisabled
                   ? "cursor-not-allowed bg-[#f4f6fb] text-[#9aa3b6]"
                   : isActive
                     ? "bg-[#e9edff] text-[#3f35d3]"
                     : "text-[#677189] hover:bg-[#f3f5ff] hover:text-[#1b1f2a]";
                 const iconClasses = isDisabled
-                  ? "relative flex h-8 w-8 items-center justify-center rounded-xl bg-[#edf1f7] text-[#a6afc1]"
-                  : "relative flex h-8 w-8 items-center justify-center rounded-xl bg-white text-[#566079] shadow-[0_1px_2px_rgba(0,0,0,0.06)] transition group-hover/item:text-[#3f35d3]";
+                  ? `relative flex items-center justify-center rounded-xl bg-[#edf1f7] text-[#a6afc1] ${
+                      isMcpItem ? "h-9 w-9" : "h-9 w-9"
+                    }`
+                  : `relative flex items-center justify-center rounded-xl bg-white text-[#566079] shadow-[0_1px_2px_rgba(0,0,0,0.06)] transition group-hover/item:text-[#3f35d3] ${
+                      isMcpItem ? "h-9 w-9" : "h-8 w-8"
+                    }`;
                 const itemContent = (
                   <>
                     {isActive ? (
