@@ -5,6 +5,7 @@ Supports app-only authentication using tenant ID, client ID, client secret,
 and a preconfigured mailbox user.
 """
 
+import html
 from typing import Any
 
 try:
@@ -148,6 +149,40 @@ class OutlookConnector(BaseConnector):
         except ValueError:
             return {"status": "success", "data": response.text}
 
+    def _build_reply_html(self, comment: str) -> str:
+        """Convert plain reply text into simple HTML for Outlook replies."""
+        normalized_lines = [
+            line.strip() for line in comment.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+        ]
+        html_parts: list[str] = []
+        in_list = False
+
+        for line in normalized_lines:
+            if not line:
+                if in_list:
+                    html_parts.append("</ul>")
+                    in_list = False
+                continue
+
+            escaped_line = html.escape(line)
+            if line.startswith("- "):
+                if not in_list:
+                    html_parts.append("<ul>")
+                    in_list = True
+                html_parts.append(f"<li>{html.escape(line[2:].strip())}</li>")
+                continue
+
+            if in_list:
+                html_parts.append("</ul>")
+                in_list = False
+
+            html_parts.append(f"<p>{escaped_line}</p>")
+
+        if in_list:
+            html_parts.append("</ul>")
+
+        return "".join(html_parts)
+
     @connector_tool
     def reply_to_email(
         self,
@@ -174,18 +209,48 @@ class OutlookConnector(BaseConnector):
                 "message": "MAILBOX_USER, message_id, and comment are required.",
             }
 
-        result = self._make_graph_request(
-            endpoint=f"/users/{self.mailbox_user}/messages/{normalized_message_id}/reply",
+        draft_result = self._make_graph_request(
+            endpoint=f"/users/{self.mailbox_user}/messages/{normalized_message_id}/createReply",
             method="POST",
-            data={"comment": normalized_comment},
         )
 
-        if result["status"] != "success":
-            return result
+        if draft_result["status"] != "success":
+            return draft_result
+
+        draft_id = (draft_result.get("data") or {}).get("id")
+        if not draft_id:
+            return {
+                "status": "error",
+                "code": 500,
+                "message": "Microsoft Graph did not return a reply draft ID.",
+            }
+
+        update_result = self._make_graph_request(
+            endpoint=f"/users/{self.mailbox_user}/messages/{draft_id}",
+            method="PATCH",
+            data={
+                "body": {
+                    "contentType": "HTML",
+                    "content": self._build_reply_html(normalized_comment),
+                }
+            },
+        )
+
+        if update_result["status"] != "success":
+            return update_result
+
+        send_result = self._make_graph_request(
+            endpoint=f"/users/{self.mailbox_user}/messages/{draft_id}/send",
+            method="POST",
+        )
+
+        if send_result["status"] != "success":
+            return send_result
 
         return {
             "status": "success",
             "mailbox_user": self.mailbox_user,
             "message_id": normalized_message_id,
+            "draft_id": draft_id,
             "message": "Reply sent successfully.",
         }
