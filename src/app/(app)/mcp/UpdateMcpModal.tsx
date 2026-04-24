@@ -11,8 +11,9 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
-import type { McpActionResult, McpAuthType } from "./CreateMcpModal";
+import type { McpAuthType } from "./CreateMcpModal";
 import {
   formatDateTime,
   getMcpErrorMessage,
@@ -120,29 +121,67 @@ function AuthTypeSelect({
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const [menuStyle, setMenuStyle] = useState<{
+    top: number;
+    left: number;
+    width: number;
+  } | null>(null);
   const selectedOption = AUTH_OPTIONS.find((option) => option.value === value);
 
   useEffect(() => {
     if (!isOpen) {
+      setMenuStyle(null);
       return;
     }
 
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(event.target as Node)
-      ) {
-        setIsOpen(false);
+    const updatePosition = () => {
+      const rect = buttonRef.current?.getBoundingClientRect();
+      if (!rect) {
+        return;
       }
+
+      const estimatedMenuHeight = AUTH_OPTIONS.length * 40 + 12;
+      const openUp = window.innerHeight - rect.bottom < estimatedMenuHeight + 16;
+      const desiredTop = openUp ? rect.top - estimatedMenuHeight - 8 : rect.bottom + 8;
+      const top = Math.max(
+        12,
+        Math.min(desiredTop, window.innerHeight - estimatedMenuHeight - 12)
+      );
+      const width = rect.width;
+      const left = Math.max(12, Math.min(rect.left, window.innerWidth - width - 12));
+
+      setMenuStyle({ top, left, width });
     };
 
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    const handlePointerDown = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (containerRef.current?.contains(target)) {
+        return;
+      }
+      if (menuRef.current?.contains(target)) {
+        return;
+      }
+
+      setIsOpen(false);
+    };
+
+    updatePosition();
+    document.addEventListener("mousedown", handlePointerDown);
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
   }, [isOpen]);
 
   return (
     <div ref={containerRef} className="relative min-w-0 flex-1">
       <button
+        ref={buttonRef}
         type="button"
         onClick={() => setIsOpen((current) => !current)}
         className="flex w-full items-center justify-between rounded-xl border border-[#cbd2ff] bg-white px-4 py-2.5 text-left text-sm text-[#111827] outline-none transition focus:border-[#4f49e2] focus:ring-2 focus:ring-[#4f49e2]/20"
@@ -151,27 +190,39 @@ function AuthTypeSelect({
         <ChevronDown className="h-4 w-4 text-[#9ca3af]" />
       </button>
 
-      {isOpen ? (
-        <div className="absolute z-30 mt-2 w-full overflow-hidden rounded-xl border border-[#e5e7eb] bg-white shadow-[0_12px_24px_-20px_rgba(15,23,42,0.35)]">
-          {AUTH_OPTIONS.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              onClick={() => {
-                onChange(option.value);
-                setIsOpen(false);
+      {isOpen && menuStyle
+        ? createPortal(
+            <div
+              ref={menuRef}
+              style={{
+                position: "fixed",
+                top: menuStyle.top,
+                left: menuStyle.left,
+                width: menuStyle.width,
               }}
-              className={`w-full px-4 py-2 text-left text-sm ${
-                option.value === value
-                  ? "bg-[#eef2ff] text-[#4f49e2]"
-                  : "text-[#111827] hover:bg-[#f3f4f6]"
-              }`}
+              className="z-[1000] overflow-hidden rounded-xl border border-[#e5e7eb] bg-white shadow-[0_12px_24px_-20px_rgba(15,23,42,0.35)]"
             >
-              {option.label}
-            </button>
-          ))}
-        </div>
-      ) : null}
+              {AUTH_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => {
+                    onChange(option.value);
+                    setIsOpen(false);
+                  }}
+                  className={`w-full px-4 py-2 text-left text-sm ${
+                    option.value === value
+                      ? "bg-[#eef2ff] text-[#4f49e2]"
+                      : "text-[#111827] hover:bg-[#f3f4f6]"
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>,
+            document.body
+          )
+        : null}
     </div>
   );
 }
