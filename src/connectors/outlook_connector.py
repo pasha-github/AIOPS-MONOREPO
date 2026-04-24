@@ -152,7 +152,8 @@ class OutlookConnector(BaseConnector):
     def _build_reply_html(self, comment: str) -> str:
         """Convert plain reply text into simple HTML for Outlook replies."""
         normalized_lines = [
-            line.strip() for line in comment.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+            line.strip()
+            for line in comment.replace("\r\n", "\n").replace("\r", "\n").split("\n")
         ]
         html_parts: list[str] = []
         in_list = False
