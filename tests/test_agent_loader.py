@@ -28,6 +28,7 @@ class _FakeSession:
         list_ids=None,
         connector_map=None,
         mcp_map=None,
+        skill_map=None,
         model_map=None,
         defaults_config=None,
     ):
@@ -36,6 +37,7 @@ class _FakeSession:
         self.list_ids = list_ids
         self.connector_map = connector_map or {}
         self.mcp_map = mcp_map or {}
+        self.skill_map = skill_map or {}
         self.model_map = model_map or {}
         self.defaults_config = defaults_config
 
@@ -62,6 +64,8 @@ class _FakeSession:
             return self.connector_map.get(str(key))
         if name == "MCPServer":
             return self.mcp_map.get(str(key))
+        if name == "Skill":
+            return self.skill_map.get(str(key))
         return None
 
 
@@ -96,6 +100,7 @@ def _agent_cfg(**kwargs):
         "mcp_servers": [],
         "mcp_server_ids": [],
         "connector_config_ids": [],
+        "skill_ids": [],
         "sub_agents": [],
         "isEnabled": True,
         "type": "agent",
@@ -116,11 +121,14 @@ def _model_cfg(**kwargs):
 
 
 def _patch_common_runtime(monkeypatch: pytest.MonkeyPatch):
+    def connector_tool():
+        return "connector"
+
     monkeypatch.setattr(
         agent_loader_module, "decrypt_secret", lambda _: "decrypted-key"
     )
     monkeypatch.setattr(
-        agent_loader_module, "resolve_connector_tools", lambda _cfg: ["connector_tool"]
+        agent_loader_module, "resolve_connector_tools", lambda _cfg: [connector_tool]
     )
     monkeypatch.setattr(
         agent_loader_module,
@@ -153,6 +161,11 @@ def _patch_common_runtime(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(
         agent_loader_module, "AgentTool", lambda agent: {"sub_agent": agent}
     )
+    monkeypatch.setattr(
+        agent_loader_module,
+        "UnsafeLocalCodeExecutor",
+        lambda: "unsafe-executor",
+    )
 
     class _FakeLiteLlm:
         def __init__(self, model, **kwargs):
@@ -163,8 +176,19 @@ def _patch_common_runtime(monkeypatch: pytest.MonkeyPatch):
         def __init__(self, **kwargs):
             self.kwargs = kwargs
 
+    class _FakeSkillToolset:
+        def __init__(self, skills, **kwargs):
+            self.skills = skills
+            self.kwargs = kwargs
+
     monkeypatch.setattr(agent_loader_module, "LiteLlm", _FakeLiteLlm)
     monkeypatch.setattr(agent_loader_module, "LlmAgent", _FakeLlmAgent)
+    monkeypatch.setattr(agent_loader_module, "SkillToolset", _FakeSkillToolset)
+    monkeypatch.setattr(
+        agent_loader_module,
+        "build_skill_model",
+        lambda skill: SimpleNamespace(name=skill.name, tools=skill.tools),
+    )
 
 
 def test_agent_loader_returns_none_when_agent_missing(monkeypatch: pytest.MonkeyPatch):
@@ -491,3 +515,55 @@ def test_agent_loader_uses_global_defaults_for_model_stack(
         "openai/gpt-4.1-mini",
         "anthropic/claude-haiku",
     ]
+
+
+def test_agent_loader_attaches_skill_toolset(monkeypatch: pytest.MonkeyPatch):
+    _patch_common_runtime(monkeypatch)
+    connector_id = str(uuid4())
+    mcp_server_id = str(uuid4())
+    skill_id = str(uuid4())
+    cfg = _agent_cfg(skill_ids=[skill_id])
+    model = _model_cfg()
+    connector_config = SimpleNamespace(
+        connector_config_id=connector_id,
+        connector_id="example_connector",
+        config=[],
+    )
+    mcp_server = SimpleNamespace(
+        mcp_server_id=mcp_server_id,
+        server_url="http://localhost:8101/mcp",
+        auth_type="none",
+        auth_username=None,
+        auth_secret=None,
+    )
+    skill = SimpleNamespace(
+        skill_id=skill_id,
+        name="lookup_skill",
+        description="desc",
+        instructions="instr",
+        tools=["connector_tool", "search_docs"],
+        connector_config_ids=[connector_id],
+        mcp_server_ids=[mcp_server_id],
+    )
+    monkeypatch.setattr(agent_loader_module, "cache", _FakeCache())
+    monkeypatch.setattr(
+        agent_loader_module,
+        "Session",
+        lambda _engine: _FakeSession(
+            agent_config=cfg,
+            model_config=model,
+            connector_map={connector_id: connector_config},
+            mcp_map={mcp_server_id: mcp_server},
+            skill_map={skill_id: skill},
+        ),
+    )
+
+    loader = DatabaseAgentLoader()
+    agent = loader.load_agent("main")
+
+    assert agent is not None
+    skill_toolsets = [tool for tool in agent.kwargs["tools"] if hasattr(tool, "skills")]
+    assert len(skill_toolsets) == 1
+    assert skill_toolsets[0].skills[0].name == "lookup_skill"
+    assert skill_toolsets[0].kwargs["code_executor"] == "unsafe-executor"
+    assert len(skill_toolsets[0].kwargs["additional_tools"]) == 2

@@ -166,3 +166,33 @@ def test_delete_mcp_server_in_use_returns_409(
     response = client.delete(f"/mcp/{mcp_server.mcp_server_id}")
     assert response.status_code == 409
     assert response.json()["detail"] == "MCP server is in use by agent: Agent Using MCP"
+
+
+def test_delete_mcp_server_in_use_by_skill_returns_409(
+    client: TestClient, session, fake_probe: None
+):
+    mcp_server = MCPServer(
+        name="Used by Skill MCP",
+        server_url="http://localhost:8200/sse",
+        auth_type="none",
+        metadata_json={},
+        tools_json=[{"name": "list_tickets"}],
+        resources_json=[],
+    )
+    session.add(mcp_server)
+    session.commit()
+    session.refresh(mcp_server)
+
+    client.post(
+        "/skill/",
+        json={
+            "name": "mcp_skill_link",
+            "description": "desc",
+            "instructions": "instr",
+            "mcp_server_ids": [str(mcp_server.mcp_server_id)],
+        },
+    )
+
+    response = client.delete(f"/mcp/{mcp_server.mcp_server_id}")
+    assert response.status_code == 409
+    assert response.json()["detail"] == "MCP server is in use by skill: mcp_skill_link"

@@ -374,6 +374,12 @@
                         </select>
                     </div>
                     <div class="form-group">
+                        <label>Skills <small>(hold Ctrl/Cmd to select multiple)</small></label>
+                        <select id="agent-skills" multiple>
+                            <option disabled>Loading skills...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
                         <label>Sub Agents <small>(hold Ctrl/Cmd to select multiple)</small></label>
                         <select id="agent-sub-agents" multiple>
                             <option disabled>Loading agents...</option>
@@ -505,6 +511,12 @@
                         <label>New Connector Configs <small>(hold Ctrl/Cmd to select multiple)</small></label>
                         <select id="agent-update-connector-configs" multiple>
                             <option disabled>Loading connector configs...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>New Skills <small>(hold Ctrl/Cmd to select multiple)</small></label>
+                        <select id="agent-update-skills" multiple>
+                            <option disabled>Loading skills...</option>
                         </select>
                     </div>
                     <div class="form-group">
@@ -666,6 +678,60 @@
             </div>
         </div>
 
+        <div class="section">
+            <h2>Skills</h2>
+            <div class="grid">
+                <div>
+                    <div id="skill-list">Loading skills...</div>
+                </div>
+                <div>
+                    <form id="add-skill-form">
+                        <div class="form-group">
+                            <label>Name</label>
+                            <input type="text" id="skill-name" placeholder="incident_skill" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Description</label>
+                            <input type="text" id="skill-description" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Instructions</label>
+                            <textarea id="skill-instructions" rows="4" required></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Tool Names <small>(comma separated)</small></label>
+                            <input type="text" id="skill-tools" placeholder="search_docs, get_post">
+                        </div>
+                        <div class="form-group">
+                            <label>Connector Configs <small>(hold Ctrl/Cmd to select multiple)</small></label>
+                            <select id="skill-connector-configs" multiple>
+                                <option disabled>Loading connector configs...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>MCP Servers <small>(hold Ctrl/Cmd to select multiple)</small></label>
+                            <select id="skill-mcp-servers" multiple>
+                                <option disabled>Loading MCP servers...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>References JSON</label>
+                            <textarea id="skill-references" rows="4" placeholder='{"guide.md":"Hello"}'></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Assets JSON</label>
+                            <textarea id="skill-assets" rows="4" placeholder='{"template.txt":"Template"}'></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Scripts JSON</label>
+                            <textarea id="skill-scripts" rows="4" placeholder='{"run.py":"print(\"hi\")"}'></textarea>
+                        </div>
+                        <button type="submit">Save Skill</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
         <!-- Visualizer Section -->
         <div class="section">
             <h2>Architecture Visualizer</h2>
@@ -700,6 +766,7 @@
             tertiary_model_id: ''
         };
         let currentMcpServers = [];
+        let currentSkills = [];
 
         // ─── Health ───────────────────────────────────────────────────────────
         async function checkHealth() {
@@ -912,6 +979,14 @@
             data[`${slot}_model_id`] = sourceValue === 'manual' ? (modelValue || null) : null;
         }
 
+        function parseJsonField(fieldId) {
+            const rawValue = document.getElementById(fieldId).value.trim();
+            if (!rawValue) {
+                return {};
+            }
+            return JSON.parse(rawValue);
+        }
+
         // ─── Agents ───────────────────────────────────────────────────────────
         async function loadAgentTemplates() {
             const res = await fetch(`${API_BASE}/agent/templates`);
@@ -971,6 +1046,9 @@
                 const mcpBadge = ((a.mcp_server_ids || []).length + (a.mcp_servers || []).length) > 0
                     ? `<br><small>MCPs: ${((a.mcp_server_ids || []).length + (a.mcp_servers || []).length)} attached</small>`
                     : '';
+                const skillBadge = (a.skill_ids || []).length > 0
+                    ? `<br><small>Skills: ${(a.skill_ids || []).length} attached</small>`
+                    : '';
                 const subAgentBadge = (a.sub_agents || []).length > 0
                     ? `<br><small>Sub-agents: ${(a.sub_agents || []).length} attached</small>`
                     : '';
@@ -982,7 +1060,7 @@
                 div.innerHTML = `
                     <strong>${a.name}</strong> (${a.type ? a.type : 'agent'})<br>
                     ${a.description}<br>
-                    <small>Status: ${a.isEnabled ? 'Enabled' : 'Disabled'} | ${modelStack}</small>${connectorBadges}${mcpBadge}${subAgentBadge}
+                    <small>Status: ${a.isEnabled ? 'Enabled' : 'Disabled'} | ${modelStack}</small>${connectorBadges}${mcpBadge}${skillBadge}${subAgentBadge}
                     <div style="margin-top:5px;">
                         <button onclick="toggleAgent('${a.agent_id}', ${!a.isEnabled})">${a.isEnabled ? 'Disable' : 'Enable'}</button>
                         <button class="delete" onclick="deleteAgent('${a.agent_id}')">Delete</button>
@@ -1032,6 +1110,8 @@
             // Collect selected connector config IDs from multi-select
             const connectorSelect = document.getElementById('agent-connector-configs');
             const connectorConfigIds = Array.from(connectorSelect.selectedOptions).map(o => o.value);
+            const skillSelect = document.getElementById('agent-skills');
+            const skillIds = Array.from(skillSelect.selectedOptions).map(o => o.value);
 
             // Collect selected sub-agent IDs from multi-select
             const subAgentSelect = document.getElementById('agent-sub-agents');
@@ -1046,6 +1126,7 @@
                 tools: toolsCode ? toolsCode : null,
                 mcp_server_ids: mcpServerIds,
                 connector_config_ids: connectorConfigIds,
+                skill_ids: skillIds,
                 sub_agents: subAgentIds,
                 isEnabled: true
             };
@@ -1076,6 +1157,8 @@
             const mcpServerIds = Array.from(mcpSelect.selectedOptions).map(o => o.value);
             const connectorSelect = document.getElementById('agent-update-connector-configs');
             const connectorConfigIds = Array.from(connectorSelect.selectedOptions).map(o => o.value);
+            const skillSelect = document.getElementById('agent-update-skills');
+            const skillIds = Array.from(skillSelect.selectedOptions).map(o => o.value);
             const subAgentSelect = document.getElementById('agent-update-sub-agents');
             const subAgentIds = Array.from(subAgentSelect.selectedOptions).map(o => o.value);
             const data = {};
@@ -1105,6 +1188,9 @@
             }
             if (connectorConfigIds.length > 0) {
                 data.connector_config_ids = connectorConfigIds;
+            }
+            if (skillIds.length > 0) {
+                data.skill_ids = skillIds;
             }
             if (subAgentIds.length > 0) {
                 data.sub_agents = subAgentIds;
@@ -1519,10 +1605,12 @@
             const listEl = document.getElementById('connector-config-list');
             const agentSelect = document.getElementById('agent-connector-configs');
             const updateAgentSelect = document.getElementById('agent-update-connector-configs');
+            const skillSelect = document.getElementById('skill-connector-configs');
 
             listEl.innerHTML = 'Loading...';
             agentSelect.innerHTML = '';
             updateAgentSelect.innerHTML = '';
+            skillSelect.innerHTML = '';
 
             // Fetch connectors list to iterate through all if no filter
             const connectorsRes = await fetch(`${API_BASE}/connectors/`);
@@ -1593,6 +1681,11 @@
                     updateOpt.value = cfg.connector_config_id;
                     updateOpt.textContent = `${cfg.name} (${connector.name})`;
                     updateAgentSelect.appendChild(updateOpt);
+
+                    const skillOpt = document.createElement('option');
+                    skillOpt.value = cfg.connector_config_id;
+                    skillOpt.textContent = `${cfg.name} (${connector.name})`;
+                    skillSelect.appendChild(skillOpt);
                 });
             }
 
@@ -1604,6 +1697,116 @@
         }
 
         // ─── MCP Servers ──────────────────────────────────────────────────────
+
+        async function loadSkills() {
+            const listEl = document.getElementById('skill-list');
+            const agentSelect = document.getElementById('agent-skills');
+            const updateAgentSelect = document.getElementById('agent-update-skills');
+
+            listEl.innerHTML = 'Loading skills...';
+            agentSelect.innerHTML = '';
+            updateAgentSelect.innerHTML = '';
+
+            const res = await fetch(`${API_BASE}/skill/`);
+            if (!res.ok) {
+                listEl.innerHTML = '<em style="color:red;">Could not load skills.</em>';
+                return;
+            }
+
+            currentSkills = await res.json();
+            listEl.innerHTML = '';
+
+            currentSkills.forEach(skill => {
+                const opt = document.createElement('option');
+                opt.value = skill.skill_id;
+                opt.textContent = `${skill.name} (${skill.skill_id})`;
+                agentSelect.appendChild(opt);
+
+                const updateOpt = document.createElement('option');
+                updateOpt.value = skill.skill_id;
+                updateOpt.textContent = `${skill.name} (${skill.skill_id})`;
+                updateAgentSelect.appendChild(updateOpt);
+
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.innerHTML = `
+                    <strong>${skill.name}</strong><br>
+                    <small>${skill.description}</small><br>
+                    <small>Tools: ${(skill.tools || []).join(', ') || 'None'}</small><br>
+                    <small>Connector configs: ${(skill.connector_config_ids || []).length} | MCP servers: ${(skill.mcp_server_ids || []).length}</small>
+                `;
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.type = 'button';
+                deleteBtn.className = 'delete';
+                deleteBtn.style.marginTop = '8px';
+                deleteBtn.textContent = 'Delete';
+                deleteBtn.addEventListener('click', () => deleteSkill(skill.skill_id, skill.name));
+                card.appendChild(deleteBtn);
+
+                listEl.appendChild(card);
+            });
+
+            if (currentSkills.length === 0) {
+                listEl.textContent = 'No skills created yet.';
+            }
+        }
+
+        async function addSkill(e) {
+            e.preventDefault();
+            try {
+                const connectorSelect = document.getElementById('skill-connector-configs');
+                const mcpSelect = document.getElementById('skill-mcp-servers');
+                const payload = {
+                    name: document.getElementById('skill-name').value.trim(),
+                    description: document.getElementById('skill-description').value.trim(),
+                    instructions: document.getElementById('skill-instructions').value.trim(),
+                    tools: document.getElementById('skill-tools').value
+                        .split(',')
+                        .map(value => value.trim())
+                        .filter(Boolean),
+                    connector_config_ids: Array.from(connectorSelect.selectedOptions).map(o => o.value),
+                    mcp_server_ids: Array.from(mcpSelect.selectedOptions).map(o => o.value),
+                    references: parseJsonField('skill-references'),
+                    assets: parseJsonField('skill-assets'),
+                    scripts: parseJsonField('skill-scripts'),
+                };
+
+                const res = await fetch(`${API_BASE}/skill/`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+
+                if (!res.ok) {
+                    alert('Failed to save skill: ' + await res.text());
+                    return;
+                }
+
+                e.target.reset();
+                await loadSkills();
+                loadAgents();
+                loadGraph();
+            } catch (error) {
+                alert(`Failed to parse skill JSON: ${error.message}`);
+            }
+        }
+
+        async function deleteSkill(skillId, skillName) {
+            if (!confirm(`Delete skill ${skillName}?`)) {
+                return;
+            }
+
+            const res = await fetch(`${API_BASE}/skill/${skillId}`, { method: 'DELETE' });
+            if (!res.ok) {
+                alert('Failed to delete skill: ' + await res.text());
+                return;
+            }
+
+            await loadSkills();
+            loadAgents();
+            loadGraph();
+        }
 
         let editingMcpServer = null;
 
@@ -1754,10 +1957,12 @@
             const listEl = document.getElementById('mcp-list');
             const addAgentSelect = document.getElementById('agent-mcp-servers');
             const updateAgentSelect = document.getElementById('agent-update-mcp-servers');
+            const skillSelect = document.getElementById('skill-mcp-servers');
 
             listEl.innerHTML = 'Loading MCP servers...';
             addAgentSelect.innerHTML = '';
             updateAgentSelect.innerHTML = '';
+            skillSelect.innerHTML = '';
 
             const res = await fetch(`${API_BASE}/mcp/`);
             if (!res.ok) {
@@ -1778,6 +1983,11 @@
                 updateOpt.value = mcp.mcp_server_id;
                 updateOpt.textContent = `${mcp.name} (${mcp.auth_type})`;
                 updateAgentSelect.appendChild(updateOpt);
+
+                const skillOpt = document.createElement('option');
+                skillOpt.value = mcp.mcp_server_id;
+                skillOpt.textContent = `${mcp.name} (${mcp.auth_type})`;
+                skillSelect.appendChild(skillOpt);
 
                 const card = document.createElement('div');
                 card.className = 'card';
@@ -1916,6 +2126,7 @@
         document.getElementById('add-agent-form').addEventListener('submit', addAgent);
         document.getElementById('agent-template-select').addEventListener('change', applyAgentTemplate);
         document.getElementById('update-agent-form').addEventListener('submit', updateAgent);
+        document.getElementById('add-skill-form').addEventListener('submit', addSkill);
         document.getElementById('send-msg-btn').addEventListener('click', sendMessage);
         document.getElementById('add-connector-config-form').addEventListener('submit', addConnectorConfig);
         document.getElementById('connector-config-cancel-edit').addEventListener('click', resetConnectorConfigForm);
@@ -1953,7 +2164,13 @@
                 const nodes = new vis.DataSet(
                     data.nodes.map(n => ({
                         id: n.id,
-                        label: n.type === 'agent' ? (n.data.agent.name || n.id) : (n.type === 'connector' ? (n.data.connector.name || n.id) : n.id),
+                        label: n.type === 'agent'
+                            ? (n.data.agent.name || n.id)
+                            : n.type === 'connector'
+                                ? (n.data.connector.name || n.id)
+                                : n.type === 'skill'
+                                    ? (n.data.skill.name || n.id)
+                                    : ((n.data.mcp && n.data.mcp.name) || n.id),
                         group: n.type,
                         title: JSON.stringify(n.data, null, 2)
                     }))
@@ -1973,6 +2190,7 @@
                     groups: {
                         agent: { color: { background: '#e3f2fd', border: '#1e88e5' }, shape: 'box' },
                         connector: { color: { background: '#f1f8e9', border: '#43a047' }, shape: 'ellipse' },
+                        skill: { color: { background: '#f3e8ff', border: '#9333ea' }, shape: 'hexagon' },
                         mcp: { color: { background: '#fff3e0', border: '#fb8c00' }, shape: 'diamond' }
                     },
                     physics: {
@@ -1993,6 +2211,7 @@
         loadAgents();
         loadConnectors().then(() => loadAllConnectorConfigs());
         loadMcpServers();
+        loadSkills();
         loadGraph();
 
         setInterval(checkHealth, 30000);

@@ -8,7 +8,7 @@ from sqlmodel import Session, select
 
 from src.agent_runtime.adk.adk_app import invalidate_cache
 from src.database.database import get_session
-from src.database.models import Agent, MCPServer
+from src.database.models import Agent, MCPServer, Skill
 from src.utils.mcp import derive_mcp_display_name, inspect_mcp_server
 from src.utils.secrets import decrypt_secret, encrypt_secret
 
@@ -85,8 +85,15 @@ async def _probe_payload(payload: MCPServerBase | MCPServerPatch) -> dict[str, A
 
 def _invalidate_agents_using_mcp(session: Session, mcp_server_id: UUID):
     target_id = str(mcp_server_id)
+    matching_skill_ids = {
+        str(skill.skill_id)
+        for skill in session.exec(select(Skill)).all()
+        if target_id in (skill.mcp_server_ids or [])
+    }
     for agent in session.exec(select(Agent)).all():
-        if target_id in (agent.mcp_server_ids or []):
+        if target_id in (agent.mcp_server_ids or []) or any(
+            skill_id in matching_skill_ids for skill_id in (agent.skill_ids or [])
+        ):
             invalidate_cache(agent.agent_id)
 
 
@@ -219,10 +226,20 @@ def delete_mcp_server(mcp_id: UUID, session: Session = Depends(get_session)):
         for agent in session.exec(select(Agent)).all()
         if mcp_server_id in (agent.mcp_server_ids or [])
     ]
+    skill_names = [
+        skill.name
+        for skill in session.exec(select(Skill)).all()
+        if mcp_server_id in (skill.mcp_server_ids or [])
+    ]
     if agent_names:
         raise HTTPException(
             status_code=409,
             detail=f"MCP server is in use by agent: {', '.join(agent_names)}",
+        )
+    if skill_names:
+        raise HTTPException(
+            status_code=409,
+            detail=f"MCP server is in use by skill: {', '.join(skill_names)}",
         )
 
     session.delete(mcp_server)

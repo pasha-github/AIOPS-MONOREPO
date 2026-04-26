@@ -21,6 +21,7 @@ class Agent(SQLModel, table=True):
     connector_config_ids: list[str] = Field(
         default_factory=list, sa_column=Column(JSON)
     )
+    skill_ids: list[str] = Field(default_factory=list, sa_column=Column(JSON))
     mcp_server_ids: list[str] = Field(default_factory=list, sa_column=Column(JSON))
     mcp_servers: list[str] = Field(
         default_factory=list, sa_column=Column(JSON)
@@ -73,6 +74,23 @@ class MCPServer(SQLModel, table=True):
     metadata_json: dict = Field(default_factory=dict, sa_column=Column(JSON))
     tools_json: list[dict] = Field(default_factory=list, sa_column=Column(JSON))
     resources_json: list[dict] = Field(default_factory=list, sa_column=Column(JSON))
+    created_at: datetime = Field(default_factory=datetime.now)
+    updated_at: datetime = Field(default_factory=datetime.now)
+
+
+class Skill(SQLModel, table=True):
+    skill_id: UUID = Field(default_factory=uuid4, primary_key=True)
+    name: str
+    description: str
+    instructions: str
+    tools: list[str] = Field(default_factory=list, sa_column=Column(JSON))
+    references: dict[str, str] = Field(default_factory=dict, sa_column=Column(JSON))
+    assets: dict[str, str] = Field(default_factory=dict, sa_column=Column(JSON))
+    scripts: dict[str, str] = Field(default_factory=dict, sa_column=Column(JSON))
+    connector_config_ids: list[str] = Field(
+        default_factory=list, sa_column=Column(JSON)
+    )
+    mcp_server_ids: list[str] = Field(default_factory=list, sa_column=Column(JSON))
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
 

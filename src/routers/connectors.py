@@ -10,7 +10,7 @@ from sqlmodel import Session, select
 from src.agent_runtime.adk.adk_app import invalidate_cache
 from src.connectors.loader import cached_connector_info
 from src.database.database import get_session
-from src.database.models import Agent, ConnectorConfig
+from src.database.models import Agent, ConnectorConfig, Skill
 
 
 class ConnectorConfigCreate(BaseModel):
@@ -110,10 +110,16 @@ def patch_connector_config(
     if db_connector_config.connector_id != connector_id:
         raise HTTPException(status_code=404, detail="Connector config not found")
     connector_config_id_str = str(connector_config_id)
+    matching_skill_ids = {
+        str(skill.skill_id)
+        for skill in session.exec(select(Skill)).all()
+        if connector_config_id_str in (skill.connector_config_ids or [])
+    }
     affected_agent_ids = [
         agent.agent_id
         for agent in session.exec(select(Agent)).all()
         if connector_config_id_str in (agent.connector_config_ids or [])
+        or any(skill_id in matching_skill_ids for skill_id in (agent.skill_ids or []))
     ]
 
     updates = connector_config.model_dump(exclude_unset=True)
@@ -150,10 +156,20 @@ def delete_connector_config(
         for agent in agents_using_config
         if connector_config_id_str in (agent.connector_config_ids or [])
     ]
+    skills_using_config = [
+        skill.name
+        for skill in session.exec(select(Skill)).all()
+        if connector_config_id_str in (skill.connector_config_ids or [])
+    ]
     if agent_names:
         raise HTTPException(
             status_code=409,
             detail=f"Connector config is in use by agent: {', '.join(agent_names)}",
+        )
+    if skills_using_config:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Connector config is in use by skill: {', '.join(skills_using_config)}",
         )
 
     session.delete(db_connector_config)

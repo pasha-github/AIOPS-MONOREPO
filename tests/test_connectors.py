@@ -308,6 +308,35 @@ def test_delete_connector_config_wrong_connector_returns_404(client: TestClient)
     assert response.json()["detail"] == "Connector config not found"
 
 
+def test_delete_connector_config_in_use_by_skill_returns_409(client: TestClient):
+    payload = {
+        "connector_id": "example_connector",
+        "name": "Config In Skill",
+        "config": [{"name": "API_KEY", "value": "abc"}],
+    }
+    create_response = client.post("/connectors/example_connector/config", json=payload)
+    assert create_response.status_code == 200
+
+    connector_config_id = create_response.json()["connector_config_id"]
+    client.post(
+        "/skill/",
+        json={
+            "name": "skill_connector_link",
+            "description": "desc",
+            "instructions": "instr",
+            "connector_config_ids": [connector_config_id],
+        },
+    )
+
+    response = client.delete(
+        f"/connectors/example_connector/config/{connector_config_id}"
+    )
+    assert response.status_code == 409
+    assert response.json()["detail"] == (
+        "Connector config is in use by skill: skill_connector_link"
+    )
+
+
 def test_cached_connector_info_extracts_expected_sections():
     source = '''
 """Demo connector documentation."""

@@ -10,7 +10,8 @@ from sqlmodel import Session, select
 
 from src.agent_runtime.adk.adk_app import adk_web_server_instance, invalidate_cache
 from src.database.database import get_session
-from src.database.models import Agent, Job, MCPServer, Model, Webhook
+from src.database.models import Agent, Job, Model, Webhook
+from src.skills.runtime import validate_mcp_server_ids, validate_skill_ids
 
 router = APIRouter(prefix="/agent", tags=["agent"])
 TEMPLATES_FILE = (
@@ -32,6 +33,7 @@ class AgentCreate(BaseModel):
     tertiary_use_global: bool = True
     tertiary_model_id: str | None = None
     tools: str | None = None
+    skill_ids: list[str] = []
     mcp_server_ids: list[str] = []
     mcp_servers: list[str] = []
     connector_config_ids: list[str] = []
@@ -51,6 +53,7 @@ class AgentPatch(BaseModel):
     tertiary_use_global: bool | None = None
     tertiary_model_id: str | None = None
     tools: str | None = None
+    skill_ids: list[str] | None = None
     mcp_server_ids: list[str] | None = None
     mcp_servers: list[str] | None = None
     connector_config_ids: list[str] | None = None
@@ -122,22 +125,6 @@ def _validate_agent_model_settings(session: Session, payload: dict):
         )
 
 
-def _validate_mcp_server_ids(session: Session, mcp_server_ids: list[str] | None):
-    for mcp_server_id in mcp_server_ids or []:
-        try:
-            mcp_uuid = UUID(mcp_server_id)
-        except ValueError as exc:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid MCP server id: {mcp_server_id}",
-            ) from exc
-        if session.get(MCPServer, mcp_uuid) is None:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid MCP server id: {mcp_server_id}",
-            )
-
-
 @router.get("/templates", response_model=list[AgentTemplate])
 def list_agent_templates():
     with TEMPLATES_FILE.open("r", encoding="utf-8") as templates_file:
@@ -152,7 +139,8 @@ def create_agent(agent: AgentCreate, session: Session = Depends(get_session)):
 
     agent_data = agent.model_dump()
     _validate_agent_model_settings(session, agent_data)
-    _validate_mcp_server_ids(session, agent_data.get("mcp_server_ids"))
+    validate_mcp_server_ids(session, agent_data.get("mcp_server_ids"))
+    validate_skill_ids(session, agent_data.get("skill_ids"))
 
     db_agent = Agent.model_validate(agent_data)
     session.add(db_agent)
@@ -179,7 +167,8 @@ def update_agent(
     merged = agent.model_dump()
     merged.update(updates)
     _validate_agent_model_settings(session, merged)
-    _validate_mcp_server_ids(session, merged.get("mcp_server_ids"))
+    validate_mcp_server_ids(session, merged.get("mcp_server_ids"))
+    validate_skill_ids(session, merged.get("skill_ids"))
 
     for key, value in updates.items():
         setattr(agent, key, value)
