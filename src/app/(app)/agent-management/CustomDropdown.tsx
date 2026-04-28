@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
 import { ChevronDown } from "lucide-react";
+import { useState } from "react";
 import { inputClass } from "./DynamicConnector";
 
 type OptionItem = {
@@ -36,17 +36,19 @@ export function CustomDropdown({
 
     for (const o of options) {
       const rowConfig = configDataMap?.[o.value];
+      if (!rowConfig) {
+        continue;
+      }
 
-      const ids: string[] = rowConfig
-        ? Array.isArray(rowConfig)
-          ? rowConfig.map((d: any) => d.connector_config_id)
-          : rowConfig.connector_config_id
-            ? [rowConfig.connector_config_id]
-            : []
-        : [];
-
-      if (ids.includes(selectedId)) {
-        return `${o.label}`;
+      if (Array.isArray(rowConfig)) {
+        const match = rowConfig.find(
+          (item: any) => item?.connector_config_id === selectedId
+        );
+        if (match) {
+          return match?.name || selectedId;
+        }
+      } else if (rowConfig.connector_config_id === selectedId) {
+        return rowConfig?.name || selectedId;
       }
     }
 
@@ -82,6 +84,16 @@ export function CustomDropdown({
       {/* Dropdown */}
       {open && (
         <div className="absolute z-50 mt-1 w-full rounded-lg border bg-white shadow-lg max-h-60 overflow-auto">
+          <button
+            type="button"
+            onClick={() => {
+              onChange([]);
+              setOpen(false);
+            }}
+            className="w-full px-3 py-2 text-left text-sm text-gray-500 hover:bg-gray-50"
+          >
+            Select Connector
+          </button>
 
           {options.map((o) => {
             const configIds = getConfigIds(o.value);
@@ -121,14 +133,8 @@ export function CustomDropdown({
                       }}
                       className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
                     >
-                      {/* ✅ SHOW NAME HERE */}
                       <div className="text-sm font-medium leading-tight">
                         {configName}
-                      </div>
-
-                      {/* ID below */}
-                      <div className="text-xs text-gray-500">
-                        Config ID: {id}
                       </div>
                     </div>
                   );
