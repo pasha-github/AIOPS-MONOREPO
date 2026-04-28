@@ -30,6 +30,7 @@ export type AgentRecord = {
   created_at: string | null;
   updated_at: string | null;
   tools: string[] | string;
+  mcp_server_ids?: string[];
   mcp_servers: string[];
   connector_config_ids: string[];
   sub_agents: string[];

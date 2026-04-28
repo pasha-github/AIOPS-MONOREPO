@@ -2,11 +2,11 @@
 
 import { trimTrailingSlash } from "@/config/agent";
 import { useRuntimeConfig } from "@/config/runtime-config";
-import { Bot, ChevronDown, X } from "lucide-react";
+import { Bot, ChevronDown, Plus, Trash2, X } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { getProviderIconSrc } from "../llm-management/llmHelpers";
-import { DynamicDropdownField, DynamicListField as SharedDynamicListField } from "./DynamicConnector";
+import { DynamicDropdownField, inputClass } from "./DynamicConnector";
 
 type UpdateAgentProps = {
     agent: any;
@@ -75,9 +75,6 @@ const normalizeLlmDefaults = (value: unknown): LlmDefaults | null => {
         tertiary_model_id: normalizeModelId(payload.tertiary_model_id),
     };
 };
-
-const inputClass =
-    "w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-900 placeholder-gray-400 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/10";
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
     return (
@@ -256,6 +253,13 @@ export default function UpdateAgent({
     const [modelOptions, setModelOptions] = useState<ModelOption[]>([]);
     const [defaultModels, setDefaultModels] = useState<LlmDefaults | null>(null);
     const [mcpServers, setMcpServers] = useState<string[]>([""]);
+    const [mcpServerIds, setMcpServerIds] = useState<string[]>([""]);
+    const [mcpOptions, setMcpOptions] = useState<
+        { id: string; name: string; serverUrl: string }[]
+    >([]);
+    const [isMcpLoading, setIsMcpLoading] = useState(false);
+    const [openMcpDropdownIndex, setOpenMcpDropdownIndex] = useState<number | null>(null);
+    const mcpDropdownRefs = useRef<Array<HTMLDivElement | null>>([]);
     const [connectorConfigIds, setConnectorConfigIds] = useState<string[][]>([[]]);
     const [connectorOptions, setConnectorOptions] = useState<{ value: string; label: string }[]>([]);
     const [configDataMap, setConfigDataMap] = useState<Record<string, any>>({});
@@ -334,6 +338,16 @@ export default function UpdateAgent({
     const normalizeList = (values: string[]) => values.map((value) => value.trim()).filter(Boolean);
     const normalizeNestedList = (values: string[][]) =>
         values.flat().map((value) => value.trim()).filter(Boolean);
+    const normalizeMcpServerIds = (values: string[]) =>
+        values.map((value) => value.trim()).filter(Boolean);
+    const normalizeManualMcpServers = (urls: string[], ids: string[]) =>
+        urls
+            .map((url, index) => {
+                const trimmedUrl = url.trim();
+                const id = ids[index]?.trim() ?? "";
+                return id ? "" : trimmedUrl;
+            })
+            .filter(Boolean);
 
     const updateConnectorList = (index: number, value: string[]) => {
         setConnectorConfigIds((previous) =>
@@ -379,6 +393,11 @@ export default function UpdateAgent({
 
     useEffect(() => {
         if (!isOpen || !agent) return;
+        const initialMcpServers = agent.mcp_servers?.length ? agent.mcp_servers : [""];
+        const initialMcpServerIds = agent.mcp_server_ids?.length
+            ? agent.mcp_server_ids
+            : (agent.mcp_servers?.length ? agent.mcp_servers.map(() => "") : [""]);
+
         setForm({
             agentName: agent.name || "",
             description: agent.description || "",
@@ -386,7 +405,7 @@ export default function UpdateAgent({
             tools: Array.isArray(agent.tools)
                 ? agent.tools.join(", ")
                 : agent.tools || "",
-            mcpServers: (agent.mcp_servers || []).join(", "),
+            mcpServers: (initialMcpServers || []).join(", "),
             connectorConfigIds: (agent.connector_config_ids || []).join(", "),
             subAgents: (agent.sub_agents || []).join(", "),
             isEnabled: agent.isEnabled ?? true,
@@ -401,7 +420,8 @@ export default function UpdateAgent({
         setPrimaryModelId(initialPrimaryModelId);
         setSecondaryModelId(normalizeModelId(agent.secondary_model_id) ?? "");
         setTertiaryModelId(normalizeModelId(agent.tertiary_model_id) ?? "");
-        setMcpServers(agent.mcp_servers?.length ? agent.mcp_servers : [""]);
+        setMcpServers(initialMcpServers);
+        setMcpServerIds(initialMcpServerIds);
         setConnectorConfigIds(
             agent.connector_config_ids?.length
                 ? agent.connector_config_ids.map((value: string) => [value])
@@ -413,6 +433,69 @@ export default function UpdateAgent({
         setError("");
         setSuccess("");
     }, [isOpen, agent]);
+
+    useEffect(() => {
+        if (!isOpen || !mcpOptions.length) return;
+        setMcpServers((previous) =>
+            previous.map((url, index) => {
+                if (url.trim()) return url;
+                const selectedId = mcpServerIds[index]?.trim();
+                if (!selectedId) return url;
+                const selected = mcpOptions.find((option) => option.id === selectedId);
+                return selected ? (selected.name || selected.serverUrl) : url;
+            })
+        );
+    }, [isOpen, mcpOptions, mcpServerIds]);
+
+    useEffect(() => {
+        if (!isOpen) return;
+        const ctrl = new AbortController();
+        (async () => {
+            setIsMcpLoading(true);
+            try {
+                const res = await fetch(`${base}/mcp/`, {
+                    headers: { accept: "application/json" },
+                    signal: ctrl.signal,
+                });
+                const data = await res.json().catch(() => null);
+                if (res.ok && Array.isArray(data)) {
+                    setMcpOptions(
+                        data
+                            .map((item: any) => {
+                                const id = typeof item?.mcp_server_id === "string" ? item.mcp_server_id.trim() : "";
+                                const name = typeof item?.name === "string" ? item.name.trim() : "";
+                                const serverUrl = typeof item?.server_url === "string" ? item.server_url.trim() : "";
+                                if (!id || !serverUrl) return null;
+                                return { id, name, serverUrl };
+                            })
+                            .filter(Boolean) as { id: string; name: string; serverUrl: string }[]
+                    );
+                } else {
+                    setMcpOptions([]);
+                }
+            } catch (error: any) {
+                if (error?.name !== "AbortError") {
+                    setMcpOptions([]);
+                }
+            } finally {
+                setIsMcpLoading(false);
+            }
+        })();
+        return () => ctrl.abort();
+    }, [base, isOpen]);
+
+    useEffect(() => {
+        const onClickOutside = (event: MouseEvent) => {
+            if (openMcpDropdownIndex === null) return;
+            const container = mcpDropdownRefs.current[openMcpDropdownIndex];
+            if (!container) return;
+            if (!container.contains(event.target as Node)) {
+                setOpenMcpDropdownIndex(null);
+            }
+        };
+        document.addEventListener("mousedown", onClickOutside);
+        return () => document.removeEventListener("mousedown", onClickOutside);
+    }, [openMcpDropdownIndex]);
 
     useEffect(() => {
         if (!isOpen) return;
@@ -569,7 +652,8 @@ export default function UpdateAgent({
                     tertiary_use_global: !tertiaryUseCustom,
                     tertiary_model_id: tertiaryUseCustom ? effectiveTertiaryModelId || null : null,
                     tools: form.tools || "",
-                    mcp_servers: normalizeList(mcpServers),
+                    mcp_server_ids: normalizeMcpServerIds(mcpServerIds),
+                    mcp_servers: normalizeManualMcpServers(mcpServers, mcpServerIds),
                     connector_config_ids: normalizeNestedList(connectorConfigIds),
                     sub_agents: form.subAgents
                         ? form.subAgents.split(",").map((s) => s.trim())
@@ -778,15 +862,109 @@ export default function UpdateAgent({
                     <SectionLabel>Capabilities</SectionLabel>
 
                     <div className="grid grid-cols-2 items-start gap-4">
-                        <SharedDynamicListField
+                        <Field
                             label="MCP Servers"
-                            hint="URLs of MCP servers this agent can connect to"
-                            values={mcpServers}
-                            placeholder="https://mcp.example.com/sse"
-                            onAdd={() => addToList(setMcpServers)}
-                            onRemove={(index) => removeFromList(setMcpServers, index)}
-                            onChange={(index, value) => updateList(setMcpServers, index, value)}
-                        />
+                            hint="Type custom URL or select from registered MCP servers"
+                        >
+                            <div className="flex flex-col gap-2">
+                                {mcpServers.map((val, index) => (
+                                    <div key={index} className="flex items-center gap-2">
+                                        <div
+                                            ref={(node) => {
+                                                mcpDropdownRefs.current[index] = node;
+                                            }}
+                                            className="relative w-full"
+                                        >
+                                            <input
+                                                className={`${inputClass} pr-10`}
+                                                value={val}
+                                                placeholder="https://mcp.example.com/sse"
+                                                onChange={(e) => {
+                                                    updateList(setMcpServers, index, e.target.value);
+                                                    updateList(setMcpServerIds, index, "");
+                                                }}
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    setOpenMcpDropdownIndex((current) => (current === index ? null : index))
+                                                }
+                                                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500"
+                                            >
+                                                <ChevronDown size={16} />
+                                            </button>
+                                            {openMcpDropdownIndex === index ? (
+                                                <div className="absolute z-50 mt-1 w-full rounded-lg border bg-white shadow-lg max-h-60 overflow-auto">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            updateList(setMcpServerIds, index, "");
+                                                            updateList(setMcpServers, index, "");
+                                                            setOpenMcpDropdownIndex(null);
+                                                        }}
+                                                        className="w-full px-3 py-2 text-left text-sm text-gray-500 hover:bg-gray-50"
+                                                    >
+                                                        Select MCP
+                                                    </button>
+                                                    {isMcpLoading ? (
+                                                        <div className="px-3 py-2 text-sm text-gray-500">Loading MCP servers...</div>
+                                                    ) : mcpOptions.length === 0 ? (
+                                                        <div className="px-3 py-2 text-sm text-gray-500">No MCP servers found</div>
+                                                    ) : (
+                                                        mcpOptions.map((option) => (
+                                                            <button
+                                                                key={option.id}
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    updateList(
+                                                                        setMcpServers,
+                                                                        index,
+                                                                        option.name || option.serverUrl
+                                                                    );
+                                                                    updateList(setMcpServerIds, index, option.id);
+                                                                    setOpenMcpDropdownIndex(null);
+                                                                }}
+                                                                className="w-full border-b px-3 py-2 text-left hover:bg-gray-50"
+                                                            >
+                                                                <div className="text-sm font-medium text-gray-900">
+                                                                    {option.name || option.serverUrl}
+                                                                </div>
+                                                                <div className="text-xs text-gray-500 break-all">
+                                                                    {option.serverUrl}
+                                                                </div>
+                                                            </button>
+                                                        ))
+                                                    )}
+                                                </div>
+                                            ) : null}
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                addToList(setMcpServers);
+                                                addToList(setMcpServerIds);
+                                            }}
+                                            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-600 transition hover:bg-indigo-100"
+                                        >
+                                            <Plus size={14} />
+                                        </button>
+                                        {mcpServers.length > 1 ? (
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    removeFromList(setMcpServers, index);
+                                                    removeFromList(setMcpServerIds, index);
+                                                    setOpenMcpDropdownIndex(null);
+                                                }}
+                                                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-500 transition hover:bg-red-100"
+                                            >
+                                                <Trash2 size={14} />
+                                            </button>
+                                        ) : null}
+                                    </div>
+                                ))}
+                            </div>
+                        </Field>
                         <DynamicDropdownField
                             label="Connector Config"
                             hint="Choose from pre-configured connectors"
