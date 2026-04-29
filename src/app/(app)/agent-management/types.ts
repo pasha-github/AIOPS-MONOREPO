@@ -30,27 +30,31 @@ export type AgentRecord = {
   created_at: string | null;
   updated_at: string | null;
   tools: string[] | string;
+  skill_ids: string[];
   mcp_server_ids?: string[];
   mcp_servers: string[];
   connector_config_ids: string[];
   sub_agents: string[];
   isEnabled: boolean | null;
 };
+
 export type DropdownOption = {
   value: string;
   label: string;
 };
+
 export interface DynamicDropdownFieldProps {
   label: string;
   hint?: string;
-  values: string[];
+  values: string[][];
   options: { value: string; label: string }[];
   placeholder?: string;
-  configDataMap?: Record<string, any>;  // ← was: configData?: any
+  configDataMap?: Record<string, unknown>;
   onAdd: () => void;
   onRemove: (i: number) => void;
-  onChange: (i: number, v: string) => void;
+  onChange: (i: number, v: string[] | string) => void;
 }
+
 export interface DynamicListFieldProps {
   label: string;
   hint?: string;
@@ -59,7 +63,7 @@ export interface DynamicListFieldProps {
   onAdd: () => void;
   onRemove: (i: number) => void;
   onChange: (i: number, v: string) => void;
-};
+}
 
 export type CreateNewAgentProps = {
   onCreateSuccess?: () => void | Promise<void>;

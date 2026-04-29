@@ -2,9 +2,9 @@ import { trimTrailingSlash } from "@/config/agent";
 import { useRuntimeConfig } from "@/config/runtime-config";
 import { Bot, ChevronDown, LayoutTemplate, Plus, Trash2 } from "lucide-react";
 import Image from "next/image";
-import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { getProviderIconSrc } from "../llm-management/llmHelpers";
-import { DynamicDropdownField, inputClass } from "./DynamicConnector";
+import { DynamicDropdownField, inputClass, SimpleDropdownField } from "./DynamicConnector";
 import ModelSelect, { ModelOption } from "./ModelSelect";
 import { CreateNewAgentProps, ModelTemplate } from "./types";
 
@@ -26,9 +26,9 @@ const getErrorMessage = (payload: unknown, fallback: string) => {
     payload &&
     typeof payload === "object" &&
     "message" in payload &&
-    typeof (payload as any).message === "string"
+    typeof (payload as { message?: unknown }).message === "string"
   ) {
-    return String((payload as any).message);
+    return String((payload as { message: string }).message);
   }
   return fallback;
 };
@@ -93,8 +93,10 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
   const [isToastVisible, setIsToastVisible] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
   const [connectorOptions, setConnectorOptions] = useState<{ value: string; label: string }[]>([]);
-  const [isConnectorsLoading, setIsConnectorsLoading] = useState(false);
-  const [configDataMap, setConfigDataMap] = useState<Record<string, any>>({});
+  const [configDataMap, setConfigDataMap] = useState<Record<string, unknown>>({});
+  const [skillIds, setSkillIds] = useState<string[]>([""]);
+  const [skillOptions, setSkillOptions] = useState<{ value: string; label: string }[]>([]);
+  const [isSkillsLoading, setIsSkillsLoading] = useState(false);
 
   const agentId = useMemo(() => toSnakeCase(agentName), [agentName]);
 
@@ -103,7 +105,6 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
     if (!isModalOpen) return;
     const ctrl = new AbortController();
     (async () => {
-      setIsConnectorsLoading(true);
       try {
         const res = await fetch(`${base}/connectors/`, {
           headers: { accept: "application/json" },
@@ -112,16 +113,68 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
         const data = await res.json();
         if (res.ok && Array.isArray(data)) {
           setConnectorOptions(
-            data.map((item: any) => ({
-              value: item.connector_config_id ?? item.id ?? "",
-              label: item.name ?? item.connector_config_id ?? item.id ?? "",
-            }))
+            data.map((item: unknown) => {
+              const record = item as Record<string, unknown>;
+              return {
+                value:
+                  typeof record.connector_config_id === "string"
+                    ? record.connector_config_id
+                    : typeof record.id === "string"
+                      ? record.id
+                      : "",
+                label:
+                  typeof record.name === "string"
+                    ? record.name
+                    : typeof record.connector_config_id === "string"
+                      ? record.connector_config_id
+                      : typeof record.id === "string"
+                        ? record.id
+                        : "",
+              };
+            })
           );
         }
-      } catch (e: any) {
-        if (e?.name !== "AbortError") setConnectorOptions([]);
+      } catch (error: unknown) {
+        if (!(error instanceof DOMException && error.name === "AbortError")) {
+          setConnectorOptions([]);
+        }
+      }
+    })();
+    return () => ctrl.abort();
+  }, [base, isModalOpen]);
+
+  useEffect(() => {
+    if (!isModalOpen) return;
+    const ctrl = new AbortController();
+    (async () => {
+      setIsSkillsLoading(true);
+      try {
+        const res = await fetch(`${base}/skill/`, {
+          headers: { accept: "application/json" },
+          signal: ctrl.signal,
+        });
+        const data = await res.json().catch(() => null);
+        if (res.ok && Array.isArray(data)) {
+          setSkillOptions(
+            data
+              .map((item: unknown) => {
+                const record = item as Record<string, unknown>;
+                const value = typeof record.skill_id === "string" ? record.skill_id.trim() : "";
+                const label = typeof record.name === "string" ? record.name.trim() : "";
+                if (!value || !label) return null;
+                return { value, label };
+              })
+              .filter(Boolean) as { value: string; label: string }[]
+          );
+        } else {
+          setSkillOptions([]);
+        }
+      } catch (error: unknown) {
+        if (!(error instanceof DOMException && error.name === "AbortError")) {
+          setSkillOptions([]);
+        }
       } finally {
-        setIsConnectorsLoading(false);
+        setIsSkillsLoading(false);
       }
     })();
     return () => ctrl.abort();
@@ -142,10 +195,11 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
         if (res.ok && Array.isArray(data)) {
           setMcpOptions(
             data
-              .map((item: any) => {
-                const id = typeof item?.mcp_server_id === "string" ? item.mcp_server_id.trim() : "";
-                const name = typeof item?.name === "string" ? item.name.trim() : "";
-                const serverUrl = typeof item?.server_url === "string" ? item.server_url.trim() : "";
+              .map((item: unknown) => {
+                const record = item as Record<string, unknown>;
+                const id = typeof record.mcp_server_id === "string" ? record.mcp_server_id.trim() : "";
+                const name = typeof record.name === "string" ? record.name.trim() : "";
+                const serverUrl = typeof record.server_url === "string" ? record.server_url.trim() : "";
                 if (!id || !serverUrl) return null;
                 return {
                   id,
@@ -159,8 +213,10 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
         } else {
           setMcpOptions([]);
         }
-      } catch (e: any) {
-        if (e?.name !== "AbortError") setMcpOptions([]);
+      } catch (error: unknown) {
+        if (!(error instanceof DOMException && error.name === "AbortError")) {
+          setMcpOptions([]);
+        }
       } finally {
         setIsMcpLoading(false);
       }
@@ -183,7 +239,7 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [openMcpDropdownIndex]);
 
-  const fetchConnectorConfig = async (value: string) => {
+  const fetchConnectorConfig = useCallback(async (value: string) => {
     if (!value || configDataMap[value] !== undefined) return;
     setConfigDataMap((prev) => ({ ...prev, [value]: null }));
     try {
@@ -208,14 +264,14 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
         return next;
       });
     }
-  };
+  }, [base, configDataMap]);
 
   useEffect(() => {
     if (!connectorOptions.length) return;
     connectorOptions.forEach((opt) => {
       fetchConnectorConfig(opt.value);
     });
-  }, [connectorOptions]);
+  }, [connectorOptions, fetchConnectorConfig]);
 
   const resolveModelOption = (modelId: string | null) => {
     if (!modelId) {
@@ -283,14 +339,15 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
         }
         setModelOptions(
           data
-            .flatMap((item: any) => {
-              const id = item?.model_id?.trim();
+            .flatMap((item: unknown) => {
+              const record = item as Record<string, unknown>;
+              const id = typeof record.model_id === "string" ? record.model_id.trim() : "";
               if (!id) return [];
-              const provider = item?.provider?.trim() || "";
+              const provider = typeof record.provider === "string" ? record.provider.trim() : "";
               return [
                 {
                   value: id,
-                  label: item?.name?.trim() || id,
+                  label: typeof record.name === "string" && record.name.trim() ? record.name.trim() : id,
                   secondary: provider ? `${provider} | ${id}` : id,
                   iconSrc: provider ? getProviderIconSrc(provider) : null,
                 },
@@ -300,8 +357,10 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
               a.label.localeCompare(b.label, undefined, { sensitivity: "base", numeric: true })
             )
         );
-      } catch (e: any) {
-        if (e?.name !== "AbortError") setModelsLoadError("Unable to load models.");
+      } catch (error: unknown) {
+        if (!(error instanceof DOMException && error.name === "AbortError")) {
+          setModelsLoadError("Unable to load models.");
+        }
       } finally {
         setIsModelsLoading(false);
       }
@@ -406,6 +465,7 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
     setMcpServers([""]);
     setMcpServerIds([""]);
     setConnectorConfigIds([[]]);
+    setSkillIds([""]);
     setConfigDataMap({});
     setDefaultModels(null);
     setDefaultsLoadError("");
@@ -473,6 +533,7 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
           tertiary_use_global: !tertiaryUseCustom,
           tertiary_model_id: tertiaryUseCustom ? effectiveTertiaryModelId || null : null,
           tools: "",
+          skill_ids: normalizeList(skillIds),
           mcp_server_ids: normalizeMcpServerIds(mcpServerIds),
           mcp_servers: normalizeManualMcpServers(mcpServers, mcpServerIds),
           connector_config_ids: connectorConfigIds.flat(),
@@ -502,6 +563,14 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
 
   const addConnector = () => {
     setConnectorConfigIds((prev) => [...prev, []]);
+  };
+
+  const addSkill = () => {
+    setSkillIds((prev) => [...prev, ""]);
+  };
+
+  const removeSkill = (index: number) => {
+    setSkillIds((prev) => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== index)));
   };
 
   const removeConnector = (index: number) => {
@@ -890,6 +959,22 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
                   onRemove={(i: number): void => removeConnector(i)}
                   onChange={(i: number, v: string[] | string): void =>
                   updateList(i, Array.isArray(v) ? v : [v])
+                  }
+                />
+                <SimpleDropdownField
+                  label="Skill"
+                  hint={
+                    isSkillsLoading
+                      ? "Loading registered skills"
+                      : "Choose from registered skills"
+                  }
+                  values={skillIds}
+                  options={skillOptions}
+                  placeholder="Select skill"
+                  onAdd={addSkill}
+                  onRemove={removeSkill}
+                  onChange={(index, value) =>
+                    setSkillIds((prev) => prev.map((item, i) => (i === index ? value : item)))
                   }
                 />
                 </div>
