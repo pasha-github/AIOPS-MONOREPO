@@ -449,6 +449,53 @@ export default function SkillModal({
     return "";
   };
 
+  const isCreateValid =
+    draft.name.trim().length > 0 &&
+    draft.description.trim().length > 0 &&
+    draft.instructions.trim().length > 0;
+
+  const saveCreate = async () => {
+    const validationError = validateDraft();
+    if (validationError) {
+      setSaveError(validationError);
+      return;
+    }
+
+    setIsSaving(true);
+    setSaveError("");
+
+    try {
+      const response = await fetch(`${apiBase}/skill/`, {
+        method: "POST",
+        headers: {
+          accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(
+          buildSkillPatchPayload({
+            ...draft,
+            tools: toUniqueValues(draft.tools),
+            mcpServerIds: toUniqueValues(draft.mcpServerIds),
+            connectorConfigIds: toUniqueValues(draft.connectorConfigIds),
+            references: buildReferenceRecord(referenceRows),
+          })
+        ),
+      });
+
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(getSkillErrorMessage(payload, "Unable to create skill."));
+      }
+
+      await onSaved?.();
+      onClose();
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : "Unable to create skill.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const saveUpdate = async () => {
     if (!skillId) {
       return;
@@ -592,7 +639,6 @@ export default function SkillModal({
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <p className="text-sm font-semibold text-[#111827]">{headerName}</p>
-                      <p className="mt-1 text-xs text-[#64748b]">Skill ID: {skillId}</p>
                     </div>
                     <div className="text-right text-xs text-[#64748b]">
                       <p>Created: {formatSkillDate(detail.createdAt)}</p>
@@ -993,9 +1039,14 @@ export default function SkillModal({
           {mode === "create" ? (
             <button
               type="button"
-              className="inline-flex items-center rounded-xl bg-[#4f49e2] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_10px_24px_-16px_rgba(79,73,226,0.8)] transition hover:bg-[#3f39d6]"
+              onClick={() => {
+                void saveCreate();
+              }}
+              disabled={!isCreateValid || isSaving}
+              className="inline-flex items-center rounded-xl bg-[#4f49e2] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_10px_24px_-16px_rgba(79,73,226,0.8)] transition hover:bg-[#3f39d6] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-[#4f49e2]"
             >
-              Create Skill
+              {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              <span className={isSaving ? "ml-2" : ""}>Create Skill</span>
             </button>
           ) : (
             <button

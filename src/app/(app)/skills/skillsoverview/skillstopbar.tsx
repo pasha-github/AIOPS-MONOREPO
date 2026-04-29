@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, Plus, Sparkles } from "lucide-react";
+import { Plus, Sparkles } from "lucide-react";
 
 type SkillsTopbarProps = {
   totalSkills: number;
@@ -52,7 +52,7 @@ export default function SkillsTopbar({
                 <p className="text-xs font-medium text-[#8b95ad]">{item.label}</p>
                 <div className="mt-1 min-h-[40px]">
                   {isLoading ? (
-                    <Loader2 className="h-7 w-7 animate-spin text-[#4f49e2]" />
+                    <div className="h-9 w-16 animate-pulse rounded-lg bg-[#edf2f9]" />
                   ) : (
                     <p className="text-3xl font-semibold tracking-tight text-[#111827]">
                       {item.value}
@@ -78,4 +78,3 @@ export default function SkillsTopbar({
     </section>
   );
 }
-

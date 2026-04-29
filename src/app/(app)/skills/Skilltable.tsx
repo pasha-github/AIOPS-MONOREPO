@@ -7,6 +7,7 @@ import type { SkillInventoryRow } from "./schema";
 
 type SkilltableProps = {
   rows: SkillInventoryRow[];
+  isLoading: boolean;
   onView: (skillId: string) => void;
   onUpdate: (skillId: string) => void;
   onDelete: (skillId: string) => void;
@@ -177,6 +178,7 @@ function SkillActionMenu({
 
 export default function Skilltable({
   rows,
+  isLoading,
   onView,
   onUpdate,
   onDelete,
@@ -203,27 +205,56 @@ export default function Skilltable({
             </div>
 
             <div className="divide-y divide-[#eef1f7] bg-white">
-              {rows.map((row) => (
-                <div
-                  key={row.id}
-                  className="grid grid-cols-[1.2fr_1.7fr_2fr_1.2fr_1.2fr_120px] items-start divide-x divide-[#e8eef7] px-4 py-4 text-sm text-[#2b3341]"
-                >
-                  <div className="px-4 font-semibold text-[#111827]">{row.name}</div>
-                  <div className="px-4 text-[#4b5563]">{row.description}</div>
-                  <div className="px-4 text-[#4b5563]">{row.instructions}</div>
-                  <div className="px-4 text-[#4b5563]">{row.createdAt}</div>
-                  <div className="px-4 text-[#4b5563]">{row.updatedAt}</div>
-                  <div className="flex justify-end px-3">
-                    <SkillActionMenu
-                      skillId={row.id}
-                      skillName={row.name}
-                      onView={onView}
-                      onUpdate={onUpdate}
-                      onDelete={onDelete}
-                    />
-                  </div>
-                </div>
-              ))}
+              {isLoading
+                ? Array.from({ length: 4 }).map((_, index) => (
+                    <div
+                      key={`skill-skeleton-${index}`}
+                      className="grid grid-cols-[1.2fr_1.7fr_2fr_1.2fr_1.2fr_120px] animate-pulse items-center divide-x divide-[#e8eef7] px-4 py-4"
+                    >
+                      <div className="space-y-2 px-4">
+                        <div className="h-4 w-32 rounded bg-[#edf2f9]" />
+                        <div className="h-3 w-24 rounded bg-[#edf2f9]" />
+                      </div>
+                      <div className="space-y-2 px-4">
+                        <div className="h-4 w-full rounded bg-[#edf2f9]" />
+                        <div className="h-4 w-4/5 rounded bg-[#edf2f9]" />
+                      </div>
+                      <div className="space-y-2 px-4">
+                        <div className="h-4 w-full rounded bg-[#edf2f9]" />
+                        <div className="h-4 w-5/6 rounded bg-[#edf2f9]" />
+                      </div>
+                      <div className="px-4">
+                        <div className="h-4 w-28 rounded bg-[#edf2f9]" />
+                      </div>
+                      <div className="px-4">
+                        <div className="h-4 w-28 rounded bg-[#edf2f9]" />
+                      </div>
+                      <div className="flex justify-end px-3">
+                        <div className="h-10 w-10 rounded-xl bg-[#edf2f9]" />
+                      </div>
+                    </div>
+                  ))
+                : rows.map((row) => (
+                    <div
+                      key={row.id}
+                      className="grid grid-cols-[1.2fr_1.7fr_2fr_1.2fr_1.2fr_120px] items-start divide-x divide-[#e8eef7] px-4 py-4 text-sm text-[#2b3341]"
+                    >
+                      <div className="px-4 font-semibold text-[#111827]">{row.name}</div>
+                      <div className="px-4 text-[#4b5563]">{row.description}</div>
+                      <div className="px-4 text-[#4b5563]">{row.instructions}</div>
+                      <div className="px-4 text-[#4b5563]">{row.createdAt}</div>
+                      <div className="px-4 text-[#4b5563]">{row.updatedAt}</div>
+                      <div className="flex justify-end px-3">
+                        <SkillActionMenu
+                          skillId={row.id}
+                          skillName={row.name}
+                          onView={onView}
+                          onUpdate={onUpdate}
+                          onDelete={onDelete}
+                        />
+                      </div>
+                    </div>
+                  ))}
             </div>
           </div>
         </div>

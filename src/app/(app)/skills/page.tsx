@@ -2,7 +2,7 @@
 
 import { trimTrailingSlash } from "@/config/agent";
 import { useRuntimeConfig } from "@/config/runtime-config";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Skilltable from "./Skilltable";
 import type { SkillInventoryRow } from "./schema";
 import {
@@ -17,6 +17,7 @@ import ViewSkill from "./ViewSkill";
 export default function SkillsPage() {
   const { llmManagerApiBaseUrl } = useRuntimeConfig();
   const apiBase = trimTrailingSlash(llmManagerApiBaseUrl);
+  const [hasMounted, setHasMounted] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [rows, setRows] = useState<SkillInventoryRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -24,68 +25,71 @@ export default function SkillsPage() {
   const [updateTargetId, setUpdateTargetId] = useState<string | null>(null);
 
   useEffect(() => {
-    const controller = new AbortController();
+    setHasMounted(true);
+  }, []);
 
-    const loadSkills = async () => {
-      try {
-        setIsLoading(true);
-        const response = await fetch(`${apiBase}/skill/`, {
-          method: "GET",
-          headers: { accept: "application/json" },
-          signal: controller.signal,
-        });
+  const loadSkills = useCallback(async (signal?: AbortSignal) => {
+    try {
+      setIsLoading(true);
+      const response = await fetch(`${apiBase}/skill/`, {
+        method: "GET",
+        headers: { accept: "application/json" },
+        signal,
+      });
 
-        const payload = await response.json().catch(() => null);
-        if (!response.ok) {
-          throw new Error(getSkillErrorMessage(payload, "Unable to load skills."));
-        }
-
-        setRows(normalizeSkillInventoryRows(payload));
-      } catch (error) {
-        if (error instanceof DOMException && error.name === "AbortError") {
-          return;
-        }
-
-        setRows([]);
-      } finally {
-        setIsLoading(false);
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(getSkillErrorMessage(payload, "Unable to load skills."));
       }
-    };
 
-    void loadSkills();
-    return () => controller.abort();
+      setRows(normalizeSkillInventoryRows(payload));
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        return;
+      }
+
+      setRows([]);
+    } finally {
+      setIsLoading(false);
+    }
   }, [apiBase]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void loadSkills(controller.signal);
+    return () => controller.abort();
+  }, [loadSkills]);
 
   return (
     <div className="space-y-8">
       <SkillsTopbar
-        totalSkills={rows.length}
+        totalSkills={hasMounted ? rows.length : 0}
         totalTools={0}
         totalConnectors={0}
         totalMcpInUse={0}
-        isLoading={isLoading}
+        isLoading={!hasMounted || isLoading}
         onCreate={() => setIsCreateOpen(true)}
       />
-      <CreateNewSkill isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} />
+      <CreateNewSkill
+        isOpen={isCreateOpen}
+        onClose={() => setIsCreateOpen(false)}
+        onCreated={async () => {
+          await loadSkills();
+          setIsCreateOpen(false);
+        }}
+      />
       <ViewSkill skillId={viewTargetId} onClose={() => setViewTargetId(null)} />
       <UpdateSkill
         skillId={updateTargetId}
         onClose={() => setUpdateTargetId(null)}
         onUpdated={async () => {
-          const response = await fetch(`${apiBase}/skill/`, {
-            method: "GET",
-            headers: { accept: "application/json" },
-          });
-          const payload = await response.json().catch(() => null);
-          if (!response.ok) {
-            return;
-          }
-          setRows(normalizeSkillInventoryRows(payload));
+          await loadSkills();
         }}
       />
 
       <Skilltable
-        rows={rows}
+        rows={hasMounted ? rows : []}
+        isLoading={!hasMounted || isLoading}
         onView={setViewTargetId}
         onUpdate={setUpdateTargetId}
         onDelete={() => undefined}
