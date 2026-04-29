@@ -174,7 +174,7 @@ export const buildSkillPatchPayload = (detail: SkillDetail) => ({
 });
 
 export const skillTabs = [
-  "Front matter",
+  "Frontmatter",
   "Instructions",
   "MCP & Connector",
   "Tools",

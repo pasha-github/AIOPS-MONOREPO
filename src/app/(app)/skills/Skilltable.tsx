@@ -10,7 +10,7 @@ type SkilltableProps = {
   isLoading: boolean;
   onView: (skillId: string) => void;
   onUpdate: (skillId: string) => void;
-  onDelete: (skillId: string) => void;
+  onDelete: (skill: { id: string; name: string }) => void;
 };
 
 type ActionItem = {
@@ -32,7 +32,7 @@ function SkillActionMenu({
   skillName: string;
   onView: (skillId: string) => void;
   onUpdate: (skillId: string) => void;
-  onDelete: (skillId: string) => void;
+  onDelete: (skill: { id: string; name: string }) => void;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -118,7 +118,7 @@ function SkillActionMenu({
       icon: Trash2,
       tone: "text-[#b91c1c]",
       hoverTone: "hover:bg-[#fff1f2]",
-      onClick: () => onDelete(skillId),
+      onClick: () => onDelete({ id: skillId, name: skillName }),
     },
   ];
 

@@ -13,6 +13,7 @@ import CreateNewSkill from "./skillsoverview/createnewskill";
 import SkillsTopbar from "./skillsoverview/skillstopbar";
 import UpdateSkill from "./UpdateSkill";
 import ViewSkill from "./ViewSkill";
+import DeleteSkill from "./DeleteSkill";
 
 export default function SkillsPage() {
   const { llmManagerApiBaseUrl } = useRuntimeConfig();
@@ -23,6 +24,10 @@ export default function SkillsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [viewTargetId, setViewTargetId] = useState<string | null>(null);
   const [updateTargetId, setUpdateTargetId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
 
   useEffect(() => {
     setHasMounted(true);
@@ -86,13 +91,22 @@ export default function SkillsPage() {
           await loadSkills();
         }}
       />
+      <DeleteSkill
+        skillId={deleteTarget?.id ?? null}
+        skillName={deleteTarget?.name ?? null}
+        onClose={() => setDeleteTarget(null)}
+        onDeleted={async () => {
+          await loadSkills();
+          setDeleteTarget(null);
+        }}
+      />
 
       <Skilltable
         rows={hasMounted ? rows : []}
         isLoading={!hasMounted || isLoading}
         onView={setViewTargetId}
         onUpdate={setUpdateTargetId}
-        onDelete={() => undefined}
+        onDelete={setDeleteTarget}
       />
     </div>
   );

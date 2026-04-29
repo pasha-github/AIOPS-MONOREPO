@@ -15,7 +15,8 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { normalizeMcpServer } from "../../mcp/mcpHelpers";
 import {
   buildSkillPatchPayload,
@@ -58,6 +59,12 @@ type EditingSection =
   | "dependencies"
   | "tools"
   | "references";
+
+type DropdownOption = {
+  value: string;
+  label: string;
+  secondary?: string;
+};
 
 const emptySkillDetail = (): SkillDetail => ({
   id: "",
@@ -141,6 +148,156 @@ const isEditable = (mode: SkillModalMode, editingSection: EditingSection | null,
 
   return editingSection === section;
 };
+
+function ThemedDropdown({
+  value,
+  options,
+  placeholder,
+  disabled = false,
+  onChange,
+}: {
+  value: string;
+  options: DropdownOption[];
+  placeholder: string;
+  disabled?: boolean;
+  onChange: (value: string) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const [menuStyle, setMenuStyle] = useState<{
+    top: number;
+    left: number;
+    width: number;
+  } | null>(null);
+  const selectedOption = options.find((option) => option.value === value);
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    const updatePosition = () => {
+      const rect = buttonRef.current?.getBoundingClientRect();
+      if (!rect) {
+        return;
+      }
+
+      const estimatedMenuHeight = 240;
+      const viewportPadding = 12;
+      const openUp =
+        window.innerHeight - rect.bottom < estimatedMenuHeight + viewportPadding;
+      const desiredTop = openUp ? rect.top - estimatedMenuHeight - 8 : rect.bottom + 8;
+      const top = Math.max(
+        viewportPadding,
+        Math.min(desiredTop, window.innerHeight - estimatedMenuHeight - viewportPadding)
+      );
+      const width = rect.width;
+      const left = Math.max(
+        viewportPadding,
+        Math.min(rect.left, window.innerWidth - width - viewportPadding)
+      );
+
+      setMenuStyle({ top, left, width });
+    };
+
+    const handlePointerDown = (event: MouseEvent) => {
+      const targetNode = event.target as Node;
+      if (containerRef.current?.contains(targetNode)) {
+        return;
+      }
+      if (menuRef.current?.contains(targetNode)) {
+        return;
+      }
+
+      if (!containerRef.current?.contains(targetNode)) {
+        setIsOpen(false);
+      }
+    };
+
+    updatePosition();
+    document.addEventListener("mousedown", handlePointerDown);
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [isOpen]);
+
+  return (
+    <div ref={containerRef} className="relative w-full">
+      <button
+        ref={buttonRef}
+        type="button"
+        onClick={() => {
+          if (!disabled) {
+            setIsOpen((current) => !current);
+          }
+        }}
+        disabled={disabled}
+        className="flex w-full items-start justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-left text-sm text-gray-900 outline-none transition hover:border-indigo-400 focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/10 disabled:cursor-not-allowed disabled:opacity-80"
+      >
+        <span className="min-w-0">
+          <span className={`block truncate ${selectedOption ? "text-gray-900" : "text-gray-400"}`}>
+            {selectedOption?.label ?? placeholder}
+          </span>
+          {selectedOption?.secondary ? (
+            <span className="mt-0.5 block truncate text-xs text-gray-500">
+              {selectedOption.secondary}
+            </span>
+          ) : null}
+        </span>
+        <ChevronDown size={16} className="mt-1 shrink-0 text-gray-500" />
+      </button>
+
+      {isOpen && menuStyle
+        ? createPortal(
+            <div
+              ref={menuRef}
+              style={{
+                position: "fixed",
+                top: menuStyle.top,
+                left: menuStyle.left,
+                width: menuStyle.width,
+              }}
+              className="z-[1000] max-h-60 overflow-auto rounded-lg border border-gray-200 bg-white shadow-lg"
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  onChange("");
+                  setIsOpen(false);
+                }}
+                className="w-full px-3 py-2 text-left text-sm text-gray-500 hover:bg-gray-50"
+              >
+                {placeholder}
+              </button>
+              {options.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => {
+                    onChange(option.value);
+                    setIsOpen(false);
+                  }}
+                  className="w-full border-b border-gray-100 px-3 py-2 text-left hover:bg-gray-50 last:border-b-0"
+                >
+                  <div className="text-sm font-medium text-gray-900">{option.label}</div>
+                  {option.secondary ? (
+                    <div className="mt-0.5 break-all text-xs text-gray-500">{option.secondary}</div>
+                  ) : null}
+                </button>
+              ))}
+            </div>,
+            document.body
+          )
+        : null}
+    </div>
+  );
+}
 
 export default function SkillModal({
   isOpen,
@@ -382,6 +539,16 @@ export default function SkillModal({
 
   const currentSection = sectionByTabIndex[activeTab];
   const canEditCurrentSection = isEditable(mode, editingSection, currentSection);
+  const mcpDropdownOptions: DropdownOption[] = mcpOptions.map((option) => ({
+    value: option.id,
+    label: option.name || option.serverUrl,
+    secondary: option.serverUrl,
+  }));
+  const connectorDropdownOptions: DropdownOption[] = connectorOptions.map((option) => ({
+    value: option.connectorConfigId,
+    label: option.configName,
+    secondary: `${option.connectorName} Enterprise`,
+  }));
 
   const resolvedMcpTools = draft.mcpServerIds.flatMap((id) => {
     const match = mcpOptions.find((option) => option.id === id);
@@ -693,7 +860,10 @@ export default function SkillModal({
               {activeTab === 0 ? (
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <label className="text-sm font-semibold text-[#111827]">Name</label>
+                    <label className="text-sm font-semibold text-[#111827]">
+                      Name
+                      {mode === "create" ? <span className="ml-1 text-red-500">*</span> : null}
+                    </label>
                     <input
                       type="text"
                       value={draft.name}
@@ -704,7 +874,10 @@ export default function SkillModal({
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-semibold text-[#111827]">Description</label>
+                    <label className="text-sm font-semibold text-[#111827]">
+                      Description
+                      {mode === "create" ? <span className="ml-1 text-red-500">*</span> : null}
+                    </label>
                     <textarea
                       rows={6}
                       value={draft.description}
@@ -719,7 +892,10 @@ export default function SkillModal({
 
               {activeTab === 1 ? (
                 <div className="space-y-2">
-                  <label className="text-sm font-semibold text-[#111827]">Instruction</label>
+                  <label className="text-sm font-semibold text-[#111827]">
+                    Instruction
+                    {mode === "create" ? <span className="ml-1 text-red-500">*</span> : null}
+                  </label>
                   <textarea
                     rows={10}
                     value={draft.instructions}
@@ -740,26 +916,17 @@ export default function SkillModal({
                       : "grid gap-6 md:grid-cols-2"
                   }
                 >
-                  <div className="space-y-3 rounded-2xl border border-[#ebeff8] bg-[#fcfdff] p-4">
+                  <div className="space-y-3 rounded-2xl p-4">
                     <label className="text-sm font-semibold text-[#111827]">MCP</label>
                     {draft.mcpServerIds.map((row, index) => (
                       <div key={`mcp-row-${index}`} className="flex items-center gap-2">
-                        <div className="relative w-full">
-                          <select
-                            value={row}
-                            onChange={(event) => setMcpRowValue(index, event.target.value)}
-                            disabled={!canEditCurrentSection}
-                            className="w-full appearance-none rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 pr-10 text-sm text-gray-900 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/10 disabled:cursor-not-allowed disabled:opacity-80"
-                          >
-                            <option value="">Select MCP</option>
-                            {mcpOptions.map((option) => (
-                              <option key={option.id} value={option.id}>
-                                {option.label}
-                              </option>
-                            ))}
-                          </select>
-                          <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-indigo-400" />
-                        </div>
+                        <ThemedDropdown
+                          value={row}
+                          options={mcpDropdownOptions}
+                          placeholder="Select MCP"
+                          disabled={!canEditCurrentSection}
+                          onChange={(value) => setMcpRowValue(index, value)}
+                        />
 
                         {canEditCurrentSection && draft.mcpServerIds.length > 1 ? (
                           <button
@@ -796,26 +963,17 @@ export default function SkillModal({
                     ))}
                   </div>
 
-                  <div className="space-y-3 rounded-2xl border border-[#ebeff8] bg-[#fcfdff] p-4">
+                  <div className="space-y-3 rounded-2xl p-4">
                     <label className="text-sm font-semibold text-[#111827]">Connectors</label>
                     {draft.connectorConfigIds.map((row, index) => (
                       <div key={`connector-row-${index}`} className="flex items-center gap-2">
-                        <div className="relative w-full">
-                          <select
-                            value={row}
-                            onChange={(event) => setConnectorRowValue(index, event.target.value)}
-                            disabled={!canEditCurrentSection}
-                            className="w-full appearance-none rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 pr-10 text-sm text-gray-900 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/10 disabled:cursor-not-allowed disabled:opacity-80"
-                          >
-                            <option value="">Select connector</option>
-                            {connectorOptions.map((option) => (
-                              <option key={option.connectorConfigId} value={option.connectorConfigId}>
-                                {option.label}
-                              </option>
-                            ))}
-                          </select>
-                          <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-indigo-400" />
-                        </div>
+                        <ThemedDropdown
+                          value={row}
+                          options={connectorDropdownOptions}
+                          placeholder="Select connector"
+                          disabled={!canEditCurrentSection}
+                          onChange={(value) => setConnectorRowValue(index, value)}
+                        />
 
                         {canEditCurrentSection && draft.connectorConfigIds.length > 1 ? (
                           <button
@@ -967,37 +1125,44 @@ export default function SkillModal({
               ) : null}
 
               {activeTab === 4 ? (
-                <div className="space-y-3 rounded-2xl border border-[#ebeff8] bg-[#fcfdff] p-4">
+                <div className="space-y-3 p-4">
+                  
                   {referenceRows.map((row, index) => (
                     <div key={`reference-row-${index}`} className="grid gap-3 md:grid-cols-[1fr_1fr_auto]">
-                      <input
-                        type="text"
-                        value={row.key}
-                        onChange={(event) =>
-                          setReferenceRows((current) =>
-                            current.map((item, itemIndex) =>
-                              itemIndex === index ? { ...item, key: event.target.value } : item
+                      <div className="space-y-2">
+                        <label className="text-sm font-semibold text-[#111827]">Reference</label>
+                        <input
+                          type="text"
+                          value={row.key}
+                          onChange={(event) =>
+                            setReferenceRows((current) =>
+                              current.map((item, itemIndex) =>
+                                itemIndex === index ? { ...item, key: event.target.value } : item
+                              )
                             )
-                          )
-                        }
-                        placeholder="e.g. guideme.md"
-                        disabled={!canEditCurrentSection}
-                        className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/10 disabled:cursor-not-allowed disabled:opacity-80"
-                      />
-                      <input
-                        type="text"
-                        value={row.value}
-                        onChange={(event) =>
-                          setReferenceRows((current) =>
-                            current.map((item, itemIndex) =>
-                              itemIndex === index ? { ...item, value: event.target.value } : item
+                          }
+                          placeholder="e.g. guideme.md"
+                          disabled={!canEditCurrentSection}
+                          className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/10 disabled:cursor-not-allowed disabled:opacity-80"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-semibold text-[#111827]">Text</label>
+                        <input
+                          type="text"
+                          value={row.value}
+                          onChange={(event) =>
+                            setReferenceRows((current) =>
+                              current.map((item, itemIndex) =>
+                                itemIndex === index ? { ...item, value: event.target.value } : item
+                              )
                             )
-                          )
-                        }
-                        placeholder="Reference text"
-                        disabled={!canEditCurrentSection}
-                        className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/10 disabled:cursor-not-allowed disabled:opacity-80"
-                      />
+                          }
+                          placeholder="Text"
+                          disabled={!canEditCurrentSection}
+                          className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/10 disabled:cursor-not-allowed disabled:opacity-80"
+                        />
+                      </div>
                       <div className="flex items-center gap-2">
                         {canEditCurrentSection && referenceRows.length > 1 ? (
                           <button
@@ -1013,7 +1178,6 @@ export default function SkillModal({
                             <Trash2 className="h-4 w-4" />
                           </button>
                         ) : null}
-
                         {canEditCurrentSection && index === referenceRows.length - 1 ? (
                           <button
                             type="button"
