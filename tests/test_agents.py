@@ -1,7 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from src.database.models import MCPServer
+from src.database.models import MCPServer, Skill
 
 
 def _create_model(client: TestClient, model_id: str = "gemini-pro"):
@@ -286,6 +286,54 @@ def test_update_agent_connector_config_ids_only(client: TestClient):
     )
     assert response.status_code == 200
     assert response.json()["connector_config_ids"] == ["cfg-2", "cfg-3"]
+
+
+def test_create_agent_with_skill_ids(client: TestClient, session):
+    _create_model(client)
+    skill = Skill(
+        name="incident_skill",
+        description="Skill",
+        instructions="Use it well",
+    )
+    session.add(skill)
+    session.commit()
+    session.refresh(skill)
+
+    response = client.post(
+        "/agent/",
+        json={
+            "agent_id": "agent-with-skill",
+            "name": "Agent 1",
+            "description": "desc",
+            "instruction": "instr",
+            "primary_use_global": False,
+            "primary_model_id": "gemini-pro",
+            "skill_ids": [str(skill.skill_id)],
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["skill_ids"] == [str(skill.skill_id)]
+
+
+def test_create_agent_invalid_skill_id_returns_400(client: TestClient):
+    _create_model(client)
+
+    response = client.post(
+        "/agent/",
+        json={
+            "agent_id": "agent-invalid-skill",
+            "name": "Agent 1",
+            "description": "desc",
+            "instruction": "instr",
+            "primary_use_global": False,
+            "primary_model_id": "gemini-pro",
+            "skill_ids": ["not-a-real-skill-id"],
+        },
+    )
+
+    assert response.status_code == 400
+    assert "Invalid skill id" in response.json()["detail"]
 
 
 def test_create_agent_with_registered_mcp_server_ids(client: TestClient, session):

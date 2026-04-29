@@ -9,6 +9,7 @@ from src.database.models import (
     MCPServer,
     Model,
     ModelDefaults,
+    Skill,
     Webhook,
 )
 
@@ -20,6 +21,7 @@ def get_visualizer(session: Session = Depends(get_session)):
     agents = session.exec(select(Agent)).all()
     connectors = session.exec(select(ConnectorConfig)).all()
     mcp_servers = session.exec(select(MCPServer)).all()
+    skills = session.exec(select(Skill)).all()
     models = session.exec(select(Model)).all()
     defaults = session.get(ModelDefaults, 1)
     webhooks = session.exec(select(Webhook)).all()
@@ -85,6 +87,16 @@ def get_visualizer(session: Session = Depends(get_session)):
                     }
                 )
 
+        if agent.skill_ids:
+            for skill_id in agent.skill_ids:
+                edges.append(
+                    {
+                        "id": f"e-{agent.agent_id}-{skill_id}",
+                        "source": agent.agent_id,
+                        "target": skill_id,
+                    }
+                )
+
         if agent.mcp_servers:
             for mcp_url in agent.mcp_servers:
                 legacy_mcp_set.add(mcp_url)
@@ -107,7 +119,15 @@ def get_visualizer(session: Session = Depends(get_session)):
                 )
 
     for conn in connectors:
-        c_dict = conn.model_dump()
+        c_dict = {
+            "connector_config_id": str(conn.connector_config_id),
+            "name": conn.name,
+            "description": conn.description,
+            "config": conn.config,
+            "created_at": conn.created_at,
+            "updated_at": conn.updated_at,
+            "connector_id": conn.connector_id,
+        }
         if "config" in c_dict and isinstance(c_dict["config"], list):
             for item in c_dict["config"]:
                 if "value" in item:
@@ -120,6 +140,31 @@ def get_visualizer(session: Session = Depends(get_session)):
                 "data": {"connector": c_dict},
             }
         )
+
+    for skill in skills:
+        nodes.append(
+            {
+                "id": str(skill.skill_id),
+                "type": "skill",
+                "data": {"skill": skill.model_dump()},
+            }
+        )
+        for connector_config_id in skill.connector_config_ids or []:
+            edges.append(
+                {
+                    "id": f"e-{skill.skill_id}-{connector_config_id}",
+                    "source": str(skill.skill_id),
+                    "target": connector_config_id,
+                }
+            )
+        for mcp_server_id in skill.mcp_server_ids or []:
+            edges.append(
+                {
+                    "id": f"e-{skill.skill_id}-{mcp_server_id}",
+                    "source": str(skill.skill_id),
+                    "target": mcp_server_id,
+                }
+            )
 
     for mcp_server in mcp_servers:
         nodes.append(

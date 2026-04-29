@@ -2,7 +2,15 @@ from uuid import uuid4
 
 from fastapi.testclient import TestClient
 
-from src.database.models import Agent, ConnectorConfig, Job, MCPServer, Model, Webhook
+from src.database.models import (
+    Agent,
+    ConnectorConfig,
+    Job,
+    MCPServer,
+    Model,
+    Skill,
+    Webhook,
+)
 
 
 def _create_model(client: TestClient, model_id: str = "viz-model"):
@@ -514,3 +522,67 @@ def test_visualizer_includes_registered_mcp_server_nodes(client: TestClient, ses
         == "http://localhost:9200/mcp"
     )
     assert ("agent-with-registered-mcp", str(mcp_server.mcp_server_id)) in edges
+
+
+def test_visualizer_includes_skill_nodes_and_edges(client: TestClient, session):
+    _create_model(client, model_id="skill-model")
+
+    connector_id = uuid4()
+    session.add(
+        ConnectorConfig(
+            connector_config_id=connector_id,
+            name="Skill Connector",
+            connector_id="example_connector",
+            config=[{"name": "token", "value": "secret"}],
+        )
+    )
+    mcp_server = MCPServer(
+        name="Skill MCP",
+        server_url="http://localhost:9500/mcp",
+        auth_type="none",
+        metadata_json={},
+        tools_json=[{"name": "search_docs"}],
+        resources_json=[],
+    )
+    session.add(mcp_server)
+    session.commit()
+    session.refresh(mcp_server)
+
+    skill = Skill(
+        name="graph_skill",
+        description="skill",
+        instructions="instr",
+        tools=["search_docs"],
+        connector_config_ids=[str(connector_id)],
+        mcp_server_ids=[str(mcp_server.mcp_server_id)],
+    )
+    session.add(skill)
+    session.commit()
+    session.refresh(skill)
+
+    session.add(
+        Agent(
+            agent_id="skill-agent",
+            name="Skill Agent",
+            description="skill agent",
+            instruction="instr",
+            primary_use_global=False,
+            primary_model_id="skill-model",
+            skill_ids=[str(skill.skill_id)],
+        )
+    )
+    session.commit()
+
+    response = client.get("/visualizer/")
+
+    assert response.status_code == 200
+    data = response.json()
+    nodes = {node["id"]: node for node in data["nodes"]}
+    edges = {(edge["source"], edge["target"]) for edge in data["edges"]}
+
+    assert str(skill.skill_id) in nodes
+    assert nodes[str(skill.skill_id)]["type"] == "skill"
+    assert nodes[str(skill.skill_id)]["data"]["skill"]["name"] == "graph_skill"
+    assert ("skill-agent", str(skill.skill_id)) in edges
+    assert (str(skill.skill_id), str(connector_id)) in edges
+    assert (str(skill.skill_id), str(mcp_server.mcp_server_id)) in edges
