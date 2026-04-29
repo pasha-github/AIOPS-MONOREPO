@@ -167,9 +167,13 @@ export const buildSkillPatchPayload = (detail: SkillDetail) => ({
   name: detail.name.trim(),
   description: detail.description.trim(),
   instructions: detail.instructions.trim(),
-  tools: detail.tools,
-  connector_config_ids: detail.connectorConfigIds,
-  mcp_server_ids: detail.mcpServerIds,
+  tools: detail.tools.map((value) => value.trim()).filter(Boolean),
+  connector_config_ids: detail.connectorConfigIds
+    .map((value) => value.trim())
+    .filter(Boolean),
+  mcp_server_ids: detail.mcpServerIds
+    .map((value) => value.trim())
+    .filter(Boolean),
   references: detail.references,
 });
 

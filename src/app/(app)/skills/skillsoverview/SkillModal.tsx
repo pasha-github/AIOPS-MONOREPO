@@ -60,6 +60,12 @@ type EditingSection =
   | "tools"
   | "references";
 
+type ReferenceRow = {
+  id: string;
+  reference: string;
+  text: string;
+};
+
 type DropdownOption = {
   value: string;
   label: string;
@@ -104,26 +110,35 @@ const toUniqueValues = (values: string[]) => {
   return result;
 };
 
+let referenceRowCounter = 0;
+const createReferenceRow = (reference = "", text = ""): ReferenceRow => {
+  referenceRowCounter += 1;
+  return {
+    id: `reference-row-${referenceRowCounter}`,
+    reference,
+    text,
+  };
+};
+
 const normalizeReferenceRows = (detail: SkillDetail) => {
   const entries = Object.entries(detail.references);
   if (entries.length === 0) {
-    return [{ key: "", value: "" }];
+    return [createReferenceRow()];
   }
 
-  return entries.map(([key, value]) => ({ key, value }));
+  return entries.map(([key, value]) => createReferenceRow(key, value));
 };
 
-const buildReferenceRecord = (rows: Array<{ key: string; value: string }>) =>
-  Object.fromEntries(
-    rows.flatMap((row) => {
-      const key = row.key.trim();
-      if (!key) {
-        return [];
-      }
+const buildReferenceRecord = (rows: ReferenceRow[]) =>
+  rows.reduce<Record<string, string>>((result, row) => {
+    const key = row.reference.trim();
+    if (!key) {
+      return result;
+    }
 
-      return [[key, row.value]];
-    })
-  );
+    result[key] = row.text;
+    return result;
+  }, {});
 
 const getModalTitle = (mode: SkillModalMode) => {
   if (mode === "view") {
@@ -313,8 +328,8 @@ export default function SkillModal({
   const [activeTab, setActiveTab] = useState(0);
   const [detail, setDetail] = useState<SkillDetail>(emptySkillDetail());
   const [draft, setDraft] = useState<SkillDetail>(emptySkillDetail());
-  const [referenceRows, setReferenceRows] = useState<Array<{ key: string; value: string }>>([
-    { key: "", value: "" },
+  const [referenceRows, setReferenceRows] = useState<ReferenceRow[]>([
+    createReferenceRow(),
   ]);
   const [mcpOptions, setMcpOptions] = useState<McpLookupOption[]>([]);
   const [connectorOptions, setConnectorOptions] = useState<ConnectorConfigLookupOption[]>([]);
@@ -342,7 +357,7 @@ export default function SkillModal({
       const initial = emptySkillDetail();
       setDetail(initial);
       setDraft(initial);
-      setReferenceRows([{ key: "", value: "" }]);
+      setReferenceRows([createReferenceRow()]);
     }
   }, [isOpen, mode]);
 
@@ -526,13 +541,6 @@ export default function SkillModal({
     return () => controller.abort();
   }, [apiBase, isOpen, mode, skillId]);
 
-  useEffect(() => {
-    setDraft((current) => ({
-      ...current,
-      references: buildReferenceRecord(referenceRows),
-    }));
-  }, [referenceRows]);
-
   if (!isOpen) {
     return null;
   }
@@ -578,6 +586,15 @@ export default function SkillModal({
     const nextValues = [...draft.connectorConfigIds];
     nextValues[index] = value;
     updateDraft({ connectorConfigIds: nextValues });
+  };
+
+  const updateReferenceRow = (
+    rowId: string,
+    patch: Partial<Pick<ReferenceRow, "reference" | "text">>
+  ) => {
+    setReferenceRows((current) =>
+      current.map((row) => (row.id === rowId ? { ...row, ...patch } : row))
+    );
   };
 
   const startEditing = () => {
@@ -1128,18 +1145,14 @@ export default function SkillModal({
                 <div className="space-y-3 p-4">
                   
                   {referenceRows.map((row, index) => (
-                    <div key={`reference-row-${index}`} className="grid gap-3 md:grid-cols-[1fr_1fr_auto]">
+                    <div key={row.id} className="grid gap-3 md:grid-cols-[1fr_1fr_auto]">
                       <div className="space-y-2">
                         <label className="text-sm font-semibold text-[#111827]">Reference</label>
                         <input
                           type="text"
-                          value={row.key}
+                          value={row.reference}
                           onChange={(event) =>
-                            setReferenceRows((current) =>
-                              current.map((item, itemIndex) =>
-                                itemIndex === index ? { ...item, key: event.target.value } : item
-                              )
-                            )
+                            updateReferenceRow(row.id, { reference: event.target.value })
                           }
                           placeholder="e.g. guideme.md"
                           disabled={!canEditCurrentSection}
@@ -1150,13 +1163,9 @@ export default function SkillModal({
                         <label className="text-sm font-semibold text-[#111827]">Text</label>
                         <input
                           type="text"
-                          value={row.value}
+                          value={row.text}
                           onChange={(event) =>
-                            setReferenceRows((current) =>
-                              current.map((item, itemIndex) =>
-                                itemIndex === index ? { ...item, value: event.target.value } : item
-                              )
-                            )
+                            updateReferenceRow(row.id, { text: event.target.value })
                           }
                           placeholder="Text"
                           disabled={!canEditCurrentSection}
@@ -1169,7 +1178,7 @@ export default function SkillModal({
                             type="button"
                             onClick={() =>
                               setReferenceRows((current) =>
-                                current.filter((_, itemIndex) => itemIndex !== index)
+                                current.filter((item) => item.id !== row.id)
                               )
                             }
                             className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#d5dbeb] bg-white text-[#64748b] transition hover:bg-[#fff1f2] hover:text-[#e11d48]"
@@ -1181,9 +1190,7 @@ export default function SkillModal({
                         {canEditCurrentSection && index === referenceRows.length - 1 ? (
                           <button
                             type="button"
-                            onClick={() =>
-                              setReferenceRows((current) => [...current, { key: "", value: "" }])
-                            }
+                            onClick={() => setReferenceRows((current) => [...current, createReferenceRow()])}
                             className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#d5dbeb] bg-[#eef2ff] text-[#4f49e2]"
                             title="Add reference"
                           >
