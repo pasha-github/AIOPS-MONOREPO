@@ -1172,7 +1172,7 @@ export default function SkillModal({
                           className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/10 disabled:cursor-not-allowed disabled:opacity-80"
                         />
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-end gap-2">
                         {canEditCurrentSection && referenceRows.length > 1 ? (
                           <button
                             type="button"
