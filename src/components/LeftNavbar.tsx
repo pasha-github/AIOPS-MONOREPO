@@ -7,6 +7,7 @@ import {
   Link2,
   MessageSquare,
   Network,
+  Sparkles,
   Users,
   Workflow,
 } from "lucide-react";
@@ -76,6 +77,12 @@ const navSections: NavSection[] = [
           />
         ),
         href: "/mcp",
+      },
+      {
+        label: "Skills",
+        id: "integrations-skills",
+        icon: <Sparkles className="h-5 w-5" />,
+        href: "/skills",
       },
     ],
   },
