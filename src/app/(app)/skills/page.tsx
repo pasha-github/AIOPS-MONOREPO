@@ -1,97 +1,95 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { trimTrailingSlash } from "@/config/agent";
+import { useRuntimeConfig } from "@/config/runtime-config";
+import { useEffect, useState } from "react";
 import Skilltable from "./Skilltable";
-import { connectorOptions, mcpOptions, toolOptions, type SkillInventoryRow } from "./schema";
+import type { SkillInventoryRow } from "./schema";
+import {
+  getSkillErrorMessage,
+  normalizeSkillInventoryRows,
+} from "./skillHelpers";
 import CreateNewSkill from "./skillsoverview/createnewskill";
 import SkillsTopbar from "./skillsoverview/skillstopbar";
-
-type SkillListApiItem = {
-  skill_id: string;
-  name: string;
-  description: string;
-  instructions: string;
-  created_at: string;
-  updated_at: string;
-};
-
-const SKILL_LIST_URL = "https://agent-manager-dev-yxjhs6bq5a-uc.a.run.app/skill/";
-
-function formatSkillDate(isoString: string): string {
-  const date = new Date(isoString);
-  if (Number.isNaN(date.getTime())) return isoString;
-  return date.toLocaleString(undefined, {
-    month: "short",
-    day: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
+import UpdateSkill from "./UpdateSkill";
+import ViewSkill from "./ViewSkill";
 
 export default function SkillsPage() {
+  const { llmManagerApiBaseUrl } = useRuntimeConfig();
+  const apiBase = trimTrailingSlash(llmManagerApiBaseUrl);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [rows, setRows] = useState<SkillInventoryRow[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [viewTargetId, setViewTargetId] = useState<string | null>(null);
+  const [updateTargetId, setUpdateTargetId] = useState<string | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
-    const load = async () => {
+
+    const loadSkills = async () => {
       try {
         setIsLoading(true);
-        const response = await fetch(SKILL_LIST_URL, {
+        const response = await fetch(`${apiBase}/skill/`, {
           method: "GET",
           headers: { accept: "application/json" },
           signal: controller.signal,
         });
 
-        if (!response.ok) throw new Error(`Failed to load skills (${response.status})`);
+        const payload = await response.json().catch(() => null);
+        if (!response.ok) {
+          throw new Error(getSkillErrorMessage(payload, "Unable to load skills."));
+        }
 
-        const payload = (await response.json()) as SkillListApiItem[];
-        const nextRows: SkillInventoryRow[] = payload.map((item) => ({
-          id: item.skill_id,
-          name: item.name,
-          description: item.description,
-          instructions: item.instructions,
-          createdAt: formatSkillDate(item.created_at),
-          updatedAt: formatSkillDate(item.updated_at),
-        }));
-        setRows(nextRows);
+        setRows(normalizeSkillInventoryRows(payload));
       } catch (error) {
-        if (error instanceof DOMException && error.name === "AbortError") return;
-        // Keep current rows on error.
+        if (error instanceof DOMException && error.name === "AbortError") {
+          return;
+        }
+
+        setRows([]);
       } finally {
         setIsLoading(false);
       }
     };
 
-    void load();
+    void loadSkills();
     return () => controller.abort();
-  }, []);
-
-  const counts = useMemo(
-    () => ({
-      totalSkills: rows.length,
-      totalTools: toolOptions.length,
-      totalConnectors: connectorOptions.length,
-      totalMcpInUse: mcpOptions.length,
-    }),
-    [rows.length]
-  );
+  }, [apiBase]);
 
   return (
     <div className="space-y-8">
       <SkillsTopbar
-        totalSkills={counts.totalSkills}
-        totalTools={counts.totalTools}
-        totalConnectors={counts.totalConnectors}
-        totalMcpInUse={counts.totalMcpInUse}
+        totalSkills={rows.length}
+        totalTools={0}
+        totalConnectors={0}
+        totalMcpInUse={0}
         isLoading={isLoading}
         onCreate={() => setIsCreateOpen(true)}
       />
       <CreateNewSkill isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} />
+      <ViewSkill skillId={viewTargetId} onClose={() => setViewTargetId(null)} />
+      <UpdateSkill
+        skillId={updateTargetId}
+        onClose={() => setUpdateTargetId(null)}
+        onUpdated={async () => {
+          const response = await fetch(`${apiBase}/skill/`, {
+            method: "GET",
+            headers: { accept: "application/json" },
+          });
+          const payload = await response.json().catch(() => null);
+          if (!response.ok) {
+            return;
+          }
+          setRows(normalizeSkillInventoryRows(payload));
+        }}
+      />
 
-      <Skilltable rows={rows} />
+      <Skilltable
+        rows={rows}
+        onView={setViewTargetId}
+        onUpdate={setUpdateTargetId}
+        onDelete={() => undefined}
+      />
     </div>
   );
 }

@@ -7,6 +7,9 @@ import type { SkillInventoryRow } from "./schema";
 
 type SkilltableProps = {
   rows: SkillInventoryRow[];
+  onView: (skillId: string) => void;
+  onUpdate: (skillId: string) => void;
+  onDelete: (skillId: string) => void;
 };
 
 type ActionItem = {
@@ -14,9 +17,22 @@ type ActionItem = {
   icon: typeof Eye;
   tone: string;
   hoverTone: string;
+  onClick: () => void;
 };
 
-function SkillActionMenu({ skillName }: { skillName: string }) {
+function SkillActionMenu({
+  skillId,
+  skillName,
+  onView,
+  onUpdate,
+  onDelete,
+}: {
+  skillId: string;
+  skillName: string;
+  onView: (skillId: string) => void;
+  onUpdate: (skillId: string) => void;
+  onDelete: (skillId: string) => void;
+}) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const buttonRef = useRef<HTMLButtonElement | null>(null);
@@ -87,18 +103,21 @@ function SkillActionMenu({ skillName }: { skillName: string }) {
       icon: Eye,
       tone: "text-[#111827]",
       hoverTone: "hover:bg-[#f8fafc]",
+      onClick: () => onView(skillId),
     },
     {
       label: "Update",
       icon: Pencil,
       tone: "text-[#2563eb]",
       hoverTone: "hover:bg-[#eff6ff]",
+      onClick: () => onUpdate(skillId),
     },
     {
       label: "Delete",
       icon: Trash2,
       tone: "text-[#b91c1c]",
       hoverTone: "hover:bg-[#fff1f2]",
+      onClick: () => onDelete(skillId),
     },
   ];
 
@@ -137,7 +156,10 @@ function SkillActionMenu({ skillName }: { skillName: string }) {
                   <button
                     key={action.label}
                     type="button"
-                    onClick={() => setIsOpen(false)}
+                    onClick={() => {
+                      setIsOpen(false);
+                      action.onClick();
+                    }}
                     className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition ${action.tone} ${action.hoverTone}`}
                   >
                     <Icon className="h-4 w-4" />
@@ -153,7 +175,12 @@ function SkillActionMenu({ skillName }: { skillName: string }) {
   );
 }
 
-export default function Skilltable({ rows }: SkilltableProps) {
+export default function Skilltable({
+  rows,
+  onView,
+  onUpdate,
+  onDelete,
+}: SkilltableProps) {
   return (
     <section className="rounded-3xl bg-white px-8 py-7 shadow-[0_18px_50px_-38px_rgba(16,24,40,0.5)]">
       <div className="space-y-6">
@@ -187,7 +214,13 @@ export default function Skilltable({ rows }: SkilltableProps) {
                   <div className="px-4 text-[#4b5563]">{row.createdAt}</div>
                   <div className="px-4 text-[#4b5563]">{row.updatedAt}</div>
                   <div className="flex justify-end px-3">
-                    <SkillActionMenu skillName={row.name} />
+                    <SkillActionMenu
+                      skillId={row.id}
+                      skillName={row.name}
+                      onView={onView}
+                      onUpdate={onUpdate}
+                      onDelete={onDelete}
+                    />
                   </div>
                 </div>
               ))}
