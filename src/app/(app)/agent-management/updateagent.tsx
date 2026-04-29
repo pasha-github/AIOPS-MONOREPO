@@ -4,12 +4,13 @@ import { trimTrailingSlash } from "@/config/agent";
 import { useRuntimeConfig } from "@/config/runtime-config";
 import { Bot, ChevronDown, Plus, Trash2, X } from "lucide-react";
 import Image from "next/image";
-import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { getProviderIconSrc } from "../llm-management/llmHelpers";
-import { DynamicDropdownField, inputClass } from "./DynamicConnector";
+import { DynamicDropdownField, inputClass, SimpleDropdownField } from "./DynamicConnector";
+import type { AgentRecord } from "./types";
 
 type UpdateAgentProps = {
-    agent: any;
+    agent: AgentRecord;
     isOpen: boolean;
     onClose: () => void;
     onUpdateSuccess?: () => void;
@@ -48,9 +49,9 @@ const getErrorMessage = (payload: unknown, fallback: string) => {
         payload &&
         typeof payload === "object" &&
         "message" in payload &&
-        typeof (payload as any).message === "string"
+        typeof (payload as { message?: unknown }).message === "string"
     ) {
-        return String((payload as any).message);
+        return String((payload as { message: string }).message);
     }
     return fallback;
 };
@@ -262,7 +263,10 @@ export default function UpdateAgent({
     const mcpDropdownRefs = useRef<Array<HTMLDivElement | null>>([]);
     const [connectorConfigIds, setConnectorConfigIds] = useState<string[][]>([[]]);
     const [connectorOptions, setConnectorOptions] = useState<{ value: string; label: string }[]>([]);
-    const [configDataMap, setConfigDataMap] = useState<Record<string, any>>({});
+    const [configDataMap, setConfigDataMap] = useState<Record<string, unknown>>({});
+    const [skillIds, setSkillIds] = useState<string[]>([""]);
+    const [skillOptions, setSkillOptions] = useState<{ value: string; label: string }[]>([]);
+    const [isSkillsLoading, setIsSkillsLoading] = useState(false);
     const [primaryUseCustom, setPrimaryUseCustom] = useState(false);
     const [secondaryUseCustom, setSecondaryUseCustom] = useState(false);
     const [tertiaryUseCustom, setTertiaryUseCustom] = useState(false);
@@ -365,7 +369,7 @@ export default function UpdateAgent({
         );
     };
 
-    const fetchConnectorConfig = async (value: string) => {
+    const fetchConnectorConfig = useCallback(async (value: string) => {
         if (!value || configDataMap[value] !== undefined) return;
         setConfigDataMap((previous) => ({ ...previous, [value]: null }));
         try {
@@ -389,7 +393,7 @@ export default function UpdateAgent({
                 return next;
             });
         }
-    };
+    }, [base, configDataMap]);
 
     useEffect(() => {
         if (!isOpen || !agent) return;
@@ -427,6 +431,7 @@ export default function UpdateAgent({
                 ? agent.connector_config_ids.map((value: string) => [value])
                 : [[]]
         );
+        setSkillIds(agent.skill_ids?.length ? agent.skill_ids : [""]);
         setConfigDataMap({});
         setDefaultModels(null);
         setDefaultsLoadError("");
@@ -461,10 +466,11 @@ export default function UpdateAgent({
                 if (res.ok && Array.isArray(data)) {
                     setMcpOptions(
                         data
-                            .map((item: any) => {
-                                const id = typeof item?.mcp_server_id === "string" ? item.mcp_server_id.trim() : "";
-                                const name = typeof item?.name === "string" ? item.name.trim() : "";
-                                const serverUrl = typeof item?.server_url === "string" ? item.server_url.trim() : "";
+                            .map((item: unknown) => {
+                                const record = item as Record<string, unknown>;
+                                const id = typeof record.mcp_server_id === "string" ? record.mcp_server_id.trim() : "";
+                                const name = typeof record.name === "string" ? record.name.trim() : "";
+                                const serverUrl = typeof record.server_url === "string" ? record.server_url.trim() : "";
                                 if (!id || !serverUrl) return null;
                                 return { id, name, serverUrl };
                             })
@@ -473,12 +479,49 @@ export default function UpdateAgent({
                 } else {
                     setMcpOptions([]);
                 }
-            } catch (error: any) {
-                if (error?.name !== "AbortError") {
+            } catch (error: unknown) {
+                if (!(error instanceof DOMException && error.name === "AbortError")) {
                     setMcpOptions([]);
                 }
             } finally {
                 setIsMcpLoading(false);
+            }
+        })();
+        return () => ctrl.abort();
+    }, [base, isOpen]);
+
+    useEffect(() => {
+        if (!isOpen) return;
+        const ctrl = new AbortController();
+        (async () => {
+            setIsSkillsLoading(true);
+            try {
+                const res = await fetch(`${base}/skill/`, {
+                    headers: { accept: "application/json" },
+                    signal: ctrl.signal,
+                });
+                const data = await res.json().catch(() => null);
+                if (res.ok && Array.isArray(data)) {
+                    setSkillOptions(
+                        data
+                            .map((item: unknown) => {
+                                const record = item as Record<string, unknown>;
+                                const value = typeof record.skill_id === "string" ? record.skill_id.trim() : "";
+                                const label = typeof record.name === "string" ? record.name.trim() : "";
+                                if (!value || !label) return null;
+                                return { value, label };
+                            })
+                            .filter(Boolean) as { value: string; label: string }[]
+                    );
+                } else {
+                    setSkillOptions([]);
+                }
+            } catch (error: unknown) {
+                if (!(error instanceof DOMException && error.name === "AbortError")) {
+                    setSkillOptions([]);
+                }
+            } finally {
+                setIsSkillsLoading(false);
             }
         })();
         return () => ctrl.abort();
@@ -509,16 +552,31 @@ export default function UpdateAgent({
                 const data = await res.json();
                 if (res.ok && Array.isArray(data)) {
                     setConnectorOptions(
-                        data.map((item: any) => ({
-                            value: item.connector_config_id ?? item.id ?? "",
-                            label: item.name ?? item.connector_config_id ?? item.id ?? "",
-                        }))
+                        data.map((item: unknown) => {
+                            const record = item as Record<string, unknown>;
+                            return {
+                                value:
+                                    typeof record.connector_config_id === "string"
+                                        ? record.connector_config_id
+                                        : typeof record.id === "string"
+                                            ? record.id
+                                            : "",
+                                label:
+                                    typeof record.name === "string"
+                                        ? record.name
+                                        : typeof record.connector_config_id === "string"
+                                            ? record.connector_config_id
+                                            : typeof record.id === "string"
+                                                ? record.id
+                                                : "",
+                            };
+                        })
                     );
                 } else {
                     setConnectorOptions([]);
                 }
-            } catch (error: any) {
-                if (error?.name !== "AbortError") {
+            } catch (error: unknown) {
+                if (!(error instanceof DOMException && error.name === "AbortError")) {
                     setConnectorOptions([]);
                 }
             }
@@ -531,7 +589,7 @@ export default function UpdateAgent({
         connectorOptions.forEach((option) => {
             void fetchConnectorConfig(option.value);
         });
-    }, [connectorOptions]);
+    }, [connectorOptions, fetchConnectorConfig]);
 
     useEffect(() => {
         if (!isOpen) return;
@@ -541,12 +599,16 @@ export default function UpdateAgent({
                 const res = await fetch(`${base}/llms/`);
                 const data = await res.json();
                 setModelOptions(
-                    data.map((item: any) => ({
-                        value: item.model_id,
-                        label: item.name,
-                        secondary: item.provider,
-                        iconSrc: getProviderIconSrc(item.provider),
-                    }))
+                    data.map((item: unknown) => {
+                        const record = item as Record<string, unknown>;
+                        const provider = typeof record.provider === "string" ? record.provider : "";
+                        return {
+                            value: typeof record.model_id === "string" ? record.model_id : "",
+                            label: typeof record.name === "string" ? record.name : "",
+                            secondary: provider,
+                            iconSrc: provider ? getProviderIconSrc(provider) : null,
+                        };
+                    })
                 );
             } catch {
                 setModelOptions([]);
@@ -652,6 +714,7 @@ export default function UpdateAgent({
                     tertiary_use_global: !tertiaryUseCustom,
                     tertiary_model_id: tertiaryUseCustom ? effectiveTertiaryModelId || null : null,
                     tools: form.tools || "",
+                    skill_ids: normalizeList(skillIds),
                     mcp_server_ids: normalizeMcpServerIds(mcpServerIds),
                     mcp_servers: normalizeManualMcpServers(mcpServers, mcpServerIds),
                     connector_config_ids: normalizeNestedList(connectorConfigIds),
@@ -976,6 +1039,30 @@ export default function UpdateAgent({
                             onRemove={removeConnector}
                             onChange={(index: number, value: string[] | string) =>
                                 updateConnectorList(index, Array.isArray(value) ? value : [value])
+                            }
+                        />
+                        <SimpleDropdownField
+                            label="Skill"
+                            hint={
+                                isSkillsLoading
+                                    ? "Loading registered skills"
+                                    : "Choose from registered skills"
+                            }
+                            values={skillIds}
+                            options={skillOptions}
+                            placeholder="Select skill"
+                            onAdd={() => setSkillIds((previous) => [...previous, ""])}
+                            onRemove={(index) =>
+                                setSkillIds((previous) =>
+                                    previous.length <= 1
+                                        ? previous
+                                        : previous.filter((_, idx) => idx !== index)
+                                )
+                            }
+                            onChange={(index, value) =>
+                                setSkillIds((previous) =>
+                                    previous.map((item, idx) => (idx === index ? value : item))
+                                )
                             }
                         />
                     </div>

@@ -250,6 +250,7 @@ export default function AgentManagementPage() {
             tools: Array.isArray(record.tools)
               ? getStringArray(record.tools)
               : getStringOrNull(record.tools) ?? "",
+            skill_ids: getStringArray(record.skill_ids),
             mcp_server_ids: getStringArray(record.mcp_server_ids),
             mcp_servers: getStringArray(record.mcp_servers),
             connector_config_ids: getStringArray(record.connector_config_ids),
