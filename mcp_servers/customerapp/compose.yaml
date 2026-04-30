@@ -1,0 +1,32 @@
+services:
+  status-app:
+    build: .
+    container_name: status-app
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      DD_API_KEY: ${DD_API_KEY}
+      DD_SERVICE: status-app
+      DD_ENV: local
+    labels:
+      com.datadoghq.ad.logs: >-
+        [{
+          "source": "java",
+          "service": "status-app",
+          "tags": ["env:local"]
+        }]
+
+  datadog-agent:
+    image: datadog/agent:latest
+    container_name: datadog-agent
+    environment:
+      DD_API_KEY: ${DD_API_KEY}
+      DD_SITE: us5.datadoghq.com
+      DD_LOGS_ENABLED: "true"
+      DD_LOGS_CONFIG_CONTAINER_COLLECT_ALL: "true"
+      DD_CONTAINER_EXCLUDE: "name:datadog-agent"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /proc/:/host/proc/:ro
+      - /sys/fs/cgroup/:/host/sys/fs/cgroup:ro
