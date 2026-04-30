@@ -53,6 +53,7 @@ ADK_APP = get_fast_api_app(
     session_service_uri=AGENT_SERVER_DATABASE_URL,
     url_prefix="/agent-server",
     logo_text="RC AIOps - DEV",
+    allow_origins=["*"],
     logo_image_url="/static/royal_cyber.jpeg",
     extra_plugins=["src.plugins.session_summary_plugin.plugin"],
 )

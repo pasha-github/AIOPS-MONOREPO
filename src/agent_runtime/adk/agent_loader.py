@@ -5,16 +5,26 @@ from uuid import UUID
 
 from google.adk.agents import LlmAgent, LoopAgent
 from google.adk.cli.utils.base_agent_loader import BaseAgentLoader
+from google.adk.code_executors.unsafe_local_code_executor import UnsafeLocalCodeExecutor
 from google.adk.models.lite_llm import LiteLlm
 from google.adk.tools.agent_tool import AgentTool
 from google.adk.tools.mcp_tool import McpToolset
+from google.adk.tools.skill_toolset import SkillToolset
 from google.adk.tools.tool_context import ToolContext
 from sqlmodel import Session, select
 
 from src.agent_runtime.adk.cache import cache
 from src.connectors.loader import resolve_connector_tools
 from src.database.database import engine
-from src.database.models import Agent, ConnectorConfig, MCPServer, Model, ModelDefaults
+from src.database.models import (
+    Agent,
+    ConnectorConfig,
+    MCPServer,
+    Model,
+    ModelDefaults,
+    Skill,
+)
+from src.skills.runtime import build_skill_model
 from src.utils.mcp import build_mcp_auth_headers, build_mcp_connection_params
 from src.utils.secrets import decrypt_secret
 
@@ -37,6 +47,10 @@ def _append_mcp_tool(
     )
     connection_params = build_mcp_connection_params(url, headers=headers)
     tools_list.append(McpToolset(connection_params=connection_params))
+
+
+def _tool_name(tool: Any) -> str | None:
+    return getattr(tool, "name", None) or getattr(tool, "__name__", None)
 
 
 def _litellm_model_name(model_config: Model) -> str:
@@ -208,6 +222,79 @@ class DatabaseAgentLoader(BaseAgentLoader):
                         logger.error(
                             f"Error loading connector config '{connector_config_id}' for agent {agent_name}: {e}"
                         )
+
+            if agent_config.skill_ids:
+                skill_models = []
+                skill_additional_tools: list[Any] = []
+                additional_tool_names: set[str] = set()
+
+                for skill_id in agent_config.skill_ids:
+                    try:
+                        skill = session.get(Skill, UUID(skill_id))
+                        if skill is None:
+                            raise ValueError(f"Skill '{skill_id}' not found.")
+
+                        skill_models.append(build_skill_model(skill))
+                        additional_tool_names.update(skill.tools or [])
+
+                        for connector_config_id in skill.connector_config_ids or []:
+                            connector_config = session.get(
+                                ConnectorConfig, UUID(connector_config_id)
+                            )
+                            if connector_config is None:
+                                raise ValueError(
+                                    "Connector config "
+                                    f"'{connector_config_id}' not found for skill."
+                                )
+
+                            connector_tools = resolve_connector_tools(connector_config)
+                            for tool in connector_tools:
+                                if _tool_name(tool) in additional_tool_names:
+                                    skill_additional_tools.append(tool)
+
+                        for mcp_server_id in skill.mcp_server_ids or []:
+                            mcp_server = session.get(MCPServer, UUID(mcp_server_id))
+                            if mcp_server is None:
+                                raise ValueError(
+                                    f"MCP server '{mcp_server_id}' not found for skill."
+                                )
+                            auth_secret = (
+                                decrypt_secret(mcp_server.auth_secret)
+                                if mcp_server.auth_secret
+                                else None
+                            )
+                            headers = build_mcp_auth_headers(
+                                mcp_server.auth_type,
+                                bearer_token=auth_secret
+                                if mcp_server.auth_type == "bearer"
+                                else None,
+                                username=mcp_server.auth_username
+                                if mcp_server.auth_type == "basic"
+                                else None,
+                                password=auth_secret
+                                if mcp_server.auth_type == "basic"
+                                else None,
+                            )
+                            connection_params = build_mcp_connection_params(
+                                mcp_server.server_url,
+                                headers=headers,
+                            )
+                            skill_additional_tools.append(
+                                McpToolset(connection_params=connection_params)
+                            )
+                    except Exception as e:
+                        logger.error(
+                            f"Error loading skill '{skill_id}' for agent {agent_name}: {e}"
+                        )
+
+                if skill_models:
+                    tools_list.append(
+                        SkillToolset(
+                            skills=skill_models,
+                            code_executor=UnsafeLocalCodeExecutor(),
+                            additional_tools=skill_additional_tools,
+                        )
+                    )
 
             # Attach Sub Agents
             sub_agents = []

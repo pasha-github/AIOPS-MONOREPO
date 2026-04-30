@@ -58,6 +58,10 @@ class SessionSummaryPlugin(BasePlugin):
     ) -> None:
         model = getattr(agent, "model", None)
         fallbacks = getattr(model, "_additional_args", {}).get("fallbacks", [])
+
+        if callback_context.state.get(SUMMARY_FALLBACKS_KEY):
+            return None
+
         callback_context.state[SUMMARY_FALLBACKS_KEY] = fallbacks
 
     async def before_model_callback(
