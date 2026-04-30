@@ -36,6 +36,7 @@ def test_test_mcp_server_returns_live_metadata(client: TestClient, fake_probe: N
     response = client.post(
         "/mcp/test/",
         json={
+            "name": "Demo MCP",
             "server_url": "http://localhost:8100/sse",
             "auth_type": "bearer",
             "auth_secret": "secret",
@@ -44,7 +45,10 @@ def test_test_mcp_server_returns_live_metadata(client: TestClient, fake_probe: N
 
     assert response.status_code == 200
     data = response.json()
-    assert data["url"] == "http://localhost:8100/sse"
+    assert data["name"] == "Demo MCP"
+    assert data["server_url"] == "http://localhost:8100/sse"
+    assert data["auth_type"] == "bearer"
+    assert data["has_auth_secret"] is True
     assert data["metadata"]["tool_count"] == 1
     assert data["tools"][0]["name"] == "list_tickets"
 
