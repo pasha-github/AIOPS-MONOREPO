@@ -87,7 +87,7 @@ class SessionSummaryPlugin(BasePlugin):
                         {
                             "role": "system",
                             "content": (
-                                "Summarize the first message in 3-6 words. "
+                                "Summarize this user message in 3-6 words. "
                                 "Return only the summary."
                             ),
                         },
