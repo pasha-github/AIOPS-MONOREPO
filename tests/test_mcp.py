@@ -110,6 +110,36 @@ def test_patch_mcp_server_refreshes_metadata(client: TestClient, fake_probe: Non
     assert data["auth_type"] == "bearer"
 
 
+def test_patch_mcp_server_clears_secret_when_auth_set_to_none(
+    client: TestClient, fake_probe: None
+):
+    create_response = client.post(
+        "/mcp/",
+        json={
+            "name": "Secret MCP",
+            "server_url": "http://localhost:8100/sse",
+            "auth_type": "basic",
+            "auth_username": "alice",
+            "auth_secret": "wonderland",
+        },
+    )
+    assert create_response.status_code == 200
+    created = create_response.json()
+    assert created["has_auth_secret"] is True
+
+    mcp_server_id = created["mcp_server_id"]
+    update_response = client.patch(
+        f"/mcp/{mcp_server_id}",
+        json={"auth_type": "none", "auth_secret": None, "auth_username": None},
+    )
+
+    assert update_response.status_code == 200
+    updated = update_response.json()
+    assert updated["auth_type"] == "none"
+    assert updated["auth_username"] is None
+    assert updated["has_auth_secret"] is False
+
+
 def test_delete_mcp_server_success(client: TestClient, fake_probe: None):
     create_response = client.post(
         "/mcp/",

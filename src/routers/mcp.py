@@ -167,16 +167,22 @@ async def update_mcp_server(
     )
 
     if should_refresh_metadata:
+        # Preserve existing secret only when auth_secret is omitted from payload.
+        existing_secret = (
+            decrypt_secret(mcp_server.auth_secret) if mcp_server.auth_secret else None
+        )
+        resolved_auth_secret = (
+            updates["auth_secret"] if "auth_secret" in updates else existing_secret
+        )
+        resolved_auth_type = updates.get("auth_type", mcp_server.auth_type)
+        if resolved_auth_type == "none":
+            resolved_auth_secret = None
+
         probe_payload = MCPServerBase(
             server_url=updates.get("server_url", mcp_server.server_url),
-            auth_type=updates.get("auth_type", mcp_server.auth_type),
+            auth_type=resolved_auth_type,
             auth_username=updates.get("auth_username", mcp_server.auth_username),
-            auth_secret=updates.get("auth_secret")
-            or (
-                decrypt_secret(mcp_server.auth_secret)
-                if mcp_server.auth_secret
-                else None
-            ),
+            auth_secret=resolved_auth_secret,
             name=updates.get("name", mcp_server.name),
             description=updates.get("description", mcp_server.description),
         )
