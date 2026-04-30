@@ -91,8 +91,10 @@ class SessionSummaryPlugin(BasePlugin):
                         {
                             "role": "system",
                             "content": (
-                                "Summarize this user message in 3-6 words. "
-                                "Return only the summary."
+                                "You will be given ONE user message. "
+                                "Rewrite that message as a concise 3-6 word title, preserving the same intent and key terms. "
+                                "Do NOT answer the question and do NOT add new facts. "
+                                "Return ONLY the 3-6 word title."
                             ),
                         },
                         {"role": "user", "content": user_text},
