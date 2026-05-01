@@ -48,6 +48,18 @@ class MCPServerRead(BaseModel):
     updated_at: datetime
 
 
+class MCPServerTestRead(BaseModel):
+    name: str
+    server_url: str
+    description: str | None = None
+    auth_type: str
+    auth_username: str | None = None
+    has_auth_secret: bool
+    metadata: dict[str, Any]
+    tools: list[dict[str, Any]]
+    resources: list[dict[str, Any]]
+
+
 def _to_read_model(mcp_server: MCPServer) -> MCPServerRead:
     return MCPServerRead(
         mcp_server_id=mcp_server.mcp_server_id,
@@ -111,12 +123,23 @@ def get_mcp_server(mcp_id: UUID, session: Session = Depends(get_session)):
     return _to_read_model(mcp_server)
 
 
-@router.post("/test/")
+@router.post("/test/", response_model=MCPServerTestRead)
 async def test_mcp_server(payload: MCPServerBase):
     probe = await _probe_payload(payload)
-    if payload.name and payload.name.strip():
-        probe["metadata"]["name"] = payload.name.strip()
-    return probe
+    display_name = (payload.name or "").strip()
+    if display_name:
+        probe["metadata"]["name"] = display_name
+    return MCPServerTestRead(
+        name=display_name,
+        server_url=probe["url"],
+        description=payload.description,
+        auth_type=probe["auth_type"],
+        auth_username=payload.auth_username,
+        has_auth_secret=bool(payload.auth_secret),
+        metadata=probe["metadata"],
+        tools=probe["tools"],
+        resources=probe["resources"],
+    )
 
 
 @router.post("/", response_model=MCPServerRead)
@@ -167,16 +190,20 @@ async def update_mcp_server(
     )
 
     if should_refresh_metadata:
+        # Preserve existing secret only when auth_secret is omitted from payload.
+        existing_secret = (
+            decrypt_secret(mcp_server.auth_secret) if mcp_server.auth_secret else None
+        )
+        resolved_auth_secret = updates.get("auth_secret", existing_secret)
+        resolved_auth_type = updates.get("auth_type", mcp_server.auth_type)
+        if resolved_auth_type == "none":
+            resolved_auth_secret = None
+
         probe_payload = MCPServerBase(
             server_url=updates.get("server_url", mcp_server.server_url),
-            auth_type=updates.get("auth_type", mcp_server.auth_type),
+            auth_type=resolved_auth_type,
             auth_username=updates.get("auth_username", mcp_server.auth_username),
-            auth_secret=updates.get("auth_secret")
-            or (
-                decrypt_secret(mcp_server.auth_secret)
-                if mcp_server.auth_secret
-                else None
-            ),
+            auth_secret=resolved_auth_secret,
             name=updates.get("name", mcp_server.name),
             description=updates.get("description", mcp_server.description),
         )

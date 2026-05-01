@@ -1827,11 +1827,12 @@
 
             const tools = result.tools || [];
             const resources = result.resources || [];
+            const serverUrl = result.server_url || result.url || '';
             resultEl.innerHTML = `
                 <div class="card" style="border-color:#198754;">
-                    <strong>${(result.metadata && result.metadata.name) || result.url}</strong><br>
+                    <strong>${(result.metadata && result.metadata.name) || serverUrl}</strong><br>
                     <small>Transport: ${(result.metadata && result.metadata.transport) || 'unknown'} | Tools: ${tools.length} | Resources: ${resources.length}</small><br>
-                    <small>URL: ${result.url}</small>
+                    <small>URL: ${serverUrl}</small>
                 </div>
             `;
         }
