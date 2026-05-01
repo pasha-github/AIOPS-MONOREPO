@@ -3,7 +3,7 @@ import logging
 from pathlib import Path
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from google.genai import types
 from pydantic import BaseModel
 from sqlmodel import Session, select
@@ -258,22 +258,33 @@ async def invoke_agent_session(agent_id: str, prompt: str):
     return events
 
 
+async def _invoke_agent_session_background(agent_id: str, prompt: str):
+    try:
+        await invoke_agent_session(agent_id, prompt)
+    except Exception as e:
+        logger.error(
+            "Background webhook invocation failed for %s: %s",
+            agent_id,
+            e,
+            exc_info=True,
+        )
+
+
 @router.post("/{agent_id}/webhook/invoke/{webhook_id}")
 async def invoke_webhook(
     agent_id: str,
     webhook_id: UUID,
+    background_tasks: BackgroundTasks,
     session: Session = Depends(get_session),
     body: WebhookInvoke | None = None,
 ):
     webhook = session.get(Webhook, webhook_id)
     if not webhook or webhook.agent_id != agent_id:
         raise HTTPException(status_code=404, detail="Webhook not found")
-    try:
-        final_prompt = body.prompt if body and body.prompt else webhook.prompt
-        result = await invoke_agent_session(agent_id, final_prompt)
-        return {"status": "success", "result": result}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+
+    final_prompt = body.prompt if body and body.prompt else webhook.prompt
+    background_tasks.add_task(_invoke_agent_session_background, agent_id, final_prompt)
+    return {"status": "accepted", "message": "Webhook invocation started"}
 
 
 # --- Jobs ---
