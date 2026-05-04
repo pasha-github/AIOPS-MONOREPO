@@ -17,17 +17,20 @@ public class StatusService {
 
     public void setStart() {
         globalStatus.set(Status.START);
+        log.info("Status changed to start");
     }
 
     public void setStop() {
         Status oldStatus = globalStatus.getAndSet(Status.STOP);
 
         if (oldStatus == Status.START) {
-            log.info("Status changed from start to stop");
+            log.error("Status changed from start to stop");
         }
     }
 
     public Status getStatus() {
+        log.info("Current status: "+globalStatus.toString());
         return globalStatus.get();
+
     }
 }

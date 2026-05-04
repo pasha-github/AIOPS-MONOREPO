@@ -1,23 +1,9 @@
 server:
   port: 8080
 
-status-app:
-  build: .
-  container_name: status-app
-  ports:
-    - "8080:8080"
-  environment:
-    SPRING_PROFILES_ACTIVE: docker
-    DD_SERVICE: status-app
-    DD_ENV: local
-    DD_VERSION: 1.0.0
-  labels:
-    com.datadoghq.ad.logs: >-
-      [{
-        "source": "java",
-        "service": "status-app",
-        "tags": ["env:local"]
-      }]
+spring:
+  application:
+    name: status-app
 
 management:
   endpoints:
@@ -27,15 +13,12 @@ management:
   endpoint:
     health:
       show-details: always
-  datadog:
-    metrics:
-      export:
-        enabled: false
-        api-key: ${DD_API_KEY}
-        uri: https://api.us5.datadoghq.com
-        step: 30s
 
 logging:
+  pattern:
+    console: "%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level --- [%thread] %logger{36} : %msg%n"
+  file:
+    name: /app/logs/status-app.log
   level:
     root: INFO
     com.rc.customerapp: INFO
