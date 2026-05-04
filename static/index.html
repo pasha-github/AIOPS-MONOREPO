@@ -296,6 +296,29 @@
                     </div>
                     <button type="submit">Update Model</button>
                 </form>
+
+                <h3 style="margin-top: 24px;">Global Model Defaults</h3>
+                <form id="update-model-defaults-form">
+                    <div class="form-group">
+                        <label>Primary Model</label>
+                        <select id="default-primary-model-select">
+                            <option value="">-- None --</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Secondary Model</label>
+                        <select id="default-secondary-model-select">
+                            <option value="">-- None --</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Tertiary Model</label>
+                        <select id="default-tertiary-model-select">
+                            <option value="">-- None --</option>
+                        </select>
+                    </div>
+                    <button type="submit">Save Global Defaults</button>
+                </form>
             </div>
 
             <!-- Agents Section -->
@@ -339,9 +362,10 @@
                         <textarea id="agent-tools" rows="5" placeholder="def my_tool(): ..."></textarea>
                     </div>
                     <div class="form-group">
-                        <label>MCP Server URLs (comma-separated)</label>
-                        <input type="text" id="agent-mcp-sse"
-                            placeholder="http://localhost:8000/sse, http://localhost:8001/mcp">
+                        <label>Registered MCP Servers <small>(hold Ctrl/Cmd to select multiple)</small></label>
+                        <select id="agent-mcp-servers" multiple>
+                            <option disabled>Loading MCP servers...</option>
+                        </select>
                     </div>
                     <div class="form-group">
                         <label>Connector Configs <small>(hold Ctrl/Cmd to select multiple)</small></label>
@@ -350,15 +374,55 @@
                         </select>
                     </div>
                     <div class="form-group">
+                        <label>Skills <small>(hold Ctrl/Cmd to select multiple)</small></label>
+                        <select id="agent-skills" multiple>
+                            <option disabled>Loading skills...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
                         <label>Sub Agents <small>(hold Ctrl/Cmd to select multiple)</small></label>
                         <select id="agent-sub-agents" multiple>
                             <option disabled>Loading agents...</option>
                         </select>
                     </div>
+                    <h4>Model Stack</h4>
                     <div class="form-group">
-                        <label>Model</label>
-                        <select id="agent-model-select" required>
-                            <option>Loading models...</option>
+                        <label>Primary Source</label>
+                        <select id="agent-primary-source" onchange="toggleAgentModelSlot('agent', 'primary')">
+                            <option value="global">Use Global Primary</option>
+                            <option value="manual">Choose Specific Model</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Primary Model</label>
+                        <select id="agent-primary-model-select" disabled>
+                            <option value="">-- Select model --</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Secondary Source</label>
+                        <select id="agent-secondary-source" onchange="toggleAgentModelSlot('agent', 'secondary')">
+                            <option value="global">Use Global Secondary</option>
+                            <option value="manual">Choose Specific Model</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Secondary Model</label>
+                        <select id="agent-secondary-model-select" disabled>
+                            <option value="">-- Select model --</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Tertiary Source</label>
+                        <select id="agent-tertiary-source" onchange="toggleAgentModelSlot('agent', 'tertiary')">
+                            <option value="global">Use Global Tertiary</option>
+                            <option value="manual">Choose Specific Model</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Tertiary Model</label>
+                        <select id="agent-tertiary-model-select" disabled>
+                            <option value="">-- Select model --</option>
                         </select>
                     </div>
                     <button type="submit">Add Agent</button>
@@ -386,9 +450,46 @@
                         <textarea id="agent-update-instruction" rows="3"
                             placeholder="Leave blank to keep current value"></textarea>
                     </div>
+                    <h4>Model Stack</h4>
                     <div class="form-group">
-                        <label>New Model</label>
-                        <select id="agent-update-model-select">
+                        <label>Primary Source</label>
+                        <select id="agent-update-primary-source" onchange="toggleAgentModelSlot('agent-update', 'primary')">
+                            <option value="">-- Keep current setting --</option>
+                            <option value="global">Use Global Primary</option>
+                            <option value="manual">Choose Specific Model</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Primary Model</label>
+                        <select id="agent-update-primary-model-select" disabled>
+                            <option value="">-- Keep current model --</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Secondary Source</label>
+                        <select id="agent-update-secondary-source" onchange="toggleAgentModelSlot('agent-update', 'secondary')">
+                            <option value="">-- Keep current setting --</option>
+                            <option value="global">Use Global Secondary</option>
+                            <option value="manual">Choose Specific Model</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Secondary Model</label>
+                        <select id="agent-update-secondary-model-select" disabled>
+                            <option value="">-- Keep current model --</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Tertiary Source</label>
+                        <select id="agent-update-tertiary-source" onchange="toggleAgentModelSlot('agent-update', 'tertiary')">
+                            <option value="">-- Keep current setting --</option>
+                            <option value="global">Use Global Tertiary</option>
+                            <option value="manual">Choose Specific Model</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Tertiary Model</label>
+                        <select id="agent-update-tertiary-model-select" disabled>
                             <option value="">-- Keep current model --</option>
                         </select>
                     </div>
@@ -401,13 +502,21 @@
                         </select>
                     </div>
                     <div class="form-group">
-                        <label>New MCP Server URLs (comma-separated)</label>
-                        <input type="text" id="agent-update-mcp-sse" placeholder="Leave blank to keep current value">
+                        <label>Registered MCP Servers <small>(hold Ctrl/Cmd to select multiple)</small></label>
+                        <select id="agent-update-mcp-servers" multiple>
+                            <option disabled>Loading MCP servers...</option>
+                        </select>
                     </div>
                     <div class="form-group">
                         <label>New Connector Configs <small>(hold Ctrl/Cmd to select multiple)</small></label>
                         <select id="agent-update-connector-configs" multiple>
                             <option disabled>Loading connector configs...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>New Skills <small>(hold Ctrl/Cmd to select multiple)</small></label>
+                        <select id="agent-update-skills" multiple>
+                            <option disabled>Loading skills...</option>
                         </select>
                     </div>
                     <div class="form-group">
@@ -521,6 +630,104 @@
                         </select>
                     </div>
                     <div id="connector-config-list">Select a connector to view its saved configs.</div>
+
+                    <h3 style="margin-top: 24px;">Registered MCP Servers</h3>
+                    <form id="add-mcp-form">
+                        <div id="mcp-edit-state"
+                            style="display:none; margin-bottom:10px; padding:8px 10px; background:#fff3cd; border-radius:4px;">
+                            Editing existing MCP server
+                            <button type="button" id="mcp-cancel-edit" style="margin-left:10px;">Cancel</button>
+                        </div>
+                        <div class="form-group">
+                            <label>Name</label>
+                            <input type="text" id="mcp-name" placeholder="e.g. Service Desk MCP">
+                        </div>
+                        <div class="form-group">
+                            <label>URL</label>
+                            <input type="text" id="mcp-url" placeholder="http://localhost:8000/sse" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Description</label>
+                            <input type="text" id="mcp-description" placeholder="Optional short note">
+                        </div>
+                        <div class="form-group">
+                            <label>Auth Type</label>
+                            <select id="mcp-auth-type">
+                                <option value="none">None</option>
+                                <option value="bearer">Bearer</option>
+                                <option value="basic">Basic</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Username</label>
+                            <input type="text" id="mcp-auth-username" placeholder="Only for Basic auth">
+                        </div>
+                        <div class="form-group">
+                            <label>Secret</label>
+                            <input type="password" id="mcp-auth-secret"
+                                placeholder="Bearer token or Basic password">
+                        </div>
+                        <div style="display:flex; gap:8px;">
+                            <button type="button" id="mcp-test-btn">Test MCP</button>
+                            <button type="submit" id="mcp-submit-btn">Save MCP</button>
+                        </div>
+                    </form>
+                    <div id="mcp-test-result" style="margin-top: 12px;"></div>
+                    <div id="mcp-list" style="margin-top: 12px;">Loading MCP servers...</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Skills</h2>
+            <div class="grid">
+                <div>
+                    <div id="skill-list">Loading skills...</div>
+                </div>
+                <div>
+                    <form id="add-skill-form">
+                        <div class="form-group">
+                            <label>Name</label>
+                            <input type="text" id="skill-name" placeholder="incident_skill" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Description</label>
+                            <input type="text" id="skill-description" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Instructions</label>
+                            <textarea id="skill-instructions" rows="4" required></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Tool Names <small>(comma separated)</small></label>
+                            <input type="text" id="skill-tools" placeholder="search_docs, get_post">
+                        </div>
+                        <div class="form-group">
+                            <label>Connector Configs <small>(hold Ctrl/Cmd to select multiple)</small></label>
+                            <select id="skill-connector-configs" multiple>
+                                <option disabled>Loading connector configs...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>MCP Servers <small>(hold Ctrl/Cmd to select multiple)</small></label>
+                            <select id="skill-mcp-servers" multiple>
+                                <option disabled>Loading MCP servers...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>References JSON</label>
+                            <textarea id="skill-references" rows="4" placeholder='{"guide.md":"Hello"}'></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Assets JSON</label>
+                            <textarea id="skill-assets" rows="4" placeholder='{"template.txt":"Template"}'></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Scripts JSON</label>
+                            <textarea id="skill-scripts" rows="4" placeholder='{"run.py":"print(\"hi\")"}'></textarea>
+                        </div>
+                        <button type="submit">Save Skill</button>
+                    </form>
                 </div>
             </div>
         </div>
@@ -552,6 +759,14 @@
     <script>
         const API_BASE = window.location.origin;
         let agentTemplates = [];
+        let currentModels = [];
+        let currentModelDefaults = {
+            primary_model_id: '',
+            secondary_model_id: '',
+            tertiary_model_id: ''
+        };
+        let currentMcpServers = [];
+        let currentSkills = [];
 
         // ─── Health ───────────────────────────────────────────────────────────
         async function checkHealth() {
@@ -570,15 +785,30 @@
         async function loadModels() {
             const res = await fetch(`${API_BASE}/llms/`);
             const models = await res.json();
+            currentModels = models;
             const listEl = document.getElementById('model-list');
-            const selectEl = document.getElementById('agent-model-select');
             const updateSelectEl = document.getElementById('model-update-select');
-            const agentUpdateModelSelectEl = document.getElementById('agent-update-model-select');
+            const modelSelectIds = [
+                'agent-primary-model-select',
+                'agent-secondary-model-select',
+                'agent-tertiary-model-select',
+                'agent-update-primary-model-select',
+                'agent-update-secondary-model-select',
+                'agent-update-tertiary-model-select',
+                'default-primary-model-select',
+                'default-secondary-model-select',
+                'default-tertiary-model-select'
+            ];
 
             listEl.innerHTML = '';
-            selectEl.innerHTML = '';
             updateSelectEl.innerHTML = '<option value="">-- Select a model --</option>';
-            agentUpdateModelSelectEl.innerHTML = '<option value="">-- Keep current model --</option>';
+            modelSelectIds.forEach(id => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                const keepText = id.startsWith('agent-update-') ? '-- Keep current model --' : '-- Select model --';
+                const noneText = id.startsWith('default-') ? '-- None --' : keepText;
+                el.innerHTML = `<option value="">${noneText}</option>`;
+            });
 
             models.forEach(m => {
                 const div = document.createElement('div');
@@ -590,20 +820,35 @@
                 `;
                 listEl.appendChild(div);
 
-                const opt = document.createElement('option');
-                opt.value = m.model_id;
-                opt.textContent = m.name;
-                selectEl.appendChild(opt);
-
                 const updateOpt = document.createElement('option');
                 updateOpt.value = m.model_id;
                 updateOpt.textContent = `${m.name} (${m.model_id})`;
                 updateSelectEl.appendChild(updateOpt);
 
-                const agentUpdateOpt = document.createElement('option');
-                agentUpdateOpt.value = m.model_id;
-                agentUpdateOpt.textContent = `${m.name} (${m.model_id})`;
-                agentUpdateModelSelectEl.appendChild(agentUpdateOpt);
+                modelSelectIds.forEach(id => {
+                    const el = document.getElementById(id);
+                    if (!el) return;
+                    const opt = document.createElement('option');
+                    opt.value = m.model_id;
+                    opt.textContent = `${m.name} (${m.model_id})`;
+                    el.appendChild(opt);
+                });
+            });
+
+            await loadModelDefaults();
+        }
+
+        async function loadModelDefaults() {
+            const res = await fetch(`${API_BASE}/llms/defaults`);
+            const defaults = await res.json();
+            currentModelDefaults = defaults;
+            document.getElementById('default-primary-model-select').value = defaults.primary_model_id || '';
+            document.getElementById('default-secondary-model-select').value = defaults.secondary_model_id || '';
+            document.getElementById('default-tertiary-model-select').value = defaults.tertiary_model_id || '';
+            ['agent', 'agent-update'].forEach(prefix => {
+                ['primary', 'secondary', 'tertiary'].forEach(slot => {
+                    syncSlotModelSelection(prefix, slot);
+                });
             });
         }
 
@@ -676,6 +921,72 @@
             loadModels();
         }
 
+        async function updateModelDefaults(e) {
+            e.preventDefault();
+            const data = {
+                primary_model_id: document.getElementById('default-primary-model-select').value || null,
+                secondary_model_id: document.getElementById('default-secondary-model-select').value || null,
+                tertiary_model_id: document.getElementById('default-tertiary-model-select').value || null
+            };
+
+            const res = await fetch(`${API_BASE}/llms/defaults`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            if (!res.ok) {
+                alert('Failed to update global defaults: ' + await res.text());
+                return;
+            }
+            loadModels();
+            loadAgents();
+        }
+
+        function toggleAgentModelSlot(prefix, slot) {
+            const sourceEl = document.getElementById(`${prefix}-${slot}-source`);
+            const modelEl = document.getElementById(`${prefix}-${slot}-model-select`);
+            if (!sourceEl || !modelEl) return;
+            modelEl.disabled = sourceEl.value !== 'manual';
+            syncSlotModelSelection(prefix, slot);
+        }
+
+        function syncSlotModelSelection(prefix, slot) {
+            const sourceEl = document.getElementById(`${prefix}-${slot}-source`);
+            const modelEl = document.getElementById(`${prefix}-${slot}-model-select`);
+            if (!sourceEl || !modelEl) return;
+
+            const isUpdate = prefix.startsWith('agent-update');
+            if (sourceEl.value === 'global') {
+                const globalModelId = currentModelDefaults[`${slot}_model_id`] || '';
+                modelEl.value = globalModelId;
+                modelEl.disabled = true;
+                return;
+            }
+
+            modelEl.disabled = sourceEl.value !== 'manual';
+            if (sourceEl.value !== 'manual' && !isUpdate) {
+                modelEl.value = '';
+            }
+        }
+
+        function addSlotConfig(data, prefix, slot, isUpdate = false) {
+            const sourceValue = document.getElementById(`${prefix}-${slot}-source`).value;
+            const modelValue = document.getElementById(`${prefix}-${slot}-model-select`).value;
+            if (isUpdate && sourceValue === '') {
+                return;
+            }
+            data[`${slot}_use_global`] = sourceValue === 'global';
+            data[`${slot}_model_id`] = sourceValue === 'manual' ? (modelValue || null) : null;
+        }
+
+        function parseJsonField(fieldId) {
+            const rawValue = document.getElementById(fieldId).value.trim();
+            if (!rawValue) {
+                return {};
+            }
+            return JSON.parse(rawValue);
+        }
+
         // ─── Agents ───────────────────────────────────────────────────────────
         async function loadAgentTemplates() {
             const res = await fetch(`${API_BASE}/agent/templates`);
@@ -732,13 +1043,24 @@
                 const connectorBadges = (a.connector_config_ids || []).length > 0
                     ? `<br><small>Connectors: ${(a.connector_config_ids || []).length} attached</small>`
                     : '';
+                const mcpBadge = ((a.mcp_server_ids || []).length + (a.mcp_servers || []).length) > 0
+                    ? `<br><small>MCPs: ${((a.mcp_server_ids || []).length + (a.mcp_servers || []).length)} attached</small>`
+                    : '';
+                const skillBadge = (a.skill_ids || []).length > 0
+                    ? `<br><small>Skills: ${(a.skill_ids || []).length} attached</small>`
+                    : '';
                 const subAgentBadge = (a.sub_agents || []).length > 0
                     ? `<br><small>Sub-agents: ${(a.sub_agents || []).length} attached</small>`
                     : '';
+                const modelStack = [
+                    `P: ${a.primary_use_global ? 'Global' : (a.primary_model_id || 'None')}`,
+                    `S: ${a.secondary_use_global ? 'Global' : (a.secondary_model_id || 'None')}`,
+                    `T: ${a.tertiary_use_global ? 'Global' : (a.tertiary_model_id || 'None')}`
+                ].join(' | ');
                 div.innerHTML = `
-                    <strong>${a.name}</strong> (${a.type ? a.type : 'agent'} | ${a.model_id})<br>
+                    <strong>${a.name}</strong> (${a.type ? a.type : 'agent'})<br>
                     ${a.description}<br>
-                    <small>Status: ${a.isEnabled ? 'Enabled' : 'Disabled'}</small>${connectorBadges}${subAgentBadge}
+                    <small>Status: ${a.isEnabled ? 'Enabled' : 'Disabled'} | ${modelStack}</small>${connectorBadges}${mcpBadge}${skillBadge}${subAgentBadge}
                     <div style="margin-top:5px;">
                         <button onclick="toggleAgent('${a.agent_id}', ${!a.isEnabled})">${a.isEnabled ? 'Disable' : 'Enable'}</button>
                         <button class="delete" onclick="deleteAgent('${a.agent_id}')">Delete</button>
@@ -782,12 +1104,14 @@
         async function addAgent(e) {
             e.preventDefault();
             const toolsCode = document.getElementById('agent-tools').value;
-            const mcpInput = document.getElementById('agent-mcp-sse').value;
-            const mcpServersList = mcpInput ? mcpInput.split(',').map(url => url.trim()).filter(url => url.length > 0) : [];
+            const mcpSelect = document.getElementById('agent-mcp-servers');
+            const mcpServerIds = Array.from(mcpSelect.selectedOptions).map(o => o.value);
 
             // Collect selected connector config IDs from multi-select
             const connectorSelect = document.getElementById('agent-connector-configs');
             const connectorConfigIds = Array.from(connectorSelect.selectedOptions).map(o => o.value);
+            const skillSelect = document.getElementById('agent-skills');
+            const skillIds = Array.from(skillSelect.selectedOptions).map(o => o.value);
 
             // Collect selected sub-agent IDs from multi-select
             const subAgentSelect = document.getElementById('agent-sub-agents');
@@ -799,13 +1123,16 @@
                 description: document.getElementById('agent-desc').value,
                 type: document.getElementById('agent-type').value,
                 instruction: document.getElementById('agent-instr').value,
-                model_id: document.getElementById('agent-model-select').value,
                 tools: toolsCode ? toolsCode : null,
-                mcp_servers: mcpServersList,
+                mcp_server_ids: mcpServerIds,
                 connector_config_ids: connectorConfigIds,
+                skill_ids: skillIds,
                 sub_agents: subAgentIds,
                 isEnabled: true
             };
+            addSlotConfig(data, 'agent', 'primary');
+            addSlotConfig(data, 'agent', 'secondary');
+            addSlotConfig(data, 'agent', 'tertiary');
             await fetch(`${API_BASE}/agent/`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -824,13 +1151,14 @@
             const name = document.getElementById('agent-update-name').value;
             const description = document.getElementById('agent-update-description').value;
             const instruction = document.getElementById('agent-update-instruction').value;
-            const modelId = document.getElementById('agent-update-model-select').value;
             const statusValue = document.getElementById('agent-update-status').value;
             const toolsCode = document.getElementById('agent-update-tools').value;
-            const mcpInput = document.getElementById('agent-update-mcp-sse').value;
-            const mcpServersList = mcpInput ? mcpInput.split(',').map(url => url.trim()).filter(url => url.length > 0) : [];
+            const mcpSelect = document.getElementById('agent-update-mcp-servers');
+            const mcpServerIds = Array.from(mcpSelect.selectedOptions).map(o => o.value);
             const connectorSelect = document.getElementById('agent-update-connector-configs');
             const connectorConfigIds = Array.from(connectorSelect.selectedOptions).map(o => o.value);
+            const skillSelect = document.getElementById('agent-update-skills');
+            const skillIds = Array.from(skillSelect.selectedOptions).map(o => o.value);
             const subAgentSelect = document.getElementById('agent-update-sub-agents');
             const subAgentIds = Array.from(subAgentSelect.selectedOptions).map(o => o.value);
             const data = {};
@@ -849,24 +1177,27 @@
             if (instruction.trim() !== '') {
                 data.instruction = instruction;
             }
-            if (modelId !== '') {
-                data.model_id = modelId;
-            }
             if (statusValue !== '') {
                 data.isEnabled = statusValue === 'true';
             }
             if (toolsCode.trim() !== '') {
                 data.tools = toolsCode;
             }
-            if (mcpServersList.length > 0) {
-                data.mcp_servers = mcpServersList;
+            if (mcpServerIds.length > 0) {
+                data.mcp_server_ids = mcpServerIds;
             }
             if (connectorConfigIds.length > 0) {
                 data.connector_config_ids = connectorConfigIds;
             }
+            if (skillIds.length > 0) {
+                data.skill_ids = skillIds;
+            }
             if (subAgentIds.length > 0) {
                 data.sub_agents = subAgentIds;
             }
+            addSlotConfig(data, 'agent-update', 'primary', true);
+            addSlotConfig(data, 'agent-update', 'secondary', true);
+            addSlotConfig(data, 'agent-update', 'tertiary', true);
 
             if (Object.keys(data).length === 0) {
                 alert('Enter at least one value to update.');
@@ -1274,10 +1605,12 @@
             const listEl = document.getElementById('connector-config-list');
             const agentSelect = document.getElementById('agent-connector-configs');
             const updateAgentSelect = document.getElementById('agent-update-connector-configs');
+            const skillSelect = document.getElementById('skill-connector-configs');
 
             listEl.innerHTML = 'Loading...';
             agentSelect.innerHTML = '';
             updateAgentSelect.innerHTML = '';
+            skillSelect.innerHTML = '';
 
             // Fetch connectors list to iterate through all if no filter
             const connectorsRes = await fetch(`${API_BASE}/connectors/`);
@@ -1348,6 +1681,11 @@
                     updateOpt.value = cfg.connector_config_id;
                     updateOpt.textContent = `${cfg.name} (${connector.name})`;
                     updateAgentSelect.appendChild(updateOpt);
+
+                    const skillOpt = document.createElement('option');
+                    skillOpt.value = cfg.connector_config_id;
+                    skillOpt.textContent = `${cfg.name} (${connector.name})`;
+                    skillSelect.appendChild(skillOpt);
                 });
             }
 
@@ -1355,6 +1693,333 @@
                 listEl.textContent = filterConnectorId
                     ? 'No configs saved for this connector yet.'
                     : 'No connector configs saved yet.';
+            }
+        }
+
+        // ─── MCP Servers ──────────────────────────────────────────────────────
+
+        async function loadSkills() {
+            const listEl = document.getElementById('skill-list');
+            const agentSelect = document.getElementById('agent-skills');
+            const updateAgentSelect = document.getElementById('agent-update-skills');
+
+            listEl.innerHTML = 'Loading skills...';
+            agentSelect.innerHTML = '';
+            updateAgentSelect.innerHTML = '';
+
+            const res = await fetch(`${API_BASE}/skill/`);
+            if (!res.ok) {
+                listEl.innerHTML = '<em style="color:red;">Could not load skills.</em>';
+                return;
+            }
+
+            currentSkills = await res.json();
+            listEl.innerHTML = '';
+
+            currentSkills.forEach(skill => {
+                const opt = document.createElement('option');
+                opt.value = skill.skill_id;
+                opt.textContent = `${skill.name} (${skill.skill_id})`;
+                agentSelect.appendChild(opt);
+
+                const updateOpt = document.createElement('option');
+                updateOpt.value = skill.skill_id;
+                updateOpt.textContent = `${skill.name} (${skill.skill_id})`;
+                updateAgentSelect.appendChild(updateOpt);
+
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.innerHTML = `
+                    <strong>${skill.name}</strong><br>
+                    <small>${skill.description}</small><br>
+                    <small>Tools: ${(skill.tools || []).join(', ') || 'None'}</small><br>
+                    <small>Connector configs: ${(skill.connector_config_ids || []).length} | MCP servers: ${(skill.mcp_server_ids || []).length}</small>
+                `;
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.type = 'button';
+                deleteBtn.className = 'delete';
+                deleteBtn.style.marginTop = '8px';
+                deleteBtn.textContent = 'Delete';
+                deleteBtn.addEventListener('click', () => deleteSkill(skill.skill_id, skill.name));
+                card.appendChild(deleteBtn);
+
+                listEl.appendChild(card);
+            });
+
+            if (currentSkills.length === 0) {
+                listEl.textContent = 'No skills created yet.';
+            }
+        }
+
+        async function addSkill(e) {
+            e.preventDefault();
+            try {
+                const connectorSelect = document.getElementById('skill-connector-configs');
+                const mcpSelect = document.getElementById('skill-mcp-servers');
+                const payload = {
+                    name: document.getElementById('skill-name').value.trim(),
+                    description: document.getElementById('skill-description').value.trim(),
+                    instructions: document.getElementById('skill-instructions').value.trim(),
+                    tools: document.getElementById('skill-tools').value
+                        .split(',')
+                        .map(value => value.trim())
+                        .filter(Boolean),
+                    connector_config_ids: Array.from(connectorSelect.selectedOptions).map(o => o.value),
+                    mcp_server_ids: Array.from(mcpSelect.selectedOptions).map(o => o.value),
+                    references: parseJsonField('skill-references'),
+                    assets: parseJsonField('skill-assets'),
+                    scripts: parseJsonField('skill-scripts'),
+                };
+
+                const res = await fetch(`${API_BASE}/skill/`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+
+                if (!res.ok) {
+                    alert('Failed to save skill: ' + await res.text());
+                    return;
+                }
+
+                e.target.reset();
+                await loadSkills();
+                loadAgents();
+                loadGraph();
+            } catch (error) {
+                alert(`Failed to parse skill JSON: ${error.message}`);
+            }
+        }
+
+        async function deleteSkill(skillId, skillName) {
+            if (!confirm(`Delete skill ${skillName}?`)) {
+                return;
+            }
+
+            const res = await fetch(`${API_BASE}/skill/${skillId}`, { method: 'DELETE' });
+            if (!res.ok) {
+                alert('Failed to delete skill: ' + await res.text());
+                return;
+            }
+
+            await loadSkills();
+            loadAgents();
+            loadGraph();
+        }
+
+        let editingMcpServer = null;
+
+        function resetMcpForm() {
+            editingMcpServer = null;
+            document.getElementById('add-mcp-form').reset();
+            document.getElementById('mcp-edit-state').style.display = 'none';
+            document.getElementById('mcp-submit-btn').textContent = 'Save MCP';
+            document.getElementById('mcp-test-result').innerHTML = '';
+        }
+
+        function renderMcpProbeResult(result, isError = false) {
+            const resultEl = document.getElementById('mcp-test-result');
+            if (isError) {
+                resultEl.innerHTML = `<div class="card" style="border-color:#dc3545; color:#842029;">${result}</div>`;
+                return;
+            }
+
+            const tools = result.tools || [];
+            const resources = result.resources || [];
+            const serverUrl = result.server_url || result.url || '';
+            resultEl.innerHTML = `
+                <div class="card" style="border-color:#198754;">
+                    <strong>${(result.metadata && result.metadata.name) || serverUrl}</strong><br>
+                    <small>Transport: ${(result.metadata && result.metadata.transport) || 'unknown'} | Tools: ${tools.length} | Resources: ${resources.length}</small><br>
+                    <small>URL: ${serverUrl}</small>
+                </div>
+            `;
+        }
+
+        async function testMcpServer() {
+            const payload = {
+                name: document.getElementById('mcp-name').value.trim() || null,
+                server_url: document.getElementById('mcp-url').value.trim(),
+                description: document.getElementById('mcp-description').value.trim() || null,
+                auth_type: document.getElementById('mcp-auth-type').value,
+                auth_username: document.getElementById('mcp-auth-username').value.trim() || null,
+                auth_secret: document.getElementById('mcp-auth-secret').value || null,
+            };
+
+            if (!payload.server_url) {
+                alert('Please enter an MCP URL first.');
+                return;
+            }
+
+            const res = await fetch(`${API_BASE}/mcp/test/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+
+            if (!res.ok) {
+                renderMcpProbeResult(await res.text(), true);
+                return;
+            }
+
+            renderMcpProbeResult(await res.json());
+        }
+
+        async function editMcpServer(mcpId) {
+            const res = await fetch(`${API_BASE}/mcp/${mcpId}`);
+            if (!res.ok) {
+                alert('Failed to load MCP server details.');
+                return;
+            }
+
+            const mcp = await res.json();
+            editingMcpServer = mcp.mcp_server_id;
+            document.getElementById('mcp-name').value = mcp.name || '';
+            document.getElementById('mcp-url').value = mcp.server_url || '';
+            document.getElementById('mcp-description').value = mcp.description || '';
+            document.getElementById('mcp-auth-type').value = mcp.auth_type || 'none';
+            document.getElementById('mcp-auth-username').value = mcp.auth_username || '';
+            document.getElementById('mcp-auth-secret').value = '';
+            document.getElementById('mcp-edit-state').style.display = 'block';
+            document.getElementById('mcp-submit-btn').textContent = 'Update MCP';
+            renderMcpProbeResult({
+                url: mcp.server_url,
+                metadata: mcp.metadata || {},
+                tools: mcp.tools || [],
+                resources: mcp.resources || [],
+            });
+        }
+
+        async function deleteMcpServer(mcpId, mcpName) {
+            if (!confirm(`Delete MCP server ${mcpName}?`)) {
+                return;
+            }
+
+            const res = await fetch(`${API_BASE}/mcp/${mcpId}`, { method: 'DELETE' });
+            if (!res.ok) {
+                alert('Failed to delete MCP server: ' + await res.text());
+                return;
+            }
+
+            if (editingMcpServer === mcpId) {
+                resetMcpForm();
+            }
+            await loadMcpServers();
+            loadAgents();
+            loadGraph();
+        }
+
+        async function saveMcpServer(e) {
+            e.preventDefault();
+            const payload = {
+                name: document.getElementById('mcp-name').value.trim() || null,
+                server_url: document.getElementById('mcp-url').value.trim(),
+                description: document.getElementById('mcp-description').value.trim() || null,
+                auth_type: document.getElementById('mcp-auth-type').value,
+                auth_username: document.getElementById('mcp-auth-username').value.trim() || null,
+                auth_secret: document.getElementById('mcp-auth-secret').value || null,
+            };
+
+            if (!payload.server_url) {
+                alert('Please enter an MCP URL.');
+                return;
+            }
+
+            const isEdit = Boolean(editingMcpServer);
+            const res = await fetch(
+                isEdit ? `${API_BASE}/mcp/${editingMcpServer}` : `${API_BASE}/mcp/`,
+                {
+                    method: isEdit ? 'PATCH' : 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                }
+            );
+
+            if (!res.ok) {
+                alert(`Failed to ${isEdit ? 'update' : 'save'} MCP server: ` + await res.text());
+                return;
+            }
+
+            const saved = await res.json();
+            resetMcpForm();
+            renderMcpProbeResult({
+                url: saved.server_url,
+                metadata: saved.metadata || {},
+                tools: saved.tools || [],
+                resources: saved.resources || [],
+            });
+            await loadMcpServers();
+            loadAgents();
+            loadGraph();
+        }
+
+        async function loadMcpServers() {
+            const listEl = document.getElementById('mcp-list');
+            const addAgentSelect = document.getElementById('agent-mcp-servers');
+            const updateAgentSelect = document.getElementById('agent-update-mcp-servers');
+            const skillSelect = document.getElementById('skill-mcp-servers');
+
+            listEl.innerHTML = 'Loading MCP servers...';
+            addAgentSelect.innerHTML = '';
+            updateAgentSelect.innerHTML = '';
+            skillSelect.innerHTML = '';
+
+            const res = await fetch(`${API_BASE}/mcp/`);
+            if (!res.ok) {
+                listEl.innerHTML = '<em style="color:red;">Could not load MCP servers.</em>';
+                return;
+            }
+
+            currentMcpServers = await res.json();
+            listEl.innerHTML = '';
+
+            currentMcpServers.forEach(mcp => {
+                const opt = document.createElement('option');
+                opt.value = mcp.mcp_server_id;
+                opt.textContent = `${mcp.name} (${mcp.auth_type})`;
+                addAgentSelect.appendChild(opt);
+
+                const updateOpt = document.createElement('option');
+                updateOpt.value = mcp.mcp_server_id;
+                updateOpt.textContent = `${mcp.name} (${mcp.auth_type})`;
+                updateAgentSelect.appendChild(updateOpt);
+
+                const skillOpt = document.createElement('option');
+                skillOpt.value = mcp.mcp_server_id;
+                skillOpt.textContent = `${mcp.name} (${mcp.auth_type})`;
+                skillSelect.appendChild(skillOpt);
+
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.innerHTML = `
+                    <strong>${mcp.name}</strong><br>
+                    <small>${mcp.server_url}</small><br>
+                    <small>Auth: ${mcp.auth_type} | Tools: ${(mcp.tools || []).length} | Resources: ${(mcp.resources || []).length}</small><br>
+                    ${mcp.description ? `<small>${mcp.description}</small><br>` : ''}
+                `;
+
+                const editBtn = document.createElement('button');
+                editBtn.type = 'button';
+                editBtn.style.marginTop = '8px';
+                editBtn.textContent = 'Edit';
+                editBtn.addEventListener('click', () => editMcpServer(mcp.mcp_server_id));
+                card.appendChild(editBtn);
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.type = 'button';
+                deleteBtn.className = 'delete';
+                deleteBtn.style.marginTop = '8px';
+                deleteBtn.style.marginLeft = '6px';
+                deleteBtn.textContent = 'Delete';
+                deleteBtn.addEventListener('click', () => deleteMcpServer(mcp.mcp_server_id, mcp.name));
+                card.appendChild(deleteBtn);
+
+                listEl.appendChild(card);
+            });
+
+            if (currentMcpServers.length === 0) {
+                listEl.textContent = 'No MCP servers registered yet.';
             }
         }
 
@@ -1458,14 +2123,19 @@
 
         document.getElementById('add-model-form').addEventListener('submit', addModel);
         document.getElementById('update-model-form').addEventListener('submit', updateModel);
+        document.getElementById('update-model-defaults-form').addEventListener('submit', updateModelDefaults);
         document.getElementById('add-agent-form').addEventListener('submit', addAgent);
         document.getElementById('agent-template-select').addEventListener('change', applyAgentTemplate);
         document.getElementById('update-agent-form').addEventListener('submit', updateAgent);
+        document.getElementById('add-skill-form').addEventListener('submit', addSkill);
         document.getElementById('send-msg-btn').addEventListener('click', sendMessage);
         document.getElementById('add-connector-config-form').addEventListener('submit', addConnectorConfig);
         document.getElementById('connector-config-cancel-edit').addEventListener('click', resetConnectorConfigForm);
         document.getElementById('connector-select').addEventListener('change', onConnectorSelected);
         document.getElementById('connector-config-filter').addEventListener('change', loadAllConnectorConfigs);
+        document.getElementById('add-mcp-form').addEventListener('submit', saveMcpServer);
+        document.getElementById('mcp-test-btn').addEventListener('click', testMcpServer);
+        document.getElementById('mcp-cancel-edit').addEventListener('click', resetMcpForm);
 
         const themeToggleBtn = document.getElementById('theme-toggle');
         
@@ -1495,7 +2165,13 @@
                 const nodes = new vis.DataSet(
                     data.nodes.map(n => ({
                         id: n.id,
-                        label: n.type === 'agent' ? (n.data.agent.name || n.id) : (n.type === 'connector' ? (n.data.connector.name || n.id) : n.id),
+                        label: n.type === 'agent'
+                            ? (n.data.agent.name || n.id)
+                            : n.type === 'connector'
+                                ? (n.data.connector.name || n.id)
+                                : n.type === 'skill'
+                                    ? (n.data.skill.name || n.id)
+                                    : ((n.data.mcp && n.data.mcp.name) || n.id),
                         group: n.type,
                         title: JSON.stringify(n.data, null, 2)
                     }))
@@ -1515,6 +2191,7 @@
                     groups: {
                         agent: { color: { background: '#e3f2fd', border: '#1e88e5' }, shape: 'box' },
                         connector: { color: { background: '#f1f8e9', border: '#43a047' }, shape: 'ellipse' },
+                        skill: { color: { background: '#f3e8ff', border: '#9333ea' }, shape: 'hexagon' },
                         mcp: { color: { background: '#fff3e0', border: '#fb8c00' }, shape: 'diamond' }
                     },
                     physics: {
@@ -1534,6 +2211,8 @@
         loadAgentTemplates();
         loadAgents();
         loadConnectors().then(() => loadAllConnectorConfigs());
+        loadMcpServers();
+        loadSkills();
         loadGraph();
 
         setInterval(checkHealth, 30000);

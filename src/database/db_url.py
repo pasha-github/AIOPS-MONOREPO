@@ -13,3 +13,7 @@ def encode_database_url_password(database_url: str) -> str:
     username, password = userinfo.split(":", 1)
     encoded_password = quote_plus(unquote_plus(password))
     return f"{scheme}://{username}:{encoded_password}@{host_and_tail}"
+
+
+def encode_alembic_database_url(database_url: str) -> str:
+    return encode_database_url_password(database_url).replace("%", "%%")

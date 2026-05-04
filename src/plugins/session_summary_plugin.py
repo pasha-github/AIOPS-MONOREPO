@@ -1,16 +1,16 @@
 import logging
 
 import litellm
+from google.adk.agents.base_agent import BaseAgent
 from google.adk.agents.callback_context import CallbackContext
 from google.adk.models.llm_request import LlmRequest
 from google.adk.models.llm_response import LlmResponse
 from google.adk.plugins.base_plugin import BasePlugin
 
-from src.utils.constants import SUMMARIZER_MODEL
-
 logger = logging.getLogger(__name__)
 
 FIRST_MESSAGE_SUMMARY_KEY = "first_message_summary"
+SUMMARY_FALLBACKS_KEY = "summary_fallbacks"
 FALLBACK_SUMMARY_MAX_LENGTH = 120
 
 
@@ -50,6 +50,20 @@ class SessionSummaryPlugin(BasePlugin):
     def __init__(self, name: str = "session_summary_plugin"):
         super().__init__(name=name)
 
+    async def before_agent_callback(
+        self,
+        *,
+        agent: BaseAgent,
+        callback_context: CallbackContext,
+    ) -> None:
+        model = getattr(agent, "model", None)
+        fallbacks = getattr(model, "_additional_args", {}).get("fallbacks", [])
+
+        if callback_context.state.get(SUMMARY_FALLBACKS_KEY):
+            return None
+
+        callback_context.state[SUMMARY_FALLBACKS_KEY] = fallbacks
+
     async def before_model_callback(
         self,
         *,
@@ -64,25 +78,23 @@ class SessionSummaryPlugin(BasePlugin):
             return None
 
         summary = ""
-        summarizer_model = SUMMARIZER_MODEL or llm_request.model
-
-        if (
-            isinstance(summarizer_model, str)
-            and summarizer_model
-            and "/" not in summarizer_model
-        ):
-            summarizer_model = f"gemini/{summarizer_model}"
+        summarizer_model = llm_request.model
 
         if summarizer_model:
             try:
+                sync_fallbacks = callback_context.state.get(SUMMARY_FALLBACKS_KEY, [])
+
                 response = litellm.completion(
                     model=summarizer_model,
+                    fallbacks=sync_fallbacks,
                     messages=[
                         {
                             "role": "system",
                             "content": (
-                                "Summarize the first message in 3-6 words. "
-                                "Return only the summary."
+                                "You will be given ONE user message. "
+                                "Rewrite that message as a concise 3-6 word title, preserving the same intent and key terms. "
+                                "Do NOT answer the question and do NOT add new facts. "
+                                "Return ONLY the 3-6 word title."
                             ),
                         },
                         {"role": "user", "content": user_text},

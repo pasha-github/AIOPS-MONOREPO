@@ -3,7 +3,7 @@ import logging
 from pathlib import Path
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from google.genai import types
 from pydantic import BaseModel
 from sqlmodel import Session, select
@@ -11,6 +11,7 @@ from sqlmodel import Session, select
 from src.agent_runtime.adk.adk_app import adk_web_server_instance, invalidate_cache
 from src.database.database import get_session
 from src.database.models import Agent, Job, Model, Webhook
+from src.skills.runtime import validate_mcp_server_ids, validate_skill_ids
 
 router = APIRouter(prefix="/agent", tags=["agent"])
 TEMPLATES_FILE = (
@@ -25,8 +26,15 @@ class AgentCreate(BaseModel):
     name: str
     description: str
     instruction: str
-    model_id: str
+    primary_use_global: bool = True
+    primary_model_id: str | None = None
+    secondary_use_global: bool = True
+    secondary_model_id: str | None = None
+    tertiary_use_global: bool = True
+    tertiary_model_id: str | None = None
     tools: str | None = None
+    skill_ids: list[str] = []
+    mcp_server_ids: list[str] = []
     mcp_servers: list[str] = []
     connector_config_ids: list[str] = []
     isEnabled: bool = True
@@ -38,8 +46,15 @@ class AgentPatch(BaseModel):
     name: str | None = None
     description: str | None = None
     instruction: str | None = None
-    model_id: str | None = None
+    primary_use_global: bool | None = None
+    primary_model_id: str | None = None
+    secondary_use_global: bool | None = None
+    secondary_model_id: str | None = None
+    tertiary_use_global: bool | None = None
+    tertiary_model_id: str | None = None
     tools: str | None = None
+    skill_ids: list[str] | None = None
+    mcp_server_ids: list[str] | None = None
     mcp_servers: list[str] | None = None
     connector_config_ids: list[str] | None = None
     isEnabled: bool | None = None
@@ -81,6 +96,35 @@ class AgentTemplate(BaseModel):
     instruction: str
 
 
+def _validate_model_id(session: Session, model_id: str | None, field_name: str):
+    if model_id is None or session.get(Model, model_id) is None:
+        raise HTTPException(status_code=400, detail=f"Invalid {field_name}")
+
+
+def _validate_agent_model_settings(session: Session, payload: dict):
+    slot_fields = (
+        ("primary_use_global", "primary_model_id", "primary_model_id"),
+        ("secondary_use_global", "secondary_model_id", "secondary_model_id"),
+        ("tertiary_use_global", "tertiary_model_id", "tertiary_model_id"),
+    )
+
+    explicit_model_ids: list[str] = []
+    for use_global_field, model_id_field, error_field in slot_fields:
+        use_global = payload.get(use_global_field, True)
+        model_id = payload.get(model_id_field)
+        if use_global:
+            continue
+        _validate_model_id(session, model_id, error_field)
+        assert model_id is not None
+        explicit_model_ids.append(model_id)
+
+    if len(explicit_model_ids) != len(set(explicit_model_ids)):
+        raise HTTPException(
+            status_code=400,
+            detail="Duplicate manual model selections are not allowed",
+        )
+
+
 @router.get("/templates", response_model=list[AgentTemplate])
 def list_agent_templates():
     with TEMPLATES_FILE.open("r", encoding="utf-8") as templates_file:
@@ -93,10 +137,12 @@ def create_agent(agent: AgentCreate, session: Session = Depends(get_session)):
     if session.get(Agent, agent.agent_id):
         raise HTTPException(status_code=409, detail="Agent already exists")
 
-    if not session.get(Model, agent.model_id):
-        raise HTTPException(status_code=400, detail="Invalid model_id")
+    agent_data = agent.model_dump()
+    _validate_agent_model_settings(session, agent_data)
+    validate_mcp_server_ids(session, agent_data.get("mcp_server_ids"))
+    validate_skill_ids(session, agent_data.get("skill_ids"))
 
-    db_agent = Agent.model_validate(agent)
+    db_agent = Agent.model_validate(agent_data)
     session.add(db_agent)
     session.commit()
     session.refresh(db_agent)
@@ -118,10 +164,11 @@ def update_agent(
         raise HTTPException(status_code=404, detail="Agent not found")
 
     updates = patch_data.model_dump(exclude_unset=True)
-    if "model_id" in updates and (
-        updates["model_id"] is None or not session.get(Model, updates["model_id"])
-    ):
-        raise HTTPException(status_code=400, detail="Invalid model_id")
+    merged = agent.model_dump()
+    merged.update(updates)
+    _validate_agent_model_settings(session, merged)
+    validate_mcp_server_ids(session, merged.get("mcp_server_ids"))
+    validate_skill_ids(session, merged.get("skill_ids"))
 
     for key, value in updates.items():
         setattr(agent, key, value)
@@ -211,22 +258,33 @@ async def invoke_agent_session(agent_id: str, prompt: str):
     return events
 
 
+async def _invoke_agent_session_background(agent_id: str, prompt: str):
+    try:
+        await invoke_agent_session(agent_id, prompt)
+    except Exception as e:
+        logger.error(
+            "Background webhook invocation failed for %s: %s",
+            agent_id,
+            e,
+            exc_info=True,
+        )
+
+
 @router.post("/{agent_id}/webhook/invoke/{webhook_id}")
 async def invoke_webhook(
     agent_id: str,
     webhook_id: UUID,
+    background_tasks: BackgroundTasks,
     session: Session = Depends(get_session),
     body: WebhookInvoke | None = None,
 ):
     webhook = session.get(Webhook, webhook_id)
     if not webhook or webhook.agent_id != agent_id:
         raise HTTPException(status_code=404, detail="Webhook not found")
-    try:
-        final_prompt = body.prompt if body and body.prompt else webhook.prompt
-        result = await invoke_agent_session(agent_id, final_prompt)
-        return {"status": "success", "result": result}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+
+    final_prompt = body.prompt if body and body.prompt else webhook.prompt
+    background_tasks.add_task(_invoke_agent_session_background, agent_id, final_prompt)
+    return {"status": "accepted", "message": "Webhook invocation started"}
 
 
 # --- Jobs ---

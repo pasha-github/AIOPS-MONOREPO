@@ -1,5 +1,6 @@
 import os
 from types import SimpleNamespace
+from uuid import uuid4
 
 import pytest
 
@@ -21,12 +22,24 @@ class _FakeResult:
 
 class _FakeSession:
     def __init__(
-        self, agent_config=None, model_config=None, list_ids=None, connector_map=None
+        self,
+        agent_config=None,
+        model_config=None,
+        list_ids=None,
+        connector_map=None,
+        mcp_map=None,
+        skill_map=None,
+        model_map=None,
+        defaults_config=None,
     ):
         self.agent_config = agent_config
         self.model_config = model_config
         self.list_ids = list_ids
         self.connector_map = connector_map or {}
+        self.mcp_map = mcp_map or {}
+        self.skill_map = skill_map or {}
+        self.model_map = model_map or {}
+        self.defaults_config = defaults_config
 
     def __enter__(self):
         return self
@@ -42,9 +55,17 @@ class _FakeSession:
     def get(self, model_cls, key):
         name = getattr(model_cls, "__name__", "")
         if name == "Model":
+            if key in self.model_map:
+                return self.model_map[key]
             return self.model_config
+        if name == "ModelDefaults":
+            return self.defaults_config
         if name == "ConnectorConfig":
             return self.connector_map.get(str(key))
+        if name == "MCPServer":
+            return self.mcp_map.get(str(key))
+        if name == "Skill":
+            return self.skill_map.get(str(key))
         return None
 
 
@@ -69,9 +90,17 @@ def _agent_cfg(**kwargs):
         "description": "desc",
         "instruction": "instr",
         "model_id": "m1",
+        "primary_use_global": False,
+        "primary_model_id": "m1",
+        "secondary_use_global": False,
+        "secondary_model_id": None,
+        "tertiary_use_global": False,
+        "tertiary_model_id": None,
         "tools": None,
         "mcp_servers": [],
+        "mcp_server_ids": [],
         "connector_config_ids": [],
+        "skill_ids": [],
         "sub_agents": [],
         "isEnabled": True,
         "type": "agent",
@@ -92,21 +121,37 @@ def _model_cfg(**kwargs):
 
 
 def _patch_common_runtime(monkeypatch: pytest.MonkeyPatch):
+    def connector_tool():
+        return "connector"
+
     monkeypatch.setattr(
         agent_loader_module, "decrypt_secret", lambda _: "decrypted-key"
     )
     monkeypatch.setattr(
-        agent_loader_module, "resolve_connector_tools", lambda _cfg: ["connector_tool"]
+        agent_loader_module, "resolve_connector_tools", lambda _cfg: [connector_tool]
     )
     monkeypatch.setattr(
         agent_loader_module,
-        "SseConnectionParams",
-        lambda url: {"url": url, "kind": "sse"},
+        "build_mcp_connection_params",
+        lambda url, headers=None: {
+            "url": url,
+            "headers": headers or {},
+            "kind": "sse" if url.endswith("/sse") else "mcp",
+        },
     )
     monkeypatch.setattr(
         agent_loader_module,
-        "StreamableHTTPConnectionParams",
-        lambda url: {"url": url, "kind": "mcp"},
+        "build_mcp_auth_headers",
+        lambda auth_type, bearer_token=None, username=None, password=None: (
+            {
+                "auth_type": auth_type,
+                "bearer_token": bearer_token,
+                "username": username,
+                "password": password,
+            }
+            if auth_type != "none"
+            else {}
+        ),
     )
     monkeypatch.setattr(
         agent_loader_module,
@@ -116,17 +161,34 @@ def _patch_common_runtime(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(
         agent_loader_module, "AgentTool", lambda agent: {"sub_agent": agent}
     )
+    monkeypatch.setattr(
+        agent_loader_module,
+        "UnsafeLocalCodeExecutor",
+        lambda: "unsafe-executor",
+    )
 
     class _FakeLiteLlm:
-        def __init__(self, model):
+        def __init__(self, model, **kwargs):
             self.model = model
+            self.kwargs = kwargs
 
     class _FakeLlmAgent:
         def __init__(self, **kwargs):
             self.kwargs = kwargs
 
+    class _FakeSkillToolset:
+        def __init__(self, skills, **kwargs):
+            self.skills = skills
+            self.kwargs = kwargs
+
     monkeypatch.setattr(agent_loader_module, "LiteLlm", _FakeLiteLlm)
     monkeypatch.setattr(agent_loader_module, "LlmAgent", _FakeLlmAgent)
+    monkeypatch.setattr(agent_loader_module, "SkillToolset", _FakeSkillToolset)
+    monkeypatch.setattr(
+        agent_loader_module,
+        "build_skill_model",
+        lambda skill: SimpleNamespace(name=skill.name, tools=skill.tools),
+    )
 
 
 def test_agent_loader_returns_none_when_agent_missing(monkeypatch: pytest.MonkeyPatch):
@@ -229,7 +291,8 @@ def test_agent_loader_google_model_path(monkeypatch: pytest.MonkeyPatch):
 
     loader = DatabaseAgentLoader()
     agent = loader.load_agent("main")
-    assert agent.kwargs["model"] == "gemini-2.0-flash"
+    assert getattr(agent.kwargs["model"], "model", "") == "gemini/gemini-2.0-flash"
+    assert agent.kwargs["model"].kwargs["fallbacks"] == []
 
 
 def test_agent_loader_does_not_attach_session_summary_callback(
@@ -264,6 +327,7 @@ def test_agent_loader_non_google_model_path(monkeypatch: pytest.MonkeyPatch):
     loader = DatabaseAgentLoader()
     agent = loader.load_agent("main")
     assert getattr(agent.kwargs["model"], "model", "") == "openai/gpt-4.1"
+    assert agent.kwargs["model"].kwargs["fallbacks"] == []
 
 
 def test_agent_loader_exec_tools_success(monkeypatch: pytest.MonkeyPatch):
@@ -316,6 +380,43 @@ def test_agent_loader_mcp_url_validation(monkeypatch: pytest.MonkeyPatch):
     agent = loader.load_agent("main")
     # Invalid MCP URL should be ignored, not crash agent creation.
     assert agent is not None
+
+
+def test_agent_loader_resolves_registered_mcp_servers(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    _patch_common_runtime(monkeypatch)
+    mcp_server_id = str(uuid4())
+    cfg = _agent_cfg(mcp_server_ids=[mcp_server_id])
+    model = _model_cfg()
+    mcp_server = SimpleNamespace(
+        mcp_server_id=mcp_server_id,
+        server_url="http://localhost:8100/mcp",
+        auth_type="bearer",
+        auth_username=None,
+        auth_secret="encrypted-token",
+    )
+    monkeypatch.setattr(agent_loader_module, "cache", _FakeCache())
+    monkeypatch.setattr(
+        agent_loader_module,
+        "Session",
+        lambda _engine: _FakeSession(
+            agent_config=cfg,
+            model_config=model,
+            mcp_map={mcp_server_id: mcp_server},
+        ),
+    )
+
+    loader = DatabaseAgentLoader()
+    agent = loader.load_agent("main")
+    assert agent is not None
+    registered_mcp_tools = [
+        tool
+        for tool in agent.kwargs["tools"]
+        if isinstance(tool, dict) and "mcp" in tool
+    ]
+    assert registered_mcp_tools[0]["mcp"]["url"] == "http://localhost:8100/mcp"
+    assert registered_mcp_tools[0]["mcp"]["headers"]["auth_type"] == "bearer"
 
 
 def test_agent_loader_sub_agent_self_reference_skipped(monkeypatch: pytest.MonkeyPatch):
@@ -373,3 +474,96 @@ def test_agent_loader_duplicate_sub_agents_skipped(monkeypatch: pytest.MonkeyPat
     agent = loader.load_agent("main")
     assert agent is not None
     assert len(wrapped_sub_agents) == 1
+
+
+def test_agent_loader_uses_global_defaults_for_model_stack(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    _patch_common_runtime(monkeypatch)
+    cfg = _agent_cfg(
+        model_id=None,
+        primary_use_global=True,
+        primary_model_id=None,
+        secondary_use_global=True,
+        secondary_model_id=None,
+        tertiary_use_global=True,
+        tertiary_model_id=None,
+    )
+    primary = _model_cfg(model_id="m1", provider="google", name="gemini-2.0-flash")
+    secondary = _model_cfg(model_id="m2", provider="openai", name="gpt-4.1-mini")
+    tertiary = _model_cfg(model_id="m3", provider="anthropic", name="claude-haiku")
+    defaults = SimpleNamespace(
+        primary_model_id="m1",
+        secondary_model_id="m2",
+        tertiary_model_id="m3",
+    )
+    monkeypatch.setattr(agent_loader_module, "cache", _FakeCache())
+    monkeypatch.setattr(
+        agent_loader_module,
+        "Session",
+        lambda _engine: _FakeSession(
+            agent_config=cfg,
+            model_map={"m1": primary, "m2": secondary, "m3": tertiary},
+            defaults_config=defaults,
+        ),
+    )
+
+    loader = DatabaseAgentLoader()
+    agent = loader.load_agent("main")
+    assert getattr(agent.kwargs["model"], "model", "") == "gemini/gemini-2.0-flash"
+    assert agent.kwargs["model"].kwargs["fallbacks"] == [
+        "openai/gpt-4.1-mini",
+        "anthropic/claude-haiku",
+    ]
+
+
+def test_agent_loader_attaches_skill_toolset(monkeypatch: pytest.MonkeyPatch):
+    _patch_common_runtime(monkeypatch)
+    connector_id = str(uuid4())
+    mcp_server_id = str(uuid4())
+    skill_id = str(uuid4())
+    cfg = _agent_cfg(skill_ids=[skill_id])
+    model = _model_cfg()
+    connector_config = SimpleNamespace(
+        connector_config_id=connector_id,
+        connector_id="example_connector",
+        config=[],
+    )
+    mcp_server = SimpleNamespace(
+        mcp_server_id=mcp_server_id,
+        server_url="http://localhost:8101/mcp",
+        auth_type="none",
+        auth_username=None,
+        auth_secret=None,
+    )
+    skill = SimpleNamespace(
+        skill_id=skill_id,
+        name="lookup_skill",
+        description="desc",
+        instructions="instr",
+        tools=["connector_tool", "search_docs"],
+        connector_config_ids=[connector_id],
+        mcp_server_ids=[mcp_server_id],
+    )
+    monkeypatch.setattr(agent_loader_module, "cache", _FakeCache())
+    monkeypatch.setattr(
+        agent_loader_module,
+        "Session",
+        lambda _engine: _FakeSession(
+            agent_config=cfg,
+            model_config=model,
+            connector_map={connector_id: connector_config},
+            mcp_map={mcp_server_id: mcp_server},
+            skill_map={skill_id: skill},
+        ),
+    )
+
+    loader = DatabaseAgentLoader()
+    agent = loader.load_agent("main")
+
+    assert agent is not None
+    skill_toolsets = [tool for tool in agent.kwargs["tools"] if hasattr(tool, "skills")]
+    assert len(skill_toolsets) == 1
+    assert skill_toolsets[0].skills[0].name == "lookup_skill"
+    assert skill_toolsets[0].kwargs["code_executor"] == "unsafe-executor"
+    assert len(skill_toolsets[0].kwargs["additional_tools"]) == 2

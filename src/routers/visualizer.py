@@ -2,7 +2,16 @@ from fastapi import APIRouter, Depends
 from sqlmodel import Session, select
 
 from src.database.database import get_session
-from src.database.models import Agent, ConnectorConfig, Job, Model, Webhook
+from src.database.models import (
+    Agent,
+    ConnectorConfig,
+    Job,
+    MCPServer,
+    Model,
+    ModelDefaults,
+    Skill,
+    Webhook,
+)
 
 router = APIRouter(prefix="/visualizer", tags=["visualizer"])
 
@@ -11,7 +20,10 @@ router = APIRouter(prefix="/visualizer", tags=["visualizer"])
 def get_visualizer(session: Session = Depends(get_session)):
     agents = session.exec(select(Agent)).all()
     connectors = session.exec(select(ConnectorConfig)).all()
+    mcp_servers = session.exec(select(MCPServer)).all()
+    skills = session.exec(select(Skill)).all()
     models = session.exec(select(Model)).all()
+    defaults = session.get(ModelDefaults, 1)
     webhooks = session.exec(select(Webhook)).all()
     jobs = session.exec(select(Job)).all()
 
@@ -37,11 +49,17 @@ def get_visualizer(session: Session = Depends(get_session)):
     nodes = []
     edges = []
 
-    mcp_set = set()
+    mcp_map = {str(server.mcp_server_id): server for server in mcp_servers}
+    legacy_mcp_set = set()
 
     for agent in agents:
         agent_data = agent.model_dump()
-        agent_data["model"] = models_map.get(agent.model_id)
+        resolved_primary_model_id = (
+            defaults.primary_model_id
+            if defaults and agent.primary_use_global
+            else agent.primary_model_id
+        )
+        agent_data["model"] = models_map.get(resolved_primary_model_id)
         agent_data["webhooks"] = webhooks_map.get(agent.agent_id, [])
         agent_data["jobs"] = jobs_map.get(agent.agent_id, [])
 
@@ -69,9 +87,19 @@ def get_visualizer(session: Session = Depends(get_session)):
                     }
                 )
 
+        if agent.skill_ids:
+            for skill_id in agent.skill_ids:
+                edges.append(
+                    {
+                        "id": f"e-{agent.agent_id}-{skill_id}",
+                        "source": agent.agent_id,
+                        "target": skill_id,
+                    }
+                )
+
         if agent.mcp_servers:
             for mcp_url in agent.mcp_servers:
-                mcp_set.add(mcp_url)
+                legacy_mcp_set.add(mcp_url)
                 edges.append(
                     {
                         "id": f"e-{agent.agent_id}-{mcp_url}",
@@ -80,8 +108,26 @@ def get_visualizer(session: Session = Depends(get_session)):
                     }
                 )
 
+        if agent.mcp_server_ids:
+            for mcp_server_id in agent.mcp_server_ids:
+                edges.append(
+                    {
+                        "id": f"e-{agent.agent_id}-{mcp_server_id}",
+                        "source": agent.agent_id,
+                        "target": mcp_server_id,
+                    }
+                )
+
     for conn in connectors:
-        c_dict = conn.model_dump()
+        c_dict = {
+            "connector_config_id": str(conn.connector_config_id),
+            "name": conn.name,
+            "description": conn.description,
+            "config": conn.config,
+            "created_at": conn.created_at,
+            "updated_at": conn.updated_at,
+            "connector_id": conn.connector_id,
+        }
         if "config" in c_dict and isinstance(c_dict["config"], list):
             for item in c_dict["config"]:
                 if "value" in item:
@@ -95,7 +141,53 @@ def get_visualizer(session: Session = Depends(get_session)):
             }
         )
 
-    for mcp_url in mcp_set:
+    for skill in skills:
+        nodes.append(
+            {
+                "id": str(skill.skill_id),
+                "type": "skill",
+                "data": {"skill": skill.model_dump()},
+            }
+        )
+        for connector_config_id in skill.connector_config_ids or []:
+            edges.append(
+                {
+                    "id": f"e-{skill.skill_id}-{connector_config_id}",
+                    "source": str(skill.skill_id),
+                    "target": connector_config_id,
+                }
+            )
+        for mcp_server_id in skill.mcp_server_ids or []:
+            edges.append(
+                {
+                    "id": f"e-{skill.skill_id}-{mcp_server_id}",
+                    "source": str(skill.skill_id),
+                    "target": mcp_server_id,
+                }
+            )
+
+    for mcp_server in mcp_servers:
+        nodes.append(
+            {
+                "id": str(mcp_server.mcp_server_id),
+                "type": "mcp",
+                "data": {
+                    "mcp": {
+                        "mcp_server_id": str(mcp_server.mcp_server_id),
+                        "name": mcp_server.name,
+                        "url": mcp_server.server_url,
+                        "auth_type": mcp_server.auth_type,
+                        "metadata": mcp_server.metadata_json or {},
+                        "tools": mcp_server.tools_json or [],
+                        "resources": mcp_server.resources_json or [],
+                    }
+                },
+            }
+        )
+
+    for mcp_url in legacy_mcp_set:
+        if any(server.server_url == mcp_url for server in mcp_map.values()):
+            continue
         nodes.append(
             {
                 "id": mcp_url,

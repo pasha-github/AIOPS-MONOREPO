@@ -341,7 +341,8 @@ def test_delete_model_used_by_agent_returns_conflict(client: TestClient):
             "name": "Agent",
             "description": "desc",
             "instruction": "instr",
-            "model_id": "gemini-pro",
+            "primary_use_global": False,
+            "primary_model_id": "gemini-pro",
             "isEnabled": True,
         },
     )
@@ -351,3 +352,70 @@ def test_delete_model_used_by_agent_returns_conflict(client: TestClient):
     detail = response.json()["detail"]
     assert detail["message"] == "Model is in use by agents"
     assert detail["agent_ids"] == ["agent-using-model"]
+
+
+def test_get_model_defaults_creates_singleton_row(client: TestClient):
+    response = client.get("/llms/defaults")
+    assert response.status_code == 200
+    assert response.json() == {
+        "id": 1,
+        "primary_model_id": None,
+        "secondary_model_id": None,
+        "tertiary_model_id": None,
+    }
+
+
+def test_patch_model_defaults_updates_global_stack(client: TestClient):
+    for model_id in ("m1", "m2", "m3"):
+        client.post(
+            "/llms/",
+            json={
+                "model_id": model_id,
+                "provider": "google",
+                "name": f"name-{model_id}",
+                "api_key": "test-key",
+                "description": "A test model",
+            },
+        )
+
+    response = client.patch(
+        "/llms/defaults",
+        json={
+            "primary_model_id": "m1",
+            "secondary_model_id": "m2",
+            "tertiary_model_id": "m3",
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["primary_model_id"] == "m1"
+    assert response.json()["secondary_model_id"] == "m2"
+    assert response.json()["tertiary_model_id"] == "m3"
+
+
+def test_patch_model_defaults_rejects_invalid_model_id(client: TestClient):
+    response = client.patch(
+        "/llms/defaults",
+        json={"primary_model_id": "does-not-exist"},
+    )
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Invalid primary_model_id"
+
+
+def test_delete_model_used_in_global_defaults_returns_conflict(client: TestClient):
+    client.post(
+        "/llms/",
+        json={
+            "model_id": "gemini-pro",
+            "provider": "google",
+            "name": "gemini-1.5-pro",
+            "api_key": "test-key",
+            "description": "A test model",
+        },
+    )
+    client.patch("/llms/defaults", json={"primary_model_id": "gemini-pro"})
+
+    response = client.delete("/llms/gemini-pro")
+    assert response.status_code == 409
+    detail = response.json()["detail"]
+    assert detail["message"] == "Model is in use by agents"
+    assert detail["used_in_defaults"] is True

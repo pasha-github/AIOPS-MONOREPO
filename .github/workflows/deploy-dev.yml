@@ -1,9 +1,9 @@
-name: Build & Deploy to Cloud Run (Main)
+name: Build & Deploy to Cloud Run (Dev)
 
 on:
   push:
     branches:
-      - main
+      - dev
   workflow_dispatch: # Allow manual triggers from GitHub UI
 
 env:
@@ -11,8 +11,8 @@ env:
   REGION: us-central1
   REGISTRY: us-central1-docker.pkg.dev
   REPOSITORY: aiops-registry
-  SERVICE_NAME: agent-manager
-  IMAGE: agent-manager
+  SERVICE_NAME: agent-manager-dev
+  IMAGE: agent-manager-dev
 
 jobs:
   build-and-deploy:
@@ -73,11 +73,12 @@ jobs:
             --image=${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE }}:${{ github.sha }} \
             --region=${{ env.REGION }} \
             --project=${{ env.PROJECT_ID }} \
+            --port=8000 \
             --min-instances=0 \
             --max-instances=1 \
             --set-env-vars="\
-              MAIN_SERVER_DATABASE_URL=${{ secrets.MAIN_SERVER_DATABASE_URL }},\
-              AGENT_SERVER_DATABASE_URL=${{ secrets.AGENT_SERVER_DATABASE_URL }},\
+              MAIN_SERVER_DATABASE_URL=${{ secrets.MAIN_SERVER_DATABASE_URL_DEV }},\
+              AGENT_SERVER_DATABASE_URL=${{ secrets.AGENT_SERVER_DATABASE_URL_DEV }},\
               ENV=${{ secrets.ENV }},\
               A2A=${{ secrets.A2A }},\
               ENCRYPTION_KEY=${{ secrets.ENCRYPTION_KEY }}" \

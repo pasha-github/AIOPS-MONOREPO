@@ -1,26 +1,110 @@
 import logging
+import os
 from typing import Any
 from uuid import UUID
 
 from google.adk.agents import LlmAgent, LoopAgent
 from google.adk.cli.utils.base_agent_loader import BaseAgentLoader
+from google.adk.code_executors.unsafe_local_code_executor import UnsafeLocalCodeExecutor
 from google.adk.models.lite_llm import LiteLlm
 from google.adk.tools.agent_tool import AgentTool
 from google.adk.tools.mcp_tool import McpToolset
-from google.adk.tools.mcp_tool.mcp_session_manager import (
-    SseConnectionParams,
-    StreamableHTTPConnectionParams,
-)
+from google.adk.tools.skill_toolset import SkillToolset
 from google.adk.tools.tool_context import ToolContext
 from sqlmodel import Session, select
 
 from src.agent_runtime.adk.cache import cache
 from src.connectors.loader import resolve_connector_tools
 from src.database.database import engine
-from src.database.models import Agent, ConnectorConfig, Model
+from src.database.models import (
+    Agent,
+    ConnectorConfig,
+    MCPServer,
+    Model,
+    ModelDefaults,
+    Skill,
+)
+from src.skills.runtime import build_skill_model
+from src.utils.mcp import build_mcp_auth_headers, build_mcp_connection_params
 from src.utils.secrets import decrypt_secret
 
 logger = logging.getLogger(__name__)
+
+
+def _append_mcp_tool(
+    tools_list: list[Any],
+    *,
+    url: str,
+    auth_type: str = "none",
+    auth_username: str | None = None,
+    auth_secret: str | None = None,
+):
+    headers = build_mcp_auth_headers(
+        auth_type,
+        bearer_token=auth_secret if auth_type == "bearer" else None,
+        username=auth_username if auth_type == "basic" else None,
+        password=auth_secret if auth_type == "basic" else None,
+    )
+    connection_params = build_mcp_connection_params(url, headers=headers)
+    tools_list.append(McpToolset(connection_params=connection_params))
+
+
+def _tool_name(tool: Any) -> str | None:
+    return getattr(tool, "name", None) or getattr(tool, "__name__", None)
+
+
+def _litellm_model_name(model_config: Model) -> str:
+    if model_config.provider.lower() == "google":
+        return f"gemini/{model_config.name}"
+    return f"{model_config.provider}/{model_config.name}"
+
+
+def _set_model_env(model_config: Model):
+    if not model_config.api_key:
+        return
+
+    decrypted_api_key = decrypt_secret(model_config.api_key)
+    if model_config.provider.upper() == "BEDROCK":
+        os.environ["AWS_BEARER_TOKEN_BEDROCK"] = decrypted_api_key
+    else:
+        os.environ[f"{model_config.provider.upper()}_API_KEY"] = decrypted_api_key
+
+
+def _resolve_model_stack(
+    session: Session,
+    agent_config: Agent,
+) -> tuple[Model | None, list[Model]]:
+    defaults = session.get(ModelDefaults, 1)
+
+    def _resolve_slot(
+        use_global: bool,
+        explicit_model_id: str | None,
+        default_model_id: str | None,
+    ) -> Model | None:
+        model_id = default_model_id if use_global else explicit_model_id
+        if model_id is None:
+            return None
+        return session.get(Model, model_id)
+
+    primary_model = _resolve_slot(
+        agent_config.primary_use_global,
+        agent_config.primary_model_id,
+        defaults.primary_model_id if defaults else None,
+    )
+    secondary_model = _resolve_slot(
+        agent_config.secondary_use_global,
+        agent_config.secondary_model_id,
+        defaults.secondary_model_id if defaults else None,
+    )
+    tertiary_model = _resolve_slot(
+        agent_config.tertiary_use_global,
+        agent_config.tertiary_model_id,
+        defaults.tertiary_model_id if defaults else None,
+    )
+    fallbacks = [
+        model for model in (secondary_model, tertiary_model) if model is not None
+    ]
+    return primary_model, fallbacks
 
 
 class DatabaseAgentLoader(BaseAgentLoader):
@@ -55,12 +139,11 @@ class DatabaseAgentLoader(BaseAgentLoader):
                 logger.warning(f"Agent {agent_name} is disabled.")
                 return None
 
-            # Fetch model config
-            model_config = session.get(Model, agent_config.model_id)
+            model_config, fallback_model_configs = _resolve_model_stack(
+                session, agent_config
+            )
             if not model_config:
-                logger.error(
-                    f"Model {agent_config.model_id} for agent {agent_name} not found."
-                )
+                logger.error(f"Primary model for agent {agent_name} not found.")
                 return None
 
             # Initialize Model (LiteLLM)
@@ -68,17 +151,9 @@ class DatabaseAgentLoader(BaseAgentLoader):
             # We might need to set env vars for keys or pass them explicitly if supported.
             # For now, we'll assume LlmAgent handles it or we set it globally/contextually.
             # LiteLLM usually reads from env, so we might need to set os.environ temporarily or globally.
-            import os
-
-            if model_config.api_key:
-                decrypted_api_key = decrypt_secret(model_config.api_key)
-                # This is a simple way, might strictly need to be scoped if multiple providers
-                if model_config.provider.upper() == "BEDROCK":
-                    os.environ["AWS_BEARER_TOKEN_BEDROCK"] = decrypted_api_key
-                else:
-                    os.environ[f"{model_config.provider.upper()}_API_KEY"] = (
-                        decrypted_api_key
-                    )
+            _set_model_env(model_config)
+            for fallback_model in fallback_model_configs:
+                _set_model_env(fallback_model)
 
             # Prepare Tools List
             tools_list = []
@@ -102,18 +177,33 @@ class DatabaseAgentLoader(BaseAgentLoader):
             if agent_config.mcp_servers:
                 for url in agent_config.mcp_servers:
                     try:
-                        if url.endswith("/sse"):
-                            connection_params = SseConnectionParams(url=url)
-                        elif url.endswith("/mcp"):
-                            connection_params = StreamableHTTPConnectionParams(url=url)
-                        else:
-                            raise ValueError(f"Invalid MCP server URL: {url}")
-
-                        mcp_toolset = McpToolset(connection_params=connection_params)
-                        tools_list.append(mcp_toolset)
+                        _append_mcp_tool(tools_list, url=url)
                     except Exception as e:
                         logger.error(
                             f"Error loading MCP tool '{url}' for agent {agent_name}: {e}"
+                        )
+
+            if agent_config.mcp_server_ids:
+                for mcp_server_id in agent_config.mcp_server_ids:
+                    try:
+                        mcp_server = session.get(MCPServer, UUID(mcp_server_id))
+                        if mcp_server is None:
+                            raise ValueError(f"MCP server '{mcp_server_id}' not found.")
+                        auth_secret = (
+                            decrypt_secret(mcp_server.auth_secret)
+                            if mcp_server.auth_secret
+                            else None
+                        )
+                        _append_mcp_tool(
+                            tools_list,
+                            url=mcp_server.server_url,
+                            auth_type=mcp_server.auth_type,
+                            auth_username=mcp_server.auth_username,
+                            auth_secret=auth_secret,
+                        )
+                    except Exception as e:
+                        logger.error(
+                            f"Error loading MCP server '{mcp_server_id}' for agent {agent_name}: {e}"
                         )
 
             if agent_config.connector_config_ids:
@@ -132,6 +222,79 @@ class DatabaseAgentLoader(BaseAgentLoader):
                         logger.error(
                             f"Error loading connector config '{connector_config_id}' for agent {agent_name}: {e}"
                         )
+
+            if agent_config.skill_ids:
+                skill_models = []
+                skill_additional_tools: list[Any] = []
+                additional_tool_names: set[str] = set()
+
+                for skill_id in agent_config.skill_ids:
+                    try:
+                        skill = session.get(Skill, UUID(skill_id))
+                        if skill is None:
+                            raise ValueError(f"Skill '{skill_id}' not found.")
+
+                        skill_models.append(build_skill_model(skill))
+                        additional_tool_names.update(skill.tools or [])
+
+                        for connector_config_id in skill.connector_config_ids or []:
+                            connector_config = session.get(
+                                ConnectorConfig, UUID(connector_config_id)
+                            )
+                            if connector_config is None:
+                                raise ValueError(
+                                    "Connector config "
+                                    f"'{connector_config_id}' not found for skill."
+                                )
+
+                            connector_tools = resolve_connector_tools(connector_config)
+                            for tool in connector_tools:
+                                if _tool_name(tool) in additional_tool_names:
+                                    skill_additional_tools.append(tool)
+
+                        for mcp_server_id in skill.mcp_server_ids or []:
+                            mcp_server = session.get(MCPServer, UUID(mcp_server_id))
+                            if mcp_server is None:
+                                raise ValueError(
+                                    f"MCP server '{mcp_server_id}' not found for skill."
+                                )
+                            auth_secret = (
+                                decrypt_secret(mcp_server.auth_secret)
+                                if mcp_server.auth_secret
+                                else None
+                            )
+                            headers = build_mcp_auth_headers(
+                                mcp_server.auth_type,
+                                bearer_token=auth_secret
+                                if mcp_server.auth_type == "bearer"
+                                else None,
+                                username=mcp_server.auth_username
+                                if mcp_server.auth_type == "basic"
+                                else None,
+                                password=auth_secret
+                                if mcp_server.auth_type == "basic"
+                                else None,
+                            )
+                            connection_params = build_mcp_connection_params(
+                                mcp_server.server_url,
+                                headers=headers,
+                            )
+                            skill_additional_tools.append(
+                                McpToolset(connection_params=connection_params)
+                            )
+                    except Exception as e:
+                        logger.error(
+                            f"Error loading skill '{skill_id}' for agent {agent_name}: {e}"
+                        )
+
+                if skill_models:
+                    tools_list.append(
+                        SkillToolset(
+                            skills=skill_models,
+                            code_executor=UnsafeLocalCodeExecutor(),
+                            additional_tools=skill_additional_tools,
+                        )
+                    )
 
             # Attach Sub Agents
             sub_agents = []
@@ -157,10 +320,18 @@ class DatabaseAgentLoader(BaseAgentLoader):
 
             tools_list.extend(sub_agents)
 
-            if model_config.provider.lower() == "google":
-                model = model_config.name
-            else:
-                model = LiteLlm(model=f"{model_config.provider}/{model_config.name}")
+            model_name = _litellm_model_name(model_config)
+            fallbacks = [
+                _litellm_model_name(fallback_model)
+                for fallback_model in fallback_model_configs
+            ]
+
+            model = LiteLlm(
+                model=model_name,
+                fallbacks=fallbacks,
+                num_retries=0,
+                timeout=60,
+            )
 
             # Create LlmAgent
             if agent_config.type.lower() == "automation":

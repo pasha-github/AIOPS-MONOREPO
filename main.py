@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 
 from src.agent_runtime.adk.adk_app import ADK_APP
 from src.database.database import create_db_and_tables
-from src.routers import agents, connectors, llms, visualizer
+from src.routers import agents, connectors, llms, mcp, skills, visualizer
 from src.utils.constants import WEB
 from src.utils.scheduler import start_scheduler
 
@@ -41,6 +41,8 @@ def health_check():
 app.include_router(agents.router)
 app.include_router(llms.router)
 app.include_router(connectors.router)
+app.include_router(mcp.router)
+app.include_router(skills.router)
 app.include_router(visualizer.router)
 
 # Mount ADK App

@@ -30,7 +30,7 @@ class TeamsConnector(BaseConnector):
         CONVERSATION_IDS: str = "",
         prefix: str = "",
     ):
-        self.base_url = TEAMS_BOT_BASE_URL.rstrip("/")
+        self.base_url = TEAMS_BOT_BASE_URL.strip().rstrip("/")
         self.alert_api_key = ALERT_API_KEY.strip()
         self.emails = self._parse_targets(EMAILS)
         self.conversation_ids = self._parse_targets(CONVERSATION_IDS)
