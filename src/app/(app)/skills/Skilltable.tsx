@@ -194,19 +194,19 @@ export default function Skilltable({
         </div>
 
         <div className="overflow-x-auto rounded-2xl border border-[#eef1f7]">
-          <div className="min-w-[1200px]">
-            <div className="grid grid-cols-[1.2fr_1.7fr_2fr_1.2fr_1.2fr_120px] items-center divide-x divide-[#d7e0ee] bg-[#f3f6fb] px-4 py-3 text-xs font-semibold uppercase tracking-[0.08em] text-[#111827]">
-              <span className="px-4">Name</span>
-              <span className="px-4">Description</span>
-              <span className="px-4">Instructions</span>
-              <span className="px-4">Created At</span>
-              <span className="px-4">Updated At</span>
-              <span className="px-3 text-right">Action</span>
-            </div>
+          {isLoading ? (
+            <div className="min-w-[1200px] bg-white">
+              <div className="grid grid-cols-[1.2fr_1.7fr_2fr_1.2fr_1.2fr_120px] items-center divide-x divide-[#d7e0ee] bg-[#f3f6fb] px-4 py-3 text-xs font-semibold uppercase tracking-[0.08em] text-[#111827]">
+                <span className="px-4">Name</span>
+                <span className="px-4">Description</span>
+                <span className="px-4">Instructions</span>
+                <span className="px-4">Created At</span>
+                <span className="px-4">Updated At</span>
+                <span className="px-3 text-right">Action</span>
+              </div>
 
-            <div className="divide-y divide-[#eef1f7] bg-white">
-              {isLoading
-                ? Array.from({ length: 4 }).map((_, index) => (
+              <div className="divide-y divide-[#eef1f7] bg-white">
+                {Array.from({ length: 4 }).map((_, index) => (
                     <div
                       key={`skill-skeleton-${index}`}
                       className="grid grid-cols-[1.2fr_1.7fr_2fr_1.2fr_1.2fr_120px] animate-pulse items-center divide-x divide-[#e8eef7] px-4 py-4"
@@ -233,8 +233,33 @@ export default function Skilltable({
                         <div className="h-10 w-10 rounded-xl bg-[#edf2f9]" />
                       </div>
                     </div>
-                  ))
-                : rows.map((row) => (
+                ))}
+              </div>
+            </div>
+          ) : rows.length === 0 ? (
+            <div className="flex min-h-[260px] items-center justify-center bg-white px-6 text-center">
+              <div>
+                <p className="text-base font-semibold text-[#111827]">
+                  No skills found
+                </p>
+                <p className="mt-2 text-sm text-[#64748b]">
+                  Create a skill to see it here.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="min-w-[1200px]">
+              <div className="grid grid-cols-[1.2fr_1.7fr_2fr_1.2fr_1.2fr_120px] items-center divide-x divide-[#d7e0ee] bg-[#f3f6fb] px-4 py-3 text-xs font-semibold uppercase tracking-[0.08em] text-[#111827]">
+                <span className="px-4">Name</span>
+                <span className="px-4">Description</span>
+                <span className="px-4">Instructions</span>
+                <span className="px-4">Created At</span>
+                <span className="px-4">Updated At</span>
+                <span className="px-3 text-right">Action</span>
+              </div>
+
+              <div className="divide-y divide-[#eef1f7] bg-white">
+                {rows.map((row) => (
                     <div
                       key={row.id}
                       className="grid grid-cols-[1.2fr_1.7fr_2fr_1.2fr_1.2fr_120px] items-start divide-x divide-[#e8eef7] px-4 py-4 text-sm text-[#2b3341]"
@@ -255,8 +280,9 @@ export default function Skilltable({
                       </div>
                     </div>
                   ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </section>

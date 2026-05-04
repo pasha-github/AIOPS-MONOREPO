@@ -26,12 +26,13 @@ import {
     type VisualizerConnector,
     type VisualizerJob,
     type VisualizerMcp,
+    type VisualizerSkill,
     type VisualizerNode,
     type VisualizerResponse,
     type VisualizerWebhook,
 } from "./data";
 
-export type GraphKind = "agent" | "connector" | "mcp";
+export type GraphKind = "agent" | "skill" | "connector" | "mcp";
 
 export type GraphNodeData = {
   id: string;
@@ -57,23 +58,26 @@ type GraphFlowNode = Node<GraphNodeData, "visualizer">;
 
 const NODE_WIDTH: Record<GraphKind, number> = {
   agent: 320,
+  skill: 320,
   connector: 320,
   mcp: 320,
 };
 
 const SUPERVISOR_Y = 40;
 const AGENT_Y = 320;
-const RESOURCE_Y = 600;
+const SKILL_Y = 600;
+const RESOURCE_Y = 880;
 const SIBLING_GAP = 72;
 const ROOT_GAP = 120;
 const START_X = 80;
 
 export function createVisualizerGraph(response: VisualizerResponse) {
-  const nodeMap = new Map(response.nodes.map((node) => [node.id, node]));
-  const outgoing = buildOutgoingEdges(response);
-  const positionMap = createPositionMap(response, nodeMap, outgoing);
+  const normalizedResponse = normalizeVisualizerResponse(response);
+  const nodeMap = new Map(normalizedResponse.nodes.map((node) => [node.id, node]));
+  const outgoing = buildOutgoingEdges(normalizedResponse);
+  const positionMap = createPositionMap(normalizedResponse, nodeMap, outgoing);
 
-  const nodes: GraphFlowNode[] = response.nodes.map((node, index) => ({
+  const nodes: GraphFlowNode[] = normalizedResponse.nodes.map((node, index) => ({
     id: node.id,
     type: "visualizer",
     position: sanitizePosition(positionMap.get(node.id), fallbackPosition(index)),
@@ -82,7 +86,7 @@ export function createVisualizerGraph(response: VisualizerResponse) {
     data: buildNodeData(node),
   }));
 
-  const edges: Edge[] = response.edges.map((edge) => ({
+  const edges: Edge[] = normalizedResponse.edges.map((edge) => ({
     id: edge.id,
     source: edge.source,
     target: edge.target,
@@ -96,6 +100,51 @@ export function createVisualizerGraph(response: VisualizerResponse) {
       strokeWidth: 3,
     },
   }));
+
+  return { nodes, edges };
+}
+
+function normalizeVisualizerResponse(response: VisualizerResponse): VisualizerResponse {
+  const nodes = [...response.nodes];
+  const nodeIds = new Set(nodes.map((node) => node.id));
+  const edges = [...response.edges];
+  const edgeIds = new Set(edges.map((edge) => edge.id));
+
+  const addEdge = (source: string, target: string, prefix: string) => {
+    if (!nodeIds.has(source) || !nodeIds.has(target)) {
+      return;
+    }
+
+    const edgeId = `${prefix}-${source}-${target}`;
+    const alreadyExists = edges.some(
+      (edge) => edge.source === source && edge.target === target
+    );
+
+    if (alreadyExists || edgeIds.has(edgeId)) {
+      return;
+    }
+
+    edgeIds.add(edgeId);
+    edges.push({ id: edgeId, source, target });
+  };
+
+  nodes.forEach((node) => {
+    if (node.type === "agent") {
+      (node.data.agent.skill_ids ?? []).forEach((skillId) => {
+        addEdge(node.id, skillId, "derived-agent-skill");
+      });
+      return;
+    }
+
+    if (node.type === "skill") {
+      node.data.skill.connector_config_ids.forEach((connectorId) => {
+        addEdge(node.id, connectorId, "derived-skill-connector");
+      });
+      node.data.skill.mcp_server_ids.forEach((mcpId) => {
+        addEdge(node.id, mcpId, "derived-skill-mcp");
+      });
+    }
+  });
 
   return { nodes, edges };
 }
@@ -119,6 +168,7 @@ function createPositionMap(
 ) {
   const positionMap = new Map<string, { x: number; y: number }>();
   const parentAgents = new Map<string, string[]>();
+  const skillParents = new Map<string, string[]>();
   const resourceParents = new Map<string, string[]>();
 
   for (const edge of response.edges) {
@@ -131,8 +181,14 @@ function createPositionMap(
       parentAgents.set(edge.target, parents);
     }
 
+    if (sourceType === "agent" && targetType === "skill") {
+      const parents = skillParents.get(edge.target) ?? [];
+      parents.push(edge.source);
+      skillParents.set(edge.target, parents);
+    }
+
     if (
-      sourceType === "agent" &&
+      (sourceType === "agent" || sourceType === "skill") &&
       (targetType === "connector" || targetType === "mcp")
     ) {
       const parents = resourceParents.get(edge.target) ?? [];
@@ -213,6 +269,39 @@ function createPositionMap(
     nodeMap
   );
 
+  const skillIds = response.nodes
+    .filter((node) => node.type === "skill")
+    .map((node) => node.id)
+    .sort((leftId, rightId) => {
+      const leftParents = skillParents.get(leftId) ?? [];
+      const rightParents = skillParents.get(rightId) ?? [];
+      const leftAnchor = getPositionAnchor(leftParents, positionMap, nodeMap);
+      const rightAnchor = getPositionAnchor(rightParents, positionMap, nodeMap);
+
+      if (typeof leftAnchor === "number" && typeof rightAnchor === "number") {
+        if (leftAnchor !== rightAnchor) {
+          return leftAnchor - rightAnchor;
+        }
+      } else if (leftAnchor !== rightAnchor) {
+        if (leftAnchor === null) {
+          return 1;
+        }
+        if (rightAnchor === null) {
+          return -1;
+        }
+      }
+
+      return compareNodes(leftId, rightId, nodeMap);
+    });
+
+  placeNodesInRow(
+    skillIds,
+    (nodeId) => getPositionAnchor(skillParents.get(nodeId) ?? [], positionMap, nodeMap),
+    SKILL_Y,
+    positionMap,
+    nodeMap
+  );
+
   const resourceIds = response.nodes
     .filter((node) => node.type === "connector" || node.type === "mcp")
     .map((node) => node.id)
@@ -241,7 +330,7 @@ function createPositionMap(
   placeNodesInRow(
     resourceIds,
     (nodeId) => getPositionAnchor(resourceParents.get(nodeId) ?? [], positionMap, nodeMap),
-    RESOURCE_Y,
+    skillIds.length > 0 ? RESOURCE_Y : SKILL_Y,
     positionMap,
     nodeMap
   );
@@ -371,7 +460,12 @@ function getNodeCenter(
 
 function getNodeWidth(nodeId: string, nodeMap: Map<string, VisualizerNode>) {
   const nodeType = nodeMap.get(nodeId)?.type;
-  if (nodeType === "agent" || nodeType === "connector" || nodeType === "mcp") {
+  if (
+    nodeType === "agent" ||
+    nodeType === "skill" ||
+    nodeType === "connector" ||
+    nodeType === "mcp"
+  ) {
     return NODE_WIDTH[nodeType];
   }
   return NODE_WIDTH.agent;
@@ -415,13 +509,16 @@ function getTypeWeight(type?: VisualizerNode["type"]) {
   if (type === "agent") {
     return 0;
   }
-  if (type === "connector") {
+  if (type === "skill") {
     return 1;
   }
-  if (type === "mcp") {
+  if (type === "connector") {
     return 2;
   }
-  return 3;
+  if (type === "mcp") {
+    return 3;
+  }
+  return 4;
 }
 
 function getDisplayName(node?: VisualizerNode) {
@@ -438,6 +535,9 @@ function getDisplayName(node?: VisualizerNode) {
   if (node.type === "mcp") {
     return node.data.mcp.name || node.id;
   }
+  if (node.type === "skill") {
+    return node.data.skill.name || node.id;
+  }
   return "";
 }
 
@@ -445,10 +545,12 @@ function buildNodeData(node: VisualizerNode): GraphNodeData {
   switch (node.type) {
     case "agent":
       return buildAgentNodeData(node.data.agent);
+    case "skill":
+      return buildSkillNodeData(node.id, node.data.skill);
     case "connector":
       return buildConnectorNodeData(node.data.connector);
     case "mcp":
-      return buildMcpNodeData(node.data.mcp);
+      return buildMcpNodeData(node.id, node.data.mcp);
   }
 
   return {
@@ -520,6 +622,51 @@ function buildAgentNodeData(agent: VisualizerAgent): GraphNodeData {
         title: "MCP servers",
         items: agent.mcp_servers,
       },
+      {
+        title: "Skills",
+        items: agent.skill_ids ?? [],
+      },
+    ].filter((section) => section.items.length > 0),
+  };
+}
+
+function buildSkillNodeData(skillId: string, skill: VisualizerSkill): GraphNodeData {
+  return {
+    id: skillId,
+    kind: "skill",
+    name: skill.name,
+    role: "Skill",
+    description: skill.description,
+    llm: "N/A",
+    hoverTitle: skill.name,
+    hoverText: truncate(skill.instructions, 160),
+    detailItems: [
+      { label: "Skill id", value: skill.skill_id },
+      { label: "Tools", value: `${skill.tools.length}` },
+      { label: "References", value: `${Object.keys(skill.references).length}` },
+      { label: "Created at", value: formatDateTime(skill.created_at) },
+      { label: "Updated at", value: formatDateTime(skill.updated_at) },
+    ],
+    longText: skill.instructions,
+    sections: [
+      {
+        title: "Tools",
+        items: skill.tools,
+      },
+      {
+        title: "Connector ids",
+        items: skill.connector_config_ids,
+      },
+      {
+        title: "MCP servers",
+        items: skill.mcp_server_ids,
+      },
+      {
+        title: "References",
+        items: Object.entries(skill.references).map(
+          ([referenceName, referenceText]) => `${referenceName}: ${referenceText}`
+        ),
+      },
     ].filter((section) => section.items.length > 0),
   };
 }
@@ -552,11 +699,13 @@ function buildConnectorNodeData(connector: VisualizerConnector): GraphNodeData {
   };
 }
 
-function buildMcpNodeData(mcp: VisualizerMcp): GraphNodeData {
-  const parsedUrl = new URL(mcp.url);
+function buildMcpNodeData(nodeId: string, mcp: VisualizerMcp): GraphNodeData {
+  const parsedUrl = tryParseUrl(mcp.url);
+  const toolCount = mcp.tools?.length ?? mcp.metadata?.tool_count ?? 0;
+  const resourceCount = mcp.resources?.length ?? mcp.metadata?.resource_count ?? 0;
 
   return {
-    id: mcp.url,
+    id: nodeId,
     kind: "mcp",
     name: mcp.name,
     role: "MCP Server",
@@ -565,10 +714,14 @@ function buildMcpNodeData(mcp: VisualizerMcp): GraphNodeData {
     hoverTitle: mcp.name,
     hoverText: mcp.url,
     detailItems: [
+      { label: "MCP id", value: mcp.mcp_server_id ?? nodeId },
       { label: "Name", value: mcp.name },
       { label: "URL", value: mcp.url },
-      { label: "Host", value: parsedUrl.hostname },
-      { label: "Protocol", value: parsedUrl.protocol.replace(":", "") },
+      { label: "Auth type", value: mcp.auth_type ?? "-" },
+      { label: "Host", value: parsedUrl?.hostname ?? "-" },
+      { label: "Protocol", value: parsedUrl?.protocol.replace(":", "") ?? "-" },
+      { label: "Tools", value: `${toolCount}` },
+      { label: "Resources", value: `${resourceCount}` },
     ],
     longText:
       "Model Context Protocol server linked to an agent in the visualizer response.",
@@ -577,8 +730,20 @@ function buildMcpNodeData(mcp: VisualizerMcp): GraphNodeData {
         title: "Endpoint",
         items: [mcp.url],
       },
+      {
+        title: "Tools",
+        items: (mcp.tools ?? []).map((tool) => tool.name),
+      },
     ],
   };
+}
+
+function tryParseUrl(value: string) {
+  try {
+    return new URL(value);
+  } catch {
+    return null;
+  }
 }
 
 function truncate(value: string, maxLength: number) {
@@ -629,6 +794,9 @@ function formatDateTime(value?: string) {
 }
 
 function getEdgeColor(nodeType?: VisualizerNode["type"]) {
+  if (nodeType === "skill") {
+    return "#14b8a6";
+  }
   if (nodeType === "connector") {
     return "#f97316";
   }
@@ -672,7 +840,7 @@ export function VisualizerNodeCard({
       <Handle
         type="target"
         position={Position.Top}
-        className="!h-3 !w-3 !border-2 !border-sky-500 !bg-white"
+        className={`!h-3 !w-3 !border-2 !bg-white ${getHandleClassName(kind)}`}
       />
       <div
         className="relative z-10 w-[320px] rounded-2xl border border-slate-200 bg-white px-4 py-4 text-left shadow-[0_18px_45px_rgba(15,23,42,0.08)] transition-shadow hover:z-50 hover:shadow-[0_24px_60px_rgba(15,23,42,0.14)]"
@@ -684,7 +852,7 @@ export function VisualizerNodeCard({
           <div className="min-w-0 flex-1">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-sky-700">
+                <div className={`text-[10px] font-semibold uppercase tracking-[0.24em] ${getRoleTextClassName(kind)}`}>
                   {data.role}
                 </div>
                 <div
@@ -715,7 +883,7 @@ export function VisualizerNodeCard({
       <Handle
         type="source"
         position={Position.Bottom}
-        className="!h-3 !w-3 !border-2 !border-sky-500 !bg-white"
+        className={`!h-3 !w-3 !border-2 !bg-white ${getHandleClassName(kind)}`}
       />
     </>
   );
@@ -729,6 +897,9 @@ export function getMiniMapColor(kind?: GraphKind) {
   if (kind === "agent") {
     return "#10b981";
   }
+  if (kind === "skill") {
+    return "#14b8a6";
+  }
   if (kind === "connector") {
     return "#f97316";
   }
@@ -741,6 +912,7 @@ export function getMiniMapColor(kind?: GraphKind) {
 function NodeLogo({ kind }: { kind: GraphKind }) {
   const palette = {
     agent: "from-sky-600 to-cyan-500",
+    skill: "from-teal-600 to-emerald-500",
     connector: "from-orange-500 to-amber-500",
     mcp: "from-violet-600 to-fuchsia-500",
   }[kind];
@@ -768,6 +940,17 @@ function NodeLogo({ kind }: { kind: GraphKind }) {
           <path d="M8 12h8" />
         </svg>
       ) : null}
+      {kind === "skill" ? (
+        <svg
+          viewBox="0 0 24 24"
+          className="h-6 w-6 fill-none stroke-current stroke-[1.8]"
+        >
+          <path d="M7 6.5h10" />
+          <path d="M7 11.5h10" />
+          <path d="M7 16.5h6" />
+          <path d="M5 4.5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-13a1 1 0 0 1 1-1Z" />
+        </svg>
+      ) : null}
       {kind === "mcp" ? (
         <svg
           viewBox="0 0 24 24"
@@ -780,6 +963,32 @@ function NodeLogo({ kind }: { kind: GraphKind }) {
       ) : null}
     </div>
   );
+}
+
+function getHandleClassName(kind: GraphKind) {
+  if (kind === "skill") {
+    return "!border-teal-500";
+  }
+  if (kind === "connector") {
+    return "!border-orange-500";
+  }
+  if (kind === "mcp") {
+    return "!border-violet-500";
+  }
+  return "!border-sky-500";
+}
+
+function getRoleTextClassName(kind: GraphKind) {
+  if (kind === "skill") {
+    return "text-teal-700";
+  }
+  if (kind === "connector") {
+    return "text-orange-700";
+  }
+  if (kind === "mcp") {
+    return "text-violet-700";
+  }
+  return "text-sky-700";
 }
 
 function renderMarkdownBlocks(text: string) {
@@ -1276,7 +1485,9 @@ export default function VisualizerView() {
               {selectedNode.longText ? (
                 <section className="border-b border-[#eef1f7] pb-6">
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b94a7]">
-                    {selectedNode.kind === "agent" ? "Instruction" : "Overview"}
+                    {selectedNode.kind === "agent" || selectedNode.kind === "skill"
+                      ? "Instruction"
+                      : "Overview"}
                   </p>
                   <div className="mt-4 space-y-4 break-words">
                     {renderMarkdownBlocks(selectedNode.longText)}
