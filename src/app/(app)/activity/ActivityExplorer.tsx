@@ -1,5 +1,6 @@
 "use client";
 
+import { useRuntimeConfig } from "@/config/runtime-config";
 import {
   Activity,
   ArrowRight,
@@ -7,12 +8,19 @@ import {
   ChevronDown,
   Loader2,
   RefreshCw,
+  Trash2,
 } from "lucide-react";
 import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { renderMarkdownBlocks } from "../dashboard/logs";
-import {fetchAgentSessionDetail, fetchAgentSessions} from "../dashboard/dashboard.helper";
-import { AgentSessionDetail,AgentSessionSummary} from "../dashboard/dashboard.types";
+import {
+  type AgentSessionDetail,
+  type AgentSessionSummary,
+  deleteAgentSession,
+  fetchAgentSessionDetail,
+  fetchAgentSessions,
+  renderMarkdownBlocks,
+  resolveLogsApiBase,
+} from "../dashboard/logs";
 
 const levelStyles = {
   text: "bg-[#eef2ff] text-[#4338ca]",
@@ -48,6 +56,20 @@ const formatEntryTime = (timestamp: number) => {
     minute: "2-digit",
     second: "2-digit",
   }).format(new Date(timestamp * 1000));
+};
+
+const formatToolPayload = (value: unknown) => {
+  if (value === null || value === undefined) {
+    return "";
+  }
+  if (typeof value === "string") {
+    return value;
+  }
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
 };
 
 function SessionDropdownSkeleton() {
@@ -112,6 +134,8 @@ function DetailSkeleton() {
 }
 
 export default function ActivityExplorer() {
+  const { agentAdkBaseUrl } = useRuntimeConfig();
+  const logsApiBaseUrl = resolveLogsApiBase(agentAdkBaseUrl);
   const [sessions, setSessions] = useState<AgentSessionSummary[]>([]);
   const [sessionDetails, setSessionDetails] = useState<Record<string, AgentSessionDetail>>({});
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
@@ -122,6 +146,7 @@ export default function ActivityExplorer() {
   const [error, setError] = useState("");
   const [isSessionMenuOpen, setIsSessionMenuOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null);
   const sessionDetailsRef = useRef<Record<string, AgentSessionDetail>>({});
   const selectedSessionIdRef = useRef<string | null>(null);
   const menuContainerRef = useRef<HTMLDivElement | null>(null);
@@ -157,7 +182,11 @@ export default function ActivityExplorer() {
 
       setLoadingSessionId(sessionId);
       try {
-        const detail = await fetchAgentSessionDetail(sessionId, options?.signal);
+        const detail = await fetchAgentSessionDetail(
+          sessionId,
+          options?.signal,
+          logsApiBaseUrl
+        );
         setSessionDetails((current) => {
           const next = { ...current, [sessionId]: detail };
           sessionDetailsRef.current = next;
@@ -168,7 +197,7 @@ export default function ActivityExplorer() {
         setLoadingSessionId((current) => (current === sessionId ? null : current));
       }
     },
-    []
+    [logsApiBaseUrl]
   );
 
   const loadSessions = useCallback(
@@ -181,7 +210,7 @@ export default function ActivityExplorer() {
       setError("");
 
       try {
-        const nextSessions = await fetchAgentSessions(signal);
+        const nextSessions = await fetchAgentSessions(signal, logsApiBaseUrl);
         const nextSelectedSessionId =
           (selectedSessionIdRef.current &&
           nextSessions.some((session) => session.id === selectedSessionIdRef.current)
@@ -221,7 +250,7 @@ export default function ActivityExplorer() {
         setIsRefreshing(false);
       }
     },
-    [loadSessionDetail]
+    [loadSessionDetail, logsApiBaseUrl]
   );
 
   useEffect(() => {
@@ -234,6 +263,29 @@ export default function ActivityExplorer() {
     const controller = new AbortController();
     void loadSessions(true, controller.signal);
   }, [loadSessions]);
+
+  const handleDeleteSession = useCallback(
+    async (sessionId: string) => {
+      setDeletingSessionId(sessionId);
+      setError("");
+
+      try {
+        await deleteAgentSession(sessionId, undefined, logsApiBaseUrl);
+        setSessionDetails((current) => {
+          const next = { ...current };
+          delete next[sessionId];
+          sessionDetailsRef.current = next;
+          return next;
+        });
+        await loadSessions(true);
+      } catch {
+        setError("Unable to delete the selected session right now.");
+      } finally {
+        setDeletingSessionId((current) => (current === sessionId ? null : current));
+      }
+    },
+    [loadSessions, logsApiBaseUrl]
+  );
 
   const handleSessionChange = useCallback(
     async (sessionId: string) => {
@@ -362,28 +414,47 @@ export default function ActivityExplorer() {
                         {sessions.map((session) => {
                           const isActive = session.id === selectedSessionId;
                           return (
-                            <button
+                            <div
                               key={session.id}
-                              type="button"
-                              onClick={() => void handleSessionChange(session.id)}
-                              className={`flex w-full items-center justify-between gap-4 rounded-lg px-4 py-3 text-left transition ${
+                              className={`flex w-full items-center justify-between gap-4 rounded-lg px-4 py-3 transition ${
                                 isActive
                                   ? "bg-[#eef2ff] text-[#24324a]"
                                   : "text-[#5f677a] hover:bg-[#f8faff]"
                               }`}
                             >
-                              <div className="min-w-0">
+                              <button
+                                type="button"
+                                onClick={() => void handleSessionChange(session.id)}
+                                className="min-w-0 flex-1 text-left"
+                              >
                                 <p className="truncate text-sm font-semibold text-[#111827]">
                                   {session.summary}
                                 </p>
                                 <p className="mt-1 text-xs text-[#7a8498]">
                                   Last updated {session.updatedAtLabel}
                                 </p>
+                              </button>
+                              <div className="flex shrink-0 items-center gap-3">
+                                {isActive ? (
+                                  <Check className="h-4 w-4 text-[#4f49e2]" />
+                                ) : (
+                                  <span className="h-4 w-4" aria-hidden="true" />
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => void handleDeleteSession(session.id)}
+                                  disabled={deletingSessionId === session.id}
+                                  className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[#ef4444] transition hover:bg-[#fff1f2] disabled:cursor-not-allowed disabled:opacity-50"
+                                  aria-label={`Delete ${session.summary}`}
+                                >
+                                  {deletingSessionId === session.id ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <Trash2 className="h-4 w-4" />
+                                  )}
+                                </button>
                               </div>
-                              {isActive ? (
-                                <Check className="h-4 w-4 shrink-0 text-[#4f49e2]" />
-                              ) : null}
-                            </button>
+                            </div>
                           );
                         })}
                       </div>
@@ -637,6 +708,32 @@ export default function ActivityExplorer() {
               </div>
 
               <div className="soft-scrollbar max-h-[70vh] overflow-y-auto px-7 py-6">
+                {detailMeta.tools.length > 0 ? (
+                  <div className="mb-6 rounded-xl border border-[#e6ebf7] bg-[#f8faff] p-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7a8498]">
+                      Tools used
+                    </p>
+                    <div className="mt-3 space-y-3">
+                      {detailMeta.tools.map((tool) => (
+                        <div
+                          key={tool.id}
+                          className="rounded-xl border border-[#d9e2f3] bg-white px-4 py-3"
+                        >
+                          <div className="flex flex-wrap items-center gap-2 text-sm">
+                            <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#dcfce7] text-[#16a34a]">
+                              <Check className="h-3.5 w-3.5" />
+                            </span>
+                            <span className="font-medium text-[#24324a]">{tool.label}</span>
+                          </div>
+                          <pre className="mt-3 overflow-x-auto rounded-xl border border-[#dbe4f5] bg-[#fbfcff] px-4 py-3 text-xs leading-6 text-[#24324a]">
+                            <code>{formatToolPayload(tool.payload)}</code>
+                          </pre>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+
                 <div className="space-y-4 break-words text-sm leading-7 text-[#5f677a]">
                   {renderMarkdownBlocks(detailMeta.text)}
                 </div>

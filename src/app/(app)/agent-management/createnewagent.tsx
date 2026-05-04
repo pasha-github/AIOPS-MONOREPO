@@ -1,11 +1,20 @@
-import { useEffect, useMemo, useState } from "react";
-import { Bot, ChevronDown, Plus, LayoutTemplate } from "lucide-react";
 import { trimTrailingSlash } from "@/config/agent";
 import { useRuntimeConfig } from "@/config/runtime-config";
+import { Bot, ChevronDown, LayoutTemplate, Plus, Trash2 } from "lucide-react";
+import Image from "next/image";
+import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { getProviderIconSrc } from "../llm-management/llmHelpers";
-import { DynamicDropdownField, DynamicListField } from "./component/common/DynamicConnector";
-import ModelSelect, { ModelOption } from "./component/common/ModelSelect.create";
+import { DynamicDropdownField, inputClass, SimpleDropdownField } from "./DynamicConnector";
+import ModelSelect, { ModelOption } from "./ModelSelect";
 import { CreateNewAgentProps, ModelTemplate } from "./types";
+
+type LlmDefaults = {
+  primary_model_id: string | null;
+  secondary_model_id: string | null;
+  tertiary_model_id: string | null;
+};
+
+type LlmSlotKey = "primary" | "secondary" | "tertiary";
 
 const toSnakeCase = (value: string) =>
   value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
@@ -17,11 +26,32 @@ const getErrorMessage = (payload: unknown, fallback: string) => {
     payload &&
     typeof payload === "object" &&
     "message" in payload &&
-    typeof (payload as any).message === "string"
+    typeof (payload as { message?: unknown }).message === "string"
   ) {
-    return String((payload as any).message);
+    return String((payload as { message: string }).message);
   }
   return fallback;
+};
+
+const normalizeModelId = (value: unknown) => {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+};
+
+const normalizeLlmDefaults = (value: unknown): LlmDefaults | null => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  const payload = value as Record<string, unknown>;
+  return {
+    primary_model_id: normalizeModelId(payload.primary_model_id),
+    secondary_model_id: normalizeModelId(payload.secondary_model_id),
+    tertiary_model_id: normalizeModelId(payload.tertiary_model_id),
+  };
 };
 
 export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps) {
@@ -32,12 +62,27 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
   const [agentName, setAgentName] = useState("");
   const [description, setDescription] = useState("");
   const [instruction, setInstruction] = useState("");
-  const [modelId, setModelId] = useState("");
+  const [primaryUseCustom, setPrimaryUseCustom] = useState(false);
+  const [secondaryUseCustom, setSecondaryUseCustom] = useState(false);
+  const [tertiaryUseCustom, setTertiaryUseCustom] = useState(false);
+  const [primaryModelId, setPrimaryModelId] = useState("");
+  const [secondaryModelId, setSecondaryModelId] = useState("");
+  const [tertiaryModelId, setTertiaryModelId] = useState("");
   const [mcpServers, setMcpServers] = useState<string[]>([""]);
+  const [mcpServerIds, setMcpServerIds] = useState<string[]>([""]);
+  const [mcpOptions, setMcpOptions] = useState<
+    { id: string; name: string; serverUrl: string; label: string }[]
+  >([]);
+  const [isMcpLoading, setIsMcpLoading] = useState(false);
+  const [openMcpDropdownIndex, setOpenMcpDropdownIndex] = useState<number | null>(null);
+  const mcpDropdownRefs = useRef<Array<HTMLDivElement | null>>([]);
   const [connectorConfigIds, setConnectorConfigIds] = useState<string[][]>([[]]);
   const [modelOptions, setModelOptions] = useState<ModelOption[]>([]);
   const [isModelsLoading, setIsModelsLoading] = useState(false);
   const [modelsLoadError, setModelsLoadError] = useState("");
+  const [defaultModels, setDefaultModels] = useState<LlmDefaults | null>(null);
+  const [isDefaultsLoading, setIsDefaultsLoading] = useState(false);
+  const [defaultsLoadError, setDefaultsLoadError] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [success, setSuccess] = useState("");
@@ -48,8 +93,10 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
   const [isToastVisible, setIsToastVisible] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
   const [connectorOptions, setConnectorOptions] = useState<{ value: string; label: string }[]>([]);
-  const [isConnectorsLoading, setIsConnectorsLoading] = useState(false);
-  const [configDataMap, setConfigDataMap] = useState<Record<string, any>>({});
+  const [configDataMap, setConfigDataMap] = useState<Record<string, unknown>>({});
+  const [skillIds, setSkillIds] = useState<string[]>([""]);
+  const [skillOptions, setSkillOptions] = useState<{ value: string; label: string }[]>([]);
+  const [isSkillsLoading, setIsSkillsLoading] = useState(false);
 
   const agentId = useMemo(() => toSnakeCase(agentName), [agentName]);
 
@@ -58,7 +105,6 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
     if (!isModalOpen) return;
     const ctrl = new AbortController();
     (async () => {
-      setIsConnectorsLoading(true);
       try {
         const res = await fetch(`${base}/connectors/`, {
           headers: { accept: "application/json" },
@@ -67,22 +113,133 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
         const data = await res.json();
         if (res.ok && Array.isArray(data)) {
           setConnectorOptions(
-            data.map((item: any) => ({
-              value: item.connector_config_id ?? item.id ?? "",
-              label: item.name ?? item.connector_config_id ?? item.id ?? "",
-            }))
+            data.map((item: unknown) => {
+              const record = item as Record<string, unknown>;
+              return {
+                value:
+                  typeof record.connector_config_id === "string"
+                    ? record.connector_config_id
+                    : typeof record.id === "string"
+                      ? record.id
+                      : "",
+                label:
+                  typeof record.name === "string"
+                    ? record.name
+                    : typeof record.connector_config_id === "string"
+                      ? record.connector_config_id
+                      : typeof record.id === "string"
+                        ? record.id
+                        : "",
+              };
+            })
           );
         }
-      } catch (e: any) {
-        if (e?.name !== "AbortError") setConnectorOptions([]);
-      } finally {
-        setIsConnectorsLoading(false);
+      } catch (error: unknown) {
+        if (!(error instanceof DOMException && error.name === "AbortError")) {
+          setConnectorOptions([]);
+        }
       }
     })();
     return () => ctrl.abort();
   }, [base, isModalOpen]);
 
-  const fetchConnectorConfig = async (value: string) => {
+  useEffect(() => {
+    if (!isModalOpen) return;
+    const ctrl = new AbortController();
+    (async () => {
+      setIsSkillsLoading(true);
+      try {
+        const res = await fetch(`${base}/skill/`, {
+          headers: { accept: "application/json" },
+          signal: ctrl.signal,
+        });
+        const data = await res.json().catch(() => null);
+        if (res.ok && Array.isArray(data)) {
+          setSkillOptions(
+            data
+              .map((item: unknown) => {
+                const record = item as Record<string, unknown>;
+                const value = typeof record.skill_id === "string" ? record.skill_id.trim() : "";
+                const label = typeof record.name === "string" ? record.name.trim() : "";
+                if (!value || !label) return null;
+                return { value, label };
+              })
+              .filter(Boolean) as { value: string; label: string }[]
+          );
+        } else {
+          setSkillOptions([]);
+        }
+      } catch (error: unknown) {
+        if (!(error instanceof DOMException && error.name === "AbortError")) {
+          setSkillOptions([]);
+        }
+      } finally {
+        setIsSkillsLoading(false);
+      }
+    })();
+    return () => ctrl.abort();
+  }, [base, isModalOpen]);
+
+  // Fetch MCP servers
+  useEffect(() => {
+    if (!isModalOpen) return;
+    const ctrl = new AbortController();
+    (async () => {
+      setIsMcpLoading(true);
+      try {
+        const res = await fetch(`${base}/mcp/`, {
+          headers: { accept: "application/json" },
+          signal: ctrl.signal,
+        });
+        const data = await res.json().catch(() => null);
+        if (res.ok && Array.isArray(data)) {
+          setMcpOptions(
+            data
+              .map((item: unknown) => {
+                const record = item as Record<string, unknown>;
+                const id = typeof record.mcp_server_id === "string" ? record.mcp_server_id.trim() : "";
+                const name = typeof record.name === "string" ? record.name.trim() : "";
+                const serverUrl = typeof record.server_url === "string" ? record.server_url.trim() : "";
+                if (!id || !serverUrl) return null;
+                return {
+                  id,
+                  name,
+                  serverUrl,
+                  label: name ? `${name} | ${serverUrl}` : serverUrl,
+                };
+              })
+              .filter(Boolean) as { id: string; name: string; serverUrl: string; label: string }[]
+          );
+        } else {
+          setMcpOptions([]);
+        }
+      } catch (error: unknown) {
+        if (!(error instanceof DOMException && error.name === "AbortError")) {
+          setMcpOptions([]);
+        }
+      } finally {
+        setIsMcpLoading(false);
+      }
+    })();
+
+    return () => ctrl.abort();
+  }, [base, isModalOpen]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (openMcpDropdownIndex === null) return;
+      const activeContainer = mcpDropdownRefs.current[openMcpDropdownIndex];
+      if (!activeContainer) return;
+      if (!activeContainer.contains(event.target as Node)) {
+        setOpenMcpDropdownIndex(null);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [openMcpDropdownIndex]);
+
+  const fetchConnectorConfig = useCallback(async (value: string) => {
     if (!value || configDataMap[value] !== undefined) return;
     setConfigDataMap((prev) => ({ ...prev, [value]: null }));
     try {
@@ -107,21 +264,54 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
         return next;
       });
     }
-  };
+  }, [base, configDataMap]);
 
   useEffect(() => {
     if (!connectorOptions.length) return;
     connectorOptions.forEach((opt) => {
       fetchConnectorConfig(opt.value);
     });
-  }, [connectorOptions]);
+  }, [connectorOptions, fetchConnectorConfig]);
+
+  const resolveModelOption = (modelId: string | null) => {
+    if (!modelId) {
+      return null;
+    }
+    return (
+      modelOptions.find((option) => option.value === modelId) ?? {
+        value: modelId,
+        label: modelId,
+        secondary: "Model unavailable in current list",
+        iconSrc: null,
+      }
+    );
+  };
+
+  const primaryDefaultOption = resolveModelOption(defaultModels?.primary_model_id ?? null);
+  const secondaryDefaultOption = resolveModelOption(
+    defaultModels?.secondary_model_id ?? null
+  );
+  const tertiaryDefaultOption = resolveModelOption(defaultModels?.tertiary_model_id ?? null);
+
+  const effectivePrimaryModelId = primaryUseCustom
+    ? primaryModelId
+    : defaultModels?.primary_model_id ?? "";
+  const effectiveSecondaryModelId = secondaryUseCustom
+    ? secondaryModelId
+    : defaultModels?.secondary_model_id ?? "";
+  const effectiveTertiaryModelId = tertiaryUseCustom
+    ? tertiaryModelId
+    : defaultModels?.tertiary_model_id ?? "";
 
   const isFormValid =
     normalizeString(agentName).length > 0 &&
     agentId.length > 0 &&
     normalizeString(description).length > 0 &&
     normalizeString(instruction).length > 0 &&
-    modelId.length > 0;
+    effectivePrimaryModelId.length > 0 &&
+    (!primaryUseCustom || primaryModelId.length > 0) &&
+    (!secondaryUseCustom || secondaryModelId.length > 0) &&
+    (!tertiaryUseCustom || tertiaryModelId.length > 0);
 
   // Toast auto hide
   useEffect(() => {
@@ -149,14 +339,15 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
         }
         setModelOptions(
           data
-            .flatMap((item: any) => {
-              const id = item?.model_id?.trim();
+            .flatMap((item: unknown) => {
+              const record = item as Record<string, unknown>;
+              const id = typeof record.model_id === "string" ? record.model_id.trim() : "";
               if (!id) return [];
-              const provider = item?.provider?.trim() || "";
+              const provider = typeof record.provider === "string" ? record.provider.trim() : "";
               return [
                 {
                   value: id,
-                  label: item?.name?.trim() || id,
+                  label: typeof record.name === "string" && record.name.trim() ? record.name.trim() : id,
                   secondary: provider ? `${provider} | ${id}` : id,
                   iconSrc: provider ? getProviderIconSrc(provider) : null,
                 },
@@ -166,10 +357,51 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
               a.label.localeCompare(b.label, undefined, { sensitivity: "base", numeric: true })
             )
         );
-      } catch (e: any) {
-        if (e?.name !== "AbortError") setModelsLoadError("Unable to load models.");
+      } catch (error: unknown) {
+        if (!(error instanceof DOMException && error.name === "AbortError")) {
+          setModelsLoadError("Unable to load models.");
+        }
       } finally {
         setIsModelsLoading(false);
+      }
+    })();
+    return () => ctrl.abort();
+  }, [base, isModalOpen]);
+
+  useEffect(() => {
+    if (!isModalOpen) return;
+    const ctrl = new AbortController();
+    (async () => {
+      setIsDefaultsLoading(true);
+      setDefaultsLoadError("");
+      try {
+        const res = await fetch(`${base}/llms/defaults`, {
+          headers: { accept: "application/json" },
+          signal: ctrl.signal,
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok) {
+          setDefaultsLoadError(
+            getErrorMessage(data, "Unable to load default LLMs.")
+          );
+          setDefaultModels(null);
+          return;
+        }
+
+        const normalized = normalizeLlmDefaults(data);
+        if (!normalized) {
+          setDefaultsLoadError("Unable to load default LLMs.");
+          setDefaultModels(null);
+          return;
+        }
+
+        setDefaultModels(normalized);
+      } catch (error: unknown) {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        setDefaultsLoadError("Unable to load default LLMs.");
+        setDefaultModels(null);
+      } finally {
+        setIsDefaultsLoading(false);
       }
     })();
     return () => ctrl.abort();
@@ -212,17 +444,31 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
     setAgentName(t.name || "");
     setDescription(t.description || "");
     setInstruction(t.instruction || "");
-    setModelId(t.model_id?.trim() || "");
+    setPrimaryUseCustom(Boolean(t.model_id?.trim()));
+    setPrimaryModelId(t.model_id?.trim() || "");
+    setSecondaryUseCustom(false);
+    setSecondaryModelId("");
+    setTertiaryUseCustom(false);
+    setTertiaryModelId("");
   }, [selectedTemplateId, modelTemplates]);
 
   const resetForm = () => {
     setAgentName("");
     setDescription("");
     setInstruction("");
-    setModelId("");
+    setPrimaryUseCustom(false);
+    setSecondaryUseCustom(false);
+    setTertiaryUseCustom(false);
+    setPrimaryModelId("");
+    setSecondaryModelId("");
+    setTertiaryModelId("");
     setMcpServers([""]);
+    setMcpServerIds([""]);
     setConnectorConfigIds([[]]);
+    setSkillIds([""]);
     setConfigDataMap({});
+    setDefaultModels(null);
+    setDefaultsLoadError("");
     setSubmitError("");
     setSuccess("");
     setSelectedTemplateId("");
@@ -241,15 +487,27 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
   // For mcpServers (string[]) — each entry is a plain string
   const updateMcpServer = (i: number, val: string) => {
     setMcpServers((prev) => prev.map((x, idx) => (idx === i ? val : x)));
+    setMcpServerIds((prev) => prev.map((x, idx) => (idx === i ? "" : x)));
   };
 
-  const addToList = (setter: React.Dispatch<React.SetStateAction<string[]>>) =>
+  const addToList = (setter: Dispatch<SetStateAction<string[]>>) =>
     setter((p) => [...p, ""]);
 
-  const removeFromList = (setter: React.Dispatch<React.SetStateAction<string[]>>, i: number) =>
+  const removeFromList = (setter: Dispatch<SetStateAction<string[]>>, i: number) =>
     setter((p) => (p.length <= 1 ? p : p.filter((_, idx) => idx !== i)));
 
   const normalizeList = (vals: string[]) => vals.map((v) => v.trim()).filter(Boolean);
+  const normalizeMcpServerIds = (vals: string[]) =>
+    vals.map((v) => v.trim()).filter(Boolean);
+
+  const normalizeManualMcpServers = (urls: string[], ids: string[]) =>
+    urls
+      .map((url, index) => {
+        const trimmedUrl = url.trim();
+        const id = ids[index]?.trim() ?? "";
+        return id ? "" : trimmedUrl;
+      })
+      .filter(Boolean);
 
   const handleCreate = async () => {
     if (!isFormValid) {
@@ -268,12 +526,20 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
           name: normalizeString(agentName),
           description: normalizeString(description),
           instruction: normalizeString(instruction),
-          model_id: modelId,
+          primary_use_global: !primaryUseCustom,
+          primary_model_id: primaryUseCustom ? effectivePrimaryModelId || null : null,
+          secondary_use_global: !secondaryUseCustom,
+          secondary_model_id: secondaryUseCustom ? effectiveSecondaryModelId || null : null,
+          tertiary_use_global: !tertiaryUseCustom,
+          tertiary_model_id: tertiaryUseCustom ? effectiveTertiaryModelId || null : null,
           tools: "",
-          mcp_servers: normalizeList(mcpServers),
+          skill_ids: normalizeList(skillIds),
+          mcp_server_ids: normalizeMcpServerIds(mcpServerIds),
+          mcp_servers: normalizeManualMcpServers(mcpServers, mcpServerIds),
           connector_config_ids: connectorConfigIds.flat(),
           isEnabled: true,
           sub_agents: [],
+          type: "agent",
         }),
       });
       const data = await res.json().catch(() => null);
@@ -299,11 +565,57 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
     setConnectorConfigIds((prev) => [...prev, []]);
   };
 
+  const addSkill = () => {
+    setSkillIds((prev) => [...prev, ""]);
+  };
+
+  const removeSkill = (index: number) => {
+    setSkillIds((prev) => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== index)));
+  };
+
   const removeConnector = (index: number) => {
     setConnectorConfigIds((prev) =>
       prev.length <= 1 ? prev : prev.filter((_, i) => i !== index)
     );
   };
+
+  const llmFields: Array<{
+    key: LlmSlotKey;
+    label: string;
+    useCustom: boolean;
+    setUseCustom: Dispatch<SetStateAction<boolean>>;
+    setModelId: Dispatch<SetStateAction<string>>;
+    effectiveModelId: string;
+    defaultOption: ModelOption | null;
+  }> = [
+    {
+      key: "primary",
+      label: "Primary LLM",
+      useCustom: primaryUseCustom,
+      setUseCustom: setPrimaryUseCustom,
+      setModelId: setPrimaryModelId,
+      effectiveModelId: effectivePrimaryModelId,
+      defaultOption: primaryDefaultOption,
+    },
+    {
+      key: "secondary",
+      label: "Secondary LLM",
+      useCustom: secondaryUseCustom,
+      setUseCustom: setSecondaryUseCustom,
+      setModelId: setSecondaryModelId,
+      effectiveModelId: effectiveSecondaryModelId,
+      defaultOption: secondaryDefaultOption,
+    },
+    {
+      key: "tertiary",
+      label: "Tertiary LLM",
+      useCustom: tertiaryUseCustom,
+      setUseCustom: setTertiaryUseCustom,
+      setModelId: setTertiaryModelId,
+      effectiveModelId: effectiveTertiaryModelId,
+      defaultOption: tertiaryDefaultOption,
+    },
+  ];
 
   return (
     <>
@@ -425,25 +737,101 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
               {/* Model */}
               <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">Model</p>
 
-              <div className="flex flex-col gap-1.5">
-                <label className="flex items-center gap-1 text-sm font-medium text-gray-700">
-                  Language Model <span className="text-red-500">*</span>
-                </label>
-                <p className="text-xs leading-snug text-gray-400">The LLM this agent will use to generate responses</p>
-                <ModelSelect
-                  value={modelId}
-                  options={modelOptions}
-                  placeholder="Choose a language model"
-                  loading={isModelsLoading}
-                  disabled={isModelsLoading || modelOptions.length === 0}
-                  onChange={setModelId}
-                />
-                {modelsLoadError && (
+              <div className="grid gap-3">
+                {llmFields.map((field) => {
+                  const selectedOption =
+                    modelOptions.find((option) => option.value === field.effectiveModelId) ??
+                    field.defaultOption;
+                  const dropdownOptions =
+                    !field.useCustom && field.defaultOption
+                      ? [field.defaultOption, ...modelOptions.filter((option) => option.value !== field.defaultOption?.value)]
+                      : modelOptions;
+
+                  return (
+                    <div
+                      key={field.key}
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex flex-col gap-1">
+                          <label className="flex items-center gap-1 text-sm font-medium text-gray-700">
+                            {field.label}
+                            {field.key === "primary" ? (
+                              <span className="text-red-500">*</span>
+                            ) : null}
+                          </label>
+                          <p className="text-xs leading-snug text-gray-400">
+                            {field.useCustom
+                              ? `Choose a specific ${field.label.toLowerCase()} for this agent`
+                              : `Uses the global ${field.label.toLowerCase()} from LLM management`}
+                          </p>
+                        </div>
+
+                        <label className="inline-flex shrink-0 items-center gap-2 py-1.5 text-xs font-medium text-indigo-700">
+                          <input
+                            type="checkbox"
+                            checked={field.useCustom}
+                            onChange={(event) => {
+                              field.setUseCustom(event.target.checked);
+                              if (!event.target.checked) {
+                                field.setModelId("");
+                              }
+                            }}
+                            className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                          />
+                          Custom LLM
+                        </label>
+                      </div>
+
+                      <div className="mt-3">
+                        <ModelSelect
+                          value={field.effectiveModelId}
+                          options={dropdownOptions}
+                          placeholder={
+                            field.useCustom
+                              ? `Choose ${field.label.toLowerCase()}`
+                              : selectedOption
+                                ? "Using global default"
+                                : "No global default configured"
+                          }
+                          loading={isModelsLoading || isDefaultsLoading}
+                          disabled={
+                            !field.useCustom ||
+                            isModelsLoading ||
+                            isDefaultsLoading ||
+                            modelOptions.length === 0
+                          }
+                          onChange={field.setModelId}
+                        />
+                      </div>
+
+                      <div className="mt-2 flex items-start justify-between gap-3">
+                        <p className="text-xs text-gray-400">
+                          {field.useCustom
+                            ? "Checkbox enabled: this agent uses the selected LLM."
+                            : selectedOption
+                              ? `Global default: ${selectedOption.label}`
+                              : "Global default is not configured for this slot."}
+                        </p>
+                        {selectedOption?.iconSrc ? (
+                          <Image
+                            src={selectedOption.iconSrc}
+                            alt=""
+                            width={20}
+                            height={20}
+                            className="h-5 w-5 shrink-0 object-contain"
+                          />
+                        ) : null}
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {(modelsLoadError || defaultsLoadError) && (
                   <p className="flex items-center gap-1.5 text-xs text-red-600">
                     <svg className="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clipRule="evenodd" />
                     </svg>
-                    {modelsLoadError}
+                    {modelsLoadError || defaultsLoadError}
                   </p>
                 )}
               </div>
@@ -452,15 +840,115 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
               <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">Capabilities</p>
 
                 <div className="space-y-4">
-                <DynamicListField
-                  label="MCP Servers"
-                  hint="URLs of Model Context Protocol servers"
-                  values={mcpServers}
-                  placeholder="https://mcp.example.com/sse"
-                  onAdd={(): void => addToList(setMcpServers)}
-                  onRemove={(i: number): void => removeFromList(setMcpServers, i)}
-                  onChange={(i: number, v: string): void => updateMcpServer(i, v)}
-                />
+                <div className="flex flex-col gap-1.5">
+                  <label className="flex items-center gap-1 text-sm font-medium text-gray-700">
+                    MCP Servers
+                  </label>
+                  <p className="text-xs leading-snug text-gray-400">
+                    Type a custom URL or choose from registered MCP servers
+                  </p>
+                  <div className="flex flex-col gap-2">
+                    {mcpServers.map((val, i) => (
+                      <div key={i} className="flex items-center gap-2">
+                        <div
+                          ref={(node) => {
+                            mcpDropdownRefs.current[i] = node;
+                          }}
+                          className="relative w-full"
+                        >
+                          <input
+                            type="text"
+                            value={val}
+                            onChange={(e) => updateMcpServer(i, e.target.value)}
+                            placeholder="https://mcp.example.com/sse"
+                            className={`${inputClass} pr-10`}
+                          />
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setOpenMcpDropdownIndex((current) => (current === i ? null : i))
+                            }
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500"
+                          >
+                            <ChevronDown size={16} />
+                          </button>
+
+                          {openMcpDropdownIndex === i ? (
+                            <div className="absolute z-50 mt-1 w-full rounded-lg border bg-white shadow-lg max-h-60 overflow-auto">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setMcpServerIds((prev) =>
+                                    prev.map((x, idx) => (idx === i ? "" : x))
+                                  );
+                                  setMcpServers((prev) =>
+                                    prev.map((x, idx) => (idx === i ? "" : x))
+                                  );
+                                  setOpenMcpDropdownIndex(null);
+                                }}
+                                className="w-full px-3 py-2 text-left text-sm text-gray-500 hover:bg-gray-50"
+                              >
+                                Show MCP
+                              </button>
+                              {isMcpLoading ? (
+                                <div className="px-3 py-2 text-sm text-gray-500">Loading MCP servers...</div>
+                              ) : mcpOptions.length === 0 ? (
+                                <div className="px-3 py-2 text-sm text-gray-500">No MCP servers found</div>
+                              ) : (
+                                mcpOptions.map((option) => (
+                                  <button
+                                    key={option.id}
+                                    type="button"
+                                    onClick={() => {
+                                      setMcpServers((prev) =>
+                                        prev.map((x, idx) =>
+                                          idx === i ? (option.name || option.serverUrl) : x
+                                        )
+                                      );
+                                      setMcpServerIds((prev) =>
+                                        prev.map((x, idx) => (idx === i ? option.id : x))
+                                      );
+                                      setOpenMcpDropdownIndex(null);
+                                    }}
+                                    className="w-full border-b px-3 py-2 text-left hover:bg-gray-50"
+                                  >
+                                    <div className="text-sm font-medium text-gray-900">{option.name || option.serverUrl}</div>
+                                    <div className="text-xs text-gray-500 break-all">{option.serverUrl}</div>
+                                  </button>
+                                ))
+                              )}
+                            </div>
+                          ) : null}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            addToList(setMcpServers);
+                            addToList(setMcpServerIds);
+                          }}
+                          title="Add"
+                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-600 transition hover:bg-indigo-100"
+                        >
+                          <Plus size={14} />
+                        </button>
+                        {mcpServers.length > 1 ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              removeFromList(setMcpServers, i);
+                              removeFromList(setMcpServerIds, i);
+                              setOpenMcpDropdownIndex(null);
+                            }}
+                            title="Remove"
+                            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-500 transition hover:bg-red-100"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                </div>
 
                 <DynamicDropdownField
                   label="Connector Config"
@@ -471,6 +959,22 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
                   onRemove={(i: number): void => removeConnector(i)}
                   onChange={(i: number, v: string[] | string): void =>
                   updateList(i, Array.isArray(v) ? v : [v])
+                  }
+                />
+                <SimpleDropdownField
+                  label="Skill"
+                  hint={
+                    isSkillsLoading
+                      ? "Loading registered skills"
+                      : "Choose from registered skills"
+                  }
+                  values={skillIds}
+                  options={skillOptions}
+                  placeholder="Select skill"
+                  onAdd={addSkill}
+                  onRemove={removeSkill}
+                  onChange={(index, value) =>
+                    setSkillIds((prev) => prev.map((item, i) => (i === index ? value : item)))
                   }
                 />
                 </div>

@@ -76,7 +76,7 @@ export function createVisualizerGraph(response: VisualizerResponse) {
   const nodes: GraphFlowNode[] = response.nodes.map((node, index) => ({
     id: node.id,
     type: "visualizer",
-    position: positionMap.get(node.id) ?? fallbackPosition(index),
+    position: sanitizePosition(positionMap.get(node.id), fallbackPosition(index)),
     sourcePosition: Position.Bottom,
     targetPosition: Position.Top,
     data: buildNodeData(node),
@@ -248,7 +248,7 @@ function createPositionMap(
 
   response.nodes.forEach((node, index) => {
     if (!positionMap.has(node.id)) {
-      positionMap.set(node.id, fallbackPosition(index));
+      positionMap.set(node.id, sanitizePosition(null, fallbackPosition(index)));
     }
   });
 
@@ -257,6 +257,18 @@ function createPositionMap(
 
 function fallbackPosition(index: number) {
   return { x: 80 + index * 280, y: 940 };
+}
+
+function sanitizePosition(
+  position: { x: number; y: number } | undefined | null,
+  fallback: { x: number; y: number }
+) {
+  const x =
+    position && Number.isFinite(position.x) ? position.x : fallback.x;
+  const y =
+    position && Number.isFinite(position.y) ? position.y : fallback.y;
+
+  return { x, y };
 }
 
 function placeNodesInRow(

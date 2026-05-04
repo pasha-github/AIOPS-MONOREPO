@@ -69,50 +69,63 @@ export const CONNECTOR_CONFIG_SCHEMAS: Record<string, ConfigField[]> = {
     },
   ],
   ibm_mq_connector: [
-    {
-      name: "URL_BASE",
-      label: "URL Base",
-      required: true,
-      placeholder: "Enter base URL",
-    },
-    {
-      name: "USER_NAME",
-      label: "User Name",
-      required: true,
-      placeholder: "Enter username",
-    },
-    {
-      name: "PASSWORD",
-      label: "Password",
-      required: true,
-      secret: true,
-      placeholder: "Enter password",
-    },
-    {
-      name: "LOGS_URL",
-      label: "Logs URL",
-      required: true,
-      placeholder: "Enter logs URL",
-    },
-    {
-      name: "SSH_URL",
-      label: "SSH URL",
-      required: true,
-      placeholder: "Enter SSH URL",
-    },
-    {
-      name: "VERIFY_TLS",
-      label: "Verify TLS",
-      required: false,
-      placeholder: "true or false",
-    },
-    {
-      name: "prefix",
-      label: "Prefix",
-      required: false,
-      placeholder: "IBM MQ",
-    },
-  ],
+  {
+    name: "URL_BASE",
+    label: "URL Base",
+    required: true,
+    placeholder: "Enter base URL",
+  },
+  {
+    name: "USER_NAME",
+    label: "User Name",
+    required: true,
+    placeholder: "Enter username",
+  },
+  {
+    name: "PASSWORD",
+    label: "Password",
+    required: true,
+    secret: true,
+    placeholder: "Enter password",
+  },
+  {
+    name: "LOGS_URL",
+    label: "Logs URL",
+    required: true,
+    placeholder: "Enter logs URL",
+  },
+  {
+    name: "SSH_HOSTNAME",
+    label: "SSH Hostname",
+    required: true,
+    placeholder: "Enter SSH hostname",
+  },
+  {
+    name: "SSH_USERNAME",
+    label: "SSH Username",
+    required: true,
+    placeholder: "Enter SSH username",
+  },
+  {
+    name: "SSH_PASSWORD",
+    label: "SSH Password",
+    required: true,
+    secret: true,
+    placeholder: "Enter SSH password",
+  },
+  {
+    name: "VERIFY_TLS",
+    label: "Verify TLS",
+    required: false,
+    placeholder: "true or false",
+  },
+  {
+    name: "prefix",
+    label: "Prefix",
+    required: false,
+    placeholder: "IBM MQ",
+  },
+],
   teams_connector: [
     {
       name: "TEAMS_BOT_BASE_URL",
@@ -146,4 +159,64 @@ export const CONNECTOR_CONFIG_SCHEMAS: Record<string, ConfigField[]> = {
       placeholder: "Teams",
     },
   ],
+  outlook_connector: [
+  {
+    name: "TENANT_ID",
+    label: "Tenant ID",
+    required: true,
+    placeholder: "Enter Microsoft Entra tenant ID",
+  },
+  {
+    name: "CLIENT_ID",
+    label: "Client ID",
+    required: true,
+    placeholder: "Enter application client ID",
+  },
+  {
+    name: "CLIENT_SECRET",
+    label: "Client Secret",
+    required: true,
+    secret: true,
+    placeholder: "Enter client secret",
+  },
+  {
+    name: "MAILBOX_USER",
+    label: "Mailbox User",
+    required: true,
+    placeholder: "Enter mailbox email or user principal name",
+  },
+  {
+    name: "prefix",
+    label: "Prefix",
+    required: false,
+    placeholder: "Outlook",
+  },
+],
+  microsoft_entra_connector: [
+  {
+    name: "TENANT_ID",
+    label: "Tenant ID",
+    required: true,
+    placeholder: "Enter Microsoft Entra tenant ID",
+  },
+  {
+    name: "CLIENT_ID",
+    label: "Client ID",
+    required: true,
+    placeholder: "Enter application client ID",
+  },
+  {
+    name: "CLIENT_SECRET",
+    label: "Client Secret",
+    required: true,
+    secret: true,
+    placeholder: "Enter client secret",
+  },
+  {
+    name: "prefix",
+    label: "Prefix",
+    required: false,
+    placeholder: "Entra",
+  },
+]
 };

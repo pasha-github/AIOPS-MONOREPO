@@ -15,29 +15,46 @@ export interface AgentRecord {
   model_id: string | null;
   modelName: string | null;
   modelProvider: string | null;
+  primary_use_global?: boolean | null;
+  primary_model_id?: string | null;
+  primary_model_name?: string | null;
+  primary_model_provider?: string | null;
+  secondary_use_global?: boolean | null;
+  secondary_model_id?: string | null;
+  secondary_model_name?: string | null;
+  secondary_model_provider?: string | null;
+  tertiary_use_global?: boolean | null;
+  tertiary_model_id?: string | null;
+  tertiary_model_name?: string | null;
+  tertiary_model_provider?: string | null;
   created_at: string | null;
   updated_at: string | null;
   tools: string[] | string;
+  skill_ids: string[];
+  mcp_server_ids?: string[];
   mcp_servers: string[];
   connector_config_ids: string[];
   sub_agents: string[];
   isEnabled: boolean | null;
 };
-export interface DropdownOption {
+
+export type DropdownOption = {
   value: string;
   label: string;
 };
+
 export interface DynamicDropdownFieldProps {
   label: string;
   hint?: string;
-  values: string[];
+  values: string[][];
   options: { value: string; label: string }[];
   placeholder?: string;
-  configDataMap?: Record<string, any>;  // ← was: configData?: any
+  configDataMap?: Record<string, unknown>;
   onAdd: () => void;
   onRemove: (i: number) => void;
-  onChange: (i: number, v: string) => void;
+  onChange: (i: number, v: string[] | string) => void;
 }
+
 export interface DynamicListFieldProps {
   label: string;
   hint?: string;
@@ -46,7 +63,7 @@ export interface DynamicListFieldProps {
   onAdd: () => void;
   onRemove: (i: number) => void;
   onChange: (i: number, v: string) => void;
-};
+}
 
 export interface CreateNewAgentProps {
   onCreateSuccess?: () => void | Promise<void>;
@@ -59,55 +76,3 @@ export interface ModelTemplate {
   instruction?: string;
   model_id?: string;
 };
-export interface OptionItem {
-  label: string;
-  value: string;
-};
-
-export interface Props {
-  value: string[];
-  options: OptionItem[];
-  configDataMap?: Record<string, any>;
-  placeholder?: string;
-  onChange: (val: string[]) => void; // ✅ return all IDs
-};
-export interface UpdateAgentProps {
-    agent: any;
-    isOpen: boolean;
-    onClose: () => void;
-    onUpdateSuccess?: () => void;
-};
-
-export interface ModelOption {
-    value: string;
-    label: string;
-    secondary: string;
-    iconSrc: string | null;
-};
-
-export interface UpdateAgentForm {
-    agentName: string;
-    description: string;
-    instruction: string;
-    modelId: string;
-    tools: string;
-    mcpServers: string;
-    connectorConfigIds: string;
-    subAgents: string;
-    isEnabled: boolean;
-};
-export interface ModelSelectProps {
-  value: string;
-  options: ModelOption[];
-  placeholder: string;
-  disabled?: boolean;
-  loading?: boolean;
-  onChange: (value: string) => void;
-}
-
-export interface FieldProps {
-  label: string;
-  hint?: string;
-  required?: boolean;
-  children: ReactNode;
-}

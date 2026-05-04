@@ -1,15 +1,9 @@
 "use client";
 
+import { buildSpinnerLabel } from "@/Spinnerverb";
 import { trimTrailingSlash } from "@/config/agent";
 import { useRuntimeConfig } from "@/config/runtime-config";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type {
-    AgentChatWorkspaceProps,
-    AdkSession,
-    ChatMessage,
-    StreamStep,
-    AppItem,
-} from "./types";
 import {
     DEFAULT_USER_ID,
     extractFunctionCalls,
@@ -24,16 +18,22 @@ import {
     mergeStreamingText,
     normalizeToolName,
     parseSsePayload,
-    renderMilestones,
     sortSessions,
-    summarizeStreamError,
+    summarizeStreamError
 } from "./chat_helpers";
+import type {
+    AdkSession,
+    AgentChatWorkspaceProps,
+    AppItem,
+    ChatMessage,
+    StreamStep,
+} from "./types";
 
-import ChatSidebar from "./components/ChatSidebar";
-import ChatHeader from "./components/ChatHeader";
-import ChatMessages from "./components/ChatMessages";
-import ChatInput from "./components/ChatInput";
 import AgentSidebar from "./components/AgentSidebar";
+import ChatHeader from "./components/ChatHeader";
+import ChatInput from "./components/ChatInput";
+import ChatMessages from "./components/ChatMessages";
+import ChatSidebar from "./components/ChatSidebar";
 
 export default function chatOps({
     agent,
@@ -112,10 +112,15 @@ export default function chatOps({
                 const data: AppItem[] = await response.json();
 
                 if (Array.isArray(data) && data.length > 0) {
-                    setApps(data);
+                    const visibleApps = data.filter(
+                        (app) =>
+                            String(app.type ?? "").trim().toLowerCase() !== "automation"
+                    );
+
+                    setApps(visibleApps);
 
                     const defaultApp =
-                        data.find((a) => a.agent_id === "supervisor") || data[0];
+                        visibleApps.find((a) => a.agent_id === "supervisor") || visibleApps[0] || null;
 
                     setSelectedApp(defaultApp);
                 }
@@ -187,7 +192,7 @@ export default function chatOps({
                 });
 
                 if (!response.ok) {
-                    throw new Error(`Failed to load messages: ${response.status}`);
+                    throw new Error(`Failed to load message: ${response.status}`);
                 }
 
                 const payload = (await response.json()) as AdkSession;
@@ -449,10 +454,17 @@ export default function chatOps({
 
             functionCalls.forEach((toolCall) => {
                 const toolName = String(toolCall.name ?? "");
-                addRunningStep(`Running ${normalizeToolName(toolName)}`, {
+                addRunningStep(
+                    buildSpinnerLabel({
+                        kind: "running",
+                        subject: normalizeToolName(toolName),
+                        sequence: streamStepCounterRef.current,
+                    }),
+                    {
                     tool: toolName,
                     args: toolCall.args ?? {},
-                });
+                    }
+                );
             });
 
             const confirmations = payload.actions?.requestedToolConfirmations;
@@ -466,10 +478,18 @@ export default function chatOps({
 
             functionResponses.forEach((toolResponse) => {
                 const toolName = String(toolResponse.name ?? "");
-                addRunningStep(`Received ${normalizeToolName(toolName)} results`, {
+                addRunningStep(
+                    buildSpinnerLabel({
+                        kind: "received",
+                        subject: normalizeToolName(toolName),
+                        suffix: "results",
+                        sequence: streamStepCounterRef.current,
+                    }),
+                    {
                     tool: toolName,
                     response: toolResponse.response ?? {},
-                });
+                    }
+                );
             });
 
             if (visibleText) {
@@ -805,8 +825,7 @@ export default function chatOps({
     // ============ RENDER ============
 
     return (
-        // <div className="flex w-full -m-10 h-[calc(100vh-64px)] overflow-hidden bg-white">
-        <div className="-m-10 flex h-screen overflow-hidden bg-white">
+        <div className="-m-10 flex h-[calc(100vh-73px)] min-h-0 overflow-hidden bg-white">
             {/* Left Sidebar - Sessions */}
             <ChatSidebar
                 sessions={sessions}
@@ -824,7 +843,7 @@ export default function chatOps({
             />
 
             {/* Center - Chat Area */}
-            <section className="flex min-w-0 flex-1 flex-col overflow-hidden">
+            <section className="flex min-w-0 flex-1 min-h-0 flex-col overflow-hidden">
                 <ChatHeader
                     assistantDisplayName={assistantDisplayName}
                     appName={appName}

@@ -2,8 +2,8 @@
 
 import { Bot, Check, Copy, Mic, Plus, RotateCcw, Send, ThumbsDown, ThumbsUp, User } from "lucide-react";
 import { forwardRef } from "react";
-import type { ChatMessagesProps} from "../types";
 import { formatTime, renderMarkdownBlocks, renderMilestones } from "../chat_helpers";
+import type { ChatMessagesProps } from "../types";
 
 
 

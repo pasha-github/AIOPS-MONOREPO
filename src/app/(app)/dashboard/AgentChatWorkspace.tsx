@@ -1,5 +1,6 @@
 "use client";
 
+import { buildSpinnerLabel } from "@/Spinnerverb";
 import { trimTrailingSlash } from "@/config/agent";
 import { useRuntimeConfig } from "@/config/runtime-config";
 import {
@@ -39,12 +40,579 @@ import { useChatActions } from "../dashboard/help/useChatActions";
 
 const DEFAULT_USER_ID = "user";
 
+const getSessionsUrl = (adkBaseUrl: string, appName: string, userId: string) =>
+  `${adkBaseUrl}/apps/${encodeURIComponent(appName)}/users/${encodeURIComponent(
+    userId
+  )}/sessions`;
+
+const getSessionUrl = (
+  adkBaseUrl: string,
+  appName: string,
+  userId: string,
+  sessionId: string
+) => `${getSessionsUrl(adkBaseUrl, appName, userId)}/${encodeURIComponent(sessionId)}`;
+
+const getRunSseUrl = (adkBaseUrl: string) => `${adkBaseUrl}/run_sse`;
+
+const resolveAdkBaseUrl = (value: string) => {
+  const trimmed = trimTrailingSlash(value.trim());
+  if (!trimmed) {
+    throw new Error("NEXT_PUBLIC_AGENT_ADK_BASE_URL is not configured.");
+  }
+
+  return trimmed.endsWith("/agent-server")
+    ? trimmed
+    : `${trimmed}/agent-server`;
+};
+
+type StreamStep = {
+  id: string;
+  label: string;
+  status: "running" | "done";
+  details?: string;
+};
+
+const formatMilestoneDetails = (value: unknown) => {
+  if (value === undefined || value === null) {
+    return "";
+  }
+  if (typeof value === "string") {
+    return value;
+  }
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
+};
+
+const renderMilestones = (
+  steps: StreamStep[],
+  expandedState: Record<string, boolean>,
+  onToggle: (stepId: string) => void
+) => (
+  <div className="mb-3 rounded-xl border border-[#d4dcf6] bg-white/60 px-3 py-2">
+    <div className="space-y-2">
+      {steps.map((step, index) => (
+        <div key={step.id} className="flex gap-2">
+          <div className="flex w-4 shrink-0 flex-col items-center">
+            <span
+              className={`inline-flex h-4 w-4 items-center justify-center rounded-full ${step.status === "done"
+                  ? "bg-[#dcfce7] text-[#16a34a]"
+                  : "bg-[#e0e7ff] text-[#4f49e2]"
+                }`}
+            >
+              {step.status === "done" ? (
+                <Check className="h-2.5 w-2.5" />
+              ) : (
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" />
+              )}
+            </span>
+            {index < steps.length - 1 ? (
+              <span className="mt-1 h-4 w-px bg-[#c5d0f5]" />
+            ) : null}
+          </div>
+          <div className="min-w-0 flex-1">
+            <button
+              type="button"
+              onClick={() => onToggle(step.id)}
+              disabled={!step.details}
+              className={`flex w-full items-center justify-between gap-2 text-left ${step.details ? "cursor-pointer" : "cursor-default"
+                }`}
+            >
+              <span
+                className={`text-xs ${step.status === "done" ? "text-[#374151]" : "font-semibold text-[#1f2937]"
+                  }`}
+              >
+                {step.label}
+              </span>
+              {step.details ? (
+                expandedState[step.id] ? (
+                  <ChevronDown className="h-3.5 w-3.5 shrink-0 text-[#64748b]" />
+                ) : (
+                  <ChevronRight className="h-3.5 w-3.5 shrink-0 text-[#64748b]" />
+                )
+              ) : null}
+            </button>
+            {step.details && expandedState[step.id] ? (
+              <pre className="mt-2 max-h-56 overflow-auto rounded-lg border border-[#dbe2f0] bg-white/80 p-2 text-[11px] leading-5 text-[#334155]">
+                {step.details}
+              </pre>
+            ) : null}
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+const mergeStreamingText = (currentText: string, incomingText: string): string => {
+  if (!incomingText) {
+    return currentText;
+  }
+  if (!currentText) {
+    return incomingText;
+  }
+  if (incomingText.startsWith(currentText)) {
+    return incomingText;
+  }
+  if (currentText.endsWith(incomingText)) {
+    return currentText;
+  }
+  return `${currentText}${incomingText}`;
+};
+
+type AdkSsePayload = {
+  partial?: boolean;
+  error?: string;
+  content?: AdkContent | null;
+  actions?: {
+    requestedToolConfirmations?: Record<string, unknown> | null;
+  } | null;
+};
+
+const parseSsePayload = (rawData: string): AdkSsePayload | null => {
+  try {
+    return JSON.parse(rawData) as AdkSsePayload;
+  } catch {
+    return null;
+  }
+};
+
+const normalizeToolName = (value: string) =>
+  value
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const extractVisibleTextFromParts = (parts: AdkPart[]) =>
+  parts
+    .filter((part) => typeof part.text === "string" && !part.thought)
+    .map((part) => part.text ?? "")
+    .join("");
+
+const extractFunctionCalls = (parts: AdkPart[]) =>
+  parts
+    .map((part) => part.functionCall)
+    .filter((call): call is AdkFunctionCall => Boolean(call?.name));
+
+const extractFunctionResponses = (parts: AdkPart[]) =>
+  parts
+    .map((part) => part.functionResponse)
+    .filter((response): response is AdkFunctionResponse => Boolean(response?.name));
+
+const summarizeStreamError = (errorText: string) => {
+  const compact = errorText.replace(/\s+/g, " ").trim();
+  if (compact.toLowerCase().includes("reasoning_content")) {
+    return "Model rejected reasoning content from a prior step. Start a new session and try again.";
+  }
+  if (compact.length <= 180) {
+    return compact;
+  }
+  return "Agent failed while generating a response.";
+};
+
+const formatTime = (timestamp?: number | null) => {
+  if (!timestamp || Number.isNaN(timestamp)) {
+    return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  }
+  const value = timestamp > 9999999999 ? timestamp : timestamp * 1000;
+  return new Date(value).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+};
+
+const normalizeRole = (event: AdkEvent): ChatMessage["role"] | null => {
+  const contentRole = String(event.content?.role ?? "").toLowerCase();
+  if (contentRole === "user") {
+    return "user";
+  }
+  if (contentRole === "model") {
+    return "agent";
+  }
+  const author = String(event.author ?? "").toLowerCase();
+  if (author.includes("user")) {
+    return "user";
+  }
+  if (author) {
+    return "agent";
+  }
+  return null;
+};
+
+const mapEventsToMessages = (events: AdkEvent[] | null | undefined) => {
+  const source = Array.isArray(events) ? events : [];
+  const messages: ChatMessage[] = [];
+  const milestonesByMessageId: Record<string, StreamStep[]> = {};
+  let pendingMilestones: StreamStep[] = [];
+  let stepCounter = 0;
+
+  const addPendingMilestone = (label: string, details?: unknown) => {
+    const cleanLabel = label.trim();
+    if (!cleanLabel) {
+      return;
+    }
+    stepCounter += 1;
+    pendingMilestones.push({
+      id: `history-step-${stepCounter}`,
+      label: cleanLabel,
+      status: "done",
+      details: formatMilestoneDetails(details),
+    });
+  };
+
+  source.forEach((event, index) => {
+    const parts = Array.isArray(event.content?.parts) ? event.content.parts : [];
+    const functionCalls = extractFunctionCalls(parts);
+    const functionResponses = extractFunctionResponses(parts);
+    functionCalls.forEach((toolCall) => {
+      const toolName = String(toolCall.name ?? "");
+      addPendingMilestone(
+        buildSpinnerLabel({
+          kind: "running",
+          subject: normalizeToolName(toolName),
+          sequence: stepCounter,
+        }),
+        {
+          tool: toolName,
+          args: toolCall.args ?? {},
+        }
+      );
+    });
+    functionResponses.forEach((toolResponse) => {
+      const toolName = String(toolResponse.name ?? "");
+      addPendingMilestone(
+        buildSpinnerLabel({
+          kind: "received",
+          subject: normalizeToolName(toolName),
+          suffix: "results",
+          sequence: stepCounter,
+        }),
+        {
+          tool: toolName,
+          response: toolResponse.response ?? {},
+        }
+      );
+    });
+
+    const text = extractVisibleTextFromParts(parts).trim();
+    const role = normalizeRole(event);
+    if (!text || !role) {
+      return;
+    }
+
+    const messageId = String(event.id ?? `${role}-${index}`);
+    messages.push({
+      id: messageId,
+      role,
+      text,
+      timeLabel: formatTime(event.timestamp),
+    });
+
+    if (role === "agent" && pendingMilestones.length > 0) {
+      milestonesByMessageId[messageId] = pendingMilestones.map((step) => ({
+        ...step,
+        id: `${messageId}-${step.id}`,
+      }));
+      pendingMilestones = [];
+    }
+  });
+
+  return {
+    messages,
+    milestonesByMessageId,
+  };
+};
+
+const renderMarkdownInline = (text: string, keyPrefix = ""): ReactNode[] => {
+  const nodes: ReactNode[] = [];
+  const pattern = /(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`|\[[^\]]+\]\([^)]+\))/g;
+  let cursor = 0;
+  let match: RegExpExecArray | null;
+  let key = 0;
+
+  while ((match = pattern.exec(text)) !== null) {
+    const token = match[0];
+    const start = match.index;
+    if (start > cursor) {
+      nodes.push(text.slice(cursor, start));
+    }
+
+    if (token.startsWith("**") && token.endsWith("**")) {
+      nodes.push(
+        <strong key={`md-${keyPrefix}-${key++}`}>{token.slice(2, -2)}</strong>
+      );
+    } else if (token.startsWith("*") && token.endsWith("*")) {
+      nodes.push(<em key={`md-${keyPrefix}-${key++}`}>{token.slice(1, -1)}</em>);
+    } else if (token.startsWith("`") && token.endsWith("`")) {
+      nodes.push(
+        <code
+          key={`md-${keyPrefix}-${key++}`}
+          className="rounded bg-black/5 px-1 py-0.5 text-[0.95em]"
+        >
+          {token.slice(1, -1)}
+        </code>
+      );
+    } else if (token.startsWith("[") && token.includes("](") && token.endsWith(")")) {
+      const linkMatch = token.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+      if (linkMatch) {
+        nodes.push(
+          <a
+            key={`md-${keyPrefix}-${key++}`}
+            href={linkMatch[2]}
+            target="_blank"
+            rel="noreferrer"
+            className="text-[#3b5bdb] underline"
+          >
+            {linkMatch[1]}
+          </a>
+        );
+      } else {
+        nodes.push(token);
+      }
+    } else {
+      nodes.push(token);
+    }
+    cursor = start + token.length;
+  }
+
+  if (cursor < text.length) {
+    nodes.push(text.slice(cursor));
+  }
+  return nodes;
+};
+
+const renderInlineWithLineBreaks = (lines: string[], keyPrefix: string): ReactNode[] =>
+  lines.flatMap((line, index) => {
+    const nodes = renderMarkdownInline(line, `${keyPrefix}-line-${index}`);
+    if (index < lines.length - 1) {
+      return [...nodes, <br key={`${keyPrefix}-br-${index}`} />];
+    }
+    return nodes;
+  });
+
+const parseTableRow = (line: string): string[] =>
+  line
+    .trim()
+    .replace(/^\|/, "")
+    .replace(/\|$/, "")
+    .split("|")
+    .map((cell) => cell.trim());
+
+const isTableSeparatorLine = (line: string): boolean => {
+  const cells = parseTableRow(line);
+  return cells.length > 0 && cells.every((cell) => /^:?-{3,}:?$/.test(cell));
+};
+
+const isHeadingLine = (line: string) => /^(#{1,6})\s+.+$/.test(line.trim());
+const isUnorderedListLine = (line: string) => /^[-*]\s+.+$/.test(line.trim());
+const isOrderedListLine = (line: string) => /^\d+\.\s+.+$/.test(line.trim());
+const isHrLine = (line: string) => /^(\*\*\*|---|___)\s*$/.test(line.trim());
+const isCodeFenceLine = (line: string) => line.trim().startsWith("```");
+
+const renderMarkdownBlocks = (text: string): ReactNode[] => {
+  const lines = text.replace(/\r\n/g, "\n").split("\n");
+  const blocks: ReactNode[] = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    if (!trimmed) {
+      i += 1;
+      continue;
+    }
+
+    if (isCodeFenceLine(trimmed)) {
+      const codeLines: string[] = [];
+      i += 1;
+      while (i < lines.length && !isCodeFenceLine(lines[i])) {
+        codeLines.push(lines[i]);
+        i += 1;
+      }
+      if (i < lines.length && isCodeFenceLine(lines[i])) {
+        i += 1;
+      }
+      blocks.push(
+        <pre
+          key={`block-code-${i}`}
+          className="overflow-x-auto rounded-xl bg-black/90 px-3 py-2 text-xs text-white"
+        >
+          <code>{codeLines.join("\n")}</code>
+        </pre>
+      );
+      continue;
+    }
+
+    const headingMatch = trimmed.match(/^(#{1,6})\s+(.+)$/);
+    if (headingMatch) {
+      const hashes = headingMatch[1].length;
+      const headingText = headingMatch[2];
+      const content = renderMarkdownInline(headingText, `heading-${i}`);
+      if (hashes === 1) {
+        blocks.push(
+          <h1 key={`block-h1-${i}`} className="text-xl font-bold leading-8">
+            {content}
+          </h1>
+        );
+      } else if (hashes === 2) {
+        blocks.push(
+          <h2 key={`block-h2-${i}`} className="text-lg font-bold leading-7">
+            {content}
+          </h2>
+        );
+      } else {
+        blocks.push(
+          <h3 key={`block-hx-${i}`} className="text-base font-semibold leading-6">
+            {content}
+          </h3>
+        );
+      }
+      i += 1;
+      continue;
+    }
+
+    if (
+      line.includes("|") &&
+      i + 1 < lines.length &&
+      isTableSeparatorLine(lines[i + 1])
+    ) {
+      const headers = parseTableRow(line);
+      i += 2;
+      const rows: string[][] = [];
+      while (i < lines.length) {
+        const rowLine = lines[i];
+        if (!rowLine.trim() || !rowLine.includes("|")) {
+          break;
+        }
+        rows.push(parseTableRow(rowLine));
+        i += 1;
+      }
+
+      blocks.push(
+        <div key={`block-table-${i}`} className="overflow-x-auto rounded-xl border border-[#dbe2f0] bg-white/70">
+          <table className="min-w-full border-collapse text-left text-xs">
+            <thead className="bg-[#eef2ff] text-[#1f2937]">
+              <tr>
+                {headers.map((header, headerIndex) => (
+                  <th
+                    key={`table-head-${i}-${headerIndex}`}
+                    className="border-b border-[#dbe2f0] px-3 py-2 font-semibold"
+                  >
+                    {renderMarkdownInline(header, `table-head-${i}-${headerIndex}`)}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, rowIndex) => (
+                <tr key={`table-row-${i}-${rowIndex}`} className="border-b border-[#e8edf7]">
+                  {headers.map((_, colIndex) => (
+                    <td key={`table-col-${i}-${rowIndex}-${colIndex}`} className="px-3 py-2 align-top">
+                      {renderMarkdownInline(
+                        row[colIndex] ?? "",
+                        `table-cell-${i}-${rowIndex}-${colIndex}`
+                      )}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+      continue;
+    }
+
+    if (isUnorderedListLine(line)) {
+      const listItems: string[] = [];
+      while (i < lines.length && isUnorderedListLine(lines[i])) {
+        listItems.push(lines[i].trim().replace(/^[-*]\s+/, ""));
+        i += 1;
+      }
+      blocks.push(
+        <ul key={`block-ul-${i}`} className="list-disc space-y-1 pl-5">
+          {listItems.map((item, itemIndex) => (
+            <li key={`ul-item-${i}-${itemIndex}`}>
+              {renderMarkdownInline(item, `ul-${i}-${itemIndex}`)}
+            </li>
+          ))}
+        </ul>
+      );
+      continue;
+    }
+
+    if (isOrderedListLine(line)) {
+      const listItems: string[] = [];
+      while (i < lines.length && isOrderedListLine(lines[i])) {
+        listItems.push(lines[i].trim().replace(/^\d+\.\s+/, ""));
+        i += 1;
+      }
+      blocks.push(
+        <ol key={`block-ol-${i}`} className="list-decimal space-y-1 pl-5">
+          {listItems.map((item, itemIndex) => (
+            <li key={`ol-item-${i}-${itemIndex}`}>
+              {renderMarkdownInline(item, `ol-${i}-${itemIndex}`)}
+            </li>
+          ))}
+        </ol>
+      );
+      continue;
+    }
+
+    if (isHrLine(line)) {
+      blocks.push(<hr key={`block-hr-${i}`} className="border-[#dbe2f0]" />);
+      i += 1;
+      continue;
+    }
+
+    const paragraphLines: string[] = [];
+    while (i < lines.length) {
+      const current = lines[i];
+      const currentTrim = current.trim();
+      const nextLine = i + 1 < lines.length ? lines[i + 1] : "";
+      if (
+        !currentTrim ||
+        isHeadingLine(current) ||
+        isUnorderedListLine(current) ||
+        isOrderedListLine(current) ||
+        isHrLine(current) ||
+        isCodeFenceLine(current) ||
+        (current.includes("|") && isTableSeparatorLine(nextLine))
+      ) {
+        break;
+      }
+      paragraphLines.push(current);
+      i += 1;
+    }
+
+    if (paragraphLines.length > 0) {
+      blocks.push(
+        <p key={`block-p-${i}`} className="leading-7">
+          {renderInlineWithLineBreaks(paragraphLines, `p-${i}`)}
+        </p>
+      );
+      continue;
+    }
+
+    i += 1;
+  }
+
+  return blocks;
+};
+
+const sortSessions = (sessions: AdkSession[]) =>
+  [...sessions].sort((a, b) => {
+    const aTime = Number(a.lastUpdateTime ?? 0);
+    const bTime = Number(b.lastUpdateTime ?? 0);
+    return bTime - aTime;
+  });
+
 export default function AgentChatWorkspace({
   agent,
   onClose,
 }: AgentChatWorkspaceProps) {
   const { agentAdkBaseUrl } = useRuntimeConfig();
-  const adkBaseUrl = trimTrailingSlash(agentAdkBaseUrl);
+  const adkBaseUrl = resolveAdkBaseUrl(agentAdkBaseUrl);
   const appName = agent.agentId;
   const assistantDisplayName = agent.name?.trim() || appName;
   const userId = DEFAULT_USER_ID;
@@ -207,8 +775,203 @@ export default function AgentChatWorkspace({
     return [...messages, pendingUserMessage];
   }, [messages, pendingUserMessage]);
 
-  const isInitialSessionView =
-    !isLoadingMessages && !isStreamingReply && visibleMessages.length === 0;
+    lines.forEach((line) => {
+      if (line.startsWith("data:")) {
+        dataLines.push(line.slice(5).trimStart());
+      }
+    });
+
+    const rawData = dataLines.join("\n").trim();
+    if (!rawData) {
+      return true;
+    }
+    if (rawData === "[DONE]") {
+      completeLastRunningStep();
+      return true;
+    }
+
+    const payload = parseSsePayload(rawData);
+    if (!payload) {
+      return true;
+    }
+
+    if (payload.error) {
+      addRunningStep("Request failed", { error: payload.error });
+      completeLastRunningStep();
+      setSendError(summarizeStreamError(payload.error));
+      return false;
+    }
+
+    const parts = Array.isArray(payload.content?.parts) ? payload.content.parts : [];
+    const visibleText = extractVisibleTextFromParts(parts);
+    const functionCalls = extractFunctionCalls(parts);
+    const functionResponses = extractFunctionResponses(parts);
+
+    functionCalls.forEach((toolCall) => {
+      const toolName = String(toolCall.name ?? "");
+      addRunningStep(
+        buildSpinnerLabel({
+          kind: "running",
+          subject: normalizeToolName(toolName),
+          sequence: streamStepCounterRef.current,
+        }),
+        {
+          tool: toolName,
+          args: toolCall.args ?? {},
+        }
+      );
+    });
+
+    const confirmations = payload.actions?.requestedToolConfirmations;
+    if (
+      confirmations &&
+      Object.keys(confirmations).length > 0 &&
+      functionCalls.length === 0
+    ) {
+      addRunningStep("Awaiting tool confirmation");
+    }
+
+    functionResponses.forEach((toolResponse) => {
+      const toolName = String(toolResponse.name ?? "");
+      addRunningStep(
+        buildSpinnerLabel({
+          kind: "received",
+          subject: normalizeToolName(toolName),
+          suffix: "results",
+          sequence: streamStepCounterRef.current,
+        }),
+        {
+          tool: toolName,
+          response: toolResponse.response ?? {},
+        }
+      );
+    });
+
+    if (visibleText) {
+      const mergedText = mergeStreamingText(streamTargetTextRef.current, visibleText);
+      if (payload.partial === false) {
+        updateStreamingTargetText(mergedText);
+        completeLastRunningStep();
+      } else {
+        updateStreamingTargetText(mergedText);
+      }
+    } else if (payload.partial === false && functionCalls.length === 0) {
+      completeLastRunningStep();
+    }
+
+    return true;
+  }, [addRunningStep, completeLastRunningStep, updateStreamingTargetText]);
+
+  const runPromptSse = useCallback(async (sessionId: string, prompt: string) => {
+    const response = await fetch(getRunSseUrl(adkBaseUrl), {
+      method: "POST",
+      headers: {
+        accept: "text/event-stream",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        appName,
+        userId,
+        sessionId,
+        streaming: true,
+        newMessage: {
+          role: "user",
+          parts: [{ text: prompt }],
+        },
+      }),
+    });
+    console.log("SSE response status:", response);
+    if (!response.ok || !response.body) {
+      return false;
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let streamOk = true;
+    let shouldStop = false;
+
+    while (!shouldStop) {
+      const { value, done } = await reader.read();
+      if (done) {
+        break;
+      }
+
+      buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, "\n");
+      let separatorIndex = buffer.indexOf("\n\n");
+
+      while (separatorIndex !== -1) {
+        const frame = buffer.slice(0, separatorIndex).trim();
+        buffer = buffer.slice(separatorIndex + 2);
+        if (frame) {
+          const frameOk = processSseFrame(frame);
+          if (!frameOk) {
+            streamOk = false;
+            shouldStop = true;
+            break;
+          }
+        }
+        separatorIndex = buffer.indexOf("\n\n");
+      }
+    }
+
+    if (shouldStop) {
+      try {
+        await reader.cancel();
+      } catch {
+        // no-op
+      }
+    } else {
+      const tail = buffer.trim();
+      if (tail) {
+        const tailOk = processSseFrame(tail);
+        if (!tailOk) {
+          streamOk = false;
+        }
+      }
+    }
+
+    completeLastRunningStep();
+    return streamOk;
+  }, [appName, completeLastRunningStep, processSseFrame, userId]);
+
+  useEffect(() => {
+    void loadSessions();
+  }, [loadSessions]);
+
+  const createSession = useCallback(
+    async () => {
+      setSessionsError("");
+      try {
+        const response = await fetch(getSessionsUrl(adkBaseUrl, appName, userId), {
+          method: "POST",
+          headers: {
+            accept: "application/json",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({}),
+        });
+        const payload = (await response.json()) as AdkSession;
+        if (!response.ok || !payload?.id) {
+          setSessionsError("Unable to create session.");
+          return null;
+        }
+
+        setSessions((prev) => sortSessions([payload, ...prev.filter((item) => item.id !== payload.id)]));
+        setSelectedSessionId(payload.id);
+        setIsDraftSession(false);
+        const mapped = mapEventsToMessages(payload.events);
+        setMessages(mapped.messages);
+        setMessageMilestones(mapped.milestonesByMessageId);
+        setExpandedMilestones({});
+        return payload.id;
+      } catch {
+        setSessionsError("Unable to create session.");
+        return null;
+      }
+    },
+    [appName, userId]
+  );
 
   const startNewChat = () => {
     setSelectedSessionId(null);
@@ -222,6 +985,167 @@ export default function AgentChatWorkspace({
     setStreamSteps([]);
     setDraft("");
   };
+
+  const deleteSession = useCallback(
+    async (sessionId: string) => {
+      setDeletingSessionId(sessionId);
+      setSessionsError("");
+      try {
+        const response = await fetch(getSessionUrl(adkBaseUrl, appName, userId, sessionId), {
+          method: "DELETE",
+          headers: { accept: "application/json" },
+        });
+        if (!response.ok) {
+          setSessionsError("Unable to delete session.");
+          return;
+        }
+
+        const nextSessions = sessions.filter((item) => item.id !== sessionId);
+        setSessions(nextSessions);
+        setOpenMenuSessionId(null);
+        if (selectedSessionId === sessionId) {
+          const nextId = nextSessions[0]?.id ?? null;
+          setSelectedSessionId(nextId);
+          setIsDraftSession(false);
+          if (nextId) {
+            await loadSessionMessages(nextId);
+          } else {
+            setMessages([]);
+            setMessageMilestones({});
+          }
+        }
+      } catch {
+        setSessionsError("Unable to delete session.");
+      } finally {
+        setDeletingSessionId(null);
+      }
+    },
+    [appName, userId, sessions, selectedSessionId, loadSessionMessages]
+  );
+
+  const sendPrompt = useCallback(
+    async (prompt: string, options?: { optimisticUser?: boolean }) => {
+      const text = prompt.trim();
+      if (!text || isSending) {
+        return false;
+      }
+
+      if (options?.optimisticUser) {
+        setPendingUserMessage({
+          id: `pending-user-${Date.now()}`,
+          role: "user",
+          text,
+          timeLabel: formatTime(),
+        });
+      }
+
+      setSendError("");
+      setIsSending(true);
+      startStreamingState();
+
+      try {
+        let sessionId = selectedSessionId;
+        if (!sessionId) {
+          sessionId = await createSession();
+        }
+        if (!sessionId) {
+          setSendError("No session available. Create a new session first.");
+          setPendingUserMessage(null);
+          return false;
+        }
+
+        const streamed = await runPromptSse(sessionId, text);
+
+        if (!streamed) {
+          setSendError((prev) => prev || "Unable to send message.");
+          setPendingUserMessage(null);
+          return false;
+        }
+
+        await loadSessions({ preferredSessionId: sessionId, silent: true });
+        setPendingUserMessage(null);
+        return true;
+      } catch {
+        setSendError("Unable to send message.");
+        setPendingUserMessage(null);
+        return false;
+      } finally {
+        setIsSending(false);
+        setIsStreamingReply(false);
+        resetStreamingText();
+        streamStepsRef.current = [];
+        setStreamSteps([]);
+      }
+    },
+    [
+      createSession,
+      isSending,
+      loadSessions,
+      resetStreamingText,
+      runPromptSse,
+      selectedSessionId,
+      startStreamingState,
+    ]
+  );
+
+  const sendMessage = useCallback(async () => {
+    setSendError("");
+    const prompt = draft.trim();
+    if (!prompt || isSending) {
+      return;
+    }
+
+    setDraft("");
+    const sent = await sendPrompt(prompt, { optimisticUser: true });
+    if (!sent) {
+      setDraft(prompt);
+    }
+  }, [draft, isSending, sendPrompt]);
+
+  const lastUserPrompt = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+      if (messages[i].role === "user") {
+        return messages[i].text;
+      }
+    }
+    return "";
+  }, [messages]);
+
+  const retryLastPrompt = useCallback(async () => {
+    if (!lastUserPrompt || isSending) {
+      return;
+    }
+    await sendPrompt(lastUserPrompt);
+  }, [isSending, lastUserPrompt, sendPrompt]);
+
+  const selectSession = useCallback(
+    (sessionId: string) => {
+      setSelectedSessionId(sessionId);
+      setIsDraftSession(false);
+      setOpenMenuSessionId(null);
+      void loadSessionMessages(sessionId);
+    },
+    [loadSessionMessages]
+  );
+
+  const copyMessage = async (messageId: string, text: string) => {
+    if (!navigator?.clipboard) {
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedMessageId(messageId);
+      if (copyResetTimerRef.current) {
+        window.clearTimeout(copyResetTimerRef.current);
+      }
+      copyResetTimerRef.current = window.setTimeout(() => {
+        setCopiedMessageId((prev) => (prev === messageId ? null : prev));
+      }, 1400);
+    } catch {
+      // no-op
+    }
+  };
+
   const selectedSessionLabel = useMemo(
     () =>
       selectedSessionId
@@ -274,22 +1198,14 @@ export default function AgentChatWorkspace({
                 return (
                   <div
                     key={session.id}
+                    onClick={() => selectSession(session.id)}
                     className={`mb-2 rounded-xl border px-3 py-2 ${isActive
-                      ? "border-[#c9d1ff] bg-[#eef2ff]"
-                      : "border-[#e8ecf4] bg-white"
-                      }`}
+                        ? "border-[#c9d1ff] bg-[#eef2ff]"
+                        : "border-[#e8ecf4] bg-white"
+                      } cursor-pointer`}
                   >
                     <div className="flex items-start gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedSessionId(session.id);
-                          setIsDraftSession(false);
-                          setOpenMenuSessionId(null);
-                          void loadSessionMessages(session.id);
-                        }}
-                        className="flex min-w-0 flex-1 items-start gap-2 text-left"
-                      >
+                      <div className="flex min-w-0 flex-1 items-start gap-2 text-left">
                         <MessageSquare className="mt-0.5 h-4 w-4 shrink-0 text-[#4f49e2]" />
                         <span className="line-clamp-2 text-xs font-semibold text-[#1f2937]">
                           {session.state?.first_message_summary ? (
@@ -301,15 +1217,16 @@ export default function AgentChatWorkspace({
                             </span>
                           )}
                         </span>
-                      </button>
+                      </div>
                       <div className="relative" data-session-menu="true">
                         <button
                           type="button"
-                          onClick={() =>
+                          onClick={(event) => {
+                            event.stopPropagation();
                             setOpenMenuSessionId((prev) =>
                               prev === session.id ? null : session.id
-                            )
-                          }
+                            );
+                          }}
                           className="inline-flex h-7 w-7 items-center justify-center rounded-full text-[#6b7280] hover:bg-[#eef2ff] hover:text-[#4f49e2]"
                           aria-label="Session actions"
                           title="Session actions"
@@ -320,7 +1237,10 @@ export default function AgentChatWorkspace({
                           <div className="absolute right-0 z-20 mt-1 w-28 overflow-hidden rounded-lg border border-[#e5e7eb] bg-white shadow-[0_12px_24px_-20px_rgba(15,23,42,0.35)]">
                             <button
                               type="button"
-                              onClick={() => void deleteSession(session.id)}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                void deleteSession(session.id);
+                              }}
                               disabled={deletingSessionId === session.id}
                               className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-[#b91c1c] hover:bg-[#fff1f2] disabled:cursor-not-allowed disabled:opacity-70"
                             >

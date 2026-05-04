@@ -7,6 +7,7 @@ import {
   Link2,
   MessageSquare,
   Network,
+  Sparkles,
   Users,
   Workflow,
 } from "lucide-react";
@@ -29,8 +30,6 @@ type NavSection = {
   title: string;
   items: NavItem[];
 };
-
-const ENABLE_CREDENTIALS_MANAGEMENT = true;
 
 const navSections: NavSection[] = [
   {
@@ -58,6 +57,36 @@ const navSections: NavSection[] = [
     ],
   },
   {
+    title: "Integrations",
+    items: [
+      {
+        label: "Connectors",
+        id: "integrations-connectors",
+        icon: <Link2 className="h-5 w-5" />,
+        href: "/connectors",
+        reloadOnNavigate: true,
+      },
+      {
+        label: "Model Context Protocol",
+        id: "integrations-model-context-protocol",
+        icon: (
+          <img
+            src="/img/mcp.png"
+            alt="MCP"
+            className="block h-5 w-5"
+          />
+        ),
+        href: "/mcp",
+      },
+      {
+        label: "Skills",
+        id: "integrations-skills",
+        icon: <Sparkles className="h-5 w-5" />,
+        href: "/skills",
+      },
+    ],
+  },
+  {
     title: "Platform",
     items: [
       {
@@ -66,30 +95,15 @@ const navSections: NavSection[] = [
         icon: <Bot className="h-5 w-5" />,
         href: "/agent-management",
       },
-      
       {
         label: "LLM Management",
         id: "platform-llm-management",
         icon: <Workflow className="h-5 w-5" />,
         href: "/llm-management",
       },
-    ],
-  },
-  {
-    title: "Operations",
-    items: [
-      {
-        label: "Connectors",
-        id: "operations-connectors",
-        icon: <Link2 className="h-5 w-5" />,
-
-        href: "/connectors",
-        disabled: !ENABLE_CREDENTIALS_MANAGEMENT,
-        reloadOnNavigate: true,
-      },
       {
         label: "User Management",
-        id: "operations-user-management",
+        id: "platform-user-management",
         icon: <Users className="h-5 w-5" />,
         href: "/user-management",
       },
@@ -113,20 +127,20 @@ export default function LeftNavbar() {
   const pathname = usePathname();
 
   return (
-    <aside className="peer group fixed left-0 top-0 z-40 flex h-screen w-[84px] shrink-0 flex-col border-r border-[#eaedf6] bg-white px-4 py-6 transition-all duration-300 hover:w-[300px]">
+    <aside className="peer group fixed left-0 top-0 z-40 flex h-screen w-[84px] shrink-0 flex-col border-r border-[#eaedf6] bg-white px-4 py-4 transition-all duration-300 hover:w-[300px]">
       <div className="flex items-center gap-3">
-        <div className="flex w-11 items-center justify-center transition-all duration-300 group-hover:w-0 group-hover:opacity-0 group-hover:overflow-hidden">
+        <div className="flex w-10 items-center justify-center transition-all duration-300 group-hover:w-0 group-hover:overflow-hidden group-hover:opacity-0">
           <img
             src="/img/rc-small.png"
             alt="Royal Cyber"
-            className="h-10 w-10"
+            className="h-9 w-9"
           />
         </div>
         <div className="flex w-0 items-center gap-3 overflow-hidden opacity-0 transition-all duration-300 group-hover:w-auto group-hover:opacity-100">
           <img
             src="/img/royal-cyber.png"
             alt="Royal Cyber"
-            className="h-[5.25rem] w-auto"
+            className="h-[4.25rem] w-auto"
           />
           <div>
             <p className="text-sm font-semibold text-[#4f49e2]">Royal Cyber</p>
@@ -137,33 +151,42 @@ export default function LeftNavbar() {
         </div>
       </div>
 
-      <nav className="no-scrollbar mt-8 flex-1 space-y-6 overflow-y-auto pr-2">
+      <nav className="no-scrollbar mt-6 flex-1 space-y-1 overflow-y-hidden pr-1 transition-all duration-300 group-hover:space-y-4">
         {navSections.map((section) => (
-          <div key={section.title} className="space-y-3">
-            <div className="flex items-center gap-3">
-              <p className="whitespace-nowrap text-xs font-semibold uppercase tracking-[0.18em] text-[#6b7280] opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+          <div
+            key={section.title}
+            className="space-y-1 transition-all duration-300 group-hover:space-y-2.5"
+          >
+            <div className="flex max-h-0 items-center gap-3 overflow-hidden opacity-0 transition-all duration-300 group-hover:max-h-8 group-hover:opacity-100">
+              <p className="whitespace-nowrap text-xs font-semibold uppercase tracking-[0.18em] text-[#6b7280]">
                 {section.title}
               </p>
-              <span className="h-px flex-1 bg-[#d6dcea] opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+              <span className="h-px flex-1 bg-[#d6dcea]" />
             </div>
-            <div className="space-y-1">
+            <div className="space-y-0.5">
               {section.items.map((item) => {
                 const isDisabled = Boolean(item.disabled);
+                const isMcpItem =
+                  item.id === "integrations-model-context-protocol";
                 const isActive =
                   !isDisabled && item.href && item.href !== "#"
                     ? pathname === item.href ||
                       pathname?.startsWith(`${item.href}/`)
                     : item.active;
                 const baseClasses =
-                  "group/item relative flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-left text-sm font-medium transition";
+                  "group/item relative flex w-full items-center gap-3 rounded-2xl px-1 py-1.5 text-left text-sm font-medium transition";
                 const stateClasses = isDisabled
                   ? "cursor-not-allowed bg-[#f4f6fb] text-[#9aa3b6]"
                   : isActive
                     ? "bg-[#e9edff] text-[#3f35d3]"
                     : "text-[#677189] hover:bg-[#f3f5ff] hover:text-[#1b1f2a]";
                 const iconClasses = isDisabled
-                  ? "relative flex h-9 w-9 items-center justify-center rounded-xl bg-[#edf1f7] text-[#a6afc1]"
-                  : "relative flex h-9 w-9 items-center justify-center rounded-xl bg-white text-[#566079] shadow-[0_1px_2px_rgba(0,0,0,0.06)] transition group-hover/item:text-[#3f35d3]";
+                  ? `relative flex items-center justify-center rounded-xl bg-[#edf1f7] text-[#a6afc1] ${
+                      isMcpItem ? "h-9 w-9" : "h-9 w-9"
+                    }`
+                  : `relative flex items-center justify-center rounded-xl bg-white text-[#566079] shadow-[0_1px_2px_rgba(0,0,0,0.06)] transition group-hover/item:text-[#3f35d3] ${
+                      isMcpItem ? "h-9 w-9" : "h-8 w-8"
+                    }`;
                 const itemContent = (
                   <>
                     {isActive ? (
@@ -185,12 +208,12 @@ export default function LeftNavbar() {
                   </>
                 );
 
-                if (isDisabled) {
+                if (isDisabled || !item.href) {
                   return (
                     <div
                       key={item.id}
                       title={item.label}
-                      aria-disabled="true"
+                      aria-disabled={isDisabled ? "true" : undefined}
                       className={`${baseClasses} ${stateClasses}`}
                     >
                       {itemContent}
