@@ -23,7 +23,9 @@ class TimeConnector(BaseConnector):
         try:
             ZoneInfo(tz)
         except ZoneInfoNotFoundError as exc:
-            raise ValueError(f"Invalid timezone '{tz}'. Use an IANA timezone like 'UTC' or 'Asia/Karachi'.") from exc
+            raise ValueError(
+                f"Invalid timezone '{tz}'. Use an IANA timezone like 'UTC' or 'Asia/Karachi'."
+            ) from exc
         return tz
 
     @connector_tool
