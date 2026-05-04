@@ -5,6 +5,8 @@ import { trimTrailingSlash } from "@/config/agent";
 import { useRuntimeConfig } from "@/config/runtime-config";
 import {
   Bot,
+  ChevronDown,
+  ChevronRight,
   Check,
   Copy,
   MessageSquare,
@@ -19,24 +21,69 @@ import {
   User,
   X,
 } from "lucide-react";
+import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import {
-  AdkSession,
-  StreamStep,
-  ChatMessage,
-  AgentChatWorkspaceProps,
-} from "./dashboard.types";
+type ChatAgent = {
+  agentId: string;
+  name: string;
+};
 
-import {
-  renderMarkdownBlocks,
-  renderMilestones,
-  formatTime,
-} from "../dashboard/help/help.chat";
+type AgentChatWorkspaceProps = {
+  agent: ChatAgent;
+  onClose: () => void;
+};
 
-import { useSessions } from "../dashboard/help/useSessions";
-import { useStreamingChat } from "../dashboard/help/useStreamingChat";
-import { useChatActions } from "../dashboard/help/useChatActions";
+type AdkFunctionCall = {
+  id?: string | null;
+  name?: string | null;
+  args?: unknown;
+};
+
+type AdkFunctionResponse = {
+  id?: string | null;
+  name?: string | null;
+  response?: unknown;
+};
+
+type AdkPart = {
+  text?: string | null;
+  thought?: boolean | null;
+  functionCall?: AdkFunctionCall | null;
+  functionResponse?: AdkFunctionResponse | null;
+};
+
+type AdkContent = {
+  role?: string | null;
+  parts?: AdkPart[] | null;
+};
+
+type AdkEvent = {
+  id?: string | null;
+  timestamp?: number | null;
+  author?: string | null;
+  content?: AdkContent | null;
+};
+
+type AdkSession = {
+  id: string;
+  appName?: string | null;
+  userId?: string | null;
+  events?: AdkEvent[] | null;
+  lastUpdateTime?: number | null;
+  state?: SessionState | null;
+};
+
+type SessionState = {
+  first_message_summary?: string;
+};
+
+type ChatMessage = {
+  id: string;
+  role: "user" | "agent";
+  text: string;
+  timeLabel: string;
+};
 
 const DEFAULT_USER_ID = "user";
 
@@ -616,8 +663,6 @@ export default function AgentChatWorkspace({
   const appName = agent.agentId;
   const assistantDisplayName = agent.name?.trim() || appName;
   const userId = DEFAULT_USER_ID;
-
-  // ---------------- STATE ----------------
   const [sessions, setSessions] = useState<AdkSession[]>([]);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [isDraftSession, setIsDraftSession] = useState(true);
@@ -628,152 +673,315 @@ export default function AgentChatWorkspace({
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null);
   const [openMenuSessionId, setOpenMenuSessionId] = useState<string | null>(null);
-
   const [isSending, setIsSending] = useState(false);
   const [isStreamingReply, setIsStreamingReply] = useState(false);
   const [streamingText, setStreamingText] = useState("");
   const [streamSteps, setStreamSteps] = useState<StreamStep[]>([]);
-
-  const [pendingUserMessage, setPendingUserMessage] =
-    useState<ChatMessage | null>(null);
-
-  const [messageMilestones, setMessageMilestones] = useState<
-    Record<string, StreamStep[]>
-  >({});
-  const [expandedMilestones, setExpandedMilestones] = useState<
-    Record<string, boolean>
-  >({});
+  const [pendingUserMessage, setPendingUserMessage] = useState<ChatMessage | null>(null);
+  const [messageMilestones, setMessageMilestones] = useState<Record<string, StreamStep[]>>({});
+  const [expandedMilestones, setExpandedMilestones] = useState<Record<string, boolean>>({});
 
   const [sessionsError, setSessionsError] = useState("");
   const [messagesError, setMessagesError] = useState("");
   const [sendError, setSendError] = useState("");
-
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
 
   const messageListRef = useRef<HTMLDivElement | null>(null);
   const selectedSessionIdRef = useRef<string | null>(null);
+  const copyResetTimerRef = useRef<number | null>(null);
+  const streamStepCounterRef = useRef(0);
+  const streamStepsRef = useRef<StreamStep[]>([]);
+  const streamTargetTextRef = useRef("");
+  const streamRenderedTextRef = useRef("");
+  const streamAnimationFrameRef = useRef<number | null>(null);
 
-  // ---------------- HOOKS ----------------
-  const { loadSessions, loadSessionMessages } = useSessions({
-    adkBaseUrl,
-    appName,
-    userId,
-    setSessions,
-    setSelectedSessionId,
-    setIsDraftSession,
-    setMessages,
-    setMessageMilestones,
-    setExpandedMilestones,
-    setSessionsError,
-    setMessagesError,
-    setIsLoadingSessions,
-    setIsLoadingMessages,
-    selectedSessionIdRef,
-  });
-
-  const { runPromptSse, startStreamingState, resetStreamingText } =
-    useStreamingChat({
-      appName,
-      userId,
-      adkBaseUrl,
-      setStreamingText,
-      setStreamSteps,
-      setIsStreamingReply,
-      setSendError,
-    });
-
-  const { createSession, deleteSession, sendPrompt } = useChatActions({
-    adkBaseUrl,
-    appName,
-    userId,
-    sessions,
-    setSessions,
-    selectedSessionId,
-    setSelectedSessionId,
-    setIsDraftSession,
-    setMessages,
-    setMessageMilestones,
-    setExpandedMilestones,
-    setSessionsError,
-    setDeletingSessionId,
-    setOpenMenuSessionId,
-    setPendingUserMessage,
-    setSendError,
-    setIsSending,
-    setIsStreamingReply,
-    setStreamSteps,
-    loadSessionMessages,
-    loadSessions,
-    runPromptSse,
-    startStreamingState,
-    resetStreamingText,
-  });
-
-  // ---------------- EFFECTS ----------------
   useEffect(() => {
     selectedSessionIdRef.current = selectedSessionId;
   }, [selectedSessionId]);
 
   useEffect(() => {
-    loadSessions();
-  }, [loadSessions]);
-
-  useEffect(() => {
-    if (!messageListRef.current) return;
-    messageListRef.current.scrollTop =
-      messageListRef.current.scrollHeight;
-  }, [messages, pendingUserMessage, streamingText]);
-
-  useEffect(() => {
     const handleOutside = (event: MouseEvent) => {
       const target = event.target as HTMLElement | null;
-      if (target?.closest("[data-session-menu='true']")) return;
+      if (target?.closest("[data-session-menu='true']")) {
+        return;
+      }
       setOpenMenuSessionId(null);
     };
     document.addEventListener("mousedown", handleOutside);
     return () => document.removeEventListener("mousedown", handleOutside);
   }, []);
 
-  // ---------------- ACTIONS ----------------
-  const sendMessage = useCallback(async () => {
-    setSendError("");
-    const prompt = draft.trim();
-    if (!prompt || isSending) return;
-
-    setDraft("");
-    const sent = await sendPrompt(prompt, { optimisticUser: true });
-    if (!sent) setDraft(prompt);
-  }, [draft, isSending, sendPrompt]);
-
-  const lastUserPrompt = useMemo(() => {
-    for (let i = messages.length - 1; i >= 0; i--) {
-      if (messages[i].role === "user") return messages[i].text;
+  useEffect(() => {
+    if (!messageListRef.current) {
+      return;
     }
-    return "";
-  }, [messages]);
+    messageListRef.current.scrollTop = messageListRef.current.scrollHeight;
+  }, [messages, pendingUserMessage, streamingText, isSending]);
 
-  const retryLastPrompt = useCallback(async () => {
-    if (!lastUserPrompt || isSending) return;
-    await sendPrompt(lastUserPrompt);
-  }, [lastUserPrompt, isSending, sendPrompt]);
+  useEffect(() => {
+    return () => {
+      if (copyResetTimerRef.current) {
+        window.clearTimeout(copyResetTimerRef.current);
+      }
+      if (streamAnimationFrameRef.current) {
+        window.cancelAnimationFrame(streamAnimationFrameRef.current);
+      }
+    };
+  }, []);
 
-  const copyMessage = async (id: string, text: string) => {
-    await navigator.clipboard.writeText(text);
-    setCopiedMessageId(id);
-    setTimeout(() => setCopiedMessageId(null), 1400);
-  };
+  const loadSessionMessages = useCallback(
+    async (sessionId: string, options?: { silent?: boolean }) => {
+      const silent = Boolean(options?.silent);
+      if (!silent) {
+        setIsLoadingMessages(true);
+      }
+      setMessagesError("");
+      try {
+        const response = await fetch(getSessionUrl(adkBaseUrl, appName, userId, sessionId), {
+          headers: { accept: "application/json" },
+        });
+        const payload = (await response.json()) as AdkSession;
+        if (!response.ok) {
+          if (!silent) {
+            setMessages([]);
+            setMessageMilestones({});
+            setExpandedMilestones({});
+          }
+          setMessagesError("Unable to load session messages.");
+          return [] as ChatMessage[];
+        }
+        const mapped = mapEventsToMessages(payload.events);
+        setMessages(mapped.messages);
+        setMessageMilestones(mapped.milestonesByMessageId);
+        setExpandedMilestones({});
+        return mapped.messages;
+      } catch {
+        if (!silent) {
+          setMessages([]);
+          setMessageMilestones({});
+          setExpandedMilestones({});
+        }
+        setMessagesError("Unable to load session messages.");
+        return [] as ChatMessage[];
+      } finally {
+        if (!silent) {
+          setIsLoadingMessages(false);
+        }
+      }
+    },
+    [appName, userId]
+  );
 
-  const toggleMilestoneExpansion = useCallback((id: string) => {
+  const loadSessions = useCallback(async (options?: { preferredSessionId?: string | null; silent?: boolean }) => {
+    const silent = Boolean(options?.silent);
+    if (!silent) {
+      setIsLoadingSessions(true);
+    }
+    setSessionsError("");
+    try {
+      const response = await fetch(getSessionsUrl(adkBaseUrl, appName, userId), {
+        headers: { accept: "application/json" },
+      });
+      //console.log("Sessions response status:", response);
+      const payload = (await response.json()) as AdkSession[];
+      if (!response.ok || !Array.isArray(payload)) {
+        if (!silent) {
+          setSessions([]);
+          setSelectedSessionId(null);
+          setIsDraftSession(true);
+          setMessages([]);
+          setMessageMilestones({});
+          setExpandedMilestones({});
+        }
+        setSessionsError("Unable to load sessions.");
+        return [] as ChatMessage[];
+      }
+
+      const sorted = sortSessions(payload);
+      setSessions(sorted);
+
+      const selectedIdToKeep = options?.preferredSessionId ?? selectedSessionIdRef.current;
+      const nextSessionId =
+        sorted.find((item) => item.id === selectedIdToKeep)?.id ?? null;
+      setSelectedSessionId(nextSessionId);
+      setIsDraftSession(!nextSessionId);
+
+      if (nextSessionId) {
+        return await loadSessionMessages(nextSessionId, { silent });
+      } else {
+        if (!silent) {
+          setMessages([]);
+          setMessageMilestones({});
+          setExpandedMilestones({});
+        }
+        return [] as ChatMessage[];
+      }
+    } catch {
+      if (!silent) {
+        setSessions([]);
+        setSelectedSessionId(null);
+        setIsDraftSession(true);
+        setMessages([]);
+        setMessageMilestones({});
+        setExpandedMilestones({});
+      }
+      setSessionsError("Unable to load sessions.");
+      return [] as ChatMessage[];
+    } finally {
+      if (!silent) {
+        setIsLoadingSessions(false);
+      }
+    }
+  }, [appName, userId, loadSessionMessages]);
+  
+
+  const resetStreamingText = useCallback(() => {
+    if (streamAnimationFrameRef.current) {
+      window.cancelAnimationFrame(streamAnimationFrameRef.current);
+      streamAnimationFrameRef.current = null;
+    }
+    streamTargetTextRef.current = "";
+    streamRenderedTextRef.current = "";
+    setStreamingText("");
+  }, []);
+
+  const animateStreamingText = useCallback(() => {
+    if (streamAnimationFrameRef.current) {
+      return;
+    }
+
+    const tick = () => {
+      const target = streamTargetTextRef.current;
+      const current = streamRenderedTextRef.current;
+      if (current === target) {
+        streamAnimationFrameRef.current = null;
+        return;
+      }
+
+      const remaining = Math.max(0, target.length - current.length);
+      const step = Math.max(12, Math.min(220, Math.ceil(Math.max(target.length, remaining) / 35)));
+      const next = target.slice(0, current.length + step);
+      streamRenderedTextRef.current = next;
+      setStreamingText(next);
+
+      if (next === target) {
+        streamAnimationFrameRef.current = null;
+        return;
+      }
+      streamAnimationFrameRef.current = window.requestAnimationFrame(tick);
+    };
+
+    streamAnimationFrameRef.current = window.requestAnimationFrame(tick);
+  }, []);
+
+  const updateStreamingTargetText = useCallback(
+    (nextText: string, options?: { immediate?: boolean }) => {
+      streamTargetTextRef.current = nextText;
+
+      if (options?.immediate) {
+        if (streamAnimationFrameRef.current) {
+          window.cancelAnimationFrame(streamAnimationFrameRef.current);
+          streamAnimationFrameRef.current = null;
+        }
+        streamRenderedTextRef.current = nextText;
+        setStreamingText(nextText);
+        return;
+      }
+
+      animateStreamingText();
+    },
+    [animateStreamingText]
+  );
+
+  const startStreamingState = useCallback(() => {
+    streamStepCounterRef.current = 0;
+    resetStreamingText();
+    const initialSteps: StreamStep[] = [];
+    streamStepsRef.current = initialSteps;
+    setStreamSteps(initialSteps);
+    setIsStreamingReply(true);
+  }, [resetStreamingText]);
+
+  const addRunningStep = useCallback((label: string, details?: unknown) => {
+    const cleanLabel = label.trim();
+    if (!cleanLabel) {
+      return;
+    }
+    const formattedDetails = formatMilestoneDetails(details);
+
+    setStreamSteps((prev) => {
+      if (prev.length === 0) {
+        streamStepCounterRef.current += 1;
+        const created: StreamStep[] = [
+          {
+            id: `stream-step-${streamStepCounterRef.current}`,
+            label: cleanLabel,
+            status: "running",
+            details: formattedDetails,
+          },
+        ];
+        streamStepsRef.current = created;
+        return created;
+      }
+
+      const next = [...prev];
+      const lastIndex = next.length - 1;
+      const lastStep = next[lastIndex];
+
+      if (lastStep.label === cleanLabel) {
+        const mergedStep =
+          formattedDetails && !lastStep.details
+            ? { ...lastStep, details: formattedDetails }
+            : lastStep;
+        if (lastStep.status === "done") {
+          next[lastIndex] = { ...mergedStep, status: "running" };
+        } else if (mergedStep !== lastStep) {
+          next[lastIndex] = mergedStep;
+        }
+        return next;
+      }
+
+      if (lastStep.status === "running") {
+        next[lastIndex] = { ...lastStep, status: "done" };
+      }
+
+      streamStepCounterRef.current += 1;
+      next.push({
+        id: `stream-step-${streamStepCounterRef.current}`,
+        label: cleanLabel,
+        status: "running",
+        details: formattedDetails,
+      });
+      streamStepsRef.current = next;
+      return next;
+    });
+  }, []);
+
+  const completeLastRunningStep = useCallback(() => {
+    setStreamSteps((prev) => {
+      if (prev.length === 0) {
+        return prev;
+      }
+      const next = [...prev];
+      const lastIndex = next.length - 1;
+      if (next[lastIndex].status === "running") {
+        next[lastIndex] = { ...next[lastIndex], status: "done" };
+      }
+      streamStepsRef.current = next;
+      return next;
+    });
+  }, []);
+
+  const toggleMilestoneExpansion = useCallback((stepId: string) => {
     setExpandedMilestones((prev) => ({
       ...prev,
-      [id]: !prev[id],
+      [stepId]: !prev[stepId],
     }));
   }, []);
 
-  const visibleMessages = useMemo(() => {
-    if (!pendingUserMessage) return messages;
-    return [...messages, pendingUserMessage];
-  }, [messages, pendingUserMessage]);
+  const processSseFrame = useCallback((frame: string): boolean => {
+    const lines = frame.split("\n");
+    const dataLines: string[] = [];
 
     lines.forEach((line) => {
       if (line.startsWith("data:")) {
@@ -976,13 +1184,17 @@ export default function AgentChatWorkspace({
   const startNewChat = () => {
     setSelectedSessionId(null);
     setIsDraftSession(true);
+    setOpenMenuSessionId(null);
     setMessages([]);
     setMessageMilestones({});
     setExpandedMilestones({});
     setPendingUserMessage(null);
     setIsStreamingReply(false);
     resetStreamingText();
+    streamStepsRef.current = [];
     setStreamSteps([]);
+    setMessagesError("");
+    setSendError("");
     setDraft("");
   };
 
@@ -1156,6 +1368,20 @@ export default function AgentChatWorkspace({
     [selectedSessionId, isDraftSession]
   );
 
+  const visibleMessages = useMemo(() => {
+    if (!pendingUserMessage) {
+      return messages;
+    }
+    const lastMessage = messages[messages.length - 1];
+    if (lastMessage?.role === "user" && lastMessage.text === pendingUserMessage.text) {
+      return messages;
+    }
+    return [...messages, pendingUserMessage];
+  }, [messages, pendingUserMessage]);
+
+  const isInitialSessionView =
+    !isLoadingMessages && !isStreamingReply && visibleMessages.length === 0;
+
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/35 p-4">
       <div className="flex h-[88vh] w-full max-w-7xl overflow-hidden rounded-3xl bg-white shadow-[0_24px_70px_-34px_rgba(15,23,42,0.7)]">
@@ -1274,8 +1500,6 @@ export default function AgentChatWorkspace({
             <button
               type="button"
               onClick={onClose}
-              aria-label="Close chat"
-              title="Close"
               className="flex h-9 w-9 items-center justify-center rounded-full border border-[#e5e7eb] text-[#111827]"
             >
               <X className="h-4 w-4" />
@@ -1285,8 +1509,8 @@ export default function AgentChatWorkspace({
           <div
             ref={messageListRef}
             className={`soft-scrollbar flex-1 ${isInitialSessionView
-              ? "overflow-hidden bg-[radial-gradient(120%_120%_at_50%_0%,#eef2ff_0%,#f7f8fc_45%,#f7f8fc_100%)] px-8 py-8"
-              : "space-y-4 overflow-y-auto bg-[#f7f8fc] px-6 py-5"
+                ? "overflow-hidden bg-[radial-gradient(120%_120%_at_50%_0%,#eef2ff_0%,#f7f8fc_45%,#f7f8fc_100%)] px-8 py-8"
+                : "space-y-4 overflow-y-auto bg-[#f7f8fc] px-6 py-5"
               }`}
           >
             {isLoadingMessages ? (
@@ -1394,8 +1618,8 @@ export default function AgentChatWorkspace({
                     >
                       <div
                         className={`max-w-[78%] rounded-2xl px-4 py-3 text-sm shadow-sm ${isUser
-                          ? "border border-[#dbe2f0] bg-white text-[#111827]"
-                          : "bg-[#e9edff] text-[#1f2937]"
+                            ? "border border-[#dbe2f0] bg-white text-[#111827]"
+                            : "bg-[#e9edff] text-[#1f2937]"
                           }`}
                       >
                         <div className="mb-1 flex items-center gap-2 whitespace-nowrap text-[11px] font-semibold text-[#8a94a6]">

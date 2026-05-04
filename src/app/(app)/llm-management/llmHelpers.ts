@@ -1,4 +1,9 @@
-import { LLMRecord } from "./helps/llm.types";
+export type LLMRecord = Record<string, string | number | boolean | null>;
+
+export type ActionResult = {
+  ok: boolean;
+  error?: string;
+};
 
 export type LlmDefaultSlot = "primary" | "secondary" | "tertiary";
 

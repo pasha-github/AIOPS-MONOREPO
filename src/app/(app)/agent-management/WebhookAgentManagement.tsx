@@ -258,8 +258,6 @@ export default function WebhookAgentManagement({
             </div>
               <button
               type="button"
-              title="Close"
-              aria-label="Close"
               onClick={onClose}
               className="flex h-9 w-9 items-center justify-center rounded-full border border-[#e5e7eb] text-[#475569] transition hover:bg-[#f8fafc]"
             >
@@ -419,8 +417,6 @@ export default function WebhookAgentManagement({
               </div>
               <button
                 type="button"
-                title="Close"
-                aria-label="Close"
                 onClick={() => {
                   setWebhookDeleteTarget(null);
                   setWebhookDeleteError("");

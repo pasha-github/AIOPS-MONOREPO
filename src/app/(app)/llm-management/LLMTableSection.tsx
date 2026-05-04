@@ -8,13 +8,20 @@ import {
   formatDateTime,
   formatHeaderLabel,
   getProviderIconSrc,
+  type ActionResult,
+  type LLMRecord,
 } from "./llmHelpers";
-import UpdateLlm from "./updatellm";
-import { LLMTableSectionProps, LlmRecord, LLMRecord } from "./helps/llm.types";
+import UpdateLlm, { type LlmRecord } from "./updatellm";
 
 const SORTABLE_HEADERS = ["provider", "created_at", "name"] as const;
-export type SortableHeader = (typeof SORTABLE_HEADERS)[number];
+type SortableHeader = (typeof SORTABLE_HEADERS)[number];
 
+type LLMTableSectionProps = {
+  llms: LLMRecord[];
+  isLoading: boolean;
+  loadError: string;
+  onDeleteModel: (modelId: string) => Promise<ActionResult>;
+};
 
 const isSortableHeader = (header: string): header is SortableHeader =>
   (SORTABLE_HEADERS as readonly string[]).includes(header);
@@ -429,8 +436,6 @@ export default function LLMTableSection({
               </div>
               <button
                 type="button"
-                aria-label="Close"
-                title="Close"
                 onClick={() => {
                   if (!isDeleting) {
                     setDeleteTarget(null);

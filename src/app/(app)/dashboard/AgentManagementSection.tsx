@@ -4,7 +4,6 @@ import { useRuntimeConfig } from "@/config/runtime-config";
 import AgentChatWorkspace from "./AgentChatWorkspace";
 import { Bot, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AgentRecord, AgentListApiResponseItem } from "./dashboard.types";
 
 import {
   AgentList,

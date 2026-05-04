@@ -1078,7 +1078,6 @@ export default function UpdateAgent({
                         </div>
                         <button
                             type="button"
-                            title={form.isEnabled ? "Disable Agent" : "Enable Agent"}
                             role="switch"
                             aria-checked={form.isEnabled}
                             onClick={() => updateField("isEnabled", !form.isEnabled)}

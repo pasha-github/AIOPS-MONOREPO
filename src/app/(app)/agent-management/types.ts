@@ -1,6 +1,6 @@
-import { ReactNode } from "react";
+"use client";
 
-export interface AgentRecord {
+export type AgentRecord = {
   agentId: number;
   name: string;
   port: number | null;
@@ -65,11 +65,11 @@ export interface DynamicListFieldProps {
   onChange: (i: number, v: string) => void;
 }
 
-export interface CreateNewAgentProps {
+export type CreateNewAgentProps = {
   onCreateSuccess?: () => void | Promise<void>;
-}
+};
 
-export interface ModelTemplate {
+export type ModelTemplate = {
   template_id: string;
   name: string;
   description?: string;

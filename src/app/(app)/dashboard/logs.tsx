@@ -348,31 +348,23 @@ export async function deleteAgentSession(
 const renderMarkdownInline = (text: string, keyPrefix = ""): ReactNode[] => {
   const nodes: ReactNode[] = [];
   const pattern = /(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`|\[[^\]]+\]\([^)]+\))/g;
-
   let cursor = 0;
   let match: RegExpExecArray | null;
   let key = 0;
 
-  while ((match = pattern.exec(text))) {
+  while ((match = pattern.exec(text)) !== null) {
     const token = match[0];
     const start = match.index;
-
     if (start > cursor) {
       nodes.push(text.slice(cursor, start));
     }
 
     if (token.startsWith("**") && token.endsWith("**")) {
       nodes.push(
-        <strong key={`md-${keyPrefix}-${key++}`}>
-          {token.slice(2, -2)}
-        </strong>
+        <strong key={`md-${keyPrefix}-${key++}`}>{token.slice(2, -2)}</strong>
       );
     } else if (token.startsWith("*") && token.endsWith("*")) {
-      nodes.push(
-        <em key={`md-${keyPrefix}-${key++}`}>
-          {token.slice(1, -1)}
-        </em>
-      );
+      nodes.push(<em key={`md-${keyPrefix}-${key++}`}>{token.slice(1, -1)}</em>);
     } else if (token.startsWith("`") && token.endsWith("`")) {
       nodes.push(
         <code
@@ -382,11 +374,7 @@ const renderMarkdownInline = (text: string, keyPrefix = ""): ReactNode[] => {
           {token.slice(1, -1)}
         </code>
       );
-    } else if (
-      token.startsWith("[") &&
-      token.includes("](") &&
-      token.endsWith(")")
-    ) {
+    } else if (token.startsWith("[") && token.includes("](") && token.endsWith(")")) {
       const linkMatch = token.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
       if (linkMatch) {
         nodes.push(
@@ -395,7 +383,7 @@ const renderMarkdownInline = (text: string, keyPrefix = ""): ReactNode[] => {
             href={linkMatch[2]}
             target="_blank"
             rel="noreferrer"
-            className="text-blue-600 underline"
+            className="text-[#3b5bdb] underline"
           >
             {linkMatch[1]}
           </a>
@@ -406,7 +394,6 @@ const renderMarkdownInline = (text: string, keyPrefix = ""): ReactNode[] => {
     } else {
       nodes.push(token);
     }
-
     cursor = start + token.length;
   }
 
@@ -416,6 +403,34 @@ const renderMarkdownInline = (text: string, keyPrefix = ""): ReactNode[] => {
 
   return nodes;
 };
+
+const renderInlineWithLineBreaks = (lines: string[], keyPrefix: string): ReactNode[] =>
+  lines.flatMap((line, index) => {
+    const nodes = renderMarkdownInline(line, `${keyPrefix}-line-${index}`);
+    if (index < lines.length - 1) {
+      return [...nodes, <br key={`${keyPrefix}-br-${index}`} />];
+    }
+    return nodes;
+  });
+
+const parseTableRow = (line: string): string[] =>
+  line
+    .trim()
+    .replace(/^\|/, "")
+    .replace(/\|$/, "")
+    .split("|")
+    .map((cell) => cell.trim());
+
+const isTableSeparatorLine = (line: string): boolean => {
+  const cells = parseTableRow(line);
+  return cells.length > 0 && cells.every((cell) => /^:?-{3,}:?$/.test(cell));
+};
+
+const isHeadingLine = (line: string) => /^(#{1,6})\s+.+$/.test(line.trim());
+const isUnorderedListLine = (line: string) => /^[-*]\s+.+$/.test(line.trim());
+const isOrderedListLine = (line: string) => /^\d+\.\s+.+$/.test(line.trim());
+const isHrLine = (line: string) => /^(\*\*\*|---|___)\s*$/.test(line.trim());
+const isCodeFenceLine = (line: string) => line.trim().startsWith("```");
 
 export const renderMarkdownBlocks = (text: string): ReactNode[] => {
   const lines = text.replace(/\r\n/g, "\n").split("\n");
@@ -427,26 +442,24 @@ export const renderMarkdownBlocks = (text: string): ReactNode[] => {
     const trimmed = line.trim();
 
     if (!trimmed) {
-      i++;
+      i += 1;
       continue;
     }
 
-    // Code Block
-    if (trimmed.startsWith("```")) {
+    if (isCodeFenceLine(trimmed)) {
       const codeLines: string[] = [];
-      i++;
-
-      while (i < lines.length && !lines[i].trim().startsWith("```")) {
+      i += 1;
+      while (i < lines.length && !isCodeFenceLine(lines[i])) {
         codeLines.push(lines[i]);
-        i++;
+        i += 1;
       }
-
-      if (i < lines.length) i++;
-
+      if (i < lines.length && isCodeFenceLine(lines[i])) {
+        i += 1;
+      }
       blocks.push(
         <pre
           key={`block-code-${i}`}
-          className="overflow-x-auto rounded-xl bg-black text-white px-3 py-2 text-xs"
+          className="overflow-x-auto rounded-xl bg-black/90 px-3 py-2 text-xs text-white"
         >
           <code>{codeLines.join("\n")}</code>
         </pre>
@@ -454,38 +467,106 @@ export const renderMarkdownBlocks = (text: string): ReactNode[] => {
       continue;
     }
 
-    // Heading
     const headingMatch = trimmed.match(/^(#{1,6})\s+(.+)$/);
     if (headingMatch) {
-      const level = headingMatch[1].length;
-      const content = headingMatch[2];
-
-      const Tag = `h${Math.min(level, 3)}` as keyof HTMLElementTagNameMap;
-
-      blocks.push(
-        <Tag key={`block-h-${i}`} className="font-semibold">
-          {renderMarkdownInline(content, `heading-${i}`)}
-        </Tag>
-      );
-
-      i++;
+      const hashes = headingMatch[1].length;
+      const headingText = headingMatch[2];
+      const content = renderMarkdownInline(headingText, `heading-${i}`);
+      if (hashes === 1) {
+        blocks.push(
+          <h1 key={`block-h1-${i}`} className="text-xl font-bold leading-8">
+            {content}
+          </h1>
+        );
+      } else if (hashes === 2) {
+        blocks.push(
+          <h2 key={`block-h2-${i}`} className="text-lg font-bold leading-7">
+            {content}
+          </h2>
+        );
+      } else {
+        blocks.push(
+          <h3 key={`block-hx-${i}`} className="text-base font-semibold leading-6">
+            {content}
+          </h3>
+        );
+      }
+      i += 1;
       continue;
     }
 
-    //Unordered List
-    if (/^[-*]\s+/.test(trimmed)) {
-      const items: string[] = [];
-
-      while (i < lines.length && /^[-*]\s+/.test(lines[i].trim())) {
-        items.push(lines[i].trim().replace(/^[-*]\s+/, ""));
-        i++;
+    if (
+      line.includes("|") &&
+      i + 1 < lines.length &&
+      isTableSeparatorLine(lines[i + 1])
+    ) {
+      const headers = parseTableRow(line);
+      i += 2;
+      const rows: string[][] = [];
+      while (i < lines.length) {
+        const rowLine = lines[i];
+        if (!rowLine.trim() || !rowLine.includes("|")) {
+          break;
+        }
+        rows.push(parseTableRow(rowLine));
+        i += 1;
       }
 
       blocks.push(
-        <ul key={`block-ul-${i}`} className="list-disc pl-5 space-y-1">
-          {items.map((item, index) => (
-            <li key={index}>
-              {renderMarkdownInline(item, `ul-${i}-${index}`)}
+        <div
+          key={`block-table-${i}`}
+          className="overflow-x-auto rounded-xl border border-[#dbe2f0] bg-white/70"
+        >
+          <table className="min-w-full border-collapse text-left text-xs">
+            <thead className="bg-[#eef2ff] text-[#1f2937]">
+              <tr>
+                {headers.map((header, headerIndex) => (
+                  <th
+                    key={`table-head-${i}-${headerIndex}`}
+                    className="border-b border-[#dbe2f0] px-3 py-2 font-semibold"
+                  >
+                    {renderMarkdownInline(header, `table-head-${i}-${headerIndex}`)}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, rowIndex) => (
+                <tr
+                  key={`table-row-${i}-${rowIndex}`}
+                  className="border-b border-[#e8edf7]"
+                >
+                  {headers.map((_, colIndex) => (
+                    <td
+                      key={`table-col-${i}-${rowIndex}-${colIndex}`}
+                      className="px-3 py-2 align-top"
+                    >
+                      {renderMarkdownInline(
+                        row[colIndex] ?? "",
+                        `table-cell-${i}-${rowIndex}-${colIndex}`
+                      )}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+      continue;
+    }
+
+    if (isUnorderedListLine(line)) {
+      const listItems: string[] = [];
+      while (i < lines.length && isUnorderedListLine(lines[i])) {
+        listItems.push(lines[i].trim().replace(/^[-*]\s+/, ""));
+        i += 1;
+      }
+      blocks.push(
+        <ul key={`block-ul-${i}`} className="list-disc space-y-1 pl-5">
+          {listItems.map((item, itemIndex) => (
+            <li key={`ul-item-${i}-${itemIndex}`}>
+              {renderMarkdownInline(item, `ul-${i}-${itemIndex}`)}
             </li>
           ))}
         </ul>
@@ -493,20 +574,17 @@ export const renderMarkdownBlocks = (text: string): ReactNode[] => {
       continue;
     }
 
-    //Ordered List
-    if (/^\d+\.\s+/.test(trimmed)) {
-      const items: string[] = [];
-
-      while (i < lines.length && /^\d+\.\s+/.test(lines[i].trim())) {
-        items.push(lines[i].trim().replace(/^\d+\.\s+/, ""));
-        i++;
+    if (isOrderedListLine(line)) {
+      const listItems: string[] = [];
+      while (i < lines.length && isOrderedListLine(lines[i])) {
+        listItems.push(lines[i].trim().replace(/^\d+\.\s+/, ""));
+        i += 1;
       }
-
       blocks.push(
-        <ol key={`block-ol-${i}`} className="list-decimal pl-5 space-y-1">
-          {items.map((item, index) => (
-            <li key={index}>
-              {renderMarkdownInline(item, `ol-${i}-${index}`)}
+        <ol key={`block-ol-${i}`} className="list-decimal space-y-1 pl-5">
+          {listItems.map((item, itemIndex) => (
+            <li key={`ol-item-${i}-${itemIndex}`}>
+              {renderMarkdownInline(item, `ol-${i}-${itemIndex}`)}
             </li>
           ))}
         </ol>
@@ -514,24 +592,42 @@ export const renderMarkdownBlocks = (text: string): ReactNode[] => {
       continue;
     }
 
-    //Paragraph
-    const paragraphLines: string[] = [];
-
-    while (i < lines.length && lines[i].trim()) {
-      paragraphLines.push(lines[i]);
-      i++;
+    if (isHrLine(line)) {
+      blocks.push(<hr key={`block-hr-${i}`} className="border-[#dbe2f0]" />);
+      i += 1;
+      continue;
     }
 
-    blocks.push(
-      <p key={`block-p-${i}`} className="leading-7">
-        {paragraphLines.map((line, index) => (
-          <span key={index}>
-            {renderMarkdownInline(line, `p-${i}-${index}`)}
-            {index < paragraphLines.length - 1 && <br />}
-          </span>
-        ))}
-      </p>
-    );
+    const paragraphLines: string[] = [];
+    while (i < lines.length) {
+      const current = lines[i];
+      const currentTrim = current.trim();
+      const nextLine = i + 1 < lines.length ? lines[i + 1] : "";
+      if (
+        !currentTrim ||
+        isHeadingLine(current) ||
+        isUnorderedListLine(current) ||
+        isOrderedListLine(current) ||
+        isHrLine(current) ||
+        isCodeFenceLine(current) ||
+        (current.includes("|") && isTableSeparatorLine(nextLine))
+      ) {
+        break;
+      }
+      paragraphLines.push(current);
+      i += 1;
+    }
+
+    if (paragraphLines.length > 0) {
+      blocks.push(
+        <p key={`block-p-${i}`} className="leading-7">
+          {renderInlineWithLineBreaks(paragraphLines, `p-${i}`)}
+        </p>
+      );
+      continue;
+    }
+
+    i += 1;
   }
 
   return blocks;
