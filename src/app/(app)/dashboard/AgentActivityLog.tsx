@@ -5,6 +5,7 @@ import {
   Activity,
   ArrowRight,
   Bell,
+  Bot,
   ChevronDown,
   Loader2,
   RefreshCw,
@@ -24,9 +25,12 @@ import {
 import {
   type AgentSessionDetail,
   type AgentSessionSummary,
+  type AutomationAgentOption,
+  fetchAutomationAgents,
   fetchAgentSessionDetail,
   fetchAgentSessions,
   renderMarkdownBlocks,
+  resolveAgentManagerApiBase,
   resolveLogsApiBase,
 } from "./logs";
 
@@ -44,8 +48,13 @@ const REVEAL_INTERVAL_MS = 140;
 const DASHBOARD_SESSION_LIMIT = 5;
 
 export default function AgentActivityLog() {
-  const { agentAdkBaseUrl } = useRuntimeConfig();
+  const { agentAdkBaseUrl, llmManagerApiBaseUrl } = useRuntimeConfig();
   const logsApiBaseUrl = resolveLogsApiBase(agentAdkBaseUrl);
+  const agentManagerApiBaseUrl = resolveAgentManagerApiBase(llmManagerApiBaseUrl);
+  const [agents, setAgents] = useState<AutomationAgentOption[]>([]);
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
+  const [isAgentsLoading, setIsAgentsLoading] = useState(true);
+  const [isAgentMenuOpen, setIsAgentMenuOpen] = useState(false);
   const [sessions, setSessions] = useState<AgentSessionSummary[]>([]);
   const [sessionDetails, setSessionDetails] = useState<Record<string, AgentSessionDetail>>(
     {}
@@ -59,6 +68,8 @@ export default function AgentActivityLog() {
   const [error, setError] = useState("");
   const sessionDetailsRef = useRef<Record<string, AgentSessionDetail>>({});
   const selectedSessionIdRef = useRef<string | null>(null);
+  const selectedAgentIdRef = useRef<string | null>(null);
+  const menuContainerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     sessionDetailsRef.current = sessionDetails;
@@ -67,6 +78,25 @@ export default function AgentActivityLog() {
   useEffect(() => {
     selectedSessionIdRef.current = selectedSessionId;
   }, [selectedSessionId]);
+
+  useEffect(() => {
+    selectedAgentIdRef.current = selectedAgentId;
+  }, [selectedAgentId]);
+
+  useEffect(() => {
+    if (!isAgentMenuOpen) {
+      return;
+    }
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!menuContainerRef.current?.contains(event.target as Node)) {
+        setIsAgentMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, [isAgentMenuOpen]);
 
   const loadSessionDetail = useCallback(
     async (sessionId: string, options?: { force?: boolean; signal?: AbortSignal }) => {
@@ -79,7 +109,8 @@ export default function AgentActivityLog() {
         const detail = await fetchAgentSessionDetail(
           sessionId,
           options?.signal,
-          logsApiBaseUrl
+          logsApiBaseUrl,
+          selectedAgentIdRef.current ?? undefined
         );
         setSessionDetails((current) => {
           const next = {
@@ -107,7 +138,11 @@ export default function AgentActivityLog() {
       setError("");
 
       try {
-        const nextSessions = await fetchAgentSessions(signal, logsApiBaseUrl);
+        const nextSessions = await fetchAgentSessions(
+          signal,
+          logsApiBaseUrl,
+          selectedAgentIdRef.current ?? undefined
+        );
         const nextSelectedSessionId =
           selectedSessionIdRef.current &&
           nextSessions.some((session) => session.id === selectedSessionIdRef.current)
@@ -132,7 +167,7 @@ export default function AgentActivityLog() {
         }
       } catch (loadError) {
         if ((loadError as Error).name !== "AbortError") {
-          setError("Unable to load MuleSoft automation sessions right now.");
+          setError("Unable to load automation sessions right now.");
           setSessions([]);
           setSelectedSessionId(null);
         }
@@ -146,14 +181,63 @@ export default function AgentActivityLog() {
 
   useEffect(() => {
     const controller = new AbortController();
+
+    const loadAgents = async () => {
+      setIsAgentsLoading(true);
+      try {
+        const nextAgents = await fetchAutomationAgents(
+          controller.signal,
+          agentManagerApiBaseUrl
+        );
+        setAgents(nextAgents);
+        setSelectedAgentId((current) => {
+          if (current && nextAgents.some((agent) => agent.id === current)) {
+            return current;
+          }
+          return nextAgents[0]?.id ?? null;
+        });
+      } catch (loadError) {
+        if ((loadError as Error).name !== "AbortError") {
+          setAgents([]);
+          setSelectedAgentId(null);
+          setError("Unable to load automation agents right now.");
+        }
+      } finally {
+        setIsAgentsLoading(false);
+      }
+    };
+
+    void loadAgents();
+    return () => controller.abort();
+  }, [agentManagerApiBaseUrl]);
+
+  useEffect(() => {
+    if (isAgentsLoading) {
+      return;
+    }
+
+    if (!selectedAgentId) {
+      setSessions([]);
+      setSelectedSessionId(null);
+      setSessionDetails({});
+      sessionDetailsRef.current = {};
+      setVisibleEntryCount(0);
+      setActiveEntryId(null);
+      setIsLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
     void loadSessions(false, controller.signal);
     return () => controller.abort();
-  }, [loadSessions]);
+  }, [isAgentsLoading, loadSessions, selectedAgentId]);
 
   const dashboardSessions = useMemo(
     () => sessions.slice(0, DASHBOARD_SESSION_LIMIT),
     [sessions]
   );
+  const selectedAgent =
+    agents.find((agent) => agent.id === selectedAgentId) ?? null;
 
   const selectedDetail = selectedSessionId ? sessionDetails[selectedSessionId] : null;
   const visibleEntries = useMemo(
@@ -203,7 +287,7 @@ export default function AgentActivityLog() {
       try {
         await loadSessionDetail(nextSessionId);
       } catch {
-        setError("Unable to load the selected MuleSoft session log.");
+        setError("Unable to load the selected automation session log.");
       }
     },
     [loadSessionDetail, selectedSessionId]
@@ -225,13 +309,72 @@ export default function AgentActivityLog() {
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-3xl bg-white p-6 shadow-[0_18px_50px_-38px_rgba(16,24,40,0.5)]">
       <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
+        <div ref={menuContainerRef} className="relative flex min-w-0 items-center gap-3">
           <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-[#e6f9ee] text-[#16a34a]">
             <Activity className="h-5 w-5" />
           </span>
-          <h3 className="text-lg font-semibold leading-none text-[#111827]">
-            Automation Agent
-          </h3>
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8a94a6]">
+              Automation agent
+            </p>
+            <button
+              type="button"
+              onClick={() => setIsAgentMenuOpen((current) => !current)}
+              disabled={isAgentsLoading || agents.length === 0}
+              className="mt-1 inline-flex min-h-8 max-w-full items-center gap-2 text-left disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <span className="truncate text-lg font-semibold leading-tight text-[#111827]">
+                {selectedAgent?.name ?? "Select agent"}
+              </span>
+              {isAgentsLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin text-[#5b4cf0]" />
+              ) : (
+                <ChevronDown
+                  className={`h-4 w-4 text-[#748096] transition-transform ${
+                    isAgentMenuOpen ? "rotate-180" : ""
+                  }`}
+                />
+              )}
+            </button>
+          </div>
+
+          {isAgentMenuOpen && agents.length > 0 ? (
+            <div className="absolute left-0 top-[calc(100%+12px)] z-40 w-[320px] rounded-2xl border border-[#e4ebf8] bg-white p-3 shadow-[0_28px_60px_-34px_rgba(15,23,42,0.35)]">
+              <div className="max-h-[320px] overflow-y-auto pr-1">
+                {agents.map((agent) => (
+                  <button
+                    key={agent.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedAgentId(agent.id);
+                      setSelectedSessionId(null);
+                      setSessionDetails({});
+                      sessionDetailsRef.current = {};
+                      setVisibleEntryCount(0);
+                      setActiveEntryId(null);
+                      setError("");
+                      setIsAgentMenuOpen(false);
+                    }}
+                    className={`flex w-full items-start justify-between gap-3 rounded-xl px-4 py-3 text-left transition ${
+                      agent.id === selectedAgentId
+                        ? "bg-[#eef2ff] text-[#24324a]"
+                        : "text-[#5f677a] hover:bg-[#f8faff]"
+                    }`}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <Bot className="h-4 w-4 shrink-0 text-[#4f49e2]" />
+                        <p className="truncate text-sm font-semibold text-[#111827]">
+                          {agent.name}
+                        </p>
+                      </div>
+                      <p className="mt-1 truncate text-xs text-[#7a8498]">{agent.id}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </div>
         <div className="inline-flex items-center gap-2">
           <button
@@ -253,7 +396,9 @@ export default function AgentActivityLog() {
             Latest Sessions
           </p>
           <p className="mt-1 text-sm text-[#6b7280]">
-            Showing the latest {DASHBOARD_SESSION_LIMIT} sessions.
+            {selectedAgent
+              ? `Showing the latest ${DASHBOARD_SESSION_LIMIT} sessions for ${selectedAgent.name}.`
+              : `Showing the latest ${DASHBOARD_SESSION_LIMIT} sessions.`}
           </p>
         </div>
         <Link

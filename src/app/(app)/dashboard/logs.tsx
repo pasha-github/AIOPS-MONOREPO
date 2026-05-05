@@ -5,6 +5,13 @@ const DEFAULT_APP_NAME = "automation";
 const DEFAULT_USER_ID = "user";
 const TRUNCATED_SUFFIX = ".....";
 
+type AgentListItemResponse = {
+  agent_id?: string;
+  name?: string;
+  description?: string | null;
+  type?: string;
+};
+
 type SessionState = {
   first_message_summary?: string;
 };
@@ -79,6 +86,12 @@ export type AgentSessionDetail = {
   entries: AgentLogEntry[];
 };
 
+export type AutomationAgentOption = {
+  id: string;
+  name: string;
+  description: string;
+};
+
 export const resolveLogsApiBase = (baseUrl: string) => {
   const trimmed = trimTrailingSlash(baseUrl.trim());
   if (!trimmed) {
@@ -90,13 +103,23 @@ export const resolveLogsApiBase = (baseUrl: string) => {
     : `${trimmed}/agent-server`;
 };
 
-const getSessionsUrl = (baseUrl: string) =>
-  `${baseUrl}/apps/${encodeURIComponent(DEFAULT_APP_NAME)}/users/${encodeURIComponent(
-    DEFAULT_USER_ID
-  )}/sessions`;
+export const resolveAgentManagerApiBase = (baseUrl: string) => {
+  const trimmed = trimTrailingSlash(baseUrl.trim());
+  if (!trimmed) {
+    throw new Error("NEXT_PUBLIC_LLM_MANAGER_API_BASE_URL is not configured.");
+  }
 
-const getSessionDetailUrl = (sessionId: string, baseUrl: string) =>
-  `${getSessionsUrl(baseUrl)}/${encodeURIComponent(sessionId)}`;
+  return trimmed;
+};
+
+const getSessionsUrl = (baseUrl: string, appName = DEFAULT_APP_NAME) =>
+  `${baseUrl}/apps/${encodeURIComponent(appName)}/users/${encodeURIComponent(DEFAULT_USER_ID)}/sessions`;
+
+const getSessionDetailUrl = (
+  sessionId: string,
+  baseUrl: string,
+  appName = DEFAULT_APP_NAME
+) => `${getSessionsUrl(baseUrl, appName)}/${encodeURIComponent(sessionId)}`;
 
 const getNumber = (value: unknown) =>
   typeof value === "number" && Number.isFinite(value) ? value : 0;
@@ -184,16 +207,51 @@ async function deleteJson(url: string, signal?: AbortSignal) {
   }
 }
 
-export async function fetchAgentSessions(
+const normalizeAutomationAgents = (payload: AgentListItemResponse[]) =>
+  payload
+    .map((item) => {
+      const id = getTrimmedText(item?.agent_id);
+      if (!id || getTrimmedText(item?.type).toLowerCase() !== "automation") {
+        return null;
+      }
+
+      return {
+        id,
+        name: getTrimmedText(item?.name) || id,
+        description: getTrimmedText(item?.description) || "",
+      } satisfies AutomationAgentOption;
+    })
+    .filter((item): item is AutomationAgentOption => item !== null)
+    .sort((left, right) =>
+      left.name.localeCompare(right.name, undefined, {
+        sensitivity: "base",
+        numeric: true,
+      })
+    );
+
+export async function fetchAutomationAgents(
   signal?: AbortSignal,
   baseUrl = ""
+) {
+  if (!baseUrl) {
+    throw new Error("Agent manager API base URL is not configured.");
+  }
+
+  const payload = await fetchJson<AgentListItemResponse[]>(`${baseUrl}/agent/`, signal);
+  return Array.isArray(payload) ? normalizeAutomationAgents(payload) : [];
+}
+
+export async function fetchAgentSessions(
+  signal?: AbortSignal,
+  baseUrl = "",
+  appName = DEFAULT_APP_NAME
 ) {
   if (!baseUrl) {
     throw new Error("Agent logs API base URL is not configured.");
   }
 
   const payload = await fetchJson<SessionSummaryResponse[]>(
-    getSessionsUrl(baseUrl),
+    getSessionsUrl(baseUrl, appName),
     signal
   );
 
@@ -225,14 +283,15 @@ export async function fetchAgentSessions(
 export async function fetchAgentSessionDetail(
   sessionId: string,
   signal?: AbortSignal,
-  baseUrl = ""
+  baseUrl = "",
+  appName = DEFAULT_APP_NAME
 ) {
   if (!baseUrl) {
     throw new Error("Agent logs API base URL is not configured.");
   }
 
   const payload = await fetchJson<SessionDetailResponse>(
-    getSessionDetailUrl(sessionId, baseUrl),
+    getSessionDetailUrl(sessionId, baseUrl, appName),
     signal
   );
 
@@ -336,13 +395,14 @@ export async function fetchAgentSessionDetail(
 export async function deleteAgentSession(
   sessionId: string,
   signal?: AbortSignal,
-  baseUrl = ""
+  baseUrl = "",
+  appName = DEFAULT_APP_NAME
 ) {
   if (!baseUrl) {
     throw new Error("Agent logs API base URL is not configured.");
   }
 
-  await deleteJson(getSessionDetailUrl(sessionId, baseUrl), signal);
+  await deleteJson(getSessionDetailUrl(sessionId, baseUrl, appName), signal);
 }
 
 const renderMarkdownInline = (text: string, keyPrefix = ""): ReactNode[] => {
