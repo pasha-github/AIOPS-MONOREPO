@@ -6,7 +6,3 @@ services:
       - "8080:8080"
     environment:
       DD_API_KEY: ${DD_API_KEY}
-      DD_SITE: us5.datadoghq.com
-      DD_SERVICE: status-app
-      DD_ENV: local
-      DD_LOGS_ENABLED: "true"

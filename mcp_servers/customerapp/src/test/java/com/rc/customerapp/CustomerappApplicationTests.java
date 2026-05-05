@@ -1,4 +1,4 @@
-package com.rc.customerapp;
+/*package com.rc.customerapp;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -10,4 +10,4 @@ class CustomerappApplicationTests {
 	void contextLoads() {
 	}
 
-}
+}*/

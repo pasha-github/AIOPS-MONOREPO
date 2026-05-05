@@ -13,12 +13,3 @@ management:
   endpoint:
     health:
       show-details: always
-
-logging:
-  pattern:
-    console: "%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level --- [%thread] %logger{36} : %msg%n"
-  file:
-    name: /app/logs/status-app.log
-  level:
-    root: INFO
-    com.rc.customerapp: INFO

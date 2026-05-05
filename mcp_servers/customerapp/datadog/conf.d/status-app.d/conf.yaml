@@ -1,5 +1,0 @@
-logs:
-  - type: file
-    path: /app/logs/status-app.log
-    service: status-app
-    source: java

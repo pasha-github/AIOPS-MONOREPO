@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Status App</title>
+    <style>
+        body {
+            font-family: Arial;
+            text-align: center;
+            margin-top: 100px;
+        }
+
+        .status-box {
+            font-size: 32px;
+            padding: 25px;
+            border-radius: 10px;
+            display: inline-block;
+            min-width: 250px;
+            font-weight: bold;
+        }
+
+        .start {
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        .stop {
+            background-color: #f44336;
+            color: white;
+        }
+
+        .idle {
+            background-color: #9e9e9e;
+            color: white;
+        }
+
+        button {
+            margin-top: 40px;
+            padding: 14px 25px;
+            font-size: 18px;
+            cursor: pointer;
+        }
+
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+
+<h1>Application Status</h1>
+
+<div id="statusBox" class="status-box idle">
+    Loading...
+</div>
+
+<br/>
+
+<button id="startBtn" onclick="startApp()">Start App</button>
+
+<script>
+
+    async function fetchStatus() {
+        const response = await fetch('/api/status');
+        const data = await response.json();
+
+        const status = data.status;
+
+        const box = document.getElementById('statusBox');
+        const btn = document.getElementById('startBtn');
+
+        box.className = 'status-box ' + status.toLowerCase();
+        box.innerText = status;
+
+        // Button active only if STOP
+        if (status === 'STOP' || status === 'IDLE') {
+            btn.disabled = false;
+        } else {
+            btn.disabled = true;
+        }
+    }
+
+    async function startApp() {
+        await fetch('/api/start', { method: 'POST' });
+        fetchStatus();
+    }
+
+    // Auto refresh every 3 seconds
+    setInterval(fetchStatus, 3000);
+
+    // Initial load
+    fetchStatus();
+
+</script>
+
+</body>
+</html>
