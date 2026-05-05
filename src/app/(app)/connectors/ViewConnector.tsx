@@ -1,23 +1,11 @@
 "use client";
 
 import { ChevronDown, Plug, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-
-type ConnectorTool = {
-  name: string;
-  documentation: string;
-};
-
-type ConnectorConfigVariable = {
-  name: string;
-  required: boolean;
-};
-
-type ConnectorDetails = {
-  documentation: string;
-  tools: ConnectorTool[];
-  config_variables: ConnectorConfigVariable[];
-};
+import { useEffect, useState } from "react";
+import {
+  fetchConnectorDetails,
+  type ConnectorDetails,
+} from "./connectorSchemas";
 
 type ViewConnectorProps = {
   isOpen: boolean;
@@ -41,15 +29,8 @@ export default function ViewConnector({
   const [openTools, setOpenTools] = useState(true);
   const [openConfig, setOpenConfig] = useState(true);
 
-  const detailsUrl = useMemo(() => {
-    if (!connectorId) {
-      return "";
-    }
-    return `${connectorsApiBase}/connectors/${encodeURIComponent(connectorId)}`;
-  }, [connectorsApiBase, connectorId]);
-
   useEffect(() => {
-    if (!isOpen || !connectorId || !detailsUrl) {
+    if (!isOpen || !connectorId) {
       return;
     }
 
@@ -57,12 +38,10 @@ export default function ViewConnector({
     const loadDetails = async () => {
       setIsLoading(true);
       setLoadError("");
-      const response = await fetch(detailsUrl, {
-        method: "GET",
-        headers: { accept: "application/json" },
-        signal: controller.signal,
-      });
-      const payload = (await response.json()) as ConnectorDetails;
+      const payload = await fetchConnectorDetails(
+        connectorId,
+        connectorsApiBase
+      );
       setDetails(payload);
       setIsLoading(false);
     };
@@ -76,7 +55,7 @@ export default function ViewConnector({
     });
 
     return () => controller.abort();
-  }, [detailsUrl, connectorId, isOpen]);
+  }, [connectorId, connectorsApiBase, isOpen]);
 
   if (!isOpen || !connectorId) {
     return null;

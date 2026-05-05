@@ -3,8 +3,8 @@
 import { Lock, Settings2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  CONNECTOR_CONFIG_SCHEMAS,
   type ConfigField,
+  fetchConnectorSchema,
 } from "./connectorSchemas";
 
 type SetConnectorConfigProps = {
@@ -35,17 +35,6 @@ type FormState = {
   configName: string;
   fieldsState: Record<string, string>;
   editingConfigId: string | null;
-};
-
-const normalizeConnectorSchemaKey = (connectorId: string | null) => {
-  if (!connectorId) {
-    return "";
-  }
-
-  const normalized = connectorId.toLowerCase();
-  return normalized === "ibm_mq" || normalized === "mq"
-    ? "ibm_mq_connector"
-    : normalized;
 };
 
 const getDefaultFieldsState = (fields: ConfigField[]) =>
@@ -109,13 +98,7 @@ export default function SetConnectorConfig({
   mode = "create",
   onClose,
 }: SetConnectorConfigProps) {
-  const schema = useMemo(() => {
-    if (!connectorId) {
-      return [];
-    }
-    return CONNECTOR_CONFIG_SCHEMAS[normalizeConnectorSchemaKey(connectorId)] ?? [];
-  }, [connectorId]);
-
+  const [schema, setSchema] = useState<ConfigField[]>([]);
   const emptyFormState = useMemo(() => buildFormState(schema), [schema]);
   const [formState, setFormState] = useState<FormState>(emptyFormState);
   const [initialFormState, setInitialFormState] = useState<FormState>(emptyFormState);
@@ -144,18 +127,29 @@ export default function SetConnectorConfig({
       return;
     }
 
-    if (!connectorId || mode === "create") {
-      queueMicrotask(() => applyFormState(emptyFormState));
+    if (!connectorId) {
       return;
     }
 
     const controller = new AbortController();
 
-    const loadExistingConfig = async () => {
+    const loadSchemaAndConfig = async () => {
       setSubmitError("");
       setPrefillError("");
       setIsSubmitting(false);
       setIsPrefilling(true);
+      setSuccessMessage("");
+
+      const nextSchema = await fetchConnectorSchema(
+        connectorId,
+        connectorsApiBase
+      );
+      setSchema(nextSchema);
+
+      if (mode === "create") {
+        applyFormState(buildFormState(nextSchema));
+        return;
+      }
 
       const response = await fetch(
         `${connectorsApiBase}/connectors/${encodeURIComponent(connectorId)}/config`,
@@ -175,21 +169,22 @@ export default function SetConnectorConfig({
       );
 
       applyFormState(
-        buildFormState(schema, latestRecord),
+        buildFormState(nextSchema, latestRecord),
         latestRecord ? "" : "No saved config was found for this connector."
       );
     };
 
-    loadExistingConfig().catch((error) => {
+    loadSchemaAndConfig().catch((error) => {
       if (error instanceof DOMException && error.name === "AbortError") {
         return;
       }
 
-      applyFormState(emptyFormState, "Unable to load current connector config.");
+      setSchema([]);
+      applyFormState(buildFormState([]), "Unable to load connector schema.");
     });
 
     return () => controller.abort();
-  }, [applyFormState, connectorId, connectorsApiBase, emptyFormState, isOpen, mode, schema]);
+  }, [applyFormState, connectorId, connectorsApiBase, isOpen, mode]);
 
   if (!isOpen || !connectorId) {
     return null;
