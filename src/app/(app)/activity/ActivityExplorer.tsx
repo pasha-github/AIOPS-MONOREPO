@@ -3,11 +3,17 @@
 import { useRuntimeConfig } from "@/config/runtime-config";
 import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import type { AgentSessionDetail, AgentSessionSummary } from "../dashboard/logs";
+import type {
+  AgentSessionDetail,
+  AgentSessionSummary,
+  AutomationAgentOption,
+} from "../dashboard/logs";
 import {
   deleteAgentSession,
+  fetchAutomationAgents,
   fetchAgentSessionDetail,
   fetchAgentSessions,
+  resolveAgentManagerApiBase,
   resolveLogsApiBase,
 } from "../dashboard/logs";
 import AgentLogDetails from "./AgentLogDetails";
@@ -15,8 +21,12 @@ import TopBar from "./TopBar";
 import UserActivityTable from "./UserActivityTable";
 
 export default function ActivityExplorer() {
-  const { agentAdkBaseUrl } = useRuntimeConfig();
+  const { agentAdkBaseUrl, llmManagerApiBaseUrl } = useRuntimeConfig();
   const logsApiBaseUrl = resolveLogsApiBase(agentAdkBaseUrl);
+  const agentManagerApiBaseUrl = resolveAgentManagerApiBase(llmManagerApiBaseUrl);
+  const [agents, setAgents] = useState<AutomationAgentOption[]>([]);
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
+  const [isAgentsLoading, setIsAgentsLoading] = useState(true);
   const [sessions, setSessions] = useState<AgentSessionSummary[]>([]);
   const [sessionDetails, setSessionDetails] = useState<Record<string, AgentSessionDetail>>({});
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
@@ -28,6 +38,7 @@ export default function ActivityExplorer() {
   const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null);
   const sessionDetailsRef = useRef<Record<string, AgentSessionDetail>>({});
   const selectedSessionIdRef = useRef<string | null>(null);
+  const selectedAgentIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     sessionDetailsRef.current = sessionDetails;
@@ -36,6 +47,10 @@ export default function ActivityExplorer() {
   useEffect(() => {
     selectedSessionIdRef.current = selectedSessionId;
   }, [selectedSessionId]);
+
+  useEffect(() => {
+    selectedAgentIdRef.current = selectedAgentId;
+  }, [selectedAgentId]);
 
   const loadSessionDetail = useCallback(
     async (sessionId: string, options?: { force?: boolean; signal?: AbortSignal }) => {
@@ -48,7 +63,8 @@ export default function ActivityExplorer() {
         const detail = await fetchAgentSessionDetail(
           sessionId,
           options?.signal,
-          logsApiBaseUrl
+          logsApiBaseUrl,
+          selectedAgentIdRef.current ?? undefined
         );
         setSessionDetails((current) => {
           const next = { ...current, [sessionId]: detail };
@@ -73,7 +89,8 @@ export default function ActivityExplorer() {
       setError("");
 
       try {
-        const nextSessions = await fetchAgentSessions(signal, logsApiBaseUrl);
+        const appName = selectedAgentIdRef.current ?? undefined;
+        const nextSessions = await fetchAgentSessions(signal, logsApiBaseUrl, appName);
         const nextSelectedSessionId =
           (selectedSessionIdRef.current &&
           nextSessions.some((session) => session.id === selectedSessionIdRef.current)
@@ -117,9 +134,55 @@ export default function ActivityExplorer() {
 
   useEffect(() => {
     const controller = new AbortController();
+
+    const loadAgents = async () => {
+      setIsAgentsLoading(true);
+      try {
+        const nextAgents = await fetchAutomationAgents(
+          controller.signal,
+          agentManagerApiBaseUrl
+        );
+        setAgents(nextAgents);
+        setSelectedAgentId((current) => {
+          if (current && nextAgents.some((agent) => agent.id === current)) {
+            return current;
+          }
+          return nextAgents[0]?.id ?? null;
+        });
+      } catch (loadError) {
+        if ((loadError as Error).name !== "AbortError") {
+          setAgents([]);
+          setSelectedAgentId(null);
+          setError("Unable to load automation agents right now.");
+        }
+      } finally {
+        setIsAgentsLoading(false);
+      }
+    };
+
+    void loadAgents();
+    return () => controller.abort();
+  }, [agentManagerApiBaseUrl]);
+
+  useEffect(() => {
+    if (isAgentsLoading) {
+      return;
+    }
+
+    if (!selectedAgentId) {
+      setSessions([]);
+      setSelectedSessionId(null);
+      setSelectedEntryId(null);
+      setSessionDetails({});
+      sessionDetailsRef.current = {};
+      setIsLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
     void loadSessions(false, controller.signal);
     return () => controller.abort();
-  }, [loadSessions]);
+  }, [isAgentsLoading, loadSessions, selectedAgentId]);
 
   const handleRefresh = useCallback(() => {
     const controller = new AbortController();
@@ -132,7 +195,12 @@ export default function ActivityExplorer() {
       setError("");
 
       try {
-        await deleteAgentSession(sessionId, undefined, logsApiBaseUrl);
+        await deleteAgentSession(
+          sessionId,
+          undefined,
+          logsApiBaseUrl,
+          selectedAgentIdRef.current ?? undefined
+        );
         setSessionDetails((current) => {
           const next = { ...current };
           delete next[sessionId];
@@ -195,12 +263,23 @@ export default function ActivityExplorer() {
   return (
     <div className="space-y-8">
       <TopBar
+        agents={agents}
+        selectedAgentId={selectedAgentId}
         sessions={sessions}
         selectedSession={selectedSession}
+        isAgentsLoading={isAgentsLoading}
         isLoading={isLoading}
         isRefreshing={isRefreshing}
         deletingSessionId={deletingSessionId}
         onRefresh={handleRefresh}
+        onAgentChange={(agentId) => {
+          setSelectedAgentId(agentId);
+          setSelectedSessionId(null);
+          setSelectedEntryId(null);
+          setSessionDetails({});
+          sessionDetailsRef.current = {};
+          setError("");
+        }}
         onSessionChange={(sessionId) => void handleSessionChange(sessionId)}
         onDeleteSession={(sessionId) => void handleDeleteSession(sessionId)}
       />
