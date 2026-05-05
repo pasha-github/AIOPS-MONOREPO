@@ -435,11 +435,10 @@ class BaseConnector:
 """
 
     temp_connectors = tmp_path / "src" / "connectors"
-    temp_connectors.mkdir(parents=True, exist_ok=True)
+    temp_connector_dir = temp_connectors / "temp_connector"
+    temp_connector_dir.mkdir(parents=True, exist_ok=True)
     (temp_connectors / "base_connector.py").write_text(base_source, encoding="utf-8")
-    (temp_connectors / "temp_connector.py").write_text(
-        connector_source, encoding="utf-8"
-    )
+    (temp_connector_dir / "connector.py").write_text(connector_source, encoding="utf-8")
 
     monkeypatch.setattr("src.connectors.loader.CONNECTORS_DIR", temp_connectors)
 
@@ -512,11 +511,10 @@ class BaseConnector:
     pass
 """
     temp_connectors = tmp_path / "connectors"
-    temp_connectors.mkdir(parents=True, exist_ok=True)
+    bad_connector_dir = temp_connectors / "bad_connector"
+    bad_connector_dir.mkdir(parents=True, exist_ok=True)
     (temp_connectors / "base_connector.py").write_text(base_source, encoding="utf-8")
-    (temp_connectors / "bad_connector.py").write_text(
-        connector_source, encoding="utf-8"
-    )
+    (bad_connector_dir / "connector.py").write_text(connector_source, encoding="utf-8")
 
     monkeypatch.setattr("src.connectors.loader.CONNECTORS_DIR", temp_connectors)
 

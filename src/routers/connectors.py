@@ -8,7 +8,11 @@ from pydantic import BaseModel
 from sqlmodel import Session, select
 
 from src.agent_runtime.adk.adk_app import invalidate_cache
-from src.connectors.loader import cached_connector_info
+from src.connectors.loader import (
+    get_connector_dir,
+    load_connector_info,
+    load_connector_metadata,
+)
 from src.database.database import get_session
 from src.database.models import Agent, ConnectorConfig, Skill
 
@@ -33,14 +37,18 @@ def list_connectors():
     connectors_dir = Path("src/connectors")
     if connectors_dir.exists():
         for path_obj in connectors_dir.iterdir():
-            filename = path_obj.name
-            if filename in {"base_connector.py", "__init__.py", "example_connector.py"}:
+            if not path_obj.is_dir():
                 continue
-            if filename.endswith("_connector.py"):
-                # Take prefix before _connector.py and making it capital case
-                name = filename.split("_connector.py")[0].replace("_", " ").title()
-                name = {"ibm_mq_connector.py": "IBM MQ"}.get(filename, name)
-                connectors.append({"id": filename.strip(".py"), "name": name})
+            connector_id = path_obj.name
+            if connector_id in {"__pycache__", "example_connector"}:
+                continue
+            metadata_path = path_obj / "metadata.json"
+            if not metadata_path.exists():
+                continue
+            metadata = load_connector_metadata(connector_id)
+            connectors.append(
+                {"id": connector_id, "name": metadata.get("name", connector_id)}
+            )
     return connectors
 
 
@@ -50,16 +58,13 @@ def get_connector_details(connector_id: str) -> dict[str, Any]:
     if connector_id in ["__init__", "base_connector"]:
         raise HTTPException(status_code=404, detail="Connector not found")
 
-    connectors_dir = Path("src/connectors")
-    file_path = connectors_dir / f"{connector_id}.py"
-
-    if not file_path.exists():
+    connector_dir = get_connector_dir(connector_id)
+    if not connector_dir.exists():
         raise HTTPException(status_code=404, detail="Connector not found")
-
-    with file_path.open(encoding="utf-8") as f:
-        source = f.read()
-
-    return cached_connector_info(source, file_path.stat().st_mtime)
+    try:
+        return load_connector_info(connector_id)
+    except FileNotFoundError as err:
+        raise HTTPException(status_code=404, detail="Connector not found") from err
 
 
 @router.get("/{connector_id}/config")
@@ -86,8 +91,8 @@ def set_connector_config(
     if connector_id in {"__init__", "base_connector"}:
         raise HTTPException(status_code=404, detail="Connector not found")
 
-    connector_file = Path("src/connectors") / f"{connector_id}.py"
-    if not connector_file.exists():
+    connector_dir = get_connector_dir(connector_id)
+    if not connector_dir.exists():
         raise HTTPException(status_code=404, detail="Connector not found")
 
     db = ConnectorConfig.model_validate(connector_config)
