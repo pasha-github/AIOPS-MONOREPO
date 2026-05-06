@@ -57,6 +57,7 @@
 <br/>
 
 <button id="startBtn" onclick="startApp()">Start App</button>
+<button id="stopBtn" onclick="stopApp()">Stop App</button>
 
 <script>
 
@@ -84,9 +85,13 @@
         await fetch('/api/start', { method: 'POST' });
         fetchStatus();
     }
+     async function stopApp() {
+        await fetch('/api/stop', { method: 'POST' });
+        fetchStatus();
+    }
 
     // Auto refresh every 3 seconds
-    setInterval(fetchStatus, 3000);
+    setInterval(fetchStatus, 5000);
 
     // Initial load
     fetchStatus();

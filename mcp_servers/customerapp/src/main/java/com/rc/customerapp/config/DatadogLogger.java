@@ -27,8 +27,8 @@ public class DatadogLogger {
         headers.add("DD-API-KEY", apiKey);
 
         Map<String, Object> payload = new HashMap<>();
-        payload.put("service", "status-app");
-        payload.put("host", "status-app");
+        payload.put("service", "customer-app");
+        payload.put("host", "customer-app");
         payload.put("ddsource", "java");
         payload.put("message", message);
         payload.put("status", status);
