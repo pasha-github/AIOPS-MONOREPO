@@ -3,8 +3,8 @@
 import { Lock, Settings2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  CONNECTOR_CONFIG_SCHEMAS,
   type ConfigField,
+  fetchConnectorSchema,
 } from "./connectorSchemas";
 
 type SetConnectorConfigProps = {
@@ -35,17 +35,6 @@ type FormState = {
   configName: string;
   fieldsState: Record<string, string>;
   editingConfigId: string | null;
-};
-
-const normalizeConnectorSchemaKey = (connectorId: string | null) => {
-  if (!connectorId) {
-    return "";
-  }
-
-  const normalized = connectorId.toLowerCase();
-  return normalized === "ibm_mq" || normalized === "mq"
-    ? "ibm_mq_connector"
-    : normalized;
 };
 
 const getDefaultFieldsState = (fields: ConfigField[]) =>
@@ -109,13 +98,8 @@ export default function SetConnectorConfig({
   mode = "create",
   onClose,
 }: SetConnectorConfigProps) {
-  const schema = useMemo(() => {
-    if (!connectorId) {
-      return [];
-    }
-    return CONNECTOR_CONFIG_SCHEMAS[normalizeConnectorSchemaKey(connectorId)] ?? [];
-  }, [connectorId]);
-
+  const [schema, setSchema] = useState<ConfigField[]>([]);
+  const [hasLoadedSchema, setHasLoadedSchema] = useState(false);
   const emptyFormState = useMemo(() => buildFormState(schema), [schema]);
   const [formState, setFormState] = useState<FormState>(emptyFormState);
   const [initialFormState, setInitialFormState] = useState<FormState>(emptyFormState);
@@ -144,18 +128,31 @@ export default function SetConnectorConfig({
       return;
     }
 
-    if (!connectorId || mode === "create") {
-      queueMicrotask(() => applyFormState(emptyFormState));
+    if (!connectorId) {
       return;
     }
 
     const controller = new AbortController();
 
-    const loadExistingConfig = async () => {
+    const loadSchemaAndConfig = async () => {
       setSubmitError("");
       setPrefillError("");
       setIsSubmitting(false);
       setIsPrefilling(true);
+      setSuccessMessage("");
+      setHasLoadedSchema(false);
+
+      const nextSchema = await fetchConnectorSchema(
+        connectorId,
+        connectorsApiBase
+      );
+      setSchema(nextSchema);
+      setHasLoadedSchema(true);
+
+      if (mode === "create") {
+        applyFormState(buildFormState(nextSchema));
+        return;
+      }
 
       const response = await fetch(
         `${connectorsApiBase}/connectors/${encodeURIComponent(connectorId)}/config`,
@@ -175,21 +172,23 @@ export default function SetConnectorConfig({
       );
 
       applyFormState(
-        buildFormState(schema, latestRecord),
+        buildFormState(nextSchema, latestRecord),
         latestRecord ? "" : "No saved config was found for this connector."
       );
     };
 
-    loadExistingConfig().catch((error) => {
+    loadSchemaAndConfig().catch((error) => {
       if (error instanceof DOMException && error.name === "AbortError") {
         return;
       }
 
-      applyFormState(emptyFormState, "Unable to load current connector config.");
+      setSchema([]);
+      setHasLoadedSchema(true);
+      applyFormState(buildFormState([]), "Unable to load connector schema.");
     });
 
     return () => controller.abort();
-  }, [applyFormState, connectorId, connectorsApiBase, emptyFormState, isOpen, mode, schema]);
+  }, [applyFormState, connectorId, connectorsApiBase, isOpen, mode]);
 
   if (!isOpen || !connectorId) {
     return null;
@@ -290,6 +289,63 @@ export default function SetConnectorConfig({
       setIsSubmitting(false);
     }
   };
+
+  if (isPrefilling || !hasLoadedSchema) {
+    return (
+      <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/35 px-4 py-8 backdrop-blur-sm">
+        <div className="flex w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-[0_20px_60px_-35px_rgba(15,23,42,0.65)]">
+          <div className="flex items-center justify-between bg-[#4f49e2] px-6 py-4 text-white">
+            <div className="flex items-center gap-3">
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20">
+                <Settings2 className="h-4 w-4" />
+              </span>
+              <div>
+                <p className="text-lg font-semibold">{copy.title}</p>
+                <p className="text-xs text-white/80">{connectorName || connectorId}</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={resetAndClose}
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-white/15"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          <div className="space-y-4 px-6 py-5">
+            <div className="space-y-4">
+              <div className="animate-pulse rounded-xl border border-[#eef1f7] bg-white p-4">
+                <div className="h-4 w-28 rounded bg-[#edf2f9]" />
+                <div className="mt-3 h-12 rounded-xl bg-[#edf2f9]" />
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                {Array.from({ length: Math.max(schema.length, 4) }).map((_, index) => (
+                  <div
+                    key={`config-schema-loading-${index}`}
+                    className="animate-pulse rounded-xl border border-[#eef1f7] bg-white p-4"
+                  >
+                    <div className="h-4 w-24 rounded bg-[#edf2f9]" />
+                    <div className="mt-3 h-11 rounded-xl bg-[#edf2f9]" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end gap-3 border-t border-[#eef1f7] px-6 py-4">
+            <button
+              type="button"
+              onClick={resetAndClose}
+              className="rounded-xl border border-[#e5e7eb] px-5 py-2 text-sm font-semibold text-[#374151] hover:bg-[#f8fafc]"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (schema.length === 0) {
     return (
