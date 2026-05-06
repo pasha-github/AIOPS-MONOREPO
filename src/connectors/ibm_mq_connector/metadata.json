@@ -1,0 +1,89 @@
+{
+  "id": "ibm_mq_connector",
+  "name": "IBM MQ",
+  "description": "IBM MQ administrative operations and support endpoints.",
+  "version": "0.1.0",
+  "config_variables": [
+    {
+      "name": "URL_BASE",
+      "label": "URL Base",
+      "required": true,
+      "secret": false,
+      "placeholder": "Enter mqweb base URL"
+    },
+    {
+      "name": "USER_NAME",
+      "label": "User Name",
+      "required": true,
+      "secret": false,
+      "placeholder": "Enter mqweb username"
+    },
+    {
+      "name": "PASSWORD",
+      "label": "Password",
+      "required": true,
+      "secret": true,
+      "placeholder": "Enter mqweb password"
+    },
+    {
+      "name": "LOGS_URL",
+      "label": "Logs URL",
+      "required": true,
+      "secret": false,
+      "placeholder": "Enter IBM MQ logs endpoint"
+    },
+    {
+      "name": "SSH_HOSTNAME",
+      "label": "SSH Hostname",
+      "required": true,
+      "secret": false,
+      "placeholder": "Enter SSH hostname"
+    },
+    {
+      "name": "SSH_USERNAME",
+      "label": "SSH Username",
+      "required": true,
+      "secret": false,
+      "placeholder": "Enter SSH username"
+    },
+    {
+      "name": "SSH_PASSWORD",
+      "label": "SSH Password",
+      "required": true,
+      "secret": true,
+      "placeholder": "Enter SSH password"
+    },
+    {
+      "name": "VERIFY_TLS",
+      "label": "Verify TLS",
+      "required": false,
+      "secret": false,
+      "placeholder": "true"
+    },
+    {
+      "name": "prefix",
+      "label": "Prefix",
+      "required": false,
+      "secret": false,
+      "placeholder": "IBM MQ"
+    }
+  ],
+  "tools": [
+    {
+      "name": "dspmq",
+      "documentation": "Lists queue managers available to the configured mqweb server and reports whether each one is running."
+    },
+    {
+      "name": "runmqsc",
+      "documentation": "Runs an MQSC command against a specific queue manager and returns normalized command output."
+    },
+    {
+      "name": "get_mq_logs",
+      "documentation": "Fetches IBM MQ log status and any detected issues such as channel failures or connectivity problems."
+    },
+    {
+      "name": "run_commands_ssh",
+      "documentation": "Runs a command over SSH using Paramiko and returns stdout/stderr."
+    }
+  ]
+}

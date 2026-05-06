@@ -1,0 +1,49 @@
+{
+  "id": "outlook_connector",
+  "name": "Outlook",
+  "description": "Reply to Outlook emails through Microsoft Graph.",
+  "version": "0.0.1",
+  "config_variables": [
+    {
+      "name": "TENANT_ID",
+      "label": "Tenant ID",
+      "required": true,
+      "secret": false,
+      "placeholder": "Enter Microsoft Entra tenant ID"
+    },
+    {
+      "name": "CLIENT_ID",
+      "label": "Client ID",
+      "required": true,
+      "secret": false,
+      "placeholder": "Enter application client ID"
+    },
+    {
+      "name": "CLIENT_SECRET",
+      "label": "Client Secret",
+      "required": true,
+      "secret": true,
+      "placeholder": "Enter client secret"
+    },
+    {
+      "name": "MAILBOX_USER",
+      "label": "Mailbox User",
+      "required": true,
+      "secret": false,
+      "placeholder": "Enter mailbox email or user principal name"
+    },
+    {
+      "name": "prefix",
+      "label": "Prefix",
+      "required": false,
+      "secret": false,
+      "placeholder": "Outlook"
+    }
+  ],
+  "tools": [
+    {
+      "name": "reply_to_email",
+      "documentation": "Reply to an existing Outlook email in the configured mailbox."
+    }
+  ]
+}

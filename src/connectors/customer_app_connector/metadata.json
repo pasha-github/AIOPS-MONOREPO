@@ -1,0 +1,29 @@
+{
+  "id": "customer_app_connector",
+  "name": "Customer App",
+  "description": "Start, stop, and check status of the customer app.",
+  "version": "0.0.1",
+  "config_variables": [
+    {
+      "name": "prefix",
+      "label": "Prefix",
+      "required": false,
+      "secret": false,
+      "placeholder": "Customer App"
+    }
+  ],
+  "tools": [
+    {
+      "name": "start_customer_app",
+      "documentation": "Starts the customer app."
+    },
+    {
+      "name": "stop_customer_app",
+      "documentation": "Stops the customer app."
+    },
+    {
+      "name": "get_customer_app_status",
+      "documentation": "Checks current status of the customer app."
+    }
+  ]
+}
