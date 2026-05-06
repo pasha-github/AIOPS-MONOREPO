@@ -1,8 +1,7 @@
 "use client";
 
-import { type AgentLogEntry, type AgentSessionDetail } from "../dashboard/logs";
-import { renderMarkdownBlocks } from "../dashboard/logs";
 import { ArrowRight, Check } from "lucide-react";
+import { renderMarkdownBlocks, type AgentLogEntry, type AgentSessionDetail } from "../dashboard/logs";
 
 const levelStyles = {
   text: "bg-[#eef2ff] text-[#4338ca]",
@@ -101,9 +100,9 @@ export default function AgentLogDetails({
               <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-[#687285]">
                 <span>{selectedEntry.timestampLabel}</span>
                 <span className="text-[#c8cfdb]">/</span>
-                <span>{selectedSessionSummary}</span>
+                <div>{renderMarkdownBlocks(selectedSessionSummary ?? "")}</div>
               </div>
-              <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg bg-[#f8faff] px-4 py-3">
+              <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg px-4 py-3">
                 <span
                   className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${
                     levelStyles[selectedEntry.source]
@@ -122,7 +121,7 @@ export default function AgentLogDetails({
 
             <div className="soft-scrollbar max-h-[70vh] overflow-y-auto px-7 py-6">
               {selectedEntry.tools.length > 0 ? (
-                <div className="mb-6 rounded-xl border border-[#e6ebf7] bg-[#f8faff] p-4">
+                <div className="mb-6  p-4">
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7a8498]">
                     Tools used
                   </p>
@@ -138,7 +137,7 @@ export default function AgentLogDetails({
                           </span>
                           <span className="font-medium text-[#24324a]">{tool.label}</span>
                         </div>
-                        <pre className="mt-3 overflow-x-auto rounded-xl border border-[#dbe4f5] bg-[#fbfcff] px-4 py-3 text-xs leading-6 text-[#24324a]">
+                        <pre className="mt-3 overflow-x-auto px-4 py-3 text-xs leading-6 text-[#24324a]">
                           <code>{formatToolPayload(tool.payload)}</code>
                         </pre>
                       </div>

@@ -1,6 +1,4 @@
 "use client";
-
-import { type AgentSessionSummary, type AutomationAgentOption } from "../dashboard/logs";
 import {
   Activity,
   Bot,
@@ -11,6 +9,15 @@ import {
   Trash2,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { type AgentSessionSummary, type AutomationAgentOption } from "../dashboard/logs";
+
+const stripMarkdown = (value: string) =>
+  value
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, "$1")
+    .replace(/(\*\*|__)(.*?)\1/g, "$2")
+    .replace(/(\*|_)(.*?)\1/g, "$2")
+    .replace(/`([^`]+)`/g, "$1")
+    .trim();
 
 function SessionDropdownSkeleton() {
   return (
@@ -63,6 +70,9 @@ export default function TopBar({
   const menuContainerRef = useRef<HTMLDivElement | null>(null);
   const selectedAgent =
     agents.find((agent) => agent.id === selectedAgentId) ?? null;
+  const selectedSessionSummary = selectedSession
+    ? stripMarkdown(selectedSession.summary)
+    : null;
 
   useEffect(() => {
     if (!isAgentMenuOpen && !isSessionMenuOpen) {
@@ -175,9 +185,6 @@ export default function TopBar({
                                     {agent.id}
                                   </p>
                                 </div>
-                                {isActive ? (
-                                  <Check className="h-4 w-4 shrink-0 text-[#4f49e2]" />
-                                ) : null}
                               </button>
                             );
                           })}
@@ -198,7 +205,7 @@ export default function TopBar({
                           {selectedSession ? "Selected session" : "Select session"}
                         </p>
                         <p className="mt-1 truncate text-[2rem] font-semibold leading-tight text-[#111827]">
-                          {selectedSession?.summary ?? "Select a session"}
+                          {selectedSessionSummary ?? "Select a session"}
                         </p>
                         <p className="mt-1 text-sm text-[#687285]">
                           {selectedSession
@@ -240,24 +247,19 @@ export default function TopBar({
                                   className="min-w-0 flex-1 text-left"
                                 >
                                   <p className="truncate text-sm font-semibold text-[#111827]">
-                                    {session.summary}
+                                    {stripMarkdown(session.summary)}
                                   </p>
                                   <p className="mt-1 text-xs text-[#7a8498]">
                                     Last updated {session.updatedAtLabel}
                                   </p>
                                 </button>
                                 <div className="flex shrink-0 items-center gap-3">
-                                  {isActive ? (
-                                    <Check className="h-4 w-4 text-[#4f49e2]" />
-                                  ) : (
-                                    <span className="h-4 w-4" aria-hidden="true" />
-                                  )}
                                   <button
                                     type="button"
                                     onClick={() => void onDeleteSession(session.id)}
                                     disabled={deletingSessionId === session.id}
                                     className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[#ef4444] transition hover:bg-[#fff1f2] disabled:cursor-not-allowed disabled:opacity-50"
-                                    aria-label={`Delete ${session.summary}`}
+                                    aria-label={`Delete ${stripMarkdown(session.summary)}`}
                                   >
                                     {deletingSessionId === session.id ? (
                                       <Loader2 className="h-4 w-4 animate-spin" />
