@@ -112,24 +112,21 @@ export default function AgentRegistry({
     if (normalized === "active" || normalized === "online" || normalized === "started") {
       return {
         text: "text-[#166534]",
-        bg: "bg-[#dcfce7]",
+        bg: "bg-transparent",
         dot: "bg-[#16a34a]",
-        border: "border-[#bbf7d0]",
       };
     }
     if (normalized === "inactive" || normalized === "offline" || normalized === "stopped") {
       return {
         text: "text-[#9a3412]",
-        bg: "bg-[#ffedd5]",
+        bg: "bg-transparent",
         dot: "bg-[#f97316]",
-        border: "border-[#fed7aa]",
       };
     }
     return {
       text: "text-[#334155]",
-      bg: "bg-[#e2e8f0]",
+      bg: "bg-transparent",
       dot: "bg-[#64748b]",
-      border: "border-[#cbd5e1]",
     };
   };
 
@@ -766,7 +763,7 @@ export default function AgentRegistry({
                       </div>
                       <div className="flex h-full items-center justify-center px-3 text-center">
                         <span
-                          className={`inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-xs font-semibold ${statusTone.bg} ${statusTone.text} ${statusTone.border}`}
+                          className={`inline-flex items-center gap-2 px-2.5 py-1 text-xs font-semibold ${statusTone.bg} ${statusTone.text}`}
                         >
                           <span className={`h-2 w-2 rounded-full ${statusTone.dot}`} />
                           {statusLabel}
@@ -894,7 +891,7 @@ export default function AgentRegistry({
                         </p>
                       </div>
                       <span
-                        className={`inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-xs font-semibold ${statusTone.bg} ${statusTone.text} ${statusTone.border}`}
+                        className={`inline-flex items-center gap-2 px-2.5 py-1 text-xs font-semibold ${statusTone.bg} ${statusTone.text}`}
                       >
                         <span className={`h-2 w-2 rounded-full ${statusTone.dot}`} />
                         {statusLabel}
