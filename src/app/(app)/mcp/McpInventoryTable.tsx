@@ -16,7 +16,7 @@ type McpInventoryTableProps = {
 };
 
 const COLUMN_TEMPLATE =
-  "minmax(240px,1.55fr) minmax(300px,1.95fr) minmax(220px,1.2fr) minmax(180px,0.95fr) minmax(180px,1fr) minmax(120px,0.8fr)";
+  "minmax(220px,1.55fr) minmax(260px,1.95fr) minmax(160px,0.95fr) minmax(170px,0.9fr) minmax(170px,0.95fr) minmax(96px,0.65fr)";
 
 export default function McpInventoryTable({
   servers,
@@ -103,7 +103,7 @@ export default function McpInventoryTable({
             </div>
           </div>
         ) : (
-          <div className="min-w-[1240px]">
+          <div className="min-w-[1160px]">
             <div
               className="grid items-center divide-x divide-[#d7e0ee] bg-[#f3f6fb] px-4 py-3 text-xs font-semibold uppercase tracking-[0.08em] text-[#111827]"
               style={{

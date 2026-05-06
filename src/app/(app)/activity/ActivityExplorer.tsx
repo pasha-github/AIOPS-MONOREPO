@@ -91,11 +91,16 @@ export default function ActivityExplorer() {
       try {
         const appName = selectedAgentIdRef.current ?? undefined;
         const nextSessions = await fetchAgentSessions(signal, logsApiBaseUrl, appName);
-        const nextSelectedSessionId =
-          (selectedSessionIdRef.current &&
-          nextSessions.some((session) => session.id === selectedSessionIdRef.current)
-            ? selectedSessionIdRef.current
-            : nextSessions[0]?.id) ?? null;
+          const nextSelectedSessionId = refresh
+            ? (nextSessions[0]?.id ?? null)
+            : (
+                selectedSessionIdRef.current &&
+                nextSessions.some(
+                  (session) => session.id === selectedSessionIdRef.current
+                )
+                  ? selectedSessionIdRef.current
+                  : nextSessions[0]?.id
+              ) ?? null;
 
         startTransition(() => {
           setSessions(nextSessions);
