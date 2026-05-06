@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
+import { renderMarkdownBlocks } from "../dashboard/logs";
 import { formatDateTime, getProviderIconSrc } from "../llm-management/llmHelpers";
 import JobsAgentManagement from "./JobsAgentManagement";
 import WebhookAgentManagement from "./WebhookAgentManagement";
@@ -209,24 +210,15 @@ export default function AgentRegistry({
     setSortDirection(nextKey === "name" || nextKey === "status" ? "asc" : "desc");
   };
 
-  const renderWrappedText = (value: string | null | undefined) => {
-    const content = value?.trim() || "-";
-    if (content === "-") {
-      return <span className="text-[#64748b]">-</span>;
-    }
-    return (
-      <span className="block break-words whitespace-normal leading-snug text-[#2b3341]">
-        {content}
-      </span>
-    );
-  };
-
-  const getInstructionPreview = (value: string | null | undefined) => {
+  const getPreviewText = (
+    value: string | null | undefined,
+    limit = 180
+  ) => {
     const content = value?.trim() || "";
-    if (content.length <= 180) {
+    if (content.length <= limit) {
       return content;
     }
-    return `${content.slice(0, 180).trimEnd()}...`;
+    return `${content.slice(0, limit).trimEnd()}...`;
   };
 
   const openInstructionDialog = (title: string, content: string | null | undefined) => {
@@ -708,7 +700,25 @@ export default function AgentRegistry({
                         </span>
                       </div>
                       <div className="flex h-full items-start px-3">
-                        {renderWrappedText(agent.description)}
+                        <div className="space-y-1">
+                          <p className="break-words whitespace-normal leading-snug text-[#2b3341]">
+                            {getPreviewText(agent.description, 140) || "-"}
+                          </p>
+                          {agent.description && agent.description.trim().length > 140 ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                openInstructionDialog(
+                                  `${agent.name} description`,
+                                  agent.description
+                                )
+                              }
+                              className="text-xs font-semibold text-[#4f49e2] transition hover:text-[#4338ca]"
+                            >
+                              See more
+                            </button>
+                          ) : null}
+                        </div>
                       </div>
                       <div className="flex h-full min-w-0 items-start px-3">
                         {renderAgentLlmList(agent)}
@@ -716,7 +726,7 @@ export default function AgentRegistry({
                       <div className="flex h-full items-start px-3">
                         <div className="space-y-1">
                           <p className="break-words whitespace-normal leading-snug text-[#2b3341]">
-                            {getInstructionPreview(agent.instruction) || "-"}
+                            {getPreviewText(agent.instruction) || "-"}
                           </p>
                           {agent.instruction && agent.instruction.trim().length > 180 ? (
                             <button
@@ -894,9 +904,25 @@ export default function AgentRegistry({
                       <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[#64748b]">
                         Description
                       </p>
-                      <div className="mt-1">
-                        {renderWrappedText(agent.description)}
-                      </div>
+                        <div className="mt-1 space-y-1">
+                          <p className="break-words whitespace-normal leading-snug text-[#2b3341]">
+                            {getPreviewText(agent.description, 140) || "-"}
+                          </p>
+                          {agent.description && agent.description.trim().length > 140 ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                openInstructionDialog(
+                                  `${agent.name} description`,
+                                  agent.description
+                                )
+                              }
+                              className="text-xs font-semibold text-[#4f49e2] transition hover:text-[#4338ca]"
+                            >
+                              See more
+                            </button>
+                          ) : null}
+                        </div>
                     </div>
                     <div className="rounded-xl border border-[#e6ebf5] bg-[#f8fafc] px-3 py-2">
                       <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[#64748b]">
@@ -911,9 +937,9 @@ export default function AgentRegistry({
                         Instructions
                       </p>
                       <div className="mt-1 space-y-1">
-                        <p className="break-words whitespace-normal leading-snug text-[#2b3341]">
-                          {getInstructionPreview(agent.instruction) || "-"}
-                        </p>
+                          <p className="break-words whitespace-normal leading-snug text-[#2b3341]">
+                            {getPreviewText(agent.instruction) || "-"}
+                          </p>
                         {agent.instruction && agent.instruction.trim().length > 180 ? (
                           <button
                             type="button"
@@ -1150,9 +1176,6 @@ export default function AgentRegistry({
                 <h4 className="text-lg font-semibold text-[#111827]">
                   {instructionDialogTarget.title}
                 </h4>
-                <p className="mt-1 text-sm text-[#6b7280]">
-                  Full instruction text
-                </p>
               </div>
               <button
                 type="button"
@@ -1163,38 +1186,13 @@ export default function AgentRegistry({
               </button>
             </div>
             <div className="max-h-[70vh] overflow-y-auto px-6 py-5">
-              <div className="rounded-2xl border border-[#eef1f7] bg-[#fbfcfe] p-5">
-                <div className="space-y-2 text-sm leading-7 text-[#2b3341]">
-                  {instructionDialogTarget.content
-                    .split(/\r?\n/)
-                    .map((line, index) => {
-                      const trimmedLine = line.trim();
-                      if (!trimmedLine) {
-                        return <div key={`instruction-dialog-empty-${index}`} className="h-2" />;
-                      }
-                      if (trimmedLine.startsWith("##")) {
-                        return (
-                          <p
-                            key={`instruction-dialog-heading-${index}`}
-                            className="text-base font-semibold leading-snug text-[#0f172a]"
-                          >
-                            {trimmedLine.replace(/^##+\s*/, "")}
-                          </p>
-                        );
-                      }
-                      return (
-                        <p
-                          key={`instruction-dialog-line-${index}`}
-                          className="break-words whitespace-normal"
-                        >
-                          {trimmedLine}
-                        </p>
-                      );
-                    })}
+                <div>
+                  <div className="space-y-3 break-words text-sm leading-7 text-[#2b3341]">
+                    {renderMarkdownBlocks(instructionDialogTarget.content)}
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
         </div>
       ) : null}
     </section>

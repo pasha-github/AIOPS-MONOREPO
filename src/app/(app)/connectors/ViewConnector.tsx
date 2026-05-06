@@ -2,11 +2,11 @@
 
 import { ChevronDown, Plug, X } from "lucide-react";
 import { useEffect, useState } from "react";
+import { renderMarkdownBlocks } from "../dashboard/logs";
 import {
   fetchConnectorDetails,
   type ConnectorDetails,
 } from "./connectorSchemas";
-
 type ViewConnectorProps = {
   isOpen: boolean;
   connectorId: string | null;
@@ -71,7 +71,6 @@ export default function ViewConnector({
             </span>
             <div>
               <p className="text-lg font-semibold">{connectorName}</p>
-              <p className="text-xs text-white/80">{connectorId}</p>
             </div>
           </div>
           <button
@@ -120,7 +119,7 @@ export default function ViewConnector({
                 </button>
                 {openDocs ? (
                   <div className="bg-white px-4 py-4 text-sm leading-6 text-[#374151] whitespace-pre-line">
-                    {details.documentation}
+                    {renderMarkdownBlocks(details.documentation)}
                   </div>
                 ) : null}
               </section>
@@ -143,7 +142,7 @@ export default function ViewConnector({
                     {details.tools.map((tool) => (
                       <div
                         key={tool.name}
-                        className="rounded-lg border border-[#eef1f7] bg-[#fbfcff] p-3"
+                        
                       >
                         <p className="text-sm font-semibold text-[#111827]">
                           {tool.name}
