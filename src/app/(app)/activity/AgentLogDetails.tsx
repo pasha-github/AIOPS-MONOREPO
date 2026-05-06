@@ -100,7 +100,7 @@ export default function AgentLogDetails({
               <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-[#687285]">
                 <span>{selectedEntry.timestampLabel}</span>
                 <span className="text-[#c8cfdb]">/</span>
-                <div>{renderMarkdownBlocks(selectedSessionSummary)}</div>
+                <div>{renderMarkdownBlocks(selectedSessionSummary ?? "")}</div>
               </div>
               <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg px-4 py-3">
                 <span
