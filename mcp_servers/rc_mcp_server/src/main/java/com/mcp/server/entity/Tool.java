@@ -1,3 +1,4 @@
+//package com.mcp.server.entity;
 package com.mcp.server.entity;
 
 import jakarta.persistence.*;
@@ -5,74 +6,161 @@ import java.util.List;
 
 @Entity
 @Table(
-	    name = "tool",
-	    uniqueConstraints = {
-	        @UniqueConstraint(columnNames = {"tool_name", "org_key", "connector_id"})
-	    }
-	)
+    name = "tool",
+    uniqueConstraints = {
+        @UniqueConstraint(columnNames = {"tool_name", "org_key", "connector_id"})
+    }
+)
 public class Tool {
 
-	@Id
-	@GeneratedValue(strategy = GenerationType.IDENTITY)
-	private Long id;
-	private String orgKey;
-	private String connectorId;
-	private String toolName;
-	private String method;
-	private String endpoint;
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
 
-	@OneToMany(cascade = CascadeType.ALL)
-	private List<ToolParameter> parameters;
+    private String orgKey;
+    private String connectorId;
+    private String toolName;
+    private String method;
+    private String endpoint;
 
-	public Long getId() {
-		return id;
-	}
+    // 🔥 FIXED RELATION
+    @OneToMany(mappedBy = "tool", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<ToolParameter> parameters;
 
-	public String getToolName() {
-		return toolName;
-	}
+    public Long getId() {
+        return id;
+    }
 
-	public void setToolName(String toolName) {
-		this.toolName = toolName;
-	}
+    public String getToolName() {
+        return toolName;
+    }
 
-	public String getOrgKey() {
-		return orgKey;
-	}
+    public void setToolName(String toolName) {
+        this.toolName = toolName;
+    }
 
-	public void setOrgKey(String orgKey) {
-		this.orgKey = orgKey;
-	}
+    public String getOrgKey() {
+        return orgKey;
+    }
 
-	public String getConnectorId() {
-		return connectorId;
-	}
+    public void setOrgKey(String orgKey) {
+        this.orgKey = orgKey;
+    }
 
-	public void setConnectorId(String connectorId) {
-		this.connectorId = connectorId;
-	}
+    public String getConnectorId() {
+        return connectorId;
+    }
 
-	public String getMethod() {
-		return method;
-	}
+    public void setConnectorId(String connectorId) {
+        this.connectorId = connectorId;
+    }
 
-	public void setMethod(String method) {
-		this.method = method;
-	}
+    public String getMethod() {
+        return method;
+    }
 
-	public String getEndpoint() {
-		return endpoint;
-	}
+    public void setMethod(String method) {
+        this.method = method;
+    }
 
-	public void setEndpoint(String endpoint) {
-		this.endpoint = endpoint;
-	}
+    public String getEndpoint() {
+        return endpoint;
+    }
 
-	public List<ToolParameter> getParameters() {
-		return parameters;
-	}
+    public void setEndpoint(String endpoint) {
+        this.endpoint = endpoint;
+    }
 
-	public void setParameters(List<ToolParameter> parameters) {
-		this.parameters = parameters;
-	}
+    public List<ToolParameter> getParameters() {
+        return parameters;
+    }
+
+    // 🔥 IMPORTANT FIX
+    public void setParameters(List<ToolParameter> parameters) {
+        this.parameters = parameters;
+
+        if (parameters != null) {
+            for (ToolParameter p : parameters) {
+                p.setTool(this); // 🔥 REQUIRED
+            }
+        }
+    }
 }
+
+//
+//import jakarta.persistence.*;
+//import java.util.List;
+//
+//@Entity
+//@Table(
+//	    name = "tool",
+//	    uniqueConstraints = {
+//	        @UniqueConstraint(columnNames = {"tool_name", "org_key", "connector_id"})
+//	    }
+//	)
+//public class Tool {
+//
+//	@Id
+//	@GeneratedValue(strategy = GenerationType.IDENTITY)
+//	private Long id;
+//	private String orgKey;
+//	private String connectorId;
+//	private String toolName;
+//	private String method;
+//	private String endpoint;
+//
+//	@OneToMany(cascade = CascadeType.ALL)
+//	private List<ToolParameter> parameters;
+//
+//	public Long getId() {
+//		return id;
+//	}
+//
+//	public String getToolName() {
+//		return toolName;
+//	}
+//
+//	public void setToolName(String toolName) {
+//		this.toolName = toolName;
+//	}
+//
+//	public String getOrgKey() {
+//		return orgKey;
+//	}
+//
+//	public void setOrgKey(String orgKey) {
+//		this.orgKey = orgKey;
+//	}
+//
+//	public String getConnectorId() {
+//		return connectorId;
+//	}
+//
+//	public void setConnectorId(String connectorId) {
+//		this.connectorId = connectorId;
+//	}
+//
+//	public String getMethod() {
+//		return method;
+//	}
+//
+//	public void setMethod(String method) {
+//		this.method = method;
+//	}
+//
+//	public String getEndpoint() {
+//		return endpoint;
+//	}
+//
+//	public void setEndpoint(String endpoint) {
+//		this.endpoint = endpoint;
+//	}
+//
+//	public List<ToolParameter> getParameters() {
+//		return parameters;
+//	}
+//
+//	public void setParameters(List<ToolParameter> parameters) {
+//		this.parameters = parameters;
+//	}
+//}
