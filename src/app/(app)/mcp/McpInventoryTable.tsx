@@ -29,7 +29,7 @@ export default function McpInventoryTable({
 }: McpInventoryTableProps) {
   return (
     <section className="">
-      <div className="rounded-2xl border border-[#eef1f7]">
+      <div className="overflow-x-auto rounded-2xl border border-[#eef1f7]">
         {isLoading ? (
           <div className="bg-white">
             <div
@@ -103,7 +103,7 @@ export default function McpInventoryTable({
             </div>
           </div>
         ) : (
-          <div>
+          <div className="min-w-[1160px]">
             <div
               className="grid items-center divide-x divide-[#d7e0ee] bg-[#f3f6fb] px-4 py-3 text-xs font-semibold uppercase tracking-[0.08em] text-[#111827]"
               style={{
