@@ -33,6 +33,36 @@ const getLogoSrc = (connectorId: string) =>
   CONNECTOR_LOGO_MAP[connectorId.toLowerCase()] ??
   `/img/${connectorId.toLowerCase()}.png`;
 
+const FALLBACK_LOGO_SRC = "/file.png";
+
+function ConnectorLogo({
+  connectorId,
+  connectorName,
+}: {
+  connectorId: string;
+  connectorName: string;
+}) {
+  const [src, setSrc] = useState(() => getLogoSrc(connectorId));
+
+  useEffect(() => {
+    setSrc(getLogoSrc(connectorId));
+  }, [connectorId]);
+
+  return (
+    <img
+      src={src}
+      alt={`${connectorName} logo`}
+      className="h-12 w-24 object-contain"
+      loading="lazy"
+      onError={() => {
+        if (src !== FALLBACK_LOGO_SRC) {
+          setSrc(FALLBACK_LOGO_SRC);
+        }
+      }}
+    />
+  );
+}
+
 const ConnectorCardSkeleton = ({ index }: { index: number }) => (
   <div
     key={`connector-skeleton-${index}`}
@@ -207,11 +237,9 @@ export default function DisplayConnectors({ searchTerm }: DisplayConnectorsProps
                     </p>
                   </div>
                 </div>
-                <img
-                  src={getLogoSrc(connector.id)}
-                  alt={`${connector.name} logo`}
-                  className="h-12 w-24 object-contain"
-                  loading="lazy"
+                <ConnectorLogo
+                  connectorId={connector.id}
+                  connectorName={connector.name}
                 />
               </div>
 
