@@ -304,8 +304,8 @@ public class ToolController {
 
     @PostMapping(value = "/stream", produces = "text/event-stream")
     public SseEmitter streamTool(
-            @RequestHeader(value = "orgKey", required = false) String headerOrgKey,
-            @RequestHeader(value = "connectorId", required = false) String headerConnectorId,
+    		@PathVariable String tenantId,
+            @PathVariable String connectorId,
             @RequestBody Map<String, Object> request) {
 
         SseEmitter emitter = new SseEmitter(0L);
@@ -317,12 +317,12 @@ public class ToolController {
                 Map<String, Object> params = (Map<String, Object>) request.get("params");
                 if (params == null) params = new HashMap<>();
 
-                if (headerOrgKey != null) params.put("orgKey", headerOrgKey);
-                if (headerConnectorId != null) params.put("connectorId", headerConnectorId);
+                if (tenantId != null) params.put("orgKey", tenantId);
+                if (connectorId != null) params.put("connectorId", connectorId);
 
                 String toolName = (String) params.get("name");
                 String orgKey = (String) params.get("orgKey");
-                String connectorId = (String) params.get("connectorId");
+                String connector_Id = (String) params.get("connectorId");
 
                 Map<String, Object> arguments =
                         (Map<String, Object>) params.getOrDefault("arguments", new HashMap<>());
@@ -330,7 +330,13 @@ public class ToolController {
                 System.out.println("🚀 STREAM TOOL CALL: " + toolName);
                 System.out.println("📦 ARGUMENTS: " + arguments);
 
-                List<Tool> tools = repo.findByToolNameAndOrgKeyAndConnectorId(toolName, orgKey, connectorId);
+                //List<Tool> tools = repo.findByToolNameAndOrgKeyAndConnectorId(toolName, orgKey, connector_Id);
+                
+                List<Tool> tools =
+                	    repo.findToolWithParameters(
+                	        toolName,
+                	        orgKey,
+                	        connector_Id);
 
                 if (tools == null || tools.isEmpty()) {
                     emitter.send(errorResponse(id, -32001, "Tool not found"));
