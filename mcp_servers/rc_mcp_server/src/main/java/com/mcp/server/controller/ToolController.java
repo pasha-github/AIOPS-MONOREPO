@@ -13,7 +13,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.util.*;
 
 @RestController
-@RequestMapping("/mcp")
+@RequestMapping("/{tenantId}/{connectorId}/mcp")
 public class ToolController {
 
     private final ToolRepository repo;
@@ -24,25 +24,26 @@ public class ToolController {
         this.executor = executor;
     }
 
-    // ---------------------------
-    // HEALTH CHECK
-    // ---------------------------
-    @GetMapping
-    public Map<String, Object> healthCheck() {
-        return Map.of(
-                "status", "MCP server running v.10",
-                "server", "enterprise-mcp-server VM"
-        );
-    }
+//    // ---------------------------
+//    // HEALTH CHECK
+//    // ---------------------------
+//    @GetMapping
+//    public Map<String, Object> healthCheck() {
+//        return Map.of(
+//                "status", "MCP server running v.10",
+//                "server", "enterprise-mcp-server VM"
+//        );
+//    }
 
     // ---------------------------
     // MCP ENTRY
     // ---------------------------
     @PostMapping
     public Map<String, Object> handleMcp(
-            @RequestHeader(value = "orgKey", required = false) String headerOrgKey,
-            @RequestHeader(value = "connectorId", required = false) String headerConnectorId,
+            @PathVariable String tenantId,
+            @PathVariable String connectorId,
             @RequestBody Map<String, Object> request) {
+
 
         // Use default ID "1" if null
         Object id = request.get("id") != null ? request.get("id") : "1";
@@ -69,8 +70,8 @@ public class ToolController {
             Map<String, Object> params = (Map<String, Object>) request.get("params");
             if (params == null) params = new HashMap<>();
             // Override with headers if present
-            if (headerOrgKey != null) params.put("orgKey", headerOrgKey);
-            if (headerConnectorId != null) params.put("connectorId", headerConnectorId);
+            if (tenantId!= null) params.put("orgKey", tenantId);
+            if (connectorId != null) params.put("connectorId", connectorId);
             
             System.out.println("Calling Inside Tool List"+method+params);
             
@@ -81,8 +82,8 @@ public class ToolController {
         	Map<String, Object> params = (Map<String, Object>) request.get("params");
             if (params == null) params = new HashMap<>();
             // Override with headers if present
-            if (headerOrgKey != null) params.put("orgKey", headerOrgKey);
-            if (headerConnectorId != null) params.put("connectorId", headerConnectorId);
+            if (tenantId!= null) params.put("orgKey", tenantId);
+            if (connectorId != null) params.put("connectorId", connectorId);
             return executeToolCall(id, request);
         }
 
@@ -535,7 +536,7 @@ public class ToolController {
             return "Swagger URL processed successfully";
 
         } catch (Exception e) {
-            return "Error: " + e.getMessage();
+            return "Tools Already Exist or Something went Wrong!";
         }
     }
     
