@@ -75,7 +75,9 @@ class SharePointConnector(BaseConnector):
         now = time.time()
         refresh_buffer_seconds = 300
 
-        if self._access_token and now < (self._access_token_expires_at - refresh_buffer_seconds):
+        if self._access_token and now < (
+            self._access_token_expires_at - refresh_buffer_seconds
+        ):
             return {"status": "success", "access_token": self._access_token}
 
         response = self.call_api(
@@ -261,11 +263,7 @@ class SharePointConnector(BaseConnector):
         elif raw_path.startswith("drive/root:/"):
             raw_path = raw_path[len("drive/root:/") :]
 
-        clean_path = (
-            posixpath.normpath(f"/{raw_path}").lstrip("/")
-            if raw_path
-            else ""
-        )
+        clean_path = posixpath.normpath(f"/{raw_path}").lstrip("/") if raw_path else ""
         if clean_path.startswith(".."):
             raise ValueError("Invalid path traversal attempt.")
 
@@ -374,7 +372,9 @@ class SharePointConnector(BaseConnector):
         if (
             mime_type.startswith("text/")
             or mime_type in {"application/json", "application/xml"}
-            or document_path.lower().endswith((".md", ".txt", ".json", ".xml", ".yaml", ".yml", ".py"))
+            or document_path.lower().endswith(
+                (".md", ".txt", ".json", ".xml", ".yaml", ".yml", ".py")
+            )
         ):
             try:
                 text_content = bytes(binary).decode("utf-8")
@@ -426,7 +426,9 @@ class SharePointConnector(BaseConnector):
         except ValueError as exc:
             return {"status": "error", "code": 400, "message": str(exc)}
 
-        check_result = self._graph_request(self._build_item_endpoint(site["site_id"], full_path))
+        check_result = self._graph_request(
+            self._build_item_endpoint(site["site_id"], full_path)
+        )
         if check_result["status"] != "success":
             return check_result
 
