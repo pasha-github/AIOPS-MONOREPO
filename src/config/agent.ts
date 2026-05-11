@@ -34,7 +34,7 @@ export const LLM_PROVIDER_MODELS = {
     "gpt-5-nano"
   ],
   anthropic: [
-    "claude-haiku-4-5-20251001",
+    "claude-haiku-4-5",
     "claude-sonnet-4-6",
     "claude-opus-4-6",
   ],
@@ -44,7 +44,7 @@ export const LLM_PROVIDER_MODELS = {
     "moonshotai/kimi-k2-instruct-0905",
   ],
   bedrock: [
-    "global.anthropic.claude-haiku-4-5-20251001-v1:0",
+    "global.anthropic.claude-haiku-4-5-v1:0",
     "global.anthropic.claude-sonnet-4-6",
     "global.amazon.nova-2-lite-v1:0",
   ],
