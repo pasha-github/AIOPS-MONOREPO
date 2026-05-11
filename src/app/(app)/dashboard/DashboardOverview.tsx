@@ -115,7 +115,7 @@ export default function DashboardOverview() {
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <h2 className="text-2xl font-semibold text-[#10131a]">
-                Welcome back, Alice!
+                Welcome back, Admin!
               </h2>
               
             </div>
