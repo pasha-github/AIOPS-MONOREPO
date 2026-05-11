@@ -131,13 +131,13 @@ export default function TopBar({
                       type="button"
                       onClick={() => setIsAgentMenuOpen((current) => !current)}
                       disabled={isAgentsLoading || agents.length === 0}
-                      className="flex w-full items-center justify-between gap-4 rounded-xl border border-[#dfe6f5] bg-white/80 px-4 py-4 text-left shadow-[0_18px_34px_-28px_rgba(15,23,42,0.35)] transition hover:border-[#cfd8ee] hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#c7d2fe] disabled:cursor-not-allowed disabled:opacity-70"
+                      className="flex min-h-[154px] w-full items-center justify-between gap-4 rounded-xl border border-[#dfe6f5] bg-white/80 px-4 py-4 text-left shadow-[0_18px_34px_-28px_rgba(15,23,42,0.35)] transition hover:border-[#cfd8ee] hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#c7d2fe] disabled:cursor-not-allowed disabled:opacity-70"
                     >
                       <div className="min-w-0">
                         <p className="truncate text-[13px] font-semibold uppercase tracking-[0.12em] text-[#7a8498]">
                           Automation agent
                         </p>
-                        <p className="mt-1 truncate text-xl font-semibold leading-tight text-[#111827]">
+                        <p className="mt-1 truncate text-[2rem] font-semibold leading-tight text-[#111827]">
                           {selectedAgent?.name ?? "Select an automation agent"}
                         </p>
                         <p className="mt-1 truncate text-sm text-[#687285]">
@@ -198,7 +198,7 @@ export default function TopBar({
                       type="button"
                       onClick={() => setIsSessionMenuOpen((current) => !current)}
                       disabled={!selectedAgentId}
-                      className="flex w-full items-center justify-between gap-4 rounded-xl border border-[#dfe6f5] bg-white/80 px-4 py-4 text-left shadow-[0_18px_34px_-28px_rgba(15,23,42,0.35)] transition hover:border-[#cfd8ee] hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#c7d2fe] disabled:cursor-not-allowed disabled:opacity-70"
+                      className="flex min-h-[154px] w-full items-center justify-between gap-4 rounded-xl border border-[#dfe6f5] bg-white/80 px-4 py-4 text-left shadow-[0_18px_34px_-28px_rgba(15,23,42,0.35)] transition hover:border-[#cfd8ee] hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#c7d2fe] disabled:cursor-not-allowed disabled:opacity-70"
                     >
                       <div className="min-w-0">
                         <p className="truncate text-[15px] font-semibold uppercase tracking-[0.12em] text-[#7a8498]">
