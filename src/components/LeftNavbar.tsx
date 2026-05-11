@@ -96,10 +96,10 @@ const navSections: NavSection[] = [
         href: "/agent-management",
       },
       {
-        label: "LLM Management",
-        id: "platform-llm-management",
+        label: "LLM Gateway",
+        id: "platform-llm-gateway",
         icon: <Workflow className="h-5 w-5" />,
-        href: "/llm-management",
+        href: "/llm-gateway",
       },
       {
         label: "User Management",
