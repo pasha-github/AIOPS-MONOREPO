@@ -55,6 +55,11 @@ export default function AdminDashboard() {
     fetchState();
   };
 
+  const clearLogs = async () => {
+    await fetch("/api/logs", { method: "DELETE" });
+    setLogs([]);
+  };
+
   return (
     <div className="min-h-screen bg-[#050814] text-slate-300">
       <div className="container mx-auto px-4 py-8">
@@ -178,12 +183,20 @@ export default function AdminDashboard() {
               <h2 className="text-lg font-semibold text-white flex items-center gap-2">
                 <Terminal className="h-4 w-4" /> Live Log Stream
               </h2>
-              <div className="flex items-center gap-2 text-xs">
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-cyan opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-brand-cyan"></span>
-                </span>
-                Streaming
+              <div className="flex items-center gap-4">
+                <button 
+                  onClick={clearLogs}
+                  className="text-[10px] px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded border border-slate-700 transition-colors uppercase font-bold"
+                >
+                  Clear Logs
+                </button>
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-cyan opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-brand-cyan"></span>
+                  </span>
+                  Streaming
+                </div>
               </div>
             </div>
             <div className="p-4 overflow-y-auto flex-1 font-mono text-xs space-y-3 custom-scrollbar">
