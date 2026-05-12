@@ -1,5 +1,4 @@
 import asyncio
-import hashlib
 import json
 import re
 from dataclasses import dataclass
@@ -7,9 +6,6 @@ from typing import Awaitable, Callable
 from urllib.parse import quote
 
 import httpx
-
-SAFE_SESSION_ID_PATTERN = re.compile(r"^[A-Za-z0-9._-]{1,128}$")
-
 
 @dataclass
 class AgentReply:
@@ -43,14 +39,6 @@ def _build_create_session_url(
 
 def _build_run_sse_url(adk_base_url: str) -> str:
     return f"{_trim_base_url(adk_base_url)}/run_sse"
-
-
-def _to_adk_safe_session_id(session_id: str) -> str:
-    value = (session_id or "").strip()
-    if SAFE_SESSION_ID_PATTERN.fullmatch(value):
-        return value
-    digest = hashlib.sha256(value.encode("utf-8")).hexdigest()
-    return f"teams_{digest[:48]}"
 
 
 def _merge_streaming_text(current_text: str, incoming_text: str) -> str:
@@ -264,21 +252,32 @@ async def fetch_agent_reply(
     on_event: EventCallback | None = None,
 ) -> AgentReply:
     """Call ADK session+SSE endpoints without replaying a submitted user message."""
-    adk_session_id = _to_adk_safe_session_id(session_id)
+    adk_session_id = str(session_id or "").strip()
+    adk_user_id = str(user_id or "").strip()
+    print(
+        "[teams_bot] adk_ids",
+        {
+            "raw_user_id": user_id,
+            "adk_user_id": adk_user_id,
+            "raw_session_id": session_id,
+            "adk_session_id": adk_session_id,
+        },
+        flush=True,
+    )
 
     async with httpx.AsyncClient(timeout=None) as client:
         await _create_session_with_id(
             client=client,
             adk_base_url=adk_base_url,
             app_name=app_name,
-            user_id=user_id,
+            user_id=adk_user_id,
             session_id=adk_session_id,
         )
         return await _run_prompt_sse(
             client=client,
             adk_base_url=adk_base_url,
             app_name=app_name,
-            user_id=user_id,
+            user_id=adk_user_id,
             session_id=adk_session_id,
             message=message,
             on_event=on_event,

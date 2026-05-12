@@ -1,9 +1,12 @@
 import asyncio
+import re
 
 from httpx import HTTPStatusError
 from microsoft.teams.api import MessageActivity, MessageActivityInput, TypingActivityInput
 from microsoft.teams.apps import ActivityContext, App
 
+from services.activity_cache import cache_activity_text, get_cached_activity_text
+from services.activity_store import fetch_activity_text
 from services.agent_client import fetch_agent_reply
 from services.email_mapping import collect_candidate_emails, onboard_personal_chat
 from services.subscriptions import (
@@ -25,6 +28,7 @@ AGENT_UNAVAILABLE_MESSAGE = "I could not reach the configured agent service righ
 TRANSIENT_SEND_STATUS_CODES = {502, 503, 504}
 TRANSIENT_SEND_ATTEMPTS = 3
 TYPING_INDICATOR_INTERVAL_SECONDS = 4
+MESSAGE_ID_PATTERN = re.compile(r"(?:^|;)messageid=([^;]+)")
 
 
 def get_message_text(ctx: ActivityContext[MessageActivity]) -> str:
@@ -38,6 +42,29 @@ def get_message_text(ctx: ActivityContext[MessageActivity]) -> str:
         return (cleaned_activity.text or raw_text).strip()
     except Exception:
         return raw_text
+
+
+def _safe_activity_value(ctx: ActivityContext[MessageActivity], name: str) -> str:
+    return str(getattr(ctx.activity, name, "") or "").strip()
+
+
+def _is_mention_only_text(text: str) -> bool:
+    normalized = (text or "").strip().lower()
+    if not normalized:
+        return True
+    return normalized in {
+        "<at>rc enterprise aiops</at>",
+    }
+
+
+def _extract_message_id_from_conversation_id(conversation_id: str) -> str:
+    value = (conversation_id or "").strip()
+    if not value:
+        return ""
+    match = MESSAGE_ID_PATTERN.search(value)
+    if not match:
+        return ""
+    return (match.group(1) or "").strip()
 
 
 async def send_with_retry(
@@ -142,8 +169,31 @@ def register_handlers(app: App, config: Config) -> None:
     @app.on_message
     async def handle_message(ctx: ActivityContext[MessageActivity]):
         """Forward Teams text messages to configured agent API and return its response."""
+        print(
+            "[teams_bot] activity_meta",
+            {
+                "id": _safe_activity_value(ctx, "id"),
+                "thread_metadata": {
+                    "reply_to_id": _safe_activity_value(ctx, "reply_to_id"),
+                    "replyToId": _safe_activity_value(ctx, "replyToId"),
+                },
+                "conversation_id": str(
+                    getattr(getattr(ctx.activity, "conversation", None), "id", "") or ""
+                ).strip(),
+                "conversation_type": str(
+                    getattr(
+                        getattr(ctx.activity, "conversation", None),
+                        "conversation_type",
+                        "",
+                    )
+                    or ""
+                ).strip(),
+                "raw_text": str(getattr(ctx.activity, "text", "") or "").strip(),
+            },
+            flush=True,
+        )
         user_text = get_message_text(ctx)
-        if not user_text:
+        if not user_text or _is_mention_only_text(user_text):
             await send_with_retry(
                 ctx,
                 app,
@@ -152,6 +202,12 @@ def register_handlers(app: App, config: Config) -> None:
                 required=True,
             )
             return
+        incoming_activity_id = str(getattr(ctx.activity, "id", "") or "").strip()
+        conversation_id = str(
+            getattr(getattr(ctx.activity, "conversation", None), "id", "") or ""
+        ).strip()
+        if incoming_activity_id:
+            cache_activity_text(incoming_activity_id, user_text)
         scope = detect_scope(ctx)
 
         # Keep channel/group targets fresh when users interact in non-personal scopes.
@@ -174,21 +230,37 @@ def register_handlers(app: App, config: Config) -> None:
         typing_task = asyncio.create_task(keep_sending_typing(ctx, app))
 
         try:
-            session_id = normalize_conversation_id(
+            conversation_session_id = normalize_conversation_id(
                 ctx.activity.conversation.id, scope
             ) or (ctx.activity.conversation.id or "").strip()
+            reply_message_id = _extract_message_id_from_conversation_id(conversation_id)
+            session_id = (
+                "teams_session"
+                if scope == "personal"
+                else (reply_message_id or conversation_session_id)
+            )
             candidate_emails = await collect_candidate_emails(ctx)
             fallback_user_id = str(getattr(ctx.activity.from_, "id", "") or "").strip()
-            if not candidate_emails and not fallback_user_id:
-                await send_with_retry(
-                    ctx,
-                    app,
-                    MISSING_USER_EMAIL_MESSAGE,
-                    label="missing-user-email warning",
-                    required=True,
+            if scope in {"channel", "team"}:
+                adk_user_id = conversation_session_id
+            else:
+                if not candidate_emails and not fallback_user_id:
+                    await send_with_retry(
+                        ctx,
+                        app,
+                        MISSING_USER_EMAIL_MESSAGE,
+                        label="missing-user-email warning",
+                        required=True,
+                    )
+                    return
+                adk_user_id = (
+                    candidate_emails[0] if candidate_emails else fallback_user_id
                 )
-                return
-            adk_user_id = candidate_emails[0] if candidate_emails else fallback_user_id
+            print(
+                "[teams_bot] adk_identity",
+                {"scope": scope, "adk_user_id": adk_user_id, "session_id": session_id},
+                flush=True,
+            )
             status_lines: list[str] = []
 
             async def send_progress_event(event_label: str) -> None:
@@ -214,12 +286,39 @@ def register_handlers(app: App, config: Config) -> None:
                 if updated_activity is not None:
                     status_activity = updated_activity
 
+            reply_to_id = (
+                _safe_activity_value(ctx, "reply_to_id")
+                or _safe_activity_value(ctx, "replyToId")
+            )
+            parent_ref_id = reply_to_id or reply_message_id
+            parent_text = fetch_activity_text(parent_ref_id) if parent_ref_id else ""
+            if not parent_text and parent_ref_id:
+                parent_text = get_cached_activity_text(parent_ref_id)
+            if parent_text:
+                message_for_agent = f"{parent_text}\n{user_text}"
+            else:
+                message_for_agent = user_text
+            print(
+                "[teams_bot] agent_payload",
+                {
+                    "activity_id": incoming_activity_id,
+                    "reply_to_id": reply_to_id,
+                    "reply_message_id": reply_message_id,
+                    "parent_ref_id": parent_ref_id,
+                    "has_parent_text": bool(parent_text),
+                    "parent_text": parent_text,
+                    "user_text": user_text,
+                    "message_for_agent": message_for_agent,
+                },
+                flush=True,
+            )
+
             agent_response = await fetch_agent_reply(
                 adk_base_url=config.AGENT_ADK_BASE_URL,
                 app_name=config.AGENT_APP_NAME,
                 user_id=adk_user_id,
                 session_id=session_id,
-                message=user_text,
+                message=message_for_agent,
                 on_event=send_progress_event,
             )
         except Exception:
@@ -249,7 +348,7 @@ def register_handlers(app: App, config: Config) -> None:
         await asyncio.gather(typing_task, return_exceptions=True)
 
         if status_activity is None:
-            await send_with_retry(
+            sent_activity = await send_with_retry(
                 ctx,
                 app,
                 agent_response.text,
@@ -257,10 +356,13 @@ def register_handlers(app: App, config: Config) -> None:
                 required=True,
             )
         else:
-            await send_with_retry(
+            sent_activity = await send_with_retry(
                 ctx,
                 app,
                 agent_response.text,
                 label="agent response",
                 required=True,
             )
+        sent_activity_id = str(getattr(sent_activity, "id", "") or "").strip()
+        if sent_activity_id:
+            cache_activity_text(sent_activity_id, agent_response.text)

@@ -1,4 +1,4 @@
-from sqlalchemy import String
+from sqlalchemy import String, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -28,3 +28,11 @@ class EmailSubscriptionRecord(Base):
         String(512), index=True, nullable=False
     )
     updated_at_utc: Mapped[str] = mapped_column(String(40), nullable=False)
+
+
+class ActivityMessageRecord(Base):
+    __tablename__ = "activity_messages"
+
+    activity_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    conversation_id: Mapped[str] = mapped_column(String(512), nullable=False)
+    text_value: Mapped[str] = mapped_column(Text, nullable=False)

@@ -6,6 +6,8 @@ from fastapi import HTTPException, Request
 from microsoft.teams.api import MessageActivityInput
 from microsoft.teams.apps import App
 
+from services.activity_cache import cache_activity_text
+from services.activity_store import save_activity_text
 from services.email_mapping import fetch_subscription_for_email
 from services.subscriptions import delete_subscription, fetch_subscription
 from utils.config import Config
@@ -117,10 +119,18 @@ async def send_proactive_alert(
     if not app.id:
         raise RuntimeError("Cannot send alerts because CLIENT_ID is not configured.")
 
-    await app.send(
+    sent_activity = await app.send(
         str(subscription["conversation_id"]),
         MessageActivityInput(text=message_text),
     )
+    sent_activity_id = str(getattr(sent_activity, "id", "") or "").strip()
+    if sent_activity_id:
+        cache_activity_text(sent_activity_id, message_text)
+        save_activity_text(
+            sent_activity_id,
+            str(subscription.get("conversation_id") or ""),
+            message_text,
+        )
 
 
 def parse_conversation_request(
@@ -192,7 +202,22 @@ def register_alert_routes(app: App, config: Config) -> None:
         validate_api_key(request, config)
 
         payload = await parse_json_body(request)
+        print(
+            "[teams_bot] alert_request",
+            {
+                "payload": payload,
+            },
+            flush=True,
+        )
         alert_request = parse_conversation_request(payload)
+        print(
+            "[teams_bot] alert_parsed",
+            {
+                "conversation_id": alert_request.conversation_id,
+                "message": alert_request.message,
+            },
+            flush=True,
+        )
 
         target_subscription = fetch_subscription(alert_request.conversation_id)
         if target_subscription is None:
@@ -200,6 +225,13 @@ def register_alert_routes(app: App, config: Config) -> None:
                 status_code=404,
                 detail="Bot is not added in this channel. Add bot to channel first.",
             )
+        print(
+            "[teams_bot] alert_subscription",
+            {
+                "subscription": dict(target_subscription),
+            },
+            flush=True,
+        )
 
         delivered_to: list[str] = []
         delivery_failures: list[AlertConversationFailure] = []
@@ -207,6 +239,11 @@ def register_alert_routes(app: App, config: Config) -> None:
         conversation_id = str(target_subscription.get("conversation_id") or "")
         try:
             await send_proactive_alert(app, target_subscription, alert_request.message)
+            print(
+                "[teams_bot] alert_send_success",
+                {"conversation_id": conversation_id},
+                flush=True,
+            )
             delivered_to.append(conversation_id)
         except Exception as exc:
             if is_bot_missing_error(exc):
