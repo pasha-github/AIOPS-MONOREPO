@@ -1,7 +1,7 @@
 from typing import Any
 
-from microsoft.teams.api import MessageActivity
-from microsoft.teams.apps import ActivityContext
+from microsoft_teams.api import MessageActivity
+from microsoft_teams.apps import ActivityContext
 from sqlalchemy import select
 
 from database.database import session_scope

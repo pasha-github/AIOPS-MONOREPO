@@ -3,8 +3,8 @@ import secrets
 from typing import Any
 
 from fastapi import HTTPException, Request
-from microsoft.teams.api import MessageActivityInput
-from microsoft.teams.apps import App
+from microsoft_teams.api import MessageActivityInput
+from microsoft_teams.apps import App
 
 from services.activity_cache import cache_activity_text
 from services.activity_store import save_activity_text

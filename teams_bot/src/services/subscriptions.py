@@ -1,6 +1,6 @@
 from typing import Any, cast
 
-from microsoft.teams.apps import ActivityContext
+from microsoft_teams.apps import ActivityContext
 from sqlalchemy import delete
 
 from database.database import session_scope

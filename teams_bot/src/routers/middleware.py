@@ -3,7 +3,7 @@ import time
 from typing import Any
 
 from fastapi import Request
-from microsoft.teams.apps import App
+from microsoft_teams.apps import App
 
 MESSAGES_ROUTE = "/api/messages"
 

@@ -2,8 +2,8 @@ import asyncio
 import re
 
 from httpx import HTTPStatusError
-from microsoft.teams.api import MessageActivity, MessageActivityInput, TypingActivityInput
-from microsoft.teams.apps import ActivityContext, App
+from microsoft_teams.api import MessageActivity, MessageActivityInput, TypingActivityInput
+from microsoft_teams.apps import ActivityContext, App
 
 from services.activity_cache import cache_activity_text, get_cached_activity_text
 from services.activity_store import fetch_activity_text
