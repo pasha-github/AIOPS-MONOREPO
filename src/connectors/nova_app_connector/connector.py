@@ -1,4 +1,4 @@
-﻿"""
+"""
 Nova App Connector v1.0.0
 -------------------------
 Connector for fetching logs and triggering remediation actions in Nova App.
@@ -16,9 +16,9 @@ class NovaAppConnector(BaseConnector):
     DEFAULT_BASE_URL = "https://nova-app-428716175586.us-central1.run.app"
     ALLOWED_ACTIONS = frozenset(
         {
-        "RESTART_REDIS",
-        "SCALE_DB_REPLICAS",
-        "RESET_PAYMENT_GATEWAY",
+            "RESTART_REDIS",
+            "SCALE_DB_REPLICAS",
+            "RESET_PAYMENT_GATEWAY",
         }
     )
 
