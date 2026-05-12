@@ -1,5 +1,6 @@
 package com.mcp.server.controller;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mcp.server.entity.Tool;
 import com.mcp.server.entity.ToolParameter;
 import com.mcp.server.repository.ToolRepository;
@@ -12,7 +13,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.util.*;
 
 @RestController
-@RequestMapping("/mcp")
+@RequestMapping("/{tenantId}/{connectorId}/mcp")
 public class ToolController {
 
     private final ToolRepository repo;
@@ -23,25 +24,26 @@ public class ToolController {
         this.executor = executor;
     }
 
-    // ---------------------------
-    // HEALTH CHECK
-    // ---------------------------
-    @GetMapping
-    public Map<String, Object> healthCheck() {
-        return Map.of(
-                "status", "MCP server running v.10",
-                "server", "enterprise-mcp-server VM"
-        );
-    }
+//    // ---------------------------
+//    // HEALTH CHECK
+//    // ---------------------------
+//    @GetMapping
+//    public Map<String, Object> healthCheck() {
+//        return Map.of(
+//                "status", "MCP server running v.10",
+//                "server", "enterprise-mcp-server VM"
+//        );
+//    }
 
     // ---------------------------
     // MCP ENTRY
     // ---------------------------
     @PostMapping
     public Map<String, Object> handleMcp(
-            @RequestHeader(value = "orgKey", required = false) String headerOrgKey,
-            @RequestHeader(value = "connectorId", required = false) String headerConnectorId,
+            @PathVariable String tenantId,
+            @PathVariable String connectorId,
             @RequestBody Map<String, Object> request) {
+
 
         // Use default ID "1" if null
         Object id = request.get("id") != null ? request.get("id") : "1";
@@ -68,8 +70,8 @@ public class ToolController {
             Map<String, Object> params = (Map<String, Object>) request.get("params");
             if (params == null) params = new HashMap<>();
             // Override with headers if present
-            if (headerOrgKey != null) params.put("orgKey", headerOrgKey);
-            if (headerConnectorId != null) params.put("connectorId", headerConnectorId);
+            if (tenantId!= null) params.put("orgKey", tenantId);
+            if (connectorId != null) params.put("connectorId", connectorId);
             
             System.out.println("Calling Inside Tool List"+method+params);
             
@@ -80,8 +82,8 @@ public class ToolController {
         	Map<String, Object> params = (Map<String, Object>) request.get("params");
             if (params == null) params = new HashMap<>();
             // Override with headers if present
-            if (headerOrgKey != null) params.put("orgKey", headerOrgKey);
-            if (headerConnectorId != null) params.put("connectorId", headerConnectorId);
+            if (tenantId!= null) params.put("orgKey", tenantId);
+            if (connectorId != null) params.put("connectorId", connectorId);
             return executeToolCall(id, request);
         }
 
@@ -176,35 +178,113 @@ public class ToolController {
 
         return response;
     }
+    
     private Map<String, Object> executeToolCall(Object id, Map<String, Object> request) {
 
-        // Extract parameters from MCP request
         Map<String, Object> params = (Map<String, Object>) request.get("params");
         if (params == null) params = new HashMap<>();
 
         String toolName = (String) params.get("name");
-        Map<String, Object> arguments = (Map<String, Object>) params.getOrDefault("arguments", new HashMap<>());
+
+        Map<String, Object> arguments =
+                (Map<String, Object>) params.getOrDefault("arguments", new HashMap<>());
 
         String orgKey = (String) params.get("orgKey");
         String connectorId = (String) params.get("connectorId");
 
-        // Fetch the tool from repo
         List<Tool> tools = repo.findByToolNameAndOrgKeyAndConnectorId(toolName, orgKey, connectorId);
+
         if (tools == null || tools.isEmpty()) {
             return errorResponse(id, -32001, "Tool not found: " + toolName);
         }
 
         Tool tool = tools.get(0);
 
-        // Execute the tool using your executor
+        System.out.println("🚀 TOOL CALL: " + toolName);
+        System.out.println("📦 ARGUMENTS: " + arguments);
+
+        // ============================
+        // ✅ VALIDATION + CLEANING
+        // ============================
+        for (ToolParameter p : tool.getParameters()) {
+
+            Object value = arguments.get(p.getName());
+
+            if (p.isRequired() && (value == null || value.toString().isEmpty())) {
+                return errorResponse(id, -32602,
+                        "Missing required parameter: " + p.getName());
+            }
+
+            if (value == null) {
+                arguments.remove(p.getName());
+            }
+        }
+
+        // ============================
+        // 🔥 SPLIT PARAMS
+        // ============================
+        Map<String, Object> queryParams = new HashMap<>();
+        Map<String, Object> bodyParams = new HashMap<>();
+        Map<String, Object> pathParams = new HashMap<>();
+
+        for (ToolParameter p : tool.getParameters()) {
+
+            Object value = arguments.get(p.getName());
+            if (value == null) continue;
+
+            String in = p.getParamIn() != null ? p.getParamIn() : "body";
+
+            switch (in.toLowerCase()) {
+                case "query":
+                    queryParams.put(p.getName(), value);
+                    break;
+                case "path":
+                    pathParams.put(p.getName(), value);
+                    break;
+                default:
+                    bodyParams.put(p.getName(), value);
+            }
+        }
+
+        // ============================
+        // 🔥 BUILD FINAL URL (PATH + QUERY)
+        // ============================
+        String finalUrl = tool.getEndpoint();
+
+        // Replace path variables
+        for (String key : pathParams.keySet()) {
+            finalUrl = finalUrl.replace("{" + key + "}", String.valueOf(pathParams.get(key)));
+        }
+
+        // Add query params
+        if (!queryParams.isEmpty()) {
+            StringBuilder queryString = new StringBuilder();
+
+            queryParams.forEach((k, v) -> {
+                if (queryString.length() > 0) queryString.append("&");
+                queryString.append(k).append("=").append(v);
+            });
+
+            finalUrl = finalUrl + "?" + queryString;
+        }
+
+        System.out.println("🌐 FINAL URL: " + finalUrl);
+        System.out.println("📨 BODY PARAMS: " + bodyParams);
+
+        // ============================
+        // 🔥 EXECUTE TOOL
+        // ============================
         Object output;
+
         try {
-            output = executor.executeTool(tool, arguments);
+            output = executor.executeTool(tool, finalUrl, bodyParams); // 🔥 UPDATED CALL
         } catch (Exception e) {
             return errorResponse(id, -32002, "Tool execution failed: " + e.getMessage());
         }
 
-        // Build the MCP-compliant response
+        // ============================
+        // MCP RESPONSE
+        // ============================
         Map<String, Object> content = new HashMap<>();
         content.put("type", "text");
         content.put("text", String.valueOf(output));
@@ -219,14 +299,13 @@ public class ToolController {
 
         return response;
     }
+    
+    
 
-    // ---------------------------
-    // STREAM TOOL EXECUTION
-    // ---------------------------
     @PostMapping(value = "/stream", produces = "text/event-stream")
     public SseEmitter streamTool(
-            @RequestHeader(value = "orgKey", required = false) String headerOrgKey,
-            @RequestHeader(value = "connectorId", required = false) String headerConnectorId,
+    		@PathVariable String tenantId,
+            @PathVariable String connectorId,
             @RequestBody Map<String, Object> request) {
 
         SseEmitter emitter = new SseEmitter(0L);
@@ -237,18 +316,28 @@ public class ToolController {
 
                 Map<String, Object> params = (Map<String, Object>) request.get("params");
                 if (params == null) params = new HashMap<>();
-                // Override with headers if present
-                if (headerOrgKey != null) params.put("orgKey", headerOrgKey);
-                if (headerConnectorId != null) params.put("connectorId", headerConnectorId);
+
+                if (tenantId != null) params.put("orgKey", tenantId);
+                if (connectorId != null) params.put("connectorId", connectorId);
 
                 String toolName = (String) params.get("name");
                 String orgKey = (String) params.get("orgKey");
-                String connectorId = (String) params.get("connectorId");
+                String connector_Id = (String) params.get("connectorId");
 
                 Map<String, Object> arguments =
                         (Map<String, Object>) params.getOrDefault("arguments", new HashMap<>());
 
-                List<Tool> tools = repo.findByToolNameAndOrgKeyAndConnectorId(toolName, orgKey, connectorId);
+                System.out.println("🚀 STREAM TOOL CALL: " + toolName);
+                System.out.println("📦 ARGUMENTS: " + arguments);
+
+                //List<Tool> tools = repo.findByToolNameAndOrgKeyAndConnectorId(toolName, orgKey, connector_Id);
+                
+                List<Tool> tools =
+                	    repo.findToolWithParameters(
+                	        toolName,
+                	        orgKey,
+                	        connector_Id);
+
                 if (tools == null || tools.isEmpty()) {
                     emitter.send(errorResponse(id, -32001, "Tool not found"));
                     emitter.complete();
@@ -256,8 +345,83 @@ public class ToolController {
                 }
 
                 Tool tool = tools.get(0);
-                Object output = executor.executeTool(tool, arguments);
 
+                // ============================
+                // ✅ VALIDATION + CLEANING
+                // ============================
+                for (ToolParameter p : tool.getParameters()) {
+
+                    Object value = arguments.get(p.getName());
+
+                    if (p.isRequired() && (value == null || value.toString().isEmpty())) {
+                        emitter.send(errorResponse(id, -32602,
+                                "Missing required parameter: " + p.getName()));
+                        emitter.complete();
+                        return;
+                    }
+
+                    if (value == null) {
+                        arguments.remove(p.getName());
+                    }
+                }
+
+                // ============================
+                // 🔥 SPLIT PARAMS
+                // ============================
+                Map<String, Object> queryParams = new HashMap<>();
+                Map<String, Object> bodyParams = new HashMap<>();
+                Map<String, Object> pathParams = new HashMap<>();
+
+                for (ToolParameter p : tool.getParameters()) {
+
+                    Object value = arguments.get(p.getName());
+                    if (value == null) continue;
+
+                    String in = p.getParamIn() != null ? p.getParamIn() : "body";
+
+                    switch (in.toLowerCase()) {
+                        case "query":
+                            queryParams.put(p.getName(), value);
+                            break;
+                        case "path":
+                            pathParams.put(p.getName(), value);
+                            break;
+                        default:
+                            bodyParams.put(p.getName(), value);
+                    }
+                }
+
+                // ============================
+                // 🔥 BUILD URL
+                // ============================
+                String finalUrl = tool.getEndpoint();
+
+                for (String key : pathParams.keySet()) {
+                    finalUrl = finalUrl.replace("{" + key + "}", String.valueOf(pathParams.get(key)));
+                }
+
+                if (!queryParams.isEmpty()) {
+                    StringBuilder queryString = new StringBuilder();
+
+                    queryParams.forEach((k, v) -> {
+                        if (queryString.length() > 0) queryString.append("&");
+                        queryString.append(k).append("=").append(v);
+                    });
+
+                    finalUrl = finalUrl + "?" + queryString;
+                }
+
+                System.out.println("🌐 FINAL URL: " + finalUrl);
+                System.out.println("📨 BODY PARAMS: " + bodyParams);
+
+                // ============================
+                // 🔥 EXECUTE TOOL
+                // ============================
+                Object output = executor.executeTool(tool, finalUrl, bodyParams);
+
+                // ============================
+                // STREAM RESPONSE
+                // ============================
                 Map<String, Object> content = new HashMap<>();
                 content.put("type", "text");
                 content.put("text", String.valueOf(output));
@@ -276,24 +440,29 @@ public class ToolController {
             } catch (Exception e) {
                 try {
                     emitter.send(Map.of("error", e.getMessage()));
-                } catch (Exception ignore) {
-                }
+                } catch (Exception ignore) {}
                 emitter.completeWithError(e);
             }
         }).start();
 
         return emitter;
     }
-
+  
+    
+    
     // ---------------------------
-    // REGISTER TOOL
+    // SPEC UPLOAD REGISTER TOOL
     // ---------------------------
+    
+    
     @PostMapping("/register")
     public Map<String, Object> registerTool(@RequestBody Map<String, Object> request) {
+
         Object id = request.get("id") != null ? request.get("id") : "1";
 
         try {
             String toolName = (String) request.get("toolName");
+
             if (toolName == null || toolName.isEmpty()) {
                 return errorResponse(id, -32602, "toolName required");
             }
@@ -302,22 +471,34 @@ public class ToolController {
             tool.setToolName(toolName);
             tool.setConnectorId((String) request.get("connectorId"));
             tool.setOrgKey((String) request.get("orgKey"));
-            tool.setMethod((String) request.get("method"));
+            tool.setMethod((String) request.getOrDefault("method", "POST"));
             tool.setEndpoint((String) request.get("endpoint"));
 
             List<Map<String, Object>> paramsList =
                     (List<Map<String, Object>>) request.getOrDefault("parameters", new ArrayList<>());
 
             List<ToolParameter> parameters = new ArrayList<>();
+
             for (Map<String, Object> p : paramsList) {
+
+                if (p.get("name") == null) continue;
+
                 ToolParameter param = new ToolParameter();
+
                 param.setName((String) p.get("name"));
                 param.setType((String) p.getOrDefault("type", "string"));
                 param.setRequired((Boolean) p.getOrDefault("required", false));
+
+                // 🔥 NEW FIELDS (IMPORTANT)
+                param.setParamIn((String) p.getOrDefault("in", "body")); // body/query/path
+                param.setDescription((String) p.getOrDefault("description", ""));
+                param.setExample(String.valueOf(p.getOrDefault("example", "")));
+
                 parameters.add(param);
             }
 
             tool.setParameters(parameters);
+
             repo.save(tool);
 
             Map<String, Object> result = new HashMap<>();
@@ -335,6 +516,374 @@ public class ToolController {
             return errorResponse(id, -32000, e.getMessage());
         }
     }
+    
+    
+    @PostMapping("/apiSpecUpload")
+    public String uploadSwaggerFromUrl(
+            @RequestParam String orgKey,
+            @RequestParam String connectorId,
+            @RequestBody Map<String, String> request) {
+
+        try {
+            String url = request.get("url");
+            String customBaseUrl = request.get("baseUrl");
+
+            if (url == null || url.isEmpty()) {
+                return "URL is required";
+            }
+
+            ObjectMapper mapper = new ObjectMapper();
+
+            Map<String, Object> swagger =
+                    mapper.readValue(new java.net.URL(url), Map.class);
+
+            parseAndSaveTools(swagger, customBaseUrl, orgKey, connectorId);
+
+            return "Swagger URL processed successfully";
+
+        } catch (Exception e) {
+            return "Tools Already Exist or Something went Wrong!";
+        }
+    }
+    
+    
+
+  
+    
+
+    
+    public void parseAndSaveTools(
+            Map<String, Object> swagger,
+            String customBaseUrl,
+            String orgKey,
+            String connectorId) {
+
+        Map<String, Object> paths = (Map<String, Object>) swagger.get("paths");
+
+        if (paths == null) {
+            System.out.println("❌ No paths found");
+            return;
+        }
+
+        // ==========================
+        // ✅ Resolve Base URL
+        // ==========================
+        String baseUrl = "";
+
+        if (swagger.containsKey("servers")) {
+            List<Map<String, Object>> servers =
+                    (List<Map<String, Object>>) swagger.get("servers");
+
+            if (servers != null && !servers.isEmpty()) {
+                baseUrl = (String) servers.get(0).get("url");
+            }
+        }
+
+        if ((baseUrl == null || baseUrl.isEmpty()) && swagger.containsKey("host")) {
+
+            String host = (String) swagger.get("host");
+            String basePath = (String) swagger.getOrDefault("basePath", "");
+            String scheme = "http";
+
+            List<String> schemes = (List<String>) swagger.get("schemes");
+            if (schemes != null && !schemes.isEmpty()) {
+                scheme = schemes.get(0);
+            }
+
+            baseUrl = scheme + "://" + host + basePath;
+        }
+
+        if (customBaseUrl != null && !customBaseUrl.isEmpty()) {
+            baseUrl = customBaseUrl;
+        }
+
+        if (baseUrl == null) baseUrl = "";
+
+        // ==========================
+        // 🔥 Iterate Paths
+        // ==========================
+        for (String path : paths.keySet()) {
+
+            Map<String, Object> methods =
+                    (Map<String, Object>) paths.get(path);
+
+            for (String method : methods.keySet()) {
+
+                Map<String, Object> apiDetails =
+                        (Map<String, Object>) methods.get(method);
+
+                Tool tool = new Tool();
+
+                // ==========================
+                // Tool Name
+                // ==========================
+                String toolName = path.substring(path.lastIndexOf("/") + 1);
+                if (toolName.contains("{")) {
+                    toolName = toolName.replaceAll("[{}]", "");
+                }
+                if (toolName.isEmpty()) {
+                    toolName = "root";
+                }
+
+                tool.setToolName(toolName);
+                tool.setMethod(method.toUpperCase());
+
+                // ==========================
+                // Endpoint
+                // ==========================
+                String finalBaseUrl = (customBaseUrl != null && !customBaseUrl.isEmpty())
+                        ? customBaseUrl
+                        : baseUrl;
+
+                if (finalBaseUrl == null || finalBaseUrl.isEmpty()) {
+                    finalBaseUrl = "http://127.0.0.1:8000";
+                }
+
+                String fullEndpoint;
+                if (path.startsWith("http")) {
+                    fullEndpoint = path;
+                } else {
+                    if (finalBaseUrl.endsWith("/") && path.startsWith("/")) {
+                        fullEndpoint = finalBaseUrl.substring(0, finalBaseUrl.length() - 1) + path;
+                    } else if (!finalBaseUrl.endsWith("/") && !path.startsWith("/")) {
+                        fullEndpoint = finalBaseUrl + "/" + path;
+                    } else {
+                        fullEndpoint = finalBaseUrl + path;
+                    }
+                }
+
+                tool.setEndpoint(fullEndpoint);
+                tool.setOrgKey(orgKey);
+                tool.setConnectorId(connectorId);
+
+                List<ToolParameter> paramList = new ArrayList<>();
+
+                // ==========================
+                // ✅ QUERY + PATH PARAMS
+                // ==========================
+                List<Map<String, Object>> parameters =
+                        (List<Map<String, Object>>) apiDetails.get("parameters");
+
+                if (parameters != null) {
+                    for (Map<String, Object> p : parameters) {
+
+                        if (p.get("name") == null) continue;
+
+                        ToolParameter param = new ToolParameter();
+                        param.setName((String) p.get("name"));
+                        param.setParamIn((String) p.getOrDefault("in", "query"));
+
+                        Map<String, Object> schema =
+                                (Map<String, Object>) p.get("schema");
+
+                        if (schema != null) {
+                            param.setType((String) schema.getOrDefault("type", "string"));
+                        } else {
+                            param.setType("string");
+                        }
+
+                        param.setRequired((Boolean) p.getOrDefault("required", false));
+                        param.setDescription((String) p.getOrDefault("description", ""));
+                        param.setExample("");
+
+                        paramList.add(param);
+                    }
+                }
+
+                // ==========================
+                // 🔥 BODY PARAMS
+                // ==========================
+                Map<String, Object> requestBody =
+                        (Map<String, Object>) apiDetails.get("requestBody");
+
+                if (requestBody != null) {
+
+                    Map<String, Object> content =
+                            (Map<String, Object>) requestBody.get("content");
+
+                    if (content != null) {
+
+                        Map<String, Object> appJson =
+                                (Map<String, Object>) content.get("application/json");
+
+                        if (appJson != null) {
+
+                            Map<String, Object> schema =
+                                    (Map<String, Object>) appJson.get("schema");
+
+                            // ==========================
+                            // 🔥 HANDLE $ref
+                            // ==========================
+                            if (schema != null && schema.containsKey("$ref")) {
+
+                                String ref = (String) schema.get("$ref");
+                                String refName = ref.substring(ref.lastIndexOf("/") + 1);
+
+                                Map<String, Object> components =
+                                        (Map<String, Object>) swagger.get("components");
+
+                                if (components != null) {
+                                    Map<String, Object> schemas =
+                                            (Map<String, Object>) components.get("schemas");
+
+                                    if (schemas != null) {
+                                        schema = (Map<String, Object>) schemas.get(refName);
+                                    }
+                                }
+                            }
+
+                            // ==========================
+                            // 🔥 CASE 1: properties
+                            // ==========================
+                            if (schema != null && schema.get("properties") != null) {
+
+                                Map<String, Object> properties =
+                                        (Map<String, Object>) schema.get("properties");
+
+                                List<String> requiredFields =
+                                        (List<String>) schema.get("required");
+
+                                for (String key : properties.keySet()) {
+
+                                    Map<String, Object> prop =
+                                            (Map<String, Object>) properties.get(key);
+
+                                    ToolParameter param = new ToolParameter();
+                                    param.setName(key);
+                                    param.setType((String) prop.getOrDefault("type", "string"));
+                                    param.setParamIn("body");
+
+                                    boolean isRequired =
+                                            requiredFields != null && requiredFields.contains(key);
+
+                                   // param.setRequired(isRequired);
+                                    param.setRequired(false);
+                                    param.setDescription((String) prop.getOrDefault("description", ""));
+                                    param.setExample("");
+
+                                    paramList.add(param);
+                                }
+                            }
+
+                            // ==========================
+                            // 🔥 CASE 2: example fallback
+                            // ==========================
+                            else {
+
+                                Map<String, Object> example =
+                                        (Map<String, Object>) appJson.get("example");
+
+                                if (example != null) {
+
+                                    extractFromExample(example, paramList, "");
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // ==========================
+                // SAVE TOOL
+                // ==========================
+                tool.setParameters(paramList);
+
+                List<Tool> existing = repo.findByToolNameAndOrgKeyAndConnectorId(
+                        tool.getToolName(),
+                        tool.getOrgKey(),
+                        tool.getConnectorId()
+                );
+
+                if (existing != null && !existing.isEmpty()) {
+
+                    Tool oldTool = existing.get(0);
+                    oldTool.setEndpoint(tool.getEndpoint());
+                    oldTool.setMethod(tool.getMethod());
+                    oldTool.setParameters(paramList);
+
+                    repo.save(oldTool);
+                    System.out.println("🔁 Updated Tool: " + tool.getToolName());
+
+                } else {
+
+                    repo.save(tool);
+                    System.out.println("✅ Inserted Tool: " + tool.getToolName());
+                }
+
+                System.out.println("📦 Params Count: " + paramList.size());
+            }
+        }
+    }
+    
+    
+    private void extractFromExample(
+            Map<String, Object> example,
+            List<ToolParameter> paramList,
+            String parent) {
+
+        for (Map.Entry<String, Object> entry : example.entrySet()) {
+
+            String key = entry.getKey();
+            Object val = entry.getValue();
+
+            // 🔥 Build nested key (queryBody.sample)
+            String paramName = parent.isEmpty() ? key : parent + "." + key;
+
+            ToolParameter param = new ToolParameter();
+           
+            param.setName(paramName);
+            param.setParamIn("body");
+            param.setRequired(false);
+
+            // ==========================
+            // 🔥 Detect Type
+            // ==========================
+            if (val instanceof String) {
+                param.setType("string");
+
+            } else if (val instanceof Integer) {
+                param.setType("integer");
+
+            } else if (val instanceof Boolean) {
+                param.setType("boolean");
+
+            } else if (val instanceof Double || val instanceof Float) {
+                param.setType("number");
+
+            } else if (val instanceof Map) {
+                param.setType("object");
+
+                // ✅ Add parent object also (queryBody)
+                param.setExample("{}");
+                param.setDescription("Object (derived from example)");
+                paramList.add(param);
+
+                // 🔥 RECURSION for nested fields
+                extractFromExample(
+                        (Map<String, Object>) val,
+                        paramList,
+                        paramName
+                );
+
+                continue; // ⚠️ avoid duplicate add
+
+            } else if (val instanceof List) {
+                param.setType("array");
+
+            } else {
+                param.setType("string");
+            }
+
+            // ==========================
+            // ✅ Set Example
+            // ==========================
+            param.setExample(val != null ? val.toString() : "");
+
+            param.setDescription("Derived from example");
+
+            paramList.add(param);
+        }
+    }
+    
 
     // ---------------------------
     // ERROR RESPONSE
