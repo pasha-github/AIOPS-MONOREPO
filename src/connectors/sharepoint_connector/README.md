@@ -21,6 +21,10 @@ List documents in the configured SharePoint scope.
 
 Read document content. Text files return plain text; binary files return Base64.
 
+### `create_document`
+
+Create a new `.md` document only.
+
 ### `update_document`
 
 Update an existing `.md` document only.

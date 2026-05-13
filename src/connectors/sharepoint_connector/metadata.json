@@ -57,8 +57,12 @@
       "documentation": "Get document content from SharePoint; text for textual files and Base64 for binaries."
     },
     {
+      "name": "create_document",
+      "documentation": "Create a new markdown document (.md only)."
+    },
+    {
       "name": "update_document",
-      "documentation": "Update an existing markdown document (.md only)."
+      "documentation": "Update an existing markdown document in SharePoint (.md only)."
     }
   ]
 }

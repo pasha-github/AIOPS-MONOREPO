@@ -9,4 +9,5 @@ Connector for Nova App logs and remediation actions.
 ## Tools
 
 - `get_nova_logs`
+- `get_nova_status`
 - `remediate`

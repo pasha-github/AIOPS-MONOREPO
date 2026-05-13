@@ -397,8 +397,89 @@ class SharePointConnector(BaseConnector):
         }
 
     @connector_tool
+    def create_document(self, document_path: str, content: str) -> dict[str, Any]:
+        """Create a new markdown document in SharePoint (.md only)."""
+        config_error = self._validate_config()
+        if config_error:
+            return {"status": "error", "code": 400, "message": config_error}
+
+        normalized_path = document_path.strip()
+        if not normalized_path:
+            return {
+                "status": "error",
+                "code": 400,
+                "message": "document_path is required.",
+            }
+        if not normalized_path.lower().endswith(".md"):
+            return {
+                "status": "error",
+                "code": 400,
+                "message": "create_document currently supports only .md files.",
+            }
+
+        site = self._get_site_id()
+        if site["status"] != "success":
+            return site
+
+        try:
+            full_path = self._normalize_path(normalized_path)
+        except ValueError as exc:
+            return {"status": "error", "code": 400, "message": str(exc)}
+
+        check_result = self._graph_request(
+            self._build_item_endpoint(site["site_id"], full_path)
+        )
+        if check_result["status"] == "success":
+            return {
+                "status": "error",
+                "code": 409,
+                "message": "Document already exists.",
+                "document_path": normalized_path,
+            }
+        if check_result.get("code") != 404:
+            return check_result
+
+        auth = self._get_access_token()
+        if auth["status"] != "success":
+            return auth
+
+        put_response = self.call_api(
+            url=(
+                f"{self.graph_base_url}"
+                f"{self._build_item_endpoint(site['site_id'], full_path)}:/content"
+            ),
+            method="PUT",
+            headers={
+                "Authorization": f"Bearer {auth['access_token']}",
+                "Content-Type": "text/markdown; charset=utf-8",
+            },
+            data=cast(dict[str, str], content),
+        )
+
+        if put_response.status_code >= 400:
+            return {
+                "status": "error",
+                "code": put_response.status_code,
+                "message": "Failed to create markdown document.",
+                "details": put_response.text,
+            }
+
+        try:
+            payload = put_response.json()
+        except ValueError:
+            payload = {}
+
+        return {
+            "status": "success",
+            "document_path": normalized_path,
+            "message": "Document created successfully.",
+            "modified": payload.get("lastModifiedDateTime"),
+            "url": payload.get("webUrl"),
+        }
+
+    @connector_tool
     def update_document(self, document_path: str, content: str) -> dict[str, Any]:
-        """Update an existing markdown document (.md only)."""
+        """Update an existing markdown document in SharePoint (.md only)."""
         config_error = self._validate_config()
         if config_error:
             return {"status": "error", "code": 400, "message": config_error}

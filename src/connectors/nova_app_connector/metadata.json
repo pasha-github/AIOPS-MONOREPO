@@ -18,6 +18,10 @@
       "documentation": "Fetches operational logs from Nova App."
     },
     {
+      "name": "get_nova_status",
+      "documentation": "Fetches current service status from Nova App."
+    },
+    {
       "name": "remediate",
       "documentation": "Triggers remediation in Nova App. Allowed actions: RESTART_REDIS, SCALE_DB_REPLICAS, RESET_PAYMENT_GATEWAY."
     }

@@ -48,6 +48,27 @@ class NovaAppConnector(BaseConnector):
             return {"status": "success", "data": response.text}
 
     @connector_tool
+    def get_nova_status(self, tool_context: ToolContext) -> dict[str, Any]:
+        """Fetches current service status from Nova App."""
+        response = self.call_api(
+            url=f"{self.base_url}/api/status",
+            method="GET",
+            headers={"Content-Type": "application/json"},
+        )
+
+        if response.status_code != 200:
+            return {
+                "status": "error",
+                "code": response.status_code,
+                "message": response.text,
+            }
+
+        try:
+            return {"status": "success", "data": response.json()}
+        except ValueError:
+            return {"status": "success", "data": response.text}
+
+    @connector_tool
     def remediate(self, action: str, tool_context: ToolContext) -> dict[str, Any]:
         """Triggers remediation in Nova App. Allowed actions: RESTART_REDIS, SCALE_DB_REPLICAS, RESET_PAYMENT_GATEWAY."""
         if action not in self.ALLOWED_ACTIONS:
