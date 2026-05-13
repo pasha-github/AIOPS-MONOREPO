@@ -13,20 +13,29 @@ export async function POST(request: Request) {
       serverState.faults[fault as keyof typeof serverState.faults] = active;
       addLog('aiops-control', `Fault toggled: ${fault} = ${active}`, 'warn');
 
-      if (fault === 'isPaymentTimeout' && active === true) {
+      if (active === true && (fault === 'isRedisDown' || fault === 'isDbLatencyHigh')) {
         const webhookUrl = process.env.PAYMENT_FAILURE_WEBHOOK_URL;
         if (webhookUrl) {
-          addLog('aiops-control', 'Triggering external agent webhook for payment failure', 'info');
-          fetch(webhookUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              prompt: "CRITICAL ALERT: Nova Shop Payment Gateway connection timeout detected. Service 'payment-service' is returning 504 Gateway Timeout errors. Customer checkout is failing. Please initiate automated diagnostic and remediation procedures."
-            })
-          }).catch(err => {
-            console.error('Failed to trigger webhook:', err);
-            addLog('aiops-control', `Failed to trigger agent webhook: ${err.message}`, 'error');
-          });
+          const faultName = fault === 'isRedisDown' ? 'Cart Outage' : 'Database Latency';
+          const faultDetail = fault === 'isRedisDown' 
+            ? "Service 'cart-service' is unable to connect to Redis. Users cannot manage their carts."
+            : "Service 'product-service' is experiencing high response times due to database performance issues.";
+          
+          setTimeout(() => {
+            // Check if fault is still active after 10s
+            if (serverState.faults[fault as keyof typeof serverState.faults]) {
+              fetch(webhookUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  prompt: `CRITICAL ALERT: Nova Shop ${faultName} detected. ${faultDetail} Please initiate automated diagnostic and remediation procedures.`
+                })
+              }).catch(err => {
+                console.error('Failed to trigger webhook:', err);
+                addLog('aiops-control', `Failed to trigger agent webhook: ${err.message}`, 'error');
+              });
+            }
+          }, 10000);
         } else {
           addLog('aiops-control', 'PAYMENT_FAILURE_WEBHOOK_URL not configured, skipping agent notification', 'warn');
         }
