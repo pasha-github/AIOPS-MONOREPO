@@ -1,0 +1,41 @@
+# apiVersion: apps/v1
+# kind: StatefulSet
+# metadata:
+#   name: postgres
+# spec:
+#   serviceName: "postgres-service"
+#   replicas: 1
+#   selector:
+#     matchLabels:
+#       app: postgres
+#   template:
+#     metadata:
+#       labels:
+#         app: postgres
+#     spec:
+#       containers:
+#       - name: postgres
+#         image: postgres:15
+#         ports:
+#         - containerPort: 5432
+#         env:
+#         - name: POSTGRES_USER
+#           value: "postgres"
+#         - name: POSTGRES_PASSWORD
+#           value: "postgres"
+#         - name: POSTGRES_DB
+#           value: "agent_management"
+#       # For a true local dev, we are omitting PersistentVolumeClaims to keep it extremely simple.
+#       # If you need data persistence across pod restarts locally, you should add a volumeMount and pvc here.
+# ---
+# apiVersion: v1
+# kind: Service
+# metadata:
+#   name: postgres-service
+# spec:
+#   selector:
+#     app: postgres
+#   ports:
+#     - protocol: TCP
+#       port: 5432
+#       targetPort: 5432

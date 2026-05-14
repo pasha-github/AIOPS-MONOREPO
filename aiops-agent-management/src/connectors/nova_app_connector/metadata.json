@@ -1,0 +1,29 @@
+{
+  "id": "nova_app_connector",
+  "name": "Nova App",
+  "description": "Connector for Nova App logs and remediation actions.",
+  "version": "1.0.0",
+  "config_variables": [
+    {
+      "name": "BASE_URL",
+      "label": "Base URL",
+      "required": false,
+      "secret": false,
+      "placeholder": "https://nova-app-428716175586.us-central1.run.app"
+    }
+  ],
+  "tools": [
+    {
+      "name": "get_nova_logs",
+      "documentation": "Fetches operational logs from Nova App."
+    },
+    {
+      "name": "get_nova_status",
+      "documentation": "Fetches current service status from Nova App."
+    },
+    {
+      "name": "remediate",
+      "documentation": "Triggers remediation in Nova App. Allowed actions: RESTART_REDIS, SCALE_DB_REPLICAS, RESET_PAYMENT_GATEWAY."
+    }
+  ]
+}

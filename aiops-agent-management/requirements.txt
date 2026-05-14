@@ -1,0 +1,25 @@
+google-adk==1.31.1
+google-adk[a2a]
+fastapi
+uvicorn
+sqlmodel
+litellm<=1.81.12
+cryptography
+
+# For Postgres
+asyncpg
+psycopg2-binary
+
+# for db migrations
+alembic
+
+# For AWS Bedrock Models
+boto3
+
+# For Webhooks and Jobs
+httpx
+apscheduler
+
+# For Linting
+ruff
+paramiko

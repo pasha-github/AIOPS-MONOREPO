@@ -1,0 +1,68 @@
+{
+  "id": "sharepoint_connector",
+  "name": "SharePoint",
+  "description": "Graph-only SharePoint connector scoped to a required document library folder.",
+  "version": "0.0.1",
+  "config_variables": [
+    {
+      "name": "SHP_ID_APP",
+      "label": "App Client ID",
+      "required": true,
+      "secret": false,
+      "placeholder": "Enter Azure AD app client ID"
+    },
+    {
+      "name": "SHP_ID_APP_SECRET",
+      "label": "App Client Secret",
+      "required": true,
+      "secret": true,
+      "placeholder": "Enter Azure AD app client secret"
+    },
+    {
+      "name": "SHP_TENANT_ID",
+      "label": "Tenant ID",
+      "required": true,
+      "secret": false,
+      "placeholder": "Enter Microsoft tenant ID"
+    },
+    {
+      "name": "SHP_SITE_URL",
+      "label": "SharePoint Site URL",
+      "required": true,
+      "secret": false,
+      "placeholder": "https://yourtenant.sharepoint.com/sites/yoursite"
+    },
+    {
+      "name": "SHP_DOC_LIBRARY",
+      "label": "Document Library Folder",
+      "required": true,
+      "secret": false,
+      "placeholder": "mcp_server"
+    },
+    {
+      "name": "prefix",
+      "label": "Prefix",
+      "required": false,
+      "secret": false,
+      "placeholder": "SharePoint"
+    }
+  ],
+  "tools": [
+    {
+      "name": "list_documents",
+      "documentation": "List documents from the configured SharePoint scope."
+    },
+    {
+      "name": "get_document_content",
+      "documentation": "Get document content from SharePoint; text for textual files and Base64 for binaries."
+    },
+    {
+      "name": "create_document",
+      "documentation": "Create a new markdown document (.md only)."
+    },
+    {
+      "name": "update_document",
+      "documentation": "Update an existing markdown document in SharePoint (.md only)."
+    }
+  ]
+}

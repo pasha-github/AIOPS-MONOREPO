@@ -1,0 +1,81 @@
+{
+  "id": "servicenow_connector",
+  "name": "ServiceNow",
+  "description": "Interact with the ServiceNow API for incidents, change requests, and knowledge base operations.",
+  "version": "0.0.1",
+  "config_variables": [
+    {
+      "name": "SERVICENOW_INSTANCE_URL",
+      "label": "Instance URL",
+      "required": true,
+      "secret": false,
+      "placeholder": "Enter ServiceNow instance URL"
+    },
+    {
+      "name": "SERVICENOW_USERNAME",
+      "label": "Username",
+      "required": true,
+      "secret": false,
+      "placeholder": "Enter ServiceNow username"
+    },
+    {
+      "name": "SERVICENOW_PASSWORD",
+      "label": "Password",
+      "required": true,
+      "secret": true,
+      "placeholder": "Enter ServiceNow password"
+    },
+    {
+      "name": "SERVICENOW_AUTH_TYPE",
+      "label": "Auth Type",
+      "required": false,
+      "secret": false,
+      "placeholder": "basic"
+    },
+    {
+      "name": "prefix",
+      "label": "Prefix",
+      "required": false,
+      "secret": false,
+      "placeholder": "ServiceNow"
+    }
+  ],
+  "tools": [
+    {
+      "name": "list_incidents",
+      "documentation": "Lists incidents from ServiceNow, optionally filtered by a query."
+    },
+    {
+      "name": "create_incident",
+      "documentation": "Creates a new incident in ServiceNow."
+    },
+    {
+      "name": "update_incident",
+      "documentation": "Updates an existing incident in ServiceNow."
+    },
+    {
+      "name": "resolve_incident",
+      "documentation": "Resolves an incident in ServiceNow."
+    },
+    {
+      "name": "list_change_requests",
+      "documentation": "Lists change requests from ServiceNow, optionally filtered by a query."
+    },
+    {
+      "name": "create_change_request",
+      "documentation": "Creates a new change request in ServiceNow."
+    },
+    {
+      "name": "update_change_request",
+      "documentation": "Updates an existing change request in ServiceNow."
+    },
+    {
+      "name": "list_knowledge_bases",
+      "documentation": "Lists available knowledge bases in ServiceNow."
+    },
+    {
+      "name": "list_kb_articles",
+      "documentation": "Lists knowledge base articles from ServiceNow, optionally filtered by a query."
+    }
+  ]
+}

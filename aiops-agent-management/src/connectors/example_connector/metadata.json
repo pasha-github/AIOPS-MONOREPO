@@ -1,0 +1,40 @@
+{
+  "id": "example_connector",
+  "name": "Example",
+  "description": "Sample connector using the JSONPlaceholder fake REST API.",
+  "version": "1.0.0",
+  "config_variables": [
+    {
+      "name": "API_KEY",
+      "label": "API Key",
+      "required": true,
+      "secret": true,
+      "placeholder": "Enter API key"
+    },
+    {
+      "name": "API_URL",
+      "label": "API URL",
+      "required": false,
+      "secret": false,
+      "placeholder": "https://jsonplaceholder.typicode.com"
+    }
+  ],
+  "tools": [
+    {
+      "name": "get_post",
+      "documentation": "Fetches a single post by its ID."
+    },
+    {
+      "name": "list_posts",
+      "documentation": "Fetches all posts, optionally filtered by a user ID."
+    },
+    {
+      "name": "create_post",
+      "documentation": "Creates a new post."
+    },
+    {
+      "name": "delete_post",
+      "documentation": "Deletes a post by its ID."
+    }
+  ]
+}

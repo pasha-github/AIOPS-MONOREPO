@@ -1,0 +1,2222 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent Management Kit</title>
+    <style>
+        :root {
+            --bg-color: #ffffff;
+            --text-color: #000000;
+            --heading-color: #333333;
+            --section-border: #dddddd;
+            --status-bg: #f0f0f0;
+            --card-border: #eeeeee;
+            --input-bg: #ffffff;
+            --input-border: #cccccc;
+            --chat-bg: #fafafa;
+            --msg-user-bg: #e3f2fd;
+            --msg-user-text: #000000;
+            --msg-agent-bg: #f1f8e9;
+            --msg-agent-text: #000000;
+            --graph-bg: #fafafa;
+        }
+
+        body.dark-mode {
+            --bg-color: #121212;
+            --text-color: #e0e0e0;
+            --heading-color: #ffffff;
+            --section-border: #444444;
+            --status-bg: #1e1e1e;
+            --card-border: #333333;
+            --input-bg: #2c2c2c;
+            --input-border: #555555;
+            --chat-bg: #1e1e1e;
+            --msg-user-bg: #0d47a1;
+            --msg-user-text: #ffffff;
+            --msg-agent-bg: #1b5e20;
+            --msg-agent-text: #ffffff;
+            --graph-bg: #1e1e1e;
+        }
+
+        body {
+            font-family: sans-serif;
+            margin: 20px;
+            line-height: 1.6;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        h1,
+        h2,
+        h3 {
+            color: var(--heading-color);
+            transition: color 0.3s;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .section {
+            margin-bottom: 40px;
+            border: 1px solid var(--section-border);
+            padding: 20px;
+            border-radius: 8px;
+            transition: border-color 0.3s;
+        }
+
+        .status {
+            padding: 10px;
+            background: var(--status-bg);
+            margin-bottom: 20px;
+            border-radius: 4px;
+            transition: background-color 0.3s;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .card {
+            border: 1px solid var(--card-border);
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group {
+            margin-bottom: 10px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        input[type="text"],
+        input[type="password"],
+        input[type="number"],
+        textarea,
+        select {
+            width: 100%;
+            padding: 8px;
+            box-sizing: border-box;
+            background-color: var(--input-bg);
+            color: var(--text-color);
+            border: 1px solid var(--input-border);
+            border-radius: 4px;
+            transition: background-color 0.3s, color 0.3s, border-color 0.3s;
+        }
+
+        select[multiple] {
+            height: 100px;
+        }
+
+        button {
+            padding: 8px 15px;
+            background: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        button:hover {
+            background: #0056b3;
+        }
+
+        button.delete {
+            background: #dc3545;
+        }
+
+        button.delete:hover {
+            background: #a71d2a;
+        }
+
+        #chat-messages {
+            height: 300px;
+            overflow-y: scroll;
+            border: 1px solid var(--input-border);
+            padding: 10px;
+            margin-bottom: 10px;
+            background: var(--chat-bg);
+            transition: background-color 0.3s, border-color 0.3s;
+        }
+
+        .message {
+            margin-bottom: 10px;
+            padding: 8px;
+            border-radius: 4px;
+        }
+
+        .message.user {
+            background: var(--msg-user-bg);
+            color: var(--msg-user-text);
+            text-align: right;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        .message.agent {
+            background: var(--msg-agent-bg);
+            color: var(--msg-agent-text);
+            text-align: left;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        /* Connector config fields rendered dynamically */
+        #connector-config-fields .config-field {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+
+        #connector-config-fields .config-field label {
+            min-width: 140px;
+            margin: 0;
+        }
+
+        #connector-config-fields .config-field input {
+            flex: 1;
+        }
+
+        .badge {
+            display: inline-block;
+            font-size: 0.75em;
+            padding: 2px 6px;
+            border-radius: 4px;
+            background: #dc3545;
+            color: white;
+            margin-left: 4px;
+            vertical-align: middle;
+        }
+
+        .badge.optional {
+            background: #6c757d;
+        }
+
+        .connector-help {
+            margin-bottom: 12px;
+            padding: 10px 12px;
+            border-radius: 6px;
+            background: #eef6ff;
+            border: 1px solid #c8def5;
+            color: #214a75;
+            font-size: 0.92em;
+        }
+
+        .connector-help strong {
+            display: block;
+            margin-bottom: 4px;
+        }
+        
+        .theme-toggle {
+            background: var(--status-bg);
+            color: var(--text-color);
+            border: 1px solid var(--section-border);
+        }
+        
+        .theme-toggle:hover {
+            background: var(--card-border);
+            color: var(--text-color);
+        }
+    </style>
+    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+</head>
+
+<body>
+    <div class="container">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h1>Agent Management Kit</h1>
+            <button id="theme-toggle" class="theme-toggle">🌙 Dark Mode</button>
+        </div>
+        <div id="health-status" class="status">Checking connection...</div>
+
+        <div class="grid">
+            <!-- LLM Models Section -->
+            <div class="section">
+                <h2>LLM Models</h2>
+                <div id="model-list">Loading models...</div>
+
+                <h3>Add New Model</h3>
+                <form id="add-model-form">
+                    <div class="form-group">
+                        <label>Model ID (e.g., gemini-1.5-flash)</label>
+                        <input type="text" id="model-id" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Provider (e.g., google)</label>
+                        <input type="text" id="model-provider" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Name (Display Name)</label>
+                        <input type="text" id="model-name" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Description</label>
+                        <input type="text" id="model-description" required>
+                    </div>
+                    <div class="form-group">
+                        <label>API Key</label>
+                        <input type="text" id="model-api-key" required>
+                    </div>
+                    <button type="submit">Add Model</button>
+                </form>
+
+                <h3 style="margin-top: 24px;">Update Model</h3>
+                <form id="update-model-form">
+                    <div class="form-group">
+                        <label>Select Model</label>
+                        <select id="model-update-select" required>
+                            <option value="">Loading models...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>New Name</label>
+                        <input type="text" id="model-update-name" placeholder="Leave blank to keep current value">
+                    </div>
+                    <div class="form-group">
+                        <label>New Description</label>
+                        <input type="text" id="model-update-description"
+                            placeholder="Leave blank to keep current value">
+                    </div>
+                    <div class="form-group">
+                        <label>New API Key</label>
+                        <input type="password" id="model-update-api-key"
+                            placeholder="Leave blank to keep current value">
+                    </div>
+                    <button type="submit">Update Model</button>
+                </form>
+
+                <h3 style="margin-top: 24px;">Global Model Defaults</h3>
+                <form id="update-model-defaults-form">
+                    <div class="form-group">
+                        <label>Primary Model</label>
+                        <select id="default-primary-model-select">
+                            <option value="">-- None --</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Secondary Model</label>
+                        <select id="default-secondary-model-select">
+                            <option value="">-- None --</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Tertiary Model</label>
+                        <select id="default-tertiary-model-select">
+                            <option value="">-- None --</option>
+                        </select>
+                    </div>
+                    <button type="submit">Save Global Defaults</button>
+                </form>
+            </div>
+
+            <!-- Agents Section -->
+            <div class="section">
+                <h2>Agents</h2>
+                <div id="agent-list">Loading agents...</div>
+
+                <h3>Add New Agent</h3>
+                <form id="add-agent-form">
+                    <div class="form-group">
+                        <label>Template</label>
+                        <select id="agent-template-select">
+                            <option value="">-- Select a template --</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Agent ID (Unique)</label>
+                        <input type="text" id="agent-id" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Name</label>
+                        <input type="text" id="agent-name" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Description</label>
+                        <input type="text" id="agent-desc" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Type of Agent</label>
+                        <select id="agent-type" required>
+                            <option value="agent">Agent</option>
+                            <option value="automation">Automation</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Instructions</label>
+                        <textarea id="agent-instr" rows="3" required></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Custom Tools (Python Code)</label>
+                        <textarea id="agent-tools" rows="5" placeholder="def my_tool(): ..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Registered MCP Servers <small>(hold Ctrl/Cmd to select multiple)</small></label>
+                        <select id="agent-mcp-servers" multiple>
+                            <option disabled>Loading MCP servers...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Connector Configs <small>(hold Ctrl/Cmd to select multiple)</small></label>
+                        <select id="agent-connector-configs" multiple>
+                            <option disabled>Loading connector configs...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Skills <small>(hold Ctrl/Cmd to select multiple)</small></label>
+                        <select id="agent-skills" multiple>
+                            <option disabled>Loading skills...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Sub Agents <small>(hold Ctrl/Cmd to select multiple)</small></label>
+                        <select id="agent-sub-agents" multiple>
+                            <option disabled>Loading agents...</option>
+                        </select>
+                    </div>
+                    <h4>Model Stack</h4>
+                    <div class="form-group">
+                        <label>Primary Source</label>
+                        <select id="agent-primary-source" onchange="toggleAgentModelSlot('agent', 'primary')">
+                            <option value="global">Use Global Primary</option>
+                            <option value="manual">Choose Specific Model</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Primary Model</label>
+                        <select id="agent-primary-model-select" disabled>
+                            <option value="">-- Select model --</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Secondary Source</label>
+                        <select id="agent-secondary-source" onchange="toggleAgentModelSlot('agent', 'secondary')">
+                            <option value="global">Use Global Secondary</option>
+                            <option value="manual">Choose Specific Model</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Secondary Model</label>
+                        <select id="agent-secondary-model-select" disabled>
+                            <option value="">-- Select model --</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Tertiary Source</label>
+                        <select id="agent-tertiary-source" onchange="toggleAgentModelSlot('agent', 'tertiary')">
+                            <option value="global">Use Global Tertiary</option>
+                            <option value="manual">Choose Specific Model</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Tertiary Model</label>
+                        <select id="agent-tertiary-model-select" disabled>
+                            <option value="">-- Select model --</option>
+                        </select>
+                    </div>
+                    <button type="submit">Add Agent</button>
+                </form>
+
+                <h3 style="margin-top: 24px;">Update Agent</h3>
+                <form id="update-agent-form">
+                    <div class="form-group">
+                        <label>Select Agent</label>
+                        <select id="agent-update-select" required>
+                            <option value="">Loading agents...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>New Name</label>
+                        <input type="text" id="agent-update-name" placeholder="Leave blank to keep current value">
+                    </div>
+                    <div class="form-group">
+                        <label>New Description</label>
+                        <input type="text" id="agent-update-description"
+                            placeholder="Leave blank to keep current value">
+                    </div>
+                    <div class="form-group">
+                        <label>New Instructions</label>
+                        <textarea id="agent-update-instruction" rows="3"
+                            placeholder="Leave blank to keep current value"></textarea>
+                    </div>
+                    <h4>Model Stack</h4>
+                    <div class="form-group">
+                        <label>Primary Source</label>
+                        <select id="agent-update-primary-source" onchange="toggleAgentModelSlot('agent-update', 'primary')">
+                            <option value="">-- Keep current setting --</option>
+                            <option value="global">Use Global Primary</option>
+                            <option value="manual">Choose Specific Model</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Primary Model</label>
+                        <select id="agent-update-primary-model-select" disabled>
+                            <option value="">-- Keep current model --</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Secondary Source</label>
+                        <select id="agent-update-secondary-source" onchange="toggleAgentModelSlot('agent-update', 'secondary')">
+                            <option value="">-- Keep current setting --</option>
+                            <option value="global">Use Global Secondary</option>
+                            <option value="manual">Choose Specific Model</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Secondary Model</label>
+                        <select id="agent-update-secondary-model-select" disabled>
+                            <option value="">-- Keep current model --</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Tertiary Source</label>
+                        <select id="agent-update-tertiary-source" onchange="toggleAgentModelSlot('agent-update', 'tertiary')">
+                            <option value="">-- Keep current setting --</option>
+                            <option value="global">Use Global Tertiary</option>
+                            <option value="manual">Choose Specific Model</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Tertiary Model</label>
+                        <select id="agent-update-tertiary-model-select" disabled>
+                            <option value="">-- Keep current model --</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Status</label>
+                        <select id="agent-update-status">
+                            <option value="">-- Keep current status --</option>
+                            <option value="true">Enable</option>
+                            <option value="false">Disable</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Registered MCP Servers <small>(hold Ctrl/Cmd to select multiple)</small></label>
+                        <select id="agent-update-mcp-servers" multiple>
+                            <option disabled>Loading MCP servers...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>New Connector Configs <small>(hold Ctrl/Cmd to select multiple)</small></label>
+                        <select id="agent-update-connector-configs" multiple>
+                            <option disabled>Loading connector configs...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>New Skills <small>(hold Ctrl/Cmd to select multiple)</small></label>
+                        <select id="agent-update-skills" multiple>
+                            <option disabled>Loading skills...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>New Sub Agents <small>(hold Ctrl/Cmd to select multiple)</small></label>
+                        <select id="agent-update-sub-agents" multiple>
+                            <option disabled>Loading agents...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>New Custom Tools (Python Code)</label>
+                        <textarea id="agent-update-tools" rows="5"
+                            placeholder="Leave blank to keep current value"></textarea>
+                    </div>
+                    <button type="submit">Update Agent</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Webhooks & Jobs Section -->
+        <div class="section" id="automation-section">
+            <h2>Webhooks & Jobs (Automation Agents)</h2>
+            <div class="form-group">
+                <label>Select Automation Agent</label>
+                <select id="automation-agent-select" onchange="loadAutomations()">
+                    <option value="">Loading automation agents...</option>
+                </select>
+            </div>
+
+            <div id="automations-content" style="display: none;">
+                <div class="grid">
+                    <div>
+                        <h3>Webhooks</h3>
+                        <div id="webhook-list">Select an agent to view webhooks.</div>
+                        <h4 style="margin-top:20px;">Create Webhook</h4>
+                        <form id="add-webhook-form" onsubmit="addWebhook(event)">
+                            <div class="form-group">
+                                <label>Prompt Payload (JSON)</label>
+                                <textarea id="webhook-prompt" rows="3" required placeholder='prompt'></textarea>
+                            </div>
+                            <button type="submit">Create Webhook</button>
+                        </form>
+                    </div>
+
+                    <div>
+                        <h3>Jobs</h3>
+                        <div id="job-list">Select an agent to view jobs.</div>
+                        <h4 style="margin-top:20px;">Create Job</h4>
+                        <form id="add-job-form" onsubmit="addJob(event)">
+                            <div class="form-group">
+                                <label>Prompt Payload (JSON)</label>
+                                <textarea id="job-prompt" rows="3" required placeholder='prompt'></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label>Cron Expression (optional)</label>
+                                <input type="text" id="job-cron" placeholder="*/5 * * * *">
+                            </div>
+                            <div class="form-group">
+                                <label>Interval Seconds (optional)</label>
+                                <input type="number" id="job-interval" placeholder="60">
+                            </div>
+                            <button type="submit">Create Job</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Connectors Section -->
+        <div class="section">
+            <h2>Connectors</h2>
+            <div class="grid">
+                <!-- Left: Available connectors + create config -->
+                <div>
+                    <h3>Available Connectors</h3>
+                    <div id="connector-list">Loading connectors...</div>
+
+                    <h3>Create Connector Config</h3>
+                    <form id="add-connector-config-form">
+                        <div id="connector-config-edit-state" style="display:none; margin-bottom:10px; padding:8px 10px; background:#fff3cd; border-radius:4px;">
+                            Editing existing connector config
+                            <button type="button" id="connector-config-cancel-edit" style="margin-left:10px;">Cancel</button>
+                        </div>
+                        <div class="form-group">
+                            <label>Connector</label>
+                            <select id="connector-select">
+                                <option value="">-- Select a connector --</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Config Name</label>
+                            <input type="text" id="connector-config-name" placeholder="e.g. My JSONPlaceholder Config"
+                                required>
+                        </div>
+                        <div id="connector-help-text"></div>
+                        <div id="connector-config-fields">
+                            <!-- Dynamically populated when a connector is selected -->
+                        </div>
+                        <div id="connector-details-doc" style="margin-bottom:10px; color: #555; font-style: italic;">
+                        </div>
+                        <button type="submit" id="connector-config-submit-btn">Save Config</button>
+                    </form>
+                </div>
+
+                <!-- Right: Saved connector configs -->
+                <div>
+                    <h3>Saved Connector Configs</h3>
+                    <div class="form-group">
+                        <label>Filter by Connector</label>
+                        <select id="connector-config-filter">
+                            <option value="">-- All --</option>
+                        </select>
+                    </div>
+                    <div id="connector-config-list">Select a connector to view its saved configs.</div>
+
+                    <h3 style="margin-top: 24px;">Registered MCP Servers</h3>
+                    <form id="add-mcp-form">
+                        <div id="mcp-edit-state"
+                            style="display:none; margin-bottom:10px; padding:8px 10px; background:#fff3cd; border-radius:4px;">
+                            Editing existing MCP server
+                            <button type="button" id="mcp-cancel-edit" style="margin-left:10px;">Cancel</button>
+                        </div>
+                        <div class="form-group">
+                            <label>Name</label>
+                            <input type="text" id="mcp-name" placeholder="e.g. Service Desk MCP">
+                        </div>
+                        <div class="form-group">
+                            <label>URL</label>
+                            <input type="text" id="mcp-url" placeholder="http://localhost:8000/sse" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Description</label>
+                            <input type="text" id="mcp-description" placeholder="Optional short note">
+                        </div>
+                        <div class="form-group">
+                            <label>Auth Type</label>
+                            <select id="mcp-auth-type">
+                                <option value="none">None</option>
+                                <option value="bearer">Bearer</option>
+                                <option value="basic">Basic</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Username</label>
+                            <input type="text" id="mcp-auth-username" placeholder="Only for Basic auth">
+                        </div>
+                        <div class="form-group">
+                            <label>Secret</label>
+                            <input type="password" id="mcp-auth-secret"
+                                placeholder="Bearer token or Basic password">
+                        </div>
+                        <div style="display:flex; gap:8px;">
+                            <button type="button" id="mcp-test-btn">Test MCP</button>
+                            <button type="submit" id="mcp-submit-btn">Save MCP</button>
+                        </div>
+                    </form>
+                    <div id="mcp-test-result" style="margin-top: 12px;"></div>
+                    <div id="mcp-list" style="margin-top: 12px;">Loading MCP servers...</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Skills</h2>
+            <div class="grid">
+                <div>
+                    <div id="skill-list">Loading skills...</div>
+                </div>
+                <div>
+                    <form id="add-skill-form">
+                        <div class="form-group">
+                            <label>Name</label>
+                            <input type="text" id="skill-name" placeholder="incident_skill" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Description</label>
+                            <input type="text" id="skill-description" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Instructions</label>
+                            <textarea id="skill-instructions" rows="4" required></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Tool Names <small>(comma separated)</small></label>
+                            <input type="text" id="skill-tools" placeholder="search_docs, get_post">
+                        </div>
+                        <div class="form-group">
+                            <label>Connector Configs <small>(hold Ctrl/Cmd to select multiple)</small></label>
+                            <select id="skill-connector-configs" multiple>
+                                <option disabled>Loading connector configs...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>MCP Servers <small>(hold Ctrl/Cmd to select multiple)</small></label>
+                            <select id="skill-mcp-servers" multiple>
+                                <option disabled>Loading MCP servers...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>References JSON</label>
+                            <textarea id="skill-references" rows="4" placeholder='{"guide.md":"Hello"}'></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Assets JSON</label>
+                            <textarea id="skill-assets" rows="4" placeholder='{"template.txt":"Template"}'></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Scripts JSON</label>
+                            <textarea id="skill-scripts" rows="4" placeholder='{"run.py":"print(\"hi\")"}'></textarea>
+                        </div>
+                        <button type="submit">Save Skill</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Visualizer Section -->
+        <div class="section">
+            <h2>Architecture Visualizer</h2>
+            <button onclick="loadGraph()">Refresh Graph</button>
+            <div id="graph-container" style="width: 100%; height: 600px; border: 1px solid var(--input-border); margin-top: 10px; background: var(--graph-bg); border-radius: 4px;"></div>
+        </div>
+
+        <!-- Chat Section -->
+        <div class="section">
+            <h2>Chat with Agent</h2>
+            <div class="form-group">
+                <label>Select Agent</label>
+                <select id="chat-agent-select">
+                    <option>Loading agents...</option>
+                </select>
+            </div>
+            <div id="chat-messages"></div>
+            <div style="display: flex; gap: 10px;">
+                <input type="text" id="chat-input" placeholder="Type your message here...">
+                <button id="send-msg-btn">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = window.location.origin;
+        let agentTemplates = [];
+        let currentModels = [];
+        let currentModelDefaults = {
+            primary_model_id: '',
+            secondary_model_id: '',
+            tertiary_model_id: ''
+        };
+        let currentMcpServers = [];
+        let currentSkills = [];
+
+        // ─── Health ───────────────────────────────────────────────────────────
+        async function checkHealth() {
+            try {
+                const res = await fetch(`${API_BASE}/health/`);
+                const data = await res.json();
+                document.getElementById('health-status').textContent = `System Status: ${data.status}`;
+                document.getElementById('health-status').style.color = 'green';
+            } catch (e) {
+                document.getElementById('health-status').textContent = `System Status: Offline or Error (${e})`;
+                document.getElementById('health-status').style.color = 'red';
+            }
+        }
+
+        // ─── Models ───────────────────────────────────────────────────────────
+        async function loadModels() {
+            const res = await fetch(`${API_BASE}/llms/`);
+            const models = await res.json();
+            currentModels = models;
+            const listEl = document.getElementById('model-list');
+            const updateSelectEl = document.getElementById('model-update-select');
+            const modelSelectIds = [
+                'agent-primary-model-select',
+                'agent-secondary-model-select',
+                'agent-tertiary-model-select',
+                'agent-update-primary-model-select',
+                'agent-update-secondary-model-select',
+                'agent-update-tertiary-model-select',
+                'default-primary-model-select',
+                'default-secondary-model-select',
+                'default-tertiary-model-select'
+            ];
+
+            listEl.innerHTML = '';
+            updateSelectEl.innerHTML = '<option value="">-- Select a model --</option>';
+            modelSelectIds.forEach(id => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                const keepText = id.startsWith('agent-update-') ? '-- Keep current model --' : '-- Select model --';
+                const noneText = id.startsWith('default-') ? '-- None --' : keepText;
+                el.innerHTML = `<option value="">${noneText}</option>`;
+            });
+
+            models.forEach(m => {
+                const div = document.createElement('div');
+                div.className = 'card';
+                div.innerHTML = `
+                    <strong>${m.name}</strong> (${m.provider})<br>
+                    ID: ${m.model_id}
+                    <button class="delete" onclick="deleteModel('${m.model_id}')" style="float:right;">Delete</button>
+                `;
+                listEl.appendChild(div);
+
+                const updateOpt = document.createElement('option');
+                updateOpt.value = m.model_id;
+                updateOpt.textContent = `${m.name} (${m.model_id})`;
+                updateSelectEl.appendChild(updateOpt);
+
+                modelSelectIds.forEach(id => {
+                    const el = document.getElementById(id);
+                    if (!el) return;
+                    const opt = document.createElement('option');
+                    opt.value = m.model_id;
+                    opt.textContent = `${m.name} (${m.model_id})`;
+                    el.appendChild(opt);
+                });
+            });
+
+            await loadModelDefaults();
+        }
+
+        async function loadModelDefaults() {
+            const res = await fetch(`${API_BASE}/llms/defaults`);
+            const defaults = await res.json();
+            currentModelDefaults = defaults;
+            document.getElementById('default-primary-model-select').value = defaults.primary_model_id || '';
+            document.getElementById('default-secondary-model-select').value = defaults.secondary_model_id || '';
+            document.getElementById('default-tertiary-model-select').value = defaults.tertiary_model_id || '';
+            ['agent', 'agent-update'].forEach(prefix => {
+                ['primary', 'secondary', 'tertiary'].forEach(slot => {
+                    syncSlotModelSelection(prefix, slot);
+                });
+            });
+        }
+
+        async function addModel(e) {
+            e.preventDefault();
+            const data = {
+                model_id: document.getElementById('model-id').value,
+                provider: document.getElementById('model-provider').value,
+                name: document.getElementById('model-name').value,
+                api_key: document.getElementById('model-api-key').value,
+                description: document.getElementById('model-description').value
+            };
+            await fetch(`${API_BASE}/llms/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            loadModels();
+            e.target.reset();
+        }
+
+        async function deleteModel(id) {
+            if (confirm('Delete this model?')) {
+                await fetch(`${API_BASE}/llms/${id}`, { method: 'DELETE' });
+                loadModels();
+            }
+        }
+
+        async function updateModel(e) {
+            e.preventDefault();
+
+            const modelId = document.getElementById('model-update-select').value;
+            const name = document.getElementById('model-update-name').value;
+            const description = document.getElementById('model-update-description').value;
+            const apiKey = document.getElementById('model-update-api-key').value;
+            const data = {};
+
+            if (!modelId) {
+                alert('Please select a model.');
+                return;
+            }
+
+            if (name.trim() !== '') {
+                data.name = name;
+            }
+            if (description.trim() !== '') {
+                data.description = description;
+            }
+            if (apiKey.trim() !== '') {
+                data.api_key = apiKey;
+            }
+
+            if (Object.keys(data).length === 0) {
+                alert('Enter a new name, description, or API key.');
+                return;
+            }
+
+            const res = await fetch(`${API_BASE}/llms/${modelId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            if (!res.ok) {
+                alert('Failed to update model: ' + await res.text());
+                return;
+            }
+
+            e.target.reset();
+            loadModels();
+        }
+
+        async function updateModelDefaults(e) {
+            e.preventDefault();
+            const data = {
+                primary_model_id: document.getElementById('default-primary-model-select').value || null,
+                secondary_model_id: document.getElementById('default-secondary-model-select').value || null,
+                tertiary_model_id: document.getElementById('default-tertiary-model-select').value || null
+            };
+
+            const res = await fetch(`${API_BASE}/llms/defaults`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            if (!res.ok) {
+                alert('Failed to update global defaults: ' + await res.text());
+                return;
+            }
+            loadModels();
+            loadAgents();
+        }
+
+        function toggleAgentModelSlot(prefix, slot) {
+            const sourceEl = document.getElementById(`${prefix}-${slot}-source`);
+            const modelEl = document.getElementById(`${prefix}-${slot}-model-select`);
+            if (!sourceEl || !modelEl) return;
+            modelEl.disabled = sourceEl.value !== 'manual';
+            syncSlotModelSelection(prefix, slot);
+        }
+
+        function syncSlotModelSelection(prefix, slot) {
+            const sourceEl = document.getElementById(`${prefix}-${slot}-source`);
+            const modelEl = document.getElementById(`${prefix}-${slot}-model-select`);
+            if (!sourceEl || !modelEl) return;
+
+            const isUpdate = prefix.startsWith('agent-update');
+            if (sourceEl.value === 'global') {
+                const globalModelId = currentModelDefaults[`${slot}_model_id`] || '';
+                modelEl.value = globalModelId;
+                modelEl.disabled = true;
+                return;
+            }
+
+            modelEl.disabled = sourceEl.value !== 'manual';
+            if (sourceEl.value !== 'manual' && !isUpdate) {
+                modelEl.value = '';
+            }
+        }
+
+        function addSlotConfig(data, prefix, slot, isUpdate = false) {
+            const sourceValue = document.getElementById(`${prefix}-${slot}-source`).value;
+            const modelValue = document.getElementById(`${prefix}-${slot}-model-select`).value;
+            if (isUpdate && sourceValue === '') {
+                return;
+            }
+            data[`${slot}_use_global`] = sourceValue === 'global';
+            data[`${slot}_model_id`] = sourceValue === 'manual' ? (modelValue || null) : null;
+        }
+
+        function parseJsonField(fieldId) {
+            const rawValue = document.getElementById(fieldId).value.trim();
+            if (!rawValue) {
+                return {};
+            }
+            return JSON.parse(rawValue);
+        }
+
+        // ─── Agents ───────────────────────────────────────────────────────────
+        async function loadAgentTemplates() {
+            const res = await fetch(`${API_BASE}/agent/templates`);
+            const templates = await res.json();
+            const templateSelectEl = document.getElementById('agent-template-select');
+
+            agentTemplates = templates;
+            templateSelectEl.innerHTML = '<option value="">-- Select a template --</option>';
+
+            templates.forEach(template => {
+                const opt = document.createElement('option');
+                opt.value = template.template_id;
+                opt.textContent = template.name;
+                templateSelectEl.appendChild(opt);
+            });
+        }
+
+        function applyAgentTemplate() {
+            const templateId = document.getElementById('agent-template-select').value;
+            const template = agentTemplates.find(item => item.template_id === templateId);
+            if (!template) {
+                return;
+            }
+
+            document.getElementById('agent-name').value = template.name;
+            document.getElementById('agent-desc').value = template.description;
+            document.getElementById('agent-instr').value = template.instruction;
+        }
+
+        async function loadAgents() {
+            const res = await fetch(`${API_BASE}/agent/`);
+            const agents = await res.json();
+            const listEl = document.getElementById('agent-list');
+            const chatSelectEl = document.getElementById('chat-agent-select');
+            const agentUpdateSelectEl = document.getElementById('agent-update-select');
+            const updateSubAgentSelectEl = document.getElementById('agent-update-sub-agents');
+
+            listEl.innerHTML = '';
+            chatSelectEl.innerHTML = '';
+            agentUpdateSelectEl.innerHTML = '<option value="">-- Select an agent --</option>';
+            updateSubAgentSelectEl.innerHTML = '';
+
+            const autoAgentSelectEl = document.getElementById('automation-agent-select');
+            if (autoAgentSelectEl) autoAgentSelectEl.innerHTML = '<option value="">-- Select automation agent --</option>';
+
+            // Rebuild sub-agents select in the add-agent form
+            const subAgentSelectEl = document.getElementById('agent-sub-agents');
+            subAgentSelectEl.innerHTML = '';
+
+            agents.forEach(a => {
+                const div = document.createElement('div');
+                div.className = 'card';
+                div.style.opacity = a.isEnabled ? 1 : 0.6;
+                const connectorBadges = (a.connector_config_ids || []).length > 0
+                    ? `<br><small>Connectors: ${(a.connector_config_ids || []).length} attached</small>`
+                    : '';
+                const mcpBadge = ((a.mcp_server_ids || []).length + (a.mcp_servers || []).length) > 0
+                    ? `<br><small>MCPs: ${((a.mcp_server_ids || []).length + (a.mcp_servers || []).length)} attached</small>`
+                    : '';
+                const skillBadge = (a.skill_ids || []).length > 0
+                    ? `<br><small>Skills: ${(a.skill_ids || []).length} attached</small>`
+                    : '';
+                const subAgentBadge = (a.sub_agents || []).length > 0
+                    ? `<br><small>Sub-agents: ${(a.sub_agents || []).length} attached</small>`
+                    : '';
+                const modelStack = [
+                    `P: ${a.primary_use_global ? 'Global' : (a.primary_model_id || 'None')}`,
+                    `S: ${a.secondary_use_global ? 'Global' : (a.secondary_model_id || 'None')}`,
+                    `T: ${a.tertiary_use_global ? 'Global' : (a.tertiary_model_id || 'None')}`
+                ].join(' | ');
+                div.innerHTML = `
+                    <strong>${a.name}</strong> (${a.type ? a.type : 'agent'})<br>
+                    ${a.description}<br>
+                    <small>Status: ${a.isEnabled ? 'Enabled' : 'Disabled'} | ${modelStack}</small>${connectorBadges}${mcpBadge}${skillBadge}${subAgentBadge}
+                    <div style="margin-top:5px;">
+                        <button onclick="toggleAgent('${a.agent_id}', ${!a.isEnabled})">${a.isEnabled ? 'Disable' : 'Enable'}</button>
+                        <button class="delete" onclick="deleteAgent('${a.agent_id}')">Delete</button>
+                    </div>
+                `;
+                listEl.appendChild(div);
+
+                // Populate chat select (enabled only)
+                if (a.isEnabled) {
+                    const opt = document.createElement('option');
+                    opt.value = a.agent_id;
+                    opt.textContent = a.name;
+                    chatSelectEl.appendChild(opt);
+                }
+
+                if (a.isEnabled && a.type === 'automation' && autoAgentSelectEl) {
+                    const autoOpt = document.createElement('option');
+                    autoOpt.value = a.agent_id;
+                    autoOpt.textContent = a.name;
+                    autoAgentSelectEl.appendChild(autoOpt);
+                }
+
+                // Populate sub-agent select (all agents are candidates)
+                const subOpt = document.createElement('option');
+                subOpt.value = a.agent_id;
+                subOpt.textContent = a.name;
+                subAgentSelectEl.appendChild(subOpt);
+
+                const updateSubOpt = document.createElement('option');
+                updateSubOpt.value = a.agent_id;
+                updateSubOpt.textContent = a.name;
+                updateSubAgentSelectEl.appendChild(updateSubOpt);
+
+                const updateOpt = document.createElement('option');
+                updateOpt.value = a.agent_id;
+                updateOpt.textContent = `${a.name} (${a.agent_id})`;
+                agentUpdateSelectEl.appendChild(updateOpt);
+            });
+        }
+
+        async function addAgent(e) {
+            e.preventDefault();
+            const toolsCode = document.getElementById('agent-tools').value;
+            const mcpSelect = document.getElementById('agent-mcp-servers');
+            const mcpServerIds = Array.from(mcpSelect.selectedOptions).map(o => o.value);
+
+            // Collect selected connector config IDs from multi-select
+            const connectorSelect = document.getElementById('agent-connector-configs');
+            const connectorConfigIds = Array.from(connectorSelect.selectedOptions).map(o => o.value);
+            const skillSelect = document.getElementById('agent-skills');
+            const skillIds = Array.from(skillSelect.selectedOptions).map(o => o.value);
+
+            // Collect selected sub-agent IDs from multi-select
+            const subAgentSelect = document.getElementById('agent-sub-agents');
+            const subAgentIds = Array.from(subAgentSelect.selectedOptions).map(o => o.value);
+
+            const data = {
+                agent_id: document.getElementById('agent-id').value,
+                name: document.getElementById('agent-name').value,
+                description: document.getElementById('agent-desc').value,
+                type: document.getElementById('agent-type').value,
+                instruction: document.getElementById('agent-instr').value,
+                tools: toolsCode ? toolsCode : null,
+                mcp_server_ids: mcpServerIds,
+                connector_config_ids: connectorConfigIds,
+                skill_ids: skillIds,
+                sub_agents: subAgentIds,
+                isEnabled: true
+            };
+            addSlotConfig(data, 'agent', 'primary');
+            addSlotConfig(data, 'agent', 'secondary');
+            addSlotConfig(data, 'agent', 'tertiary');
+            await fetch(`${API_BASE}/agent/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            loadAgents();
+            e.target.reset();
+            document.getElementById('connector-config-fields').innerHTML = '';
+            document.getElementById('connector-details-doc').textContent = '';
+        }
+
+        async function updateAgent(e) {
+            e.preventDefault();
+
+            const agentId = document.getElementById('agent-update-select').value;
+            const name = document.getElementById('agent-update-name').value;
+            const description = document.getElementById('agent-update-description').value;
+            const instruction = document.getElementById('agent-update-instruction').value;
+            const statusValue = document.getElementById('agent-update-status').value;
+            const toolsCode = document.getElementById('agent-update-tools').value;
+            const mcpSelect = document.getElementById('agent-update-mcp-servers');
+            const mcpServerIds = Array.from(mcpSelect.selectedOptions).map(o => o.value);
+            const connectorSelect = document.getElementById('agent-update-connector-configs');
+            const connectorConfigIds = Array.from(connectorSelect.selectedOptions).map(o => o.value);
+            const skillSelect = document.getElementById('agent-update-skills');
+            const skillIds = Array.from(skillSelect.selectedOptions).map(o => o.value);
+            const subAgentSelect = document.getElementById('agent-update-sub-agents');
+            const subAgentIds = Array.from(subAgentSelect.selectedOptions).map(o => o.value);
+            const data = {};
+
+            if (!agentId) {
+                alert('Please select an agent.');
+                return;
+            }
+
+            if (name.trim() !== '') {
+                data.name = name;
+            }
+            if (description.trim() !== '') {
+                data.description = description;
+            }
+            if (instruction.trim() !== '') {
+                data.instruction = instruction;
+            }
+            if (statusValue !== '') {
+                data.isEnabled = statusValue === 'true';
+            }
+            if (toolsCode.trim() !== '') {
+                data.tools = toolsCode;
+            }
+            if (mcpServerIds.length > 0) {
+                data.mcp_server_ids = mcpServerIds;
+            }
+            if (connectorConfigIds.length > 0) {
+                data.connector_config_ids = connectorConfigIds;
+            }
+            if (skillIds.length > 0) {
+                data.skill_ids = skillIds;
+            }
+            if (subAgentIds.length > 0) {
+                data.sub_agents = subAgentIds;
+            }
+            addSlotConfig(data, 'agent-update', 'primary', true);
+            addSlotConfig(data, 'agent-update', 'secondary', true);
+            addSlotConfig(data, 'agent-update', 'tertiary', true);
+
+            if (Object.keys(data).length === 0) {
+                alert('Enter at least one value to update.');
+                return;
+            }
+
+            const res = await fetch(`${API_BASE}/agent/${agentId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            if (!res.ok) {
+                alert('Failed to update agent: ' + await res.text());
+                return;
+            }
+
+            e.target.reset();
+            loadAgents();
+        }
+
+
+        async function deleteAgent(id) {
+            if (confirm('Delete this agent?')) {
+                await fetch(`${API_BASE}/agent/${id}`, { method: 'DELETE' });
+                loadAgents();
+            }
+        }
+
+        async function toggleAgent(id, status) {
+            await fetch(`${API_BASE}/agent/${id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ isEnabled: status })
+            });
+            loadAgents();
+        }
+
+        // ─── Automations (Webhooks & Jobs) ────────────────────────────────────
+        async function loadAutomations() {
+            const agentId = document.getElementById('automation-agent-select').value;
+            const contentDiv = document.getElementById('automations-content');
+            if (!agentId) {
+                contentDiv.style.display = 'none';
+                return;
+            }
+            contentDiv.style.display = 'block';
+
+            // Load Webhooks
+            const whRes = await fetch(`${API_BASE}/agent/${agentId}/webhook`);
+            const webhooks = await whRes.json();
+            const whListEl = document.getElementById('webhook-list');
+            whListEl.innerHTML = '';
+            if (webhooks.length === 0) whListEl.innerHTML = '<em>No webhooks for this agent.</em>';
+            webhooks.forEach(w => {
+                const div = document.createElement('div');
+                div.className = 'card';
+                
+                // Construct full URL (handle relative and absolute API_BASE)
+                const baseUrl = API_BASE.startsWith('http') ? API_BASE : window.location.origin + API_BASE;
+                const invokeUrl = `${baseUrl}/agent/${agentId}/webhook/invoke/${w.webhook_id}`;
+                
+                div.innerHTML = `
+                    <small>ID: ${w.webhook_id}</small><br>
+                    <strong>URL:</strong> <a href="${invokeUrl}" target="_blank" style="word-break: break-all; font-size: 0.8em; color: var(--accent-color);">${invokeUrl}</a><br>
+                    <strong>Prompt:</strong> <code>${w.prompt}</code><br>
+                    <button class="delete" onclick="deleteWebhook('${agentId}', '${w.webhook_id}')" style="margin-top:5px;">Delete</button>
+                    <button onclick="invokeWebhook('${agentId}', '${w.webhook_id}')" style="margin-top:5px;">Invoke</button>
+                `;
+                whListEl.appendChild(div);
+            });
+
+            // Load Jobs
+            const jobRes = await fetch(`${API_BASE}/agent/${agentId}/jobs`);
+            const jobs = await jobRes.json();
+            const jobListEl = document.getElementById('job-list');
+            jobListEl.innerHTML = '';
+            if (jobs.length === 0) jobListEl.innerHTML = '<em>No jobs for this agent.</em>';
+            jobs.forEach(j => {
+                const div = document.createElement('div');
+                div.className = 'card';
+                div.innerHTML = `
+                    <small>ID: ${j.job_id}</small><br>
+                    <strong>Prompt:</strong> <code>${j.prompt}</code><br>
+                    <strong>Cron:</strong> ${j.cron_expression || 'N/A'} | <strong>Interval (s):</strong> ${j.interval_seconds || 'N/A'}<br>
+                    <button class="delete" onclick="deleteJob('${agentId}', '${j.job_id}')" style="margin-top:5px;">Delete</button>
+                `;
+                jobListEl.appendChild(div);
+            });
+        }
+
+        async function addWebhook(e) {
+            e.preventDefault();
+            const agentId = document.getElementById('automation-agent-select').value;
+            const promptVal = document.getElementById('webhook-prompt').value;
+            if (!promptVal) { alert("Prompt is required"); return; }
+            await fetch(`${API_BASE}/agent/${agentId}/webhooks`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prompt: promptVal })
+            });
+            document.getElementById('webhook-prompt').value = '';
+            loadAutomations();
+        }
+
+        async function deleteWebhook(agentId, webhookId) {
+            if (confirm('Delete webhook?')) {
+                await fetch(`${API_BASE}/agent/${agentId}/webhook/${webhookId}`, { method: 'DELETE' });
+                loadAutomations();
+            }
+        }
+
+        async function invokeWebhook(agentId, webhookId) {
+            alert('Invokation request sent. Keep an eye on the server logs for the output.');
+            await fetch(`${API_BASE}/agent/${agentId}/webhook/invoke/${webhookId}`, { method: 'POST' });
+        }
+
+        async function addJob(e) {
+            e.preventDefault();
+            const agentId = document.getElementById('automation-agent-select').value;
+            const cronVal = document.getElementById('job-cron').value.trim();
+            const intVal = document.getElementById('job-interval').value.trim();
+            const promptVal = document.getElementById('job-prompt').value;
+            if (!promptVal) { alert("Prompt is required"); return; }
+            await fetch(`${API_BASE}/agent/${agentId}/jobs`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    prompt: promptVal,
+                    cron_expression: cronVal || null,
+                    interval_seconds: intVal ? parseInt(intVal) : null
+                })
+            });
+            document.getElementById('job-prompt').value = '';
+            document.getElementById('job-cron').value = '';
+            document.getElementById('job-interval').value = '';
+            loadAutomations();
+        }
+
+        async function deleteJob(agentId, jobId) {
+            if (confirm('Delete job?')) {
+                await fetch(`${API_BASE}/agent/${agentId}/jobs/${jobId}`, { method: 'DELETE' });
+                loadAutomations();
+            }
+        }
+
+        // ─── Connectors ───────────────────────────────────────────────────────
+
+        let editingConnectorConfig = null;
+        const connectorFieldPlaceholders = {
+            TEAMS_BOT_BASE_URL: 'http://localhost:3978',
+            ALERT_API_KEY: 'same value configured in teams_bot/.env',
+            EMAILS: 'user1@company.com, user2@company.com',
+            CONVERSATION_IDS: '19:...@thread.tacv2, 19:...@thread.tacv2',
+        };
+
+        function getConnectorHelpHtml(connectorId) {
+            if (connectorId !== 'teams_connector') {
+                return '';
+            }
+
+            return `
+                <div class="connector-help">
+                    <strong>Teams connector setup</strong>
+                    Add <code>TEAMS_BOT_BASE_URL</code> and <code>ALERT_API_KEY</code> for the Teams bot API.
+                    Configure one or more targets using <code>EMAILS</code> / <code>CONVERSATION_IDS</code>.
+                    Only tools with a configured target are exposed to the agent. If both are blank, no Teams tool is exposed.
+                </div>
+            `;
+        }
+
+        function resetConnectorConfigForm() {
+            editingConnectorConfig = null;
+            document.getElementById('add-connector-config-form').reset();
+            document.getElementById('connector-config-fields').innerHTML = '';
+            document.getElementById('connector-help-text').innerHTML = '';
+            document.getElementById('connector-details-doc').textContent = '';
+            document.getElementById('connector-config-edit-state').style.display = 'none';
+            document.getElementById('connector-config-submit-btn').textContent = 'Save Config';
+        }
+
+        /** Fetches available connector types and populates selects + list */
+        async function loadConnectors() {
+            const res = await fetch(`${API_BASE}/connectors/`);
+            const connectors = await res.json();
+
+            const listEl = document.getElementById('connector-list');
+            const selectEl = document.getElementById('connector-select');
+            const filterEl = document.getElementById('connector-config-filter');
+
+            listEl.innerHTML = '';
+            // Keep the placeholder option, then add connector options
+            selectEl.innerHTML = '<option value="">-- Select a connector --</option>';
+            filterEl.innerHTML = '<option value="">-- All --</option>';
+
+            connectors.forEach(c => {
+                // Card in the list
+                const div = document.createElement('div');
+                div.className = 'card';
+                div.innerHTML = `<strong>${c.name}</strong><br><small>ID: ${c.id}</small>`;
+                listEl.appendChild(div);
+
+                // Option in the create-config form
+                const opt = document.createElement('option');
+                opt.value = c.id;
+                opt.textContent = c.name;
+                selectEl.appendChild(opt);
+
+                // Option in the filter select
+                const fopt = opt.cloneNode(true);
+                filterEl.appendChild(fopt);
+            });
+
+            if (connectors.length === 0) {
+                listEl.textContent = 'No connectors found.';
+            }
+        }
+
+        /** Loads connector details (config_variables + docs + tools) and renders input fields */
+        async function onConnectorSelected() {
+            const connectorId = document.getElementById('connector-select').value;
+            const fieldsEl = document.getElementById('connector-config-fields');
+            const docEl = document.getElementById('connector-details-doc');
+            const helpEl = document.getElementById('connector-help-text');
+
+            if (
+                editingConnectorConfig
+                && connectorId
+                && connectorId !== editingConnectorConfig.connectorId
+            ) {
+                editingConnectorConfig = null;
+                document.getElementById('connector-config-edit-state').style.display = 'none';
+                document.getElementById('connector-config-submit-btn').textContent = 'Save Config';
+                document.getElementById('connector-config-name').value = '';
+            }
+
+            fieldsEl.innerHTML = '';
+            docEl.textContent = '';
+            helpEl.innerHTML = getConnectorHelpHtml(connectorId);
+
+            if (!connectorId) return;
+
+            const res = await fetch(`${API_BASE}/connectors/${connectorId}`);
+            if (!res.ok) {
+                fieldsEl.innerHTML = '<em style="color:red;">Could not load connector details.</em>';
+                return;
+            }
+
+            const details = await res.json();
+
+            // ── Documentation ──────────────────────────────────────────────
+            if (details.documentation) {
+                docEl.textContent = details.documentation;
+            }
+
+            // ── Config variable inputs ─────────────────────────────────────
+            const configVars = details.config_variables || [];
+            configVars.forEach(v => {
+                const placeholder = connectorFieldPlaceholders[v.name] || v.name;
+                const row = document.createElement('div');
+                row.className = 'config-field';
+                row.innerHTML = `
+                    <label for="cfg-${v.name}">
+                        ${v.name}
+                        <span class="badge ${v.required ? '' : 'optional'}">${v.required ? 'required' : 'optional'}</span>
+                    </label>
+                    <input type="text" id="cfg-${v.name}" data-config-name="${v.name}" placeholder="${placeholder}" ${v.required ? 'required' : ''}>
+                `;
+                fieldsEl.appendChild(row);
+            });
+
+            // ── Tools list ─────────────────────────────────────────────────
+            const tools = details.tools || [];
+            if (tools.length > 0) {
+                const toolsSection = document.createElement('div');
+                toolsSection.style.cssText = 'margin-top:14px; border-top:1px solid #eee; padding-top:10px;';
+                toolsSection.innerHTML = '<strong style="font-size:0.9em; color:#555;">Tools exposed by this connector:</strong>';
+
+                tools.forEach(tool => {
+                    const toolCard = document.createElement('div');
+                    toolCard.style.cssText = 'margin-top:6px; padding:8px 10px; background:#f8f9fa; border-radius:4px; border-left:3px solid #007bff;';
+                    toolCard.innerHTML = `
+                        <code style="font-size:0.9em; font-weight:bold;">${tool.name}</code>
+                        ${tool.documentation
+                            ? `<p style="margin:4px 0 0; font-size:0.82em; color:#555; white-space:pre-wrap;">${tool.documentation}</p>`
+                            : ''}
+                    `;
+                    toolsSection.appendChild(toolCard);
+                });
+
+                fieldsEl.appendChild(toolsSection);
+            }
+        }
+
+        function populateConnectorConfigFields(configEntries) {
+            const configMap = new Map((configEntries || []).map(entry => [entry.name, entry.value ?? '']));
+            document.querySelectorAll('#connector-config-fields input[data-config-name]').forEach(inp => {
+                inp.value = configMap.get(inp.dataset.configName) || '';
+            });
+        }
+
+        async function editConnectorConfig(connectorId, connectorConfigId) {
+            const selectEl = document.getElementById('connector-select');
+            selectEl.value = connectorId;
+            await onConnectorSelected();
+
+            const res = await fetch(`${API_BASE}/connectors/${connectorId}/config`);
+            if (!res.ok) {
+                alert('Failed to load connector configs: ' + await res.text());
+                return;
+            }
+
+            const configs = await res.json();
+            const cfg = configs.find(item => item.connector_config_id === connectorConfigId);
+            if (!cfg) {
+                alert('Connector config not found.');
+                return;
+            }
+
+            editingConnectorConfig = {
+                connectorId,
+                connectorConfigId,
+            };
+
+            document.getElementById('connector-config-name').value = cfg.name || '';
+            populateConnectorConfigFields(cfg.config || []);
+            document.getElementById('connector-config-edit-state').style.display = 'block';
+            document.getElementById('connector-config-submit-btn').textContent = 'Update Config';
+        }
+
+        async function deleteConnectorConfig(connectorId, connectorConfigId, connectorName) {
+            if (!confirm(`Delete config from ${connectorName}?`)) {
+                return;
+            }
+
+            const res = await fetch(`${API_BASE}/connectors/${connectorId}/config/${connectorConfigId}`, {
+                method: 'DELETE'
+            });
+
+            if (!res.ok) {
+                alert('Failed to delete config: ' + await res.text());
+                return;
+            }
+
+            if (editingConnectorConfig && editingConnectorConfig.connectorConfigId === connectorConfigId) {
+                resetConnectorConfigForm();
+            }
+
+            await loadAllConnectorConfigs();
+        }
+
+        /** POST or PATCH /connectors/{connector_id}/config */
+        async function addConnectorConfig(e) {
+            e.preventDefault();
+            const connectorId = document.getElementById('connector-select').value;
+            if (!connectorId) {
+                alert('Please select a connector first.');
+                return;
+            }
+
+            const name = document.getElementById('connector-config-name').value;
+
+            // Collect all rendered config fields
+            const configInputs = document.querySelectorAll('#connector-config-fields input[data-config-name]');
+            const config = Array.from(configInputs).map(inp => ({
+                name: inp.dataset.configName,
+                value: inp.value
+            }));
+
+            const payload = { connector_id: connectorId, name, config };
+
+            const isEdit = editingConnectorConfig && editingConnectorConfig.connectorConfigId;
+            if (isEdit && connectorId !== editingConnectorConfig.connectorId) {
+                alert('Connector cannot be changed while editing a saved config.');
+                return;
+            }
+            const url = isEdit
+                ? `${API_BASE}/connectors/${connectorId}/config/${editingConnectorConfig.connectorConfigId}`
+                : `${API_BASE}/connectors/${connectorId}/config`;
+            const method = isEdit ? 'PATCH' : 'POST';
+            const body = isEdit
+                ? JSON.stringify({ name, config })
+                : JSON.stringify(payload);
+
+            const res = await fetch(url, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body
+            });
+
+            if (!res.ok) {
+                alert(`Failed to ${isEdit ? 'update' : 'save'} config: ` + await res.text());
+                return;
+            }
+
+            resetConnectorConfigForm();
+
+            // Refresh saved configs list and agent connector select
+            await loadAllConnectorConfigs();
+        }
+
+        /** Load all saved connector configs for current filter and populate agent multi-select */
+        async function loadAllConnectorConfigs() {
+            const filterConnectorId = document.getElementById('connector-config-filter').value;
+            const listEl = document.getElementById('connector-config-list');
+            const agentSelect = document.getElementById('agent-connector-configs');
+            const updateAgentSelect = document.getElementById('agent-update-connector-configs');
+            const skillSelect = document.getElementById('skill-connector-configs');
+
+            listEl.innerHTML = 'Loading...';
+            agentSelect.innerHTML = '';
+            updateAgentSelect.innerHTML = '';
+            skillSelect.innerHTML = '';
+
+            // Fetch connectors list to iterate through all if no filter
+            const connectorsRes = await fetch(`${API_BASE}/connectors/`);
+            const connectors = await connectorsRes.json();
+
+            const toFetch = filterConnectorId
+                ? connectors.filter(c => c.id === filterConnectorId)
+                : connectors;
+
+            listEl.innerHTML = '';
+
+            for (const connector of toFetch) {
+                const res = await fetch(`${API_BASE}/connectors/${connector.id}/config`);
+                if (!res.ok) continue;
+                const configs = await res.json();
+
+                configs.forEach(cfg => {
+                    // Card in config list
+                    const div = document.createElement('div');
+                    div.className = 'card';
+                    const configMap = new Map((cfg.config || []).map(f => [f.name, f.value]));
+                    const teamsTarget = configMap.get('EMAILS')
+                        || configMap.get('CONVERSATION_IDS')
+                        || 'no target configured';
+                    const teamsSummary = connector.id === 'teams_connector'
+                        ? `<small>Target: ${teamsTarget}</small><br>`
+                        : '';
+                    div.innerHTML = `
+                        <strong>${cfg.name}</strong><br>
+                        <small>Connector: ${connector.name} &bull; ID: ${cfg.connector_config_id}</small><br>
+                        ${teamsSummary}
+                        <small>Fields: ${(cfg.config || []).map(f => f.name).join(', ') || '(none)'}</small><br>
+                    `;
+
+                    const editBtn = document.createElement('button');
+                    editBtn.type = 'button';
+                    editBtn.style.marginTop = '8px';
+                    editBtn.textContent = 'Edit';
+                    editBtn.addEventListener('click', () => {
+                        editConnectorConfig(connector.id, cfg.connector_config_id);
+                    });
+                    div.appendChild(editBtn);
+
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.type = 'button';
+                    deleteBtn.className = 'delete';
+                    deleteBtn.style.marginTop = '8px';
+                    deleteBtn.style.marginLeft = '6px';
+                    deleteBtn.textContent = 'Delete';
+                    deleteBtn.addEventListener('click', () => {
+                        deleteConnectorConfig(
+                            connector.id,
+                            cfg.connector_config_id,
+                            connector.name,
+                        );
+                    });
+                    div.appendChild(deleteBtn);
+
+                    listEl.appendChild(div);
+
+                    // Option in agent multi-select
+                    const opt = document.createElement('option');
+                    opt.value = cfg.connector_config_id;
+                    opt.textContent = `${cfg.name} (${connector.name})`;
+                    agentSelect.appendChild(opt);
+
+                    const updateOpt = document.createElement('option');
+                    updateOpt.value = cfg.connector_config_id;
+                    updateOpt.textContent = `${cfg.name} (${connector.name})`;
+                    updateAgentSelect.appendChild(updateOpt);
+
+                    const skillOpt = document.createElement('option');
+                    skillOpt.value = cfg.connector_config_id;
+                    skillOpt.textContent = `${cfg.name} (${connector.name})`;
+                    skillSelect.appendChild(skillOpt);
+                });
+            }
+
+            if (listEl.innerHTML === '') {
+                listEl.textContent = filterConnectorId
+                    ? 'No configs saved for this connector yet.'
+                    : 'No connector configs saved yet.';
+            }
+        }
+
+        // ─── MCP Servers ──────────────────────────────────────────────────────
+
+        async function loadSkills() {
+            const listEl = document.getElementById('skill-list');
+            const agentSelect = document.getElementById('agent-skills');
+            const updateAgentSelect = document.getElementById('agent-update-skills');
+
+            listEl.innerHTML = 'Loading skills...';
+            agentSelect.innerHTML = '';
+            updateAgentSelect.innerHTML = '';
+
+            const res = await fetch(`${API_BASE}/skill/`);
+            if (!res.ok) {
+                listEl.innerHTML = '<em style="color:red;">Could not load skills.</em>';
+                return;
+            }
+
+            currentSkills = await res.json();
+            listEl.innerHTML = '';
+
+            currentSkills.forEach(skill => {
+                const opt = document.createElement('option');
+                opt.value = skill.skill_id;
+                opt.textContent = `${skill.name} (${skill.skill_id})`;
+                agentSelect.appendChild(opt);
+
+                const updateOpt = document.createElement('option');
+                updateOpt.value = skill.skill_id;
+                updateOpt.textContent = `${skill.name} (${skill.skill_id})`;
+                updateAgentSelect.appendChild(updateOpt);
+
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.innerHTML = `
+                    <strong>${skill.name}</strong><br>
+                    <small>${skill.description}</small><br>
+                    <small>Tools: ${(skill.tools || []).join(', ') || 'None'}</small><br>
+                    <small>Connector configs: ${(skill.connector_config_ids || []).length} | MCP servers: ${(skill.mcp_server_ids || []).length}</small>
+                `;
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.type = 'button';
+                deleteBtn.className = 'delete';
+                deleteBtn.style.marginTop = '8px';
+                deleteBtn.textContent = 'Delete';
+                deleteBtn.addEventListener('click', () => deleteSkill(skill.skill_id, skill.name));
+                card.appendChild(deleteBtn);
+
+                listEl.appendChild(card);
+            });
+
+            if (currentSkills.length === 0) {
+                listEl.textContent = 'No skills created yet.';
+            }
+        }
+
+        async function addSkill(e) {
+            e.preventDefault();
+            try {
+                const connectorSelect = document.getElementById('skill-connector-configs');
+                const mcpSelect = document.getElementById('skill-mcp-servers');
+                const payload = {
+                    name: document.getElementById('skill-name').value.trim(),
+                    description: document.getElementById('skill-description').value.trim(),
+                    instructions: document.getElementById('skill-instructions').value.trim(),
+                    tools: document.getElementById('skill-tools').value
+                        .split(',')
+                        .map(value => value.trim())
+                        .filter(Boolean),
+                    connector_config_ids: Array.from(connectorSelect.selectedOptions).map(o => o.value),
+                    mcp_server_ids: Array.from(mcpSelect.selectedOptions).map(o => o.value),
+                    references: parseJsonField('skill-references'),
+                    assets: parseJsonField('skill-assets'),
+                    scripts: parseJsonField('skill-scripts'),
+                };
+
+                const res = await fetch(`${API_BASE}/skill/`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+
+                if (!res.ok) {
+                    alert('Failed to save skill: ' + await res.text());
+                    return;
+                }
+
+                e.target.reset();
+                await loadSkills();
+                loadAgents();
+                loadGraph();
+            } catch (error) {
+                alert(`Failed to parse skill JSON: ${error.message}`);
+            }
+        }
+
+        async function deleteSkill(skillId, skillName) {
+            if (!confirm(`Delete skill ${skillName}?`)) {
+                return;
+            }
+
+            const res = await fetch(`${API_BASE}/skill/${skillId}`, { method: 'DELETE' });
+            if (!res.ok) {
+                alert('Failed to delete skill: ' + await res.text());
+                return;
+            }
+
+            await loadSkills();
+            loadAgents();
+            loadGraph();
+        }
+
+        let editingMcpServer = null;
+
+        function resetMcpForm() {
+            editingMcpServer = null;
+            document.getElementById('add-mcp-form').reset();
+            document.getElementById('mcp-edit-state').style.display = 'none';
+            document.getElementById('mcp-submit-btn').textContent = 'Save MCP';
+            document.getElementById('mcp-test-result').innerHTML = '';
+        }
+
+        function renderMcpProbeResult(result, isError = false) {
+            const resultEl = document.getElementById('mcp-test-result');
+            if (isError) {
+                resultEl.innerHTML = `<div class="card" style="border-color:#dc3545; color:#842029;">${result}</div>`;
+                return;
+            }
+
+            const tools = result.tools || [];
+            const resources = result.resources || [];
+            const serverUrl = result.server_url || result.url || '';
+            resultEl.innerHTML = `
+                <div class="card" style="border-color:#198754;">
+                    <strong>${(result.metadata && result.metadata.name) || serverUrl}</strong><br>
+                    <small>Transport: ${(result.metadata && result.metadata.transport) || 'unknown'} | Tools: ${tools.length} | Resources: ${resources.length}</small><br>
+                    <small>URL: ${serverUrl}</small>
+                </div>
+            `;
+        }
+
+        async function testMcpServer() {
+            const payload = {
+                name: document.getElementById('mcp-name').value.trim() || null,
+                server_url: document.getElementById('mcp-url').value.trim(),
+                description: document.getElementById('mcp-description').value.trim() || null,
+                auth_type: document.getElementById('mcp-auth-type').value,
+                auth_username: document.getElementById('mcp-auth-username').value.trim() || null,
+                auth_secret: document.getElementById('mcp-auth-secret').value || null,
+            };
+
+            if (!payload.server_url) {
+                alert('Please enter an MCP URL first.');
+                return;
+            }
+
+            const res = await fetch(`${API_BASE}/mcp/test/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+
+            if (!res.ok) {
+                renderMcpProbeResult(await res.text(), true);
+                return;
+            }
+
+            renderMcpProbeResult(await res.json());
+        }
+
+        async function editMcpServer(mcpId) {
+            const res = await fetch(`${API_BASE}/mcp/${mcpId}`);
+            if (!res.ok) {
+                alert('Failed to load MCP server details.');
+                return;
+            }
+
+            const mcp = await res.json();
+            editingMcpServer = mcp.mcp_server_id;
+            document.getElementById('mcp-name').value = mcp.name || '';
+            document.getElementById('mcp-url').value = mcp.server_url || '';
+            document.getElementById('mcp-description').value = mcp.description || '';
+            document.getElementById('mcp-auth-type').value = mcp.auth_type || 'none';
+            document.getElementById('mcp-auth-username').value = mcp.auth_username || '';
+            document.getElementById('mcp-auth-secret').value = '';
+            document.getElementById('mcp-edit-state').style.display = 'block';
+            document.getElementById('mcp-submit-btn').textContent = 'Update MCP';
+            renderMcpProbeResult({
+                url: mcp.server_url,
+                metadata: mcp.metadata || {},
+                tools: mcp.tools || [],
+                resources: mcp.resources || [],
+            });
+        }
+
+        async function deleteMcpServer(mcpId, mcpName) {
+            if (!confirm(`Delete MCP server ${mcpName}?`)) {
+                return;
+            }
+
+            const res = await fetch(`${API_BASE}/mcp/${mcpId}`, { method: 'DELETE' });
+            if (!res.ok) {
+                alert('Failed to delete MCP server: ' + await res.text());
+                return;
+            }
+
+            if (editingMcpServer === mcpId) {
+                resetMcpForm();
+            }
+            await loadMcpServers();
+            loadAgents();
+            loadGraph();
+        }
+
+        async function saveMcpServer(e) {
+            e.preventDefault();
+            const payload = {
+                name: document.getElementById('mcp-name').value.trim() || null,
+                server_url: document.getElementById('mcp-url').value.trim(),
+                description: document.getElementById('mcp-description').value.trim() || null,
+                auth_type: document.getElementById('mcp-auth-type').value,
+                auth_username: document.getElementById('mcp-auth-username').value.trim() || null,
+                auth_secret: document.getElementById('mcp-auth-secret').value || null,
+            };
+
+            if (!payload.server_url) {
+                alert('Please enter an MCP URL.');
+                return;
+            }
+
+            const isEdit = Boolean(editingMcpServer);
+            const res = await fetch(
+                isEdit ? `${API_BASE}/mcp/${editingMcpServer}` : `${API_BASE}/mcp/`,
+                {
+                    method: isEdit ? 'PATCH' : 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                }
+            );
+
+            if (!res.ok) {
+                alert(`Failed to ${isEdit ? 'update' : 'save'} MCP server: ` + await res.text());
+                return;
+            }
+
+            const saved = await res.json();
+            resetMcpForm();
+            renderMcpProbeResult({
+                url: saved.server_url,
+                metadata: saved.metadata || {},
+                tools: saved.tools || [],
+                resources: saved.resources || [],
+            });
+            await loadMcpServers();
+            loadAgents();
+            loadGraph();
+        }
+
+        async function loadMcpServers() {
+            const listEl = document.getElementById('mcp-list');
+            const addAgentSelect = document.getElementById('agent-mcp-servers');
+            const updateAgentSelect = document.getElementById('agent-update-mcp-servers');
+            const skillSelect = document.getElementById('skill-mcp-servers');
+
+            listEl.innerHTML = 'Loading MCP servers...';
+            addAgentSelect.innerHTML = '';
+            updateAgentSelect.innerHTML = '';
+            skillSelect.innerHTML = '';
+
+            const res = await fetch(`${API_BASE}/mcp/`);
+            if (!res.ok) {
+                listEl.innerHTML = '<em style="color:red;">Could not load MCP servers.</em>';
+                return;
+            }
+
+            currentMcpServers = await res.json();
+            listEl.innerHTML = '';
+
+            currentMcpServers.forEach(mcp => {
+                const opt = document.createElement('option');
+                opt.value = mcp.mcp_server_id;
+                opt.textContent = `${mcp.name} (${mcp.auth_type})`;
+                addAgentSelect.appendChild(opt);
+
+                const updateOpt = document.createElement('option');
+                updateOpt.value = mcp.mcp_server_id;
+                updateOpt.textContent = `${mcp.name} (${mcp.auth_type})`;
+                updateAgentSelect.appendChild(updateOpt);
+
+                const skillOpt = document.createElement('option');
+                skillOpt.value = mcp.mcp_server_id;
+                skillOpt.textContent = `${mcp.name} (${mcp.auth_type})`;
+                skillSelect.appendChild(skillOpt);
+
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.innerHTML = `
+                    <strong>${mcp.name}</strong><br>
+                    <small>${mcp.server_url}</small><br>
+                    <small>Auth: ${mcp.auth_type} | Tools: ${(mcp.tools || []).length} | Resources: ${(mcp.resources || []).length}</small><br>
+                    ${mcp.description ? `<small>${mcp.description}</small><br>` : ''}
+                `;
+
+                const editBtn = document.createElement('button');
+                editBtn.type = 'button';
+                editBtn.style.marginTop = '8px';
+                editBtn.textContent = 'Edit';
+                editBtn.addEventListener('click', () => editMcpServer(mcp.mcp_server_id));
+                card.appendChild(editBtn);
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.type = 'button';
+                deleteBtn.className = 'delete';
+                deleteBtn.style.marginTop = '8px';
+                deleteBtn.style.marginLeft = '6px';
+                deleteBtn.textContent = 'Delete';
+                deleteBtn.addEventListener('click', () => deleteMcpServer(mcp.mcp_server_id, mcp.name));
+                card.appendChild(deleteBtn);
+
+                listEl.appendChild(card);
+            });
+
+            if (currentMcpServers.length === 0) {
+                listEl.textContent = 'No MCP servers registered yet.';
+            }
+        }
+
+        // ─── Chat ─────────────────────────────────────────────────────────────
+        let currentSessionId = null;
+        let currentUserId = 'u_' + Math.floor(Math.random() * 1000);
+
+        async function createSession(agentId) {
+            const sessionId = 's_' + Date.now();
+            try {
+                const res = await fetch(`${API_BASE}/agent-server/apps/${agentId}/users/${currentUserId}/sessions/${sessionId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                if (res.ok) {
+                    currentSessionId = sessionId;
+                    return true;
+                } else {
+                    console.error("Failed to create session", await res.text());
+                    return false;
+                }
+            } catch (e) {
+                console.error("Error creating session", e);
+                return false;
+            }
+        }
+
+        async function sendMessage() {
+            const agentId = document.getElementById('chat-agent-select').value;
+            const inputEl = document.getElementById('chat-input');
+            const msgText = inputEl.value.trim();
+            if (!agentId || !msgText) return;
+
+            if (!currentSessionId) {
+                const created = await createSession(agentId);
+                if (!created) {
+                    alert("Could not create session. Check console.");
+                    return;
+                }
+            }
+
+            const chatBox = document.getElementById('chat-messages');
+            const userDiv = document.createElement('div');
+            userDiv.className = 'message user';
+            userDiv.textContent = msgText;
+            chatBox.appendChild(userDiv);
+            inputEl.value = '';
+
+            try {
+                const res = await fetch(`${API_BASE}/agent-server/run`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        appName: agentId,
+                        userId: currentUserId,
+                        sessionId: currentSessionId,
+                        newMessage: {
+                            role: "user",
+                            parts: [{ text: msgText }]
+                        }
+                    })
+                });
+
+                if (!res.ok) throw new Error(await res.text());
+
+                const responseData = await res.json();
+                let replyText = "";
+                if (Array.isArray(responseData)) {
+                    responseData.forEach(event => {
+                        if (event.content && event.content.parts) {
+                            event.content.parts.forEach(part => {
+                                if (part.text) replyText += part.text;
+                            });
+                        }
+                    });
+                } else {
+                    replyText = "Error: Unexpected response format";
+                }
+
+                const agentDiv = document.createElement('div');
+                agentDiv.className = 'message agent';
+                agentDiv.textContent = replyText || "(No response text)";
+                chatBox.appendChild(agentDiv);
+                chatBox.scrollTop = chatBox.scrollHeight;
+
+            } catch (e) {
+                console.error(e);
+                const errDiv = document.createElement('div');
+                errDiv.className = 'message agent';
+                errDiv.textContent = `Error: ${e.message}`;
+                errDiv.style.color = 'red';
+                chatBox.appendChild(errDiv);
+            }
+        }
+
+        // ─── Event Listeners ──────────────────────────────────────────────────
+        document.getElementById('chat-agent-select').addEventListener('change', () => {
+            currentSessionId = null;
+            document.getElementById('chat-messages').innerHTML = '';
+        });
+
+        document.getElementById('add-model-form').addEventListener('submit', addModel);
+        document.getElementById('update-model-form').addEventListener('submit', updateModel);
+        document.getElementById('update-model-defaults-form').addEventListener('submit', updateModelDefaults);
+        document.getElementById('add-agent-form').addEventListener('submit', addAgent);
+        document.getElementById('agent-template-select').addEventListener('change', applyAgentTemplate);
+        document.getElementById('update-agent-form').addEventListener('submit', updateAgent);
+        document.getElementById('add-skill-form').addEventListener('submit', addSkill);
+        document.getElementById('send-msg-btn').addEventListener('click', sendMessage);
+        document.getElementById('add-connector-config-form').addEventListener('submit', addConnectorConfig);
+        document.getElementById('connector-config-cancel-edit').addEventListener('click', resetConnectorConfigForm);
+        document.getElementById('connector-select').addEventListener('change', onConnectorSelected);
+        document.getElementById('connector-config-filter').addEventListener('change', loadAllConnectorConfigs);
+        document.getElementById('add-mcp-form').addEventListener('submit', saveMcpServer);
+        document.getElementById('mcp-test-btn').addEventListener('click', testMcpServer);
+        document.getElementById('mcp-cancel-edit').addEventListener('click', resetMcpForm);
+
+        const themeToggleBtn = document.getElementById('theme-toggle');
+        
+        if (localStorage.getItem('theme') === 'dark' || (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.body.classList.add('dark-mode');
+            themeToggleBtn.textContent = '☀️ Light Mode';
+        }
+
+        themeToggleBtn.addEventListener('click', () => {
+            document.body.classList.toggle('dark-mode');
+            if (document.body.classList.contains('dark-mode')) {
+                localStorage.setItem('theme', 'dark');
+                themeToggleBtn.textContent = '☀️ Light Mode';
+            } else {
+                localStorage.setItem('theme', 'light');
+                themeToggleBtn.textContent = '🌙 Dark Mode';
+            }
+        });
+
+        // ─── Visualizer ───────────────────────────────────────────────────────
+        async function loadGraph() {
+            try {
+                const res = await fetch(`${API_BASE}/visualizer/`);
+                if (!res.ok) throw new Error("Failed to fetch graph data");
+                const data = await res.json();
+                
+                const nodes = new vis.DataSet(
+                    data.nodes.map(n => ({
+                        id: n.id,
+                        label: n.type === 'agent'
+                            ? (n.data.agent.name || n.id)
+                            : n.type === 'connector'
+                                ? (n.data.connector.name || n.id)
+                                : n.type === 'skill'
+                                    ? (n.data.skill.name || n.id)
+                                    : ((n.data.mcp && n.data.mcp.name) || n.id),
+                        group: n.type,
+                        title: JSON.stringify(n.data, null, 2)
+                    }))
+                );
+                
+                const edges = new vis.DataSet(
+                    data.edges.map(e => ({
+                        from: e.source,
+                        to: e.target,
+                        arrows: 'to'
+                    }))
+                );
+                
+                const container = document.getElementById('graph-container');
+                const graphData = { nodes, edges };
+                const options = {
+                    groups: {
+                        agent: { color: { background: '#e3f2fd', border: '#1e88e5' }, shape: 'box' },
+                        connector: { color: { background: '#f1f8e9', border: '#43a047' }, shape: 'ellipse' },
+                        skill: { color: { background: '#f3e8ff', border: '#9333ea' }, shape: 'hexagon' },
+                        mcp: { color: { background: '#fff3e0', border: '#fb8c00' }, shape: 'diamond' }
+                    },
+                    physics: {
+                        stabilization: true
+                    }
+                };
+                new vis.Network(container, graphData, options);
+            } catch (e) {
+                console.error("Error loading graph:", e);
+                document.getElementById('graph-container').innerHTML = `<p style="color:red; padding:10px;">Error loading graph: ${e.message}</p>`;
+            }
+        }
+
+        // ─── Init ─────────────────────────────────────────────────────────────
+        checkHealth();
+        loadModels();
+        loadAgentTemplates();
+        loadAgents();
+        loadConnectors().then(() => loadAllConnectorConfigs());
+        loadMcpServers();
+        loadSkills();
+        loadGraph();
+
+        setInterval(checkHealth, 30000);
+    </script>
+</body>
+
+</html>

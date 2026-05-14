@@ -1,0 +1,50 @@
+{
+  "id": "microsoft_entra_connector",
+  "name": "Microsoft Entra",
+  "description": "Microsoft Entra ID password reset and account state workflows via Microsoft Graph.",
+  "version": "0.0.1",
+  "config_variables": [
+    {
+      "name": "TENANT_ID",
+      "label": "Tenant ID",
+      "required": true,
+      "secret": false,
+      "placeholder": "Enter Microsoft Entra tenant ID"
+    },
+    {
+      "name": "CLIENT_ID",
+      "label": "Client ID",
+      "required": true,
+      "secret": false,
+      "placeholder": "Enter application client ID"
+    },
+    {
+      "name": "CLIENT_SECRET",
+      "label": "Client Secret",
+      "required": true,
+      "secret": true,
+      "placeholder": "Enter client secret"
+    },
+    {
+      "name": "prefix",
+      "label": "Prefix",
+      "required": false,
+      "secret": false,
+      "placeholder": "Entra"
+    }
+  ],
+  "tools": [
+    {
+      "name": "reset_user_password",
+      "documentation": "Reset a Microsoft Entra ID user's password through Microsoft Graph."
+    },
+    {
+      "name": "enable_user",
+      "documentation": "Enable a Microsoft Entra ID user account."
+    },
+    {
+      "name": "disable_user",
+      "documentation": "Disable a Microsoft Entra ID user account."
+    }
+  ]
+}

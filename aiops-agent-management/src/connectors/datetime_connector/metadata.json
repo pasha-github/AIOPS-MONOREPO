@@ -1,0 +1,21 @@
+{
+  "id": "datetime_connector",
+  "name": "DateTime",
+  "description": "Returns the current time for a configured timezone, with optional per-call override.",
+  "version": "1.0.0",
+  "config_variables": [
+    {
+      "name": "TIMEZONE",
+      "label": "Default Timezone",
+      "required": false,
+      "secret": false,
+      "placeholder": "UTC"
+    }
+  ],
+  "tools": [
+    {
+      "name": "get_current_time",
+      "documentation": "Returns the current local time for the configured timezone or optional timezone override."
+    }
+  ]
+}
