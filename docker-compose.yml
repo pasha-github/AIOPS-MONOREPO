@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  agent-manager:
+    build:
+      context: ./aiops-agent-management
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=sqlite:///agent_management.db
+    volumes:
+      - ./aiops-agent-management:/app
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./aiops-frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    restart: unless-stopped
+    depends_on:
+      - agent-manager
+
+  teams-bot:
+    build:
+      context: ./aiops-backend-mcps/teams_bot
+      dockerfile: Dockerfile
+    ports:
+      - "3978:3978"
+    environment:
+      - BOT_ID=${BOT_ID:-}
+      - BOT_PASSWORD=${BOT_PASSWORD:-}
+    restart: unless-stopped
+
+  ibm-mq-mcp:
+    build:
+      context: ./aiops-backend-mcps/mcp_servers/ibm_mq_mcp
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8000"
+    environment:
+      - IBM_MQ_HOST=${IBM_MQ_HOST:-192.168.18.35}
+    restart: unless-stopped
+
+  servicenow-mcp:
+    build:
+      context: ./aiops-backend-mcps/mcp_servers/servicenow-mcp
+      dockerfile: Dockerfile
+    ports:
+      - "8002:8000"
+    environment:
+      - SNOW_INSTANCE=${SNOW_INSTANCE:-}
+    restart: unless-stopped
