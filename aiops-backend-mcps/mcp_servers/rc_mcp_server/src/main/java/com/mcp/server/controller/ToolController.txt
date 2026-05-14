@@ -1,0 +1,297 @@
+package com.mcp.server.controller;
+
+import com.mcp.server.entity.Tool;
+import com.mcp.server.entity.ToolParameter;
+import com.mcp.server.repository.ToolRepository;
+import com.mcp.server.service.ToolExecutor;
+
+import org.springframework.web.bind.annotation.*;
+
+import java.util.*;
+
+
+
+
+@RestController
+@RequestMapping("/mcp")
+public class ToolController {
+	
+	
+	private final ToolRepository repo;
+	private final ToolExecutor executor;
+
+	public ToolController(ToolRepository repo, ToolExecutor executor) {
+	    this.repo = repo;
+	    this.executor = executor;
+	}
+
+    @GetMapping
+    public Map<String, Object> healthCheck() {
+        return Map.of(
+                "status", "MCP server running",
+                "server", "enterprise-mcp-server"
+        );
+    }
+
+    @PostMapping
+    public Map<String, Object> handleMcp(@RequestBody Map<String, Object> request) {
+
+        String method = (String) request.get("method");
+        Object id = request.get("id");
+
+        if ("initialize".equals(method)) {
+            return initialize(id);
+        }
+
+        if ("ping".equals(method)) {
+            return ping(id);
+        }
+
+    
+        if ("tools/list".equals(method)) {
+            Map<String, Object> params = (Map<String, Object>) request.get("params");
+            return buildToolsList(id, params);
+        }
+        
+        
+       if ("tools/call".equals(method)) {
+          Map<String, Object> params = (Map<String, Object>) request.get("params");
+          return executeTool(id, params);
+        }
+     
+
+        
+        return errorResponse(id, -32601, "Method not found");
+    }
+
+
+    private Map<String, Object> initialize(Object id) {
+
+        Map<String, Object> capabilities = new HashMap<>();
+        capabilities.put("tools", new HashMap<>());
+
+        Map<String, Object> serverInfo = new HashMap<>();
+        serverInfo.put("name", "enterprise-mcp-server");
+        serverInfo.put("version", "1.0.0");
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("protocolVersion", "2024-11-05");
+        result.put("capabilities", capabilities);
+        result.put("serverInfo", serverInfo);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("jsonrpc", "2.0");
+        response.put("id", id);
+        response.put("result", result);
+
+        return response;
+    }
+
+    private Map<String, Object> ping(Object id) {
+
+        Map<String, Object> result = new HashMap<>();
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("jsonrpc", "2.0");
+        response.put("id", id);
+        response.put("result", result);
+
+        return response;
+    }
+
+
+    
+    private Map<String, Object> buildToolsList(Object id, Map<String, Object> params) {
+
+        String orgKey = params != null ? (String) params.get("orgKey") : null;
+        String connectorId = params != null ? (String) params.get("connectorId") : null;
+
+        List<Tool> tools;
+        tools = repo.findByOrgKeyAndConnectorId(orgKey, connectorId);
+
+
+        List<Map<String, Object>> mcpTools = new ArrayList<>();
+
+        for (Tool tool : tools) {
+            Map<String, Object> properties = new HashMap<>();
+            List<String> required = new ArrayList<>();
+
+            for (ToolParameter p : tool.getParameters()) {
+                Map<String, Object> prop = new HashMap<>();
+                prop.put("type", p.getType());
+                properties.put(p.getName(), prop);
+                if (p.isRequired()) required.add(p.getName());
+            }
+
+            Map<String, Object> inputSchema = new HashMap<>();
+            inputSchema.put("type", "object");
+            inputSchema.put("properties", properties);
+            if (!required.isEmpty()) inputSchema.put("required", required);
+
+            Map<String, Object> toolMap = new HashMap<>();
+            toolMap.put("name", tool.getToolName());
+            toolMap.put("description", "Execute " + tool.getToolName());
+            toolMap.put("inputSchema", inputSchema);
+
+            mcpTools.add(toolMap);
+        }
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("tools", mcpTools);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("jsonrpc", "2.0");
+        response.put("id", id);
+        response.put("result", result);
+
+        return response;
+    }
+
+//    private Map<String, Object> executeTool(Map<String, Object> request, Object id) {
+//
+//        Map<String, Object> params = (Map<String, Object>) request.get("params");
+//
+//        if (params == null) {
+//            return errorResponse(id, -32602, "Missing params");
+//        }
+//
+//        String toolName = (String) params.get("name");
+//
+//        Map<String, Object> arguments =
+//                (Map<String, Object>) params.getOrDefault("arguments", new HashMap<>());
+//
+//        Optional<Tool> toolOpt = repo.findByToolName(toolName);
+//
+//        if (toolOpt.isEmpty()) {
+//            return errorResponse(id, -32001, "Tool not found");
+//        }
+//
+//        Object output = executor.executeTool(toolOpt.get(), arguments);
+//
+//        Map<String, Object> content = new HashMap<>();
+//        content.put("type", "text");
+//        content.put("text", String.valueOf(output));
+//
+//        List<Map<String, Object>> contentList = new ArrayList<>();
+//        contentList.add(content);
+//
+//        Map<String, Object> result = new HashMap<>();
+//        result.put("content", contentList);
+//
+//        Map<String, Object> response = new HashMap<>();
+//        response.put("jsonrpc", "2.0");
+//        response.put("id", id);
+//        response.put("result", result);
+//
+//        return response;
+//    }
+//    
+    private Map<String, Object> executeTool(Object id, Map<String, Object> params) {
+
+        if (params == null) {
+            return errorResponse(id, -32602, "Missing params");
+        }
+
+        String toolName = (String) params.get("name");
+        String orgKey = (String) params.get("orgKey");
+        String connectorId = (String) params.get("connectorId");
+
+        Map<String, Object> arguments =
+                (Map<String, Object>) params.getOrDefault("arguments", new HashMap<>());
+
+        List<Tool> tools =
+                repo.findByToolNameAndOrgKeyAndConnectorId(toolName, orgKey, connectorId);
+
+        if (tools == null || tools.isEmpty()) {
+            return errorResponse(id, -32001, "Tool not found");
+        }
+
+        Tool tool = tools.get(0);
+
+        Object output = executor.executeTool(tool, arguments);
+
+        Map<String, Object> content = new HashMap<>();
+        content.put("type", "text");
+        content.put("text", String.valueOf(output));
+
+        List<Map<String, Object>> contentList = new ArrayList<>();
+        contentList.add(content);
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("content", contentList);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("jsonrpc", "2.0");
+        response.put("id", id);
+        response.put("result", result);
+
+        return response;
+    }
+   
+    
+ // Inside ToolController.java
+    @PostMapping("/register")
+    public Map<String, Object> registerTool(@RequestBody Map<String, Object> request) {
+        try {
+            String toolName = (String) request.get("toolName");
+            List<Map<String, Object>> paramsList = (List<Map<String, Object>>) request.getOrDefault("parameters", new ArrayList<>());
+
+            if (toolName == null || toolName.isEmpty()) {
+                return errorResponse(null, -32602, "toolName is required");
+            }
+
+            // Create Tool entity
+            Tool tool = new Tool();
+            tool.setToolName(toolName);
+            tool.setConnectorId((String) request.get("connectorId"));
+            tool.setOrgKey((String) request.get("orgKey"));
+            tool.setMethod((String) request.get("method"));
+            tool.setEndpoint((String) request.get("endpoint"));
+
+            // Create ToolParameter entities
+            List<ToolParameter> parameters = new ArrayList<>();
+            for (Map<String, Object> p : paramsList) {
+                ToolParameter param = new ToolParameter();
+                param.setName((String) p.get("name"));
+                param.setType((String) p.getOrDefault("type", "string"));
+                param.setRequired((Boolean) p.getOrDefault("required", false));
+                parameters.add(param);
+            }
+
+            tool.setParameters(parameters);
+
+            // Save tool and parameters in DB
+            repo.save(tool);
+
+            // Return success response
+            Map<String, Object> result = new HashMap<>();
+            result.put("status", "Tool registered successfully");
+            result.put("toolName", toolName);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("jsonrpc", "2.0");
+            response.put("id", request.get("id")); // optional, if coming from MCP
+            response.put("result", result);
+
+            return response;
+
+        } catch (Exception e) {
+            return errorResponse(request.get("id"), -32000, e.getMessage());
+        }
+    }
+ 
+
+    private Map<String, Object> errorResponse(Object id, int code, String message) {
+
+        Map<String, Object> error = new HashMap<>();
+        error.put("code", code);
+        error.put("message", message);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("jsonrpc", "2.0");
+        response.put("id", id);
+        response.put("error", error);
+
+        return response;
+    }
+}

@@ -1,0 +1,116 @@
+name: Build & Push MCP Server Images
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "mcp_servers/**"
+  workflow_dispatch:
+    inputs:
+      server_name:
+        description: "MCP server folder name to build (leave empty to auto-detect)"
+        required: false
+        type: string
+
+env:
+  PROJECT_ID: rc-ai-ops-internal
+  REGION: us-central1
+  REGISTRY: us-central1-docker.pkg.dev
+  REPOSITORY: aiops-mcp-servers
+
+jobs:
+  detect-changes:
+    name: Detect Changed MCP Servers
+    runs-on: ubuntu-latest
+    outputs:
+      servers: ${{ steps.detect.outputs.servers }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2 # Need previous commit to diff against
+
+      - name: Detect changed MCP server folders
+        id: detect
+        run: |
+          # If a specific server was provided via manual trigger, use that
+          if [[ -n "${{ github.event.inputs.server_name }}" ]]; then
+            SERVERS='["${{ github.event.inputs.server_name }}"]'
+            echo "servers=$SERVERS" >> $GITHUB_OUTPUT
+            echo "Manually triggered for: ${{ github.event.inputs.server_name }}"
+            exit 0
+          fi
+
+          # Otherwise, detect folders with changes
+          CHANGED=$(git diff --name-only HEAD~1 HEAD -- 'mcp_servers/' \
+            | grep '^mcp_servers/' \
+            | cut -d'/' -f2 \
+            | sort -u)
+
+          if [[ -z "$CHANGED" ]]; then
+            echo "No MCP server changes detected."
+            echo "servers=[]" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Build JSON array for matrix
+          SERVERS=$(echo "$CHANGED" | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          echo "servers=$SERVERS" >> $GITHUB_OUTPUT
+          echo "Changed servers: $SERVERS"
+
+  build-and-push:
+    name: Build & Push — ${{ matrix.server }}
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.servers != '[]'
+
+    strategy:
+      matrix:
+        server: ${{ fromJson(needs.detect-changes.outputs.servers) }}
+      fail-fast: false # Build all changed servers even if one fails
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      # ── 1. Checkout code ──────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── 2. Authenticate to Google Cloud ───────────────────────────────────
+      - name: Authenticate to Google Cloud (SA Key)
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      # ── 3. Set up gcloud CLI ──────────────────────────────────────────────
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      # ── 4. Configure Docker for Artifact Registry ─────────────────────────
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGISTRY }} --quiet
+
+      # ── 5. Build Docker image ─────────────────────────────────────────────
+      - name: Build Docker image — ${{ matrix.server }}
+        run: |
+          docker build \
+            --tag ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ matrix.server }}:${{ github.sha }} \
+            --tag ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ matrix.server }}:latest \
+            ./mcp_servers/${{ matrix.server }}
+
+      # ── 6. Push to Artifact Registry ──────────────────────────────────────
+      - name: Push image to Artifact Registry — ${{ matrix.server }}
+        run: |
+          docker push ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ matrix.server }}:${{ github.sha }}
+          docker push ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ matrix.server }}:latest
+
+      # ── 7. Summary ────────────────────────────────────────────────────────
+      - name: Print image details
+        run: |
+          echo "✅ Image pushed:"
+          echo "   ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ matrix.server }}:${{ github.sha }}"
+          echo "   ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ matrix.server }}:latest"

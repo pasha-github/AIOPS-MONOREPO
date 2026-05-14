@@ -1,0 +1,98 @@
+name: Build & Deploy Teams Bot to Cloud Run
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "teams_bot/**"
+  workflow_dispatch: # Allow manual triggers from GitHub UI
+
+env:
+  PROJECT_ID: rc-ai-ops-internal
+  REGION: us-central1
+  REGISTRY: us-central1-docker.pkg.dev
+  REPOSITORY: aiops-registry
+  SERVICE_NAME: teams-bot-server
+  IMAGE: teams-bot-server
+
+jobs:
+  build-and-deploy:
+    name: Build, Push & Deploy Teams Bot
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write # Required for Workload Identity Federation (recommended)
+
+    steps:
+      # ── 1. Checkout code ──────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      # ── 2. Authenticate to Google Cloud ───────────────────────────────────
+      - name: Authenticate to Google Cloud (SA Key)
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      # ── 3. Set up gcloud CLI ──────────────────────────────────────────────
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      # ── 4. Configure Docker for Artifact Registry ─────────────────────────
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGISTRY }} --quiet
+
+      # ── 5. Build Docker image from teams_bot folder ───────────────────────
+      - name: Build Docker image
+        run: |
+          docker build \
+            --tag ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE }}:${{ github.sha }} \
+            --tag ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE }}:latest \
+            ./teams_bot
+
+      # ── 6. Push to Artifact Registry ──────────────────────────────────────
+      - name: Push image to Artifact Registry
+        run: |
+          docker push ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE }}:${{ github.sha }}
+          docker push ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE }}:latest
+
+      # ── 7. Deploy to Cloud Run ────────────────────────────────────────────
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy ${{ env.SERVICE_NAME }} \
+            --image=${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE }}:${{ github.sha }} \
+            --region=${{ env.REGION }} \
+            --project=${{ env.PROJECT_ID }} \
+            --port=${{ secrets.PORT }} \
+            --min-instances=0 \
+            --max-instances=1 \
+            --allow-unauthenticated \
+            --set-env-vars="\
+              CLIENT_ID=${{ secrets.CLIENT_ID }},\
+              CLIENT_SECRET=${{ secrets.CLIENT_SECRET }},\
+              TENANT_ID=${{ secrets.TENANT_ID }},\
+              ALERT_API_KEY=${{ secrets.ALERT_API_KEY }},\
+              DATABASE_URL=${{ secrets.DATABASE_URL }},\
+              AGENT_ADK_BASE_URL=${{ vars.AGENT_ADK_BASE_URL }},\
+              AGENT_APP_NAME=${{ vars.AGENT_APP_NAME }}" \
+            --quiet
+
+      # ── 8. Route all traffic to the new revision ──────────────────────────
+      - name: Update traffic to latest revision
+        run: |
+          gcloud run services update-traffic ${{ env.SERVICE_NAME }} \
+            --to-latest \
+            --region=${{ env.REGION }} \
+            --project=${{ env.PROJECT_ID }}
+
+      # ── 9. Print the deployed service URL ────────────────────────────────
+      - name: Get Service URL
+        run: |
+          URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} \
+            --region=${{ env.REGION }} \
+            --project=${{ env.PROJECT_ID }} \
+            --format='value(status.url)')
+          echo "✅ Teams Bot deployed to: $URL"
+          echo "📌 Messaging endpoint: $URL/api/messages"
