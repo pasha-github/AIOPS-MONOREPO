@@ -1,0 +1,139 @@
+@import "tailwindcss";
+
+:root {
+  --background: #d6d9e2;
+  --foreground: #0f1115;
+  --font-sans-fallback: "Poppins", "Segoe UI", Arial, sans-serif;
+  --font-mono-fallback: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-sans-fallback);
+  --font-mono: var(--font-mono-fallback);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans-fallback);
+}
+
+/* Utility: hide scrollbars while preserving scroll behavior */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Utility: soft themed scrollbar */
+.soft-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #c6cde6 transparent;
+}
+
+.soft-scrollbar::-webkit-scrollbar {
+  width: 10px;
+}
+
+.soft-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+  margin: 8px 0;
+}
+
+.soft-scrollbar::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #cfd6ee 0%, #b9c2e4 100%);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+.soft-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #b8c1eb 0%, #a8b2df 100%);
+}
+
+@keyframes toastFade {
+  0% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  80% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@keyframes toastProgress {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
+@keyframes toastDot {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(0);
+  }
+}
+
+.toast-fade {
+  animation: toastFade 3s ease forwards;
+}
+
+.toast-progress-bar {
+  transform-origin: left;
+  animation: toastProgress 3s linear forwards;
+}
+
+.toast-dot-fill {
+  transform-origin: center;
+  animation: toastDot 3s linear forwards;
+}
+
+@keyframes logReveal {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+.log-typing {
+  display: inline-block;
+  clip-path: inset(0 100% 0 0);
+  animation: logReveal 1.6s steps(40, end) forwards;
+}
+
+@keyframes typingDots {
+  0% {
+    width: 0.6ch;
+  }
+  50% {
+    width: 4.2ch;
+  }
+  100% {
+    width: 0.6ch;
+  }
+}
+
+.typing-dots {
+  display: inline-block;
+  overflow: hidden;
+  vertical-align: bottom;
+  white-space: nowrap;
+  animation: typingDots 1.6s steps(4, end) infinite;
+}
