@@ -1,16 +1,21 @@
 import ast
-import importlib.util
+import importlib
 import inspect
 import json
+import logging
 import sys
 from functools import lru_cache
-from importlib.machinery import ModuleSpec
 from pathlib import Path
 from typing import Any
 
 from src.database.models import ConnectorConfig
 
 CONNECTORS_DIR = Path(__file__).parent.parent / "connectors"
+logger = logging.getLogger(__name__)
+
+
+def _config_names(config: list[dict[str, str]]) -> list[str]:
+    return [str(item.get("name", "")) for item in config]
 
 
 def get_connector_dir(connector_id: str) -> Path:
@@ -59,6 +64,18 @@ def load_connector_info(connector_id: str) -> dict[str, Any]:
     }
 
 
+def connector_module_name(connector_id: str) -> str:
+    return f"connectors.{connector_id}.connector"
+
+
+def ensure_connector_import_paths() -> None:
+    project_src = CONNECTORS_DIR.resolve().parent
+    for path in (project_src, CONNECTORS_DIR.resolve()):
+        path_str = str(path)
+        if path_str not in sys.path:
+            sys.path.insert(0, path_str)
+
+
 def resolve_connector_tools(connector_config: ConnectorConfig):
     """Dynamically imports a connector by connector_id and instantiates it with config values.
 
@@ -76,6 +93,12 @@ def resolve_connector_tools(connector_config: ConnectorConfig):
     """
     connector_id = connector_config.connector_id
     config = connector_config.config
+    logger.info(
+        "Resolving connector tools: connector_id=%s config_id=%s config_keys=%s",
+        connector_id,
+        connector_config.connector_config_id,
+        _config_names(config),
+    )
 
     # --- 1. Locate the connector module file ---
     module_path = get_connector_module_path(connector_id)
@@ -83,22 +106,25 @@ def resolve_connector_tools(connector_config: ConnectorConfig):
         raise FileNotFoundError(
             f"Connector '{connector_id}' not found. Expected file: {module_path}"
         )
-
-    # --- 2. Dynamically import the module ---
-    # Add connectors dir to sys.path so relative imports (e.g. base_connector) resolve
-    connectors_abs = str(CONNECTORS_DIR.resolve())
-    if connectors_abs not in sys.path:
-        sys.path.insert(0, connectors_abs)
-
-    spec: ModuleSpec | None = importlib.util.spec_from_file_location(
-        connector_id, module_path
+    logger.info(
+        "Connector module found: connector_id=%s path=%s", connector_id, module_path
     )
-    if spec is None:
-        raise ValueError(f"Could not load module '{connector_id}'.")
-    module = importlib.util.module_from_spec(spec)
-    if spec.loader is None:
-        raise ValueError(f"Could not load module '{connector_id}'.")
-    spec.loader.exec_module(module)
+
+    # --- 2. Import the module by stable package name ---
+    # Add src for `connectors.*` imports and connectors for legacy
+    # `from base_connector import ...` imports used by connector modules.
+    ensure_connector_import_paths()
+    importlib.invalidate_caches()
+    module_name = connector_module_name(connector_id)
+    try:
+        module = importlib.import_module(module_name)
+    except ImportError as exc:
+        raise ValueError(f"Could not load module '{module_name}'.") from exc
+    logger.info(
+        "Connector module imported: connector_id=%s module=%s",
+        connector_id,
+        module_name,
+    )
 
     # --- 3. Find the BaseConnector subclass in the module ---
     from base_connector import BaseConnector
@@ -108,20 +134,48 @@ def resolve_connector_tools(connector_config: ConnectorConfig):
         if (
             issubclass(obj, BaseConnector)
             and obj is not BaseConnector
-            and obj.__module__ == connector_id
+            and obj.__module__ == module_name
         ):
             connector_class = obj
             break
 
     if connector_class is None:
         raise ValueError(f"No BaseConnector subclass found in '{connector_id}.py'.")
+    logger.info(
+        "Connector class selected: connector_id=%s class=%s",
+        connector_id,
+        connector_class.__name__,
+    )
 
     # --- 4. Convert config list → kwargs dict and instantiate ---
     # config format: [{"name": "API_KEY", "value": "abc123"}, ...]
-    kwargs = {item["name"]: item["value"] for item in config}
+    kwargs = {
+        item["name"]: item["value"]
+        for item in config
+        if item.get("value") is not None and str(item.get("value")).strip() != ""
+    }
+    omitted_blank_keys = sorted(
+        str(item.get("name"))
+        for item in config
+        if item.get("value") is None or str(item.get("value")).strip() == ""
+    )
+    logger.info(
+        "Connector kwargs prepared: connector_id=%s provided_keys=%s "
+        "omitted_blank_keys=%s",
+        connector_id,
+        sorted(kwargs.keys()),
+        omitted_blank_keys,
+    )
     connector = connector_class(**kwargs)
+    tools = connector.get_tools()
+    logger.info(
+        "Connector tools resolved: connector_id=%s class=%s tool_names=%s",
+        connector_id,
+        connector_class.__name__,
+        [getattr(tool, "name", repr(tool)) for tool in tools],
+    )
 
-    return connector.get_tools()
+    return tools
 
 
 @lru_cache(maxsize=128)

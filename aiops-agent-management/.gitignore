@@ -70,3 +70,10 @@ dmypy.json
 
 *.db
 agent_management.db
+
+# Legacy Vertex packaging artifacts (if generated)
+.build/
+
+#exclude bedrock packages
+.bedrock_agentcore
+.bedrock_agentcore.yaml

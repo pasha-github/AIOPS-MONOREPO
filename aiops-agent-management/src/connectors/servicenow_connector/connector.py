@@ -5,10 +5,13 @@ Provides a connector for interacting with the ServiceNow API.
 Supports Incidents, Change Requests, and the Knowledge Base.
 """
 
+import logging
 from typing import Any
 
 from base_connector import BaseConnector, connector_tool
 from google.adk.tools.tool_context import ToolContext
+
+logger = logging.getLogger(__name__)
 
 
 class ServiceNowConnector(BaseConnector):
@@ -59,14 +62,26 @@ class ServiceNowConnector(BaseConnector):
 
         headers = {"Accept": "application/json", "Content-Type": "application/json"}
 
-        response = self.call_api(
-            url=url,
-            method=method,
-            headers=headers,
-            params=params,
-            json=data,
-            basic_auth=(self.username, self.password),
-        )
+        try:
+            response = self.call_api(
+                url=url,
+                method=method,
+                headers=headers,
+                params=params,
+                json=data,
+                basic_auth=(self.username, self.password),
+            )
+        except Exception as exc:
+            logger.exception(
+                "ServiceNow connector request failed: method=%s endpoint=%s",
+                method,
+                endpoint,
+            )
+            return {
+                "status": "error",
+                "code": "request_failed",
+                "message": str(exc),
+            }
 
         # Handle Auth token/credential expiration
         if response.status_code == 401:
@@ -84,9 +99,10 @@ class ServiceNowConnector(BaseConnector):
             }
 
         try:
+            response_json = response.json()
             return {
                 "status": "success",
-                "data": response.json().get("result", response.json()),
+                "data": response_json.get("result", response_json),
             }
         except ValueError:
             # Not JSON

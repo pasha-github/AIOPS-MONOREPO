@@ -7,7 +7,19 @@ from fastapi.staticfiles import StaticFiles
 
 from src.agent_runtime.adk.adk_app import ADK_APP
 from src.database.database import create_db_and_tables
-from src.routers import agents, connectors, llms, mcp, skills, visualizer
+from src.routers import (
+    agent_files,
+    agents,
+    auth,
+    aws_credentials,
+    connectors,
+    llms,
+    mcp,
+    observability,
+    skills,
+    vertex_config,
+    visualizer,
+)
 from src.utils.constants import WEB
 from src.utils.scheduler import start_scheduler
 
@@ -39,11 +51,16 @@ def health_check():
 
 # Routers
 app.include_router(agents.router)
+app.include_router(agent_files.router)
+app.include_router(aws_credentials.router)
+app.include_router(auth.router)
 app.include_router(llms.router)
 app.include_router(connectors.router)
 app.include_router(mcp.router)
 app.include_router(skills.router)
 app.include_router(visualizer.router)
+app.include_router(observability.router)
+app.include_router(vertex_config.router)
 
 # Mount ADK App
 app.mount("/agent-server", ADK_APP)

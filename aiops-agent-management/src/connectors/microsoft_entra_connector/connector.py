@@ -197,6 +197,149 @@ class MicrosoftEntraConnector(BaseConnector):
             return {"status": "success", "data": response.text}
 
     @connector_tool
+    def create_user(
+        self,
+        display_name: str,
+        first_name: str,
+        last_name: str,
+        user_principal_name: str,
+        mail_nickname: str,
+        password: str = "",
+        usage_location: str = "US",
+        tool_context: ToolContext | None = None,
+    ) -> dict[str, Any]:
+        """Create a new user in Microsoft Entra ID via Microsoft Graph.
+
+        Creates the account with the provided details and a temporary password.
+        The user will be required to change their password on first sign-in.
+
+        Args:
+            display_name: Full name of the user e.g. "John Doe".
+            first_name: User's first name.
+            last_name: User's last name.
+            user_principal_name: Sign-in UPN e.g. "john.doe@company.com".
+            mail_nickname: Alias portion of the email e.g. "john.doe".
+            password: Password to set. Leave empty to auto-generate one.
+            usage_location: Two-letter ISO country code e.g. "US". Required by Microsoft Graph before a license can be assigned to this user.
+        """
+        password_to_set = password.strip() or self._generate_password()
+
+        result = self._make_graph_request(
+            endpoint="/users",
+            method="POST",
+            data={
+                "accountEnabled": True,
+                "displayName": display_name.strip(),
+                "givenName": first_name.strip(),
+                "surname": last_name.strip(),
+                "userPrincipalName": user_principal_name.strip(),
+                "mailNickname": mail_nickname.strip(),
+                "usageLocation": usage_location.strip().upper(),
+                "passwordProfile": {
+                    "password": password_to_set,
+                    "forceChangePasswordNextSignIn": True,
+                },
+            },
+        )
+
+        if result["status"] != "success":
+            return result
+
+        user_id = (result.get("data") or {}).get("id", "")
+        payload: dict[str, Any] = {
+            "status": "success",
+            "user_id": user_id,
+            "user_principal_name": user_principal_name.strip(),
+            "message": "User created successfully.",
+        }
+        if not password.strip():
+            payload["generated_password"] = password_to_set
+        return payload
+
+    @connector_tool
+    def assign_license(
+        self,
+        user_id: str,
+        sku_id: str,
+        tool_context: ToolContext | None = None,
+    ) -> dict[str, Any]:
+        """Assign a Microsoft 365 license to a user in Microsoft Entra ID.
+
+        Use this after creating a user to activate services such as Outlook,
+        SharePoint, and Teams. Requires the license SKU ID from your tenant.
+
+        Args:
+            user_id: The user object ID or user principal name (UPN).
+            sku_id: The license SKU ID e.g. "6fd2c87f-b296-42f0-b197-1e91e994b900" for M365 Business Standard.
+        """
+        if not user_id.strip() or not sku_id.strip():
+            return {
+                "status": "error",
+                "code": 400,
+                "message": "user_id and sku_id are required.",
+            }
+
+        result = self._make_graph_request(
+            endpoint=f"/users/{user_id.strip()}/assignLicense",
+            method="POST",
+            data={
+                "addLicenses": [{"skuId": sku_id.strip(), "disabledPlans": []}],
+                "removeLicenses": [],
+            },
+        )
+
+        if result["status"] != "success":
+            return result
+
+        return {
+            "status": "success",
+            "user_id": user_id.strip(),
+            "sku_id": sku_id.strip(),
+            "message": "License assigned successfully.",
+        }
+
+    @connector_tool
+    def list_licenses(
+        self,
+        tool_context: ToolContext | None = None,
+    ) -> dict[str, Any]:
+        """List all Microsoft 365 licenses (SKUs) available in the tenant.
+
+        Use this before assign_license to find the correct sku_id and confirm
+        enough seats are available. Shows each license's SKU ID, part number,
+        and how many seats are enabled, consumed, and remaining.
+        """
+        result = self._make_graph_request(
+            endpoint="/subscribedSkus",
+            method="GET",
+        )
+
+        if result["status"] != "success":
+            return result
+
+        skus = (result.get("data") or {}).get("value", [])
+        licenses = []
+        for sku in skus:
+            prepaid = sku.get("prepaidUnits") or {}
+            enabled = prepaid.get("enabled", 0)
+            consumed = sku.get("consumedUnits", 0)
+            licenses.append(
+                {
+                    "sku_id": sku.get("skuId", ""),
+                    "sku_part_number": sku.get("skuPartNumber", ""),
+                    "enabled_units": enabled,
+                    "consumed_units": consumed,
+                    "available_units": enabled - consumed,
+                }
+            )
+
+        return {
+            "status": "success",
+            "licenses": licenses,
+            "message": f"Found {len(licenses)} license SKU(s) in the tenant.",
+        }
+
+    @connector_tool
     def reset_user_password(
         self,
         user_id: str,

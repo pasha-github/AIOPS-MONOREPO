@@ -1,4 +1,5 @@
 import logging
+import os
 
 import litellm
 from google.adk.agents.base_agent import BaseAgent
@@ -46,6 +47,24 @@ def _fallback_summary(user_text: str) -> str:
     return normalized[:cutoff].rstrip() + "..."
 
 
+def _litellm_summary_model(model: str | None) -> str | None:
+    if not model:
+        return None
+
+    # ADK's native Gemini model reports bare names like `gemini-2.5-flash`.
+    # In Bedrock AgentCore we authenticate Gemini through GOOGLE_API_KEY, so
+    # LiteLLM needs the AI Studio provider prefix instead of defaulting to
+    # Vertex ADC.
+    if (
+        model.startswith("gemini-")
+        and os.environ.get("GOOGLE_API_KEY")
+        and os.environ.get("GOOGLE_GENAI_USE_VERTEXAI", "").lower() != "true"
+    ):
+        return f"gemini/{model}"
+
+    return model
+
+
 class SessionSummaryPlugin(BasePlugin):
     def __init__(self, name: str = "session_summary_plugin"):
         super().__init__(name=name)
@@ -78,7 +97,7 @@ class SessionSummaryPlugin(BasePlugin):
             return None
 
         summary = ""
-        summarizer_model = llm_request.model
+        summarizer_model = _litellm_summary_model(llm_request.model)
 
         if summarizer_model:
             try:

@@ -1,8 +1,8 @@
 {
   "id": "outlook_connector",
   "name": "Outlook",
-  "description": "Reply to Outlook emails through Microsoft Graph.",
-  "version": "0.0.1",
+  "description": "Send emails, create calendar events, and reply to Outlook emails through Microsoft Graph.",
+  "version": "0.1.0",
   "config_variables": [
     {
       "name": "TENANT_ID",
@@ -41,6 +41,14 @@
     }
   ],
   "tools": [
+    {
+      "name": "send_email",
+      "documentation": "Send a new email from the configured mailbox with support for to, cc, and bcc recipients."
+    },
+    {
+      "name": "create_calendar_event",
+      "documentation": "Create a calendar event with a Teams meeting link and send invites to attendees."
+    },
     {
       "name": "reply_to_email",
       "documentation": "Reply to an existing Outlook email in the configured mailbox."

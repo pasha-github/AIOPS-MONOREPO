@@ -1,0 +1,38 @@
+{
+  "claude-sonnet-4-6": {
+    "input_cost_per_million_tokens": 3.0,
+    "output_cost_per_million_tokens": 15.0
+  },
+  "anthropic/claude-sonnet-4-6": {
+    "input_cost_per_million_tokens": 3.0,
+    "output_cost_per_million_tokens": 15.0
+  },
+  "global.anthropic.claude-sonnet-4-6": {
+    "input_cost_per_million_tokens": 3.0,
+    "output_cost_per_million_tokens": 15.0
+  },
+  "gemini-3-flash-preview": {
+    "input_cost_per_million_tokens": 0.5,
+    "output_cost_per_million_tokens": 3.0
+  },
+  "gemini/gemini-3-flash-preview": {
+    "input_cost_per_million_tokens": 0.5,
+    "output_cost_per_million_tokens": 3.0
+  },
+  "gemini-2.5-flash": {
+    "input_cost_per_million_tokens": 0.3,
+    "output_cost_per_million_tokens": 2.5
+  },
+  "gemini/gemini-2.5-flash": {
+    "input_cost_per_million_tokens": 0.3,
+    "output_cost_per_million_tokens": 2.5
+  },
+  "claude-haiku-4-5": {
+    "input_cost_per_million_tokens": 1.0,
+    "output_cost_per_million_tokens": 5.0
+  },
+  "anthropic/claude-haiku-4-5": {
+    "input_cost_per_million_tokens": 1.0,
+    "output_cost_per_million_tokens": 5.0
+  }
+}

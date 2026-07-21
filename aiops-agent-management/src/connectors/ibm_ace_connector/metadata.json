@@ -1,0 +1,46 @@
+{
+  "id": "ibm_ace_connector",
+  "name": "IBM ACE",
+  "category": "enterprise",
+  "description": "Manages IBM App Connect Enterprise servers and applications via the ACE REST API.",
+  "version": "1.0.0",
+  "config_variables": [
+    {
+      "name": "IBM_ACE_BASE_URL",
+      "label": "ACE Base URL",
+      "required": true,
+      "secret": false,
+      "placeholder": "http://your-ace-host:4414"
+    }
+  ],
+  "tools": [
+    {
+      "name": "list_servers",
+      "documentation": "Lists all IBM ACE integration servers with their name and state."
+    },
+    {
+      "name": "start_server",
+      "documentation": "Starts a specific IBM ACE integration server."
+    },
+    {
+      "name": "list_applications",
+      "documentation": "Lists all applications deployed on a specific IBM ACE integration server."
+    },
+    {
+      "name": "start_application",
+      "documentation": "Starts a specific application on an IBM ACE integration server."
+    },
+    {
+      "name": "stop_server",
+      "documentation": "Stops a specific IBM ACE integration server that is currently running."
+    },
+    {
+      "name": "stop_application",
+      "documentation": "Stops a specific application running on an IBM ACE integration server."
+    },
+    {
+      "name": "get_server_logs",
+      "documentation": "Retrieves the last 20 log entries from a specific IBM ACE integration server for monitoring and diagnostics."
+    }
+  ]
+}
