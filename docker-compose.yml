@@ -21,6 +21,8 @@ services:
       - "3000:3000"
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NEXT_PUBLIC_LLM_MANAGER_API_BASE_URL=http://localhost:8000
+      - NEXT_PUBLIC_AGENT_ADK_BASE_URL=http://localhost:8000
     restart: unless-stopped
     depends_on:
       - agent-manager

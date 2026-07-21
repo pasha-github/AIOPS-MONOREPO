@@ -85,14 +85,20 @@ sequenceDiagram
 
 ## Example Use Cases
 
-### 1. Automated IBM MQ Topology Discovery
-A user asks the Agent to map out the current IBM MQ landscape. The Agent Manager connects with the `ibm_mq_mcp` server, which polls the remote MQ nodes to discover Queue Managers, Channels, and Listeners. The Frontend then dynamically renders this data as an interactive visual graph.
+### 1. Automated IBM MQ Diagnostics & Log Analysis
+A user asks the Agent to check the health of their messaging infrastructure. The Agent Manager connects with the `ibm_mq_mcp` server, which securely runs `dspmq` to list active Queue Managers and fetches recent system logs. The Agent synthesizes this raw data into a human-readable health summary for the user.
 
 ### 2. ServiceNow Incident Triage & Self-Healing
 An alert triggers regarding a failure on an enterprise application. The `servicenow-mcp` logs an incident. The Agent Manager intercepts the incident, uses the appropriate MCP (like `rc_connector_mule` or `rc_connector_elk`) to diagnose the root cause, executes a fix (e.g., restarting a service), and finally resolves the ServiceNow ticket with a full summary attached—all autonomously.
 
 ### 3. Conversational Infrastructure Management
 A DevOps engineer on the go needs to check system health. They ping the MS Teams AIOps Bot: *"Are there any ELK log anomalies in the last 15 minutes?"* The bot routes the request to the Agent Manager, which executes a search via the `rc_connector_elk` MCP, summarizes the errors, and replies directly within the Teams chat window.
+
+### 4. Background Monitoring via Webhook
+An external APM tool (like Datadog) detects a database spike and fires a webhook payload to the Agent Manager (`POST /agent/{id}/webhook/invoke/{webhook_id}`). The AI agent launches a background diagnostic workflow, querying system metrics autonomously, and automatically posts its findings to a designated Slack/Teams channel.
+
+### 5. Automated Identity Management (Entra ID)
+A user requests a password reset. The Agent connects via the `microsoft_entra_connector` using the Microsoft Graph API, generates a secure password, enforces a password change at next sign-in, and securely provides the temporary credentials to the user, completely eliminating a Tier 1 Helpdesk ticket.
 
 ---
 
