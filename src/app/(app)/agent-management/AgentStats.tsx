@@ -1,6 +1,6 @@
 "use client";
 
-import { Bot, CheckCircle2, Loader2, Zap } from "lucide-react";
+import { Bot, Globe, GlobeX, Loader2 } from "lucide-react";
 
 type AgentStatsProps = {
   onlineCount: number;
@@ -17,18 +17,18 @@ export default function AgentStats({
 }: AgentStatsProps) {
   const statCards = [
     {
-      title: "Online",
+      title: "Agents Online",
       value: onlineCount,
       note: "All healthy",
-      icon: CheckCircle2,
+      icon: Globe,
       tone: "from-[#18c964] to-[#00b56c]",
       noteColor: "text-[#16a34a]",
     },
     {
-      title: "Offline",
+      title: "Agents Offline",
       value: offlineCount,
       note: "Review connectivity",
-      icon: Zap,
+      icon: GlobeX,
       tone: "from-[#2f80ff] to-[#1aa7ff]",
       noteColor: "text-[#3b82f6]",
     },
@@ -49,7 +49,7 @@ export default function AgentStats({
         return (
           <div
             key={card.title}
-            className="min-w-[220px] rounded-2xl bg-white p-5 shadow-[0_12px_30px_-28px_rgba(16,24,40,0.45)] ring-1 ring-[#eef1f7]"
+            className="min-w-[220px] rounded-2xl bg-white p-5 ring-[#eef1f7]"
           >
             <div className="flex items-center justify-between">
               <div

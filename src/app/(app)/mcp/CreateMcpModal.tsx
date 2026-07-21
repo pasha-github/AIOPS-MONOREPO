@@ -1,5 +1,13 @@
 "use client";
 
+import {
+  ModalCard,
+  ModalCardBody,
+  ModalCardFooter,
+  ModalCardHeader,
+  ModalCardPanel,
+  ModalCardRequiredNote,
+} from "@/components/modalcards";
 import { ChevronDown, Loader2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import McpDetailsDrawer from "./McpDetailsDrawer";
@@ -218,27 +226,25 @@ export default function CreateMcpModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/40 px-4 py-8 backdrop-blur-sm">
-      <div
+    <ModalCard zIndexClassName="z-[95]">
+      <ModalCardPanel
         ref={modalRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="create-mcp-title"
-        className="flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl bg-white shadow-[0_18px_50px_-30px_rgba(15,23,42,0.6)]"
+        maxWidthClassName="max-w-xl"
       >
-        <div className="flex items-center justify-between bg-[#4f49e2] px-6 py-4 text-white">
-          <div>
-            <h4 id="create-mcp-title" className="text-lg font-semibold text-white">
-              Create MCP Server
-            </h4>
-            <p className="mt-1 text-sm text-white/80">
-              Register a new Model Context Protocol endpoint.
-            </p>
-          </div>
-          
-        </div>
+        <ModalCardHeader
+          title="Register MCP Server"
+          subtitle="Register a new Model Context Protocol Server."
+          onClose={() => {
+            if (!isSubmitting) {
+              onClose();
+            }
+          }}
+        />
 
-        <div className="flex-1 overflow-y-auto px-6 py-5">
+        <ModalCardBody className="flex-1 overflow-y-auto">
           <div className="space-y-4">
           <div className="space-y-2">
             <label className="text-sm font-semibold text-[#111827]">
@@ -353,9 +359,10 @@ export default function CreateMcpModal({
             <p className="text-sm font-medium text-[#dc2626]">{submitError}</p>
           ) : null}
           </div>
-        </div>
+        </ModalCardBody>
 
-        <div className="flex items-center justify-between gap-3 border-t border-[#eef1f7] px-6 py-4">
+        <ModalCardFooter className="justify-between">
+          <ModalCardRequiredNote />
           <TestMcp
             mcpApiBase={mcpApiBase}
             payload={currentPayload}
@@ -391,16 +398,16 @@ export default function CreateMcpModal({
               }`}
             >
               {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              {isSubmitting ? "Creating..." : "Create MCP Server"}
+              {isSubmitting ? "Registering..." : "Register Server"}
             </button>
           </div>
-        </div>
-      </div>
+        </ModalCardFooter>
+      </ModalCardPanel>
 
       <McpDetailsDrawer
         server={testedServer}
         onClose={() => setTestedServer(null)}
       />
-    </div>
+    </ModalCard>
   );
 }

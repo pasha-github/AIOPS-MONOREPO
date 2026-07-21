@@ -1,25 +1,28 @@
 "use client";
 
+import ActionMenu, { type ActionMenuItem } from "@/components/ActionMenu";
 import { trimTrailingSlash } from "@/config/agent";
 import { useRuntimeConfig } from "@/config/runtime-config";
-import { ChevronRight, Eye, Link2, Plug, Settings2 } from "lucide-react";
-import type { ReactElement } from "react";
+import { EyeIcon, Info, Link2, Minus, Plus, Settings2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import SetConnectorConfig from "./SetConnectorConfig";
-import ShowConnectorConfig from "./ShowConnectorConfig";
-import StaticConnectorCards from "./StaticConnectorCards";
-import ViewConnector from "./ViewConnector";
-
-type ConnectorItem = {
-  id: string;
-  name: string;
-};
+import type {
+  ConnectorAction,
+  ConnectorCategory,
+  ConnectorFilter,
+  ConnectorItem,
+} from "./page";
+import StaticConnectorCards, { filterStaticConnectors } from "./StaticConnectorCards";
 
 type DisplayConnectorsProps = {
   searchTerm?: string;
+  connectorFilter: ConnectorFilter;
+  selectedConnectorId: string | null;
+  onSelectedConnectorChange: (connector: ConnectorItem | null) => void;
+  onOpenConnectorAction: (
+    connector: ConnectorItem,
+    action: Exclude<ConnectorAction, never>
+  ) => void;
 };
-
-type ModalType = "view" | "set" | "show" | null;
 
 const CONNECTOR_LOGO_MAP: Record<string, string> = {
   datadog_connector: "/img/datadog_connector.png",
@@ -34,6 +37,25 @@ const getLogoSrc = (connectorId: string) =>
   `/img/${connectorId.toLowerCase()}.png`;
 
 const FALLBACK_LOGO_SRC = "/file.png";
+
+const SECTION_TITLES: Record<ConnectorCategory, string> = {
+  enterprise: "Enterprise Connectors",
+  helper: "Helper Connectors",
+};
+
+const SECTION_DESCRIPTIONS: Record<ConnectorCategory, string> = {
+  enterprise: "Business and platform integrations used across enterprise workflows.",
+  helper: "Utility connectors that support runtime helpers and lightweight actions.",
+};
+
+const SECTION_LABEL_STYLES: Record<ConnectorCategory, string> = {
+  enterprise: "text-[#4f49e2]",
+  helper: "text-[#0f766e]",
+};
+
+const normalizeConnectorCategory = (
+  category?: string | null
+): ConnectorCategory => (category?.trim().toLowerCase() === "helper" ? "helper" : "enterprise");
 
 function ConnectorLogo({
   connectorId,
@@ -81,15 +103,18 @@ const ConnectorCardSkeleton = ({ index }: { index: number }) => (
   </div>
 );
 
-export default function DisplayConnectors({ searchTerm }: DisplayConnectorsProps) {
+export default function DisplayConnectors({
+  searchTerm,
+  connectorFilter,
+  selectedConnectorId,
+  onSelectedConnectorChange,
+  onOpenConnectorAction,
+}: DisplayConnectorsProps) {
   const { llmManagerApiBaseUrl } = useRuntimeConfig();
   const [connectors, setConnectors] = useState<ConnectorItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
-  const [selectedConnector, setSelectedConnector] = useState<ConnectorItem | null>(
-    null
-  );
-  const [activeModal, setActiveModal] = useState<ModalType>(null);
+  const [isHelperExpanded, setIsHelperExpanded] = useState(false);
   const connectorsApiBase = trimTrailingSlash(llmManagerApiBaseUrl);
 
   const connectorsUrl = useMemo(
@@ -132,72 +157,67 @@ export default function DisplayConnectors({ searchTerm }: DisplayConnectorsProps
         return id.includes(normalizedSearch) || name.includes(normalizedSearch);
       })
     : connectors;
-  const staticConnectorCount = normalizedSearch
-    ? [
-        "elastic search",
-        "ibm ace",
-        "informatica",
-        "dynatrace",
-        "apigee",
-        "mulesoft",
-      ].filter((name) => name.includes(normalizedSearch)).length
-    : 6;
-  const showCardShimmer = isLoading && connectors.length > 0;
-
-  const openConnectorModal = (
-    connector: ConnectorItem,
-    modal: Exclude<ModalType, null>
-  ) => {
-    setSelectedConnector(connector);
-    setActiveModal(modal);
-  };
-
-  const connectorModals = (
-    <>
-      <ViewConnector
-        isOpen={activeModal === "view"}
-        connectorId={selectedConnector?.id ?? null}
-        connectorName={selectedConnector?.name ?? null}
-        connectorsApiBase={connectorsApiBase}
-        onClose={() => setActiveModal(null)}
-      />
-      <SetConnectorConfig
-        key={`set-config-${selectedConnector?.id ?? "none"}`}
-        isOpen={activeModal === "set"}
-        connectorId={selectedConnector?.id ?? null}
-        connectorName={selectedConnector?.name ?? null}
-        connectorsApiBase={connectorsApiBase}
-        onClose={() => setActiveModal(null)}
-      />
-      <ShowConnectorConfig
-        key={`show-config-${selectedConnector?.id ?? "none"}`}
-        isOpen={activeModal === "show"}
-        connectorId={selectedConnector?.id ?? null}
-        connectorName={selectedConnector?.name ?? null}
-        connectorsApiBase={connectorsApiBase}
-        onClose={() => setActiveModal(null)}
-      />
-    </>
+  const visibleStaticConnectors = filterStaticConnectors(searchTerm);
+  const enterpriseConnectors = visibleConnectors.filter(
+    (connector) => normalizeConnectorCategory(connector.category) === "enterprise"
   );
-
-  let content: ReactElement;
-
+  const helperConnectors = visibleConnectors.filter(
+    (connector) => normalizeConnectorCategory(connector.category) === "helper"
+  );
+  const visibleSections =
+    connectorFilter === "all"
+      ? [
+          {
+            category: "enterprise" as const,
+            connectors: enterpriseConnectors,
+            staticConnectors: visibleStaticConnectors,
+          },
+          {
+            category: "helper" as const,
+            connectors: helperConnectors,
+            staticConnectors: [],
+          },
+        ]
+      : [
+          {
+            category: connectorFilter,
+            connectors:
+              connectorFilter === "enterprise"
+                ? enterpriseConnectors
+                : helperConnectors,
+            staticConnectors:
+              connectorFilter === "enterprise" ? visibleStaticConnectors : [],
+          },
+        ];
+  const visibleConnectorCount =
+    visibleConnectors.length +
+    (connectorFilter === "helper" ? 0 : visibleStaticConnectors.length);
+  const showCardShimmer = isLoading && connectors.length > 0;
   if (isLoading && connectors.length === 0) {
-    content = (
+    return (
+      <>
       <div className="mt-6 grid gap-6 lg:grid-cols-3">
         {Array.from({ length: 3 }).map((_, index) => (
           <ConnectorCardSkeleton key={index} index={index} />
         ))}
       </div>
+      </>
     );
-  } else if (loadError) {
-    content = (
+  }
+
+  if (loadError) {
+    return (
+      <>
       <div className="mt-6 rounded-2xl border border-[#fee2e2] bg-[#fff5f5] px-5 py-8 text-sm text-[#b91c1c]">
         {loadError}
       </div>
+      </>
     );
-  } else if (visibleConnectors.length === 0 && staticConnectorCount === 0) {
-    content = (
+  }
+
+  if (visibleConnectorCount === 0) {
+    return (
+      <>
       <div className="mt-6 rounded-2xl border border-[#e6eaf3] bg-white px-6 py-10 text-center">
         <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#eef2ff] text-[#4f49e2]">
           <Link2 className="h-6 w-6" />
@@ -206,90 +226,157 @@ export default function DisplayConnectors({ searchTerm }: DisplayConnectorsProps
           No connectors found
         </p>
       </div>
-    );
-  } else {
-    content = (
-      <div className="mt-6 grid gap-6 lg:grid-cols-3">
-        {visibleConnectors.map((connector) => {
-          const isSelected = selectedConnector?.id === connector.id;
-
-          return (
-            <div
-              key={connector.id}
-              className={`relative rounded-2xl bg-white p-5 transition-all duration-200 ${
-                isSelected
-                  ? "shadow-[0_22px_40px_-28px_rgba(79,73,226,0.65)] ring-2 ring-[#cbd2ff]"
-                  : "shadow-[0_12px_30px_-24px_rgba(16,24,40,0.35)] ring-1 ring-[#eef1f7] hover:shadow-[0_20px_34px_-24px_rgba(79,73,226,0.45)] hover:ring-[#d7defe]"
-              }`}
-            >
-              {showCardShimmer ? (
-                <div className="pointer-events-none absolute inset-0 animate-pulse bg-[#ffffff]/70" />
-              ) : null}
-
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3">
-                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#eef2ff] text-[#4f49e2]">
-                      <Plug className="h-4 w-4" />
-                    </span>
-                    <p className="text-xl font-semibold text-[#111827]">
-                      {connector.name}
-                    </p>
-                  </div>
-                </div>
-                <ConnectorLogo
-                  connectorId={connector.id}
-                  connectorName={connector.name}
-                />
-              </div>
-
-              <div className="mt-6 grid grid-cols-3 gap-2">
-                <button
-                  type="button"
-                  onClick={() => openConnectorModal(connector, "set")}
-                  disabled={showCardShimmer}
-                  className="inline-flex w-full items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-[#4f49e2] px-3 py-2 text-sm font-semibold text-white shadow-[0_10px_22px_-14px_rgba(79,73,226,0.85)] transition-all duration-150 hover:bg-[#3f39d6] active:translate-y-px active:scale-[0.97] active:shadow-none"
-                  aria-label={`Set config for ${connector.name}`}
-                  title={`Set config for ${connector.name}`}
-                >
-                  <Settings2 className="h-4 w-4" />
-                  Set Config
-                </button>
-                <button
-                  type="button"
-                  onClick={() => openConnectorModal(connector, "show")}
-                  disabled={showCardShimmer}
-                  className="inline-flex w-full items-center justify-center gap-2 whitespace-nowrap rounded-lg border border-[#cbd2ff] px-3 py-2 text-sm font-semibold text-[#4f49e2] shadow-[0_6px_16px_-12px_rgba(79,73,226,0.8)] transition-all duration-150 hover:bg-[#eef2ff] active:translate-y-px active:scale-[0.97] active:shadow-none"
-                  aria-label={`Show config for ${connector.name}`}
-                  title={`Show config for ${connector.name}`}
-                >
-                  <Eye className="h-4 w-4" />
-                  Show Config
-                </button>
-                <button
-                  type="button"
-                  onClick={() => openConnectorModal(connector, "view")}
-                  disabled={showCardShimmer}
-                  className="inline-flex w-full items-center justify-center gap-2 whitespace-nowrap rounded-lg border border-[#cbd2ff] px-3 py-2 text-sm font-semibold text-[#4f49e2] shadow-[0_6px_16px_-12px_rgba(79,73,226,0.8)] transition-all duration-150 hover:bg-[#eef2ff] active:translate-y-px active:scale-[0.97] active:shadow-none"
-                  aria-label={`View details about ${connector.name}`}
-                  title={`View details about ${connector.name}`}
-                >
-                  View Details
-                  <ChevronRight className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-          );
-        })}
-        <StaticConnectorCards searchTerm={searchTerm} />
-      </div>
+      </>
     );
   }
 
   return (
     <>
-      {content}
-      {connectorModals}
+      <div className="mt-6 space-y-4">
+        {visibleSections.map(({ category, connectors, staticConnectors }) => {
+          if (connectors.length === 0 && staticConnectors.length === 0) {
+            return null;
+          }
+
+          const isHelperSection = category === "helper";
+          const isSectionExpanded = !isHelperSection || isHelperExpanded;
+          const ToggleIcon = isHelperExpanded ? Minus : Plus;
+
+          return (
+            <section key={category} className="space-y-4">
+              <div className="flex items-end justify-between gap-4 border-b border-[#edf2f7] pb-3">
+                <div>
+                  <h3 className="text-lg font-semibold text-[#111827]">
+                    {SECTION_TITLES[category]}
+                  </h3>
+                  <p className="mt-1 text-sm text-[#667085]">
+                    {SECTION_DESCRIPTIONS[category]}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span
+                    className={`inline-flex items-center text-[11px] font-semibold uppercase tracking-[0.18em] ${SECTION_LABEL_STYLES[category]}`}
+                  >
+                    {category === "helper" ? "Helper" : "Enterprise"}
+                  </span>
+                  {isHelperSection ? (
+                    <button
+                      type="button"
+                      onClick={() => setIsHelperExpanded((current) => !current)}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[#dbe4f2] bg-white text-[#0f766e] transition hover:bg-[#f0fdfa]"
+                      aria-label={
+                        isHelperExpanded
+                          ? "Collapse helper connectors"
+                          : "Expand helper connectors"
+                      }
+                    >
+                      <ToggleIcon className="h-4 w-4" />
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+
+              {isSectionExpanded ? (
+              <div className="grid gap-6 lg:grid-cols-3">
+                {connectors.map((connector) => {
+          const isSelected = selectedConnectorId === connector.id;
+          const connectorActions: ActionMenuItem[] = [
+            {
+              label: "Set Connection",
+              icon: Settings2,
+              onClick: () => {
+                onSelectedConnectorChange(connector);
+                onOpenConnectorAction(connector, "set");
+              },
+              tone: "text-[#4f49e2]",
+              hoverTone: "hover:bg-[#f6f8ff]",
+            },
+            {
+              label: "View Connection",
+              icon: EyeIcon,
+              onClick: () => {
+                onSelectedConnectorChange(connector);
+                onOpenConnectorAction(connector, "show");
+              },
+              tone: "text-[#4f49e2]",
+              hoverTone: "hover:bg-[#f6f8ff]",
+            },
+            {
+              label: "View Tool Details",
+              icon: Info,
+              onClick: () => {
+                onSelectedConnectorChange(connector);
+                onOpenConnectorAction(connector, "view");
+              },
+              tone: "text-[#4f49e2]",
+              hoverTone: "hover:bg-[#f6f8ff]",
+            },
+          ];
+
+          return (
+            <ActionMenu
+              key={connector.id}
+              align="left"
+              estimatedMenuHeight={132}
+              actions={connectorActions}
+              renderButton={({ isOpen, buttonRef, toggle }) => (
+                <button
+                  ref={buttonRef}
+                  type="button"
+                  disabled={showCardShimmer}
+                  onClick={() => {
+                    if (showCardShimmer) {
+                      return;
+                    }
+                    onSelectedConnectorChange(connector);
+                    toggle();
+                  }}
+                  className={`group relative w-full rounded-2xl bg-white px-5 py-6 text-left transition-all duration-300 ${
+                    isSelected || isOpen
+                      ? "shadow-[0_20px_36px_-28px_rgba(79,73,226,0.65)] ring-2 ring-[#cbd2ff]"
+                      : "shadow-[0_12px_30px_-24px_rgba(16,24,40,0.22)] ring-1 ring-[#eef1f7]"
+                  } ${
+                    showCardShimmer
+                      ? "cursor-default"
+                      : "cursor-pointer hover:shadow-[0_20px_34px_-24px_rgba(79,73,226,0.38)] hover:ring-[#d7defe] focus:outline-none focus:ring-2 focus:ring-[#4f49e2] focus:ring-offset-2"
+                  }`}
+                >
+                  {showCardShimmer ? (
+                    <div className="pointer-events-none absolute inset-0 animate-pulse bg-[#ffffff]/70" />
+                  ) : null}
+
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#eef2ff] text-[#4f49e2]">
+                          <Link2 className="h-4 w-4" />
+                        </span>
+                        <div>
+                          <p className="text-[22px] font-semibold text-[#111827] transition-all duration-150 group-hover:font-bold">
+                            {connector.name}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    <ConnectorLogo
+                      connectorId={connector.id}
+                      connectorName={connector.name}
+                    />
+                  </div>
+                </button>
+              )}
+            />
+          );
+                })}
+                {staticConnectors.length > 0 ? (
+                  <StaticConnectorCards connectors={staticConnectors} />
+                ) : null}
+              </div>
+              ) : null}
+            </section>
+          );
+        })}
+      </div>
     </>
   );
 }

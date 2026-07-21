@@ -1,5 +1,6 @@
 "use client";
 
+import Searchbar from "@/components/Searchbar";
 import { trimTrailingSlash } from "@/config/agent";
 import { useRuntimeConfig } from "@/config/runtime-config";
 import { Loader2, Plus, Trash2, X } from "lucide-react";
@@ -42,6 +43,7 @@ export default function McpPage() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
   const [isToastVisible, setIsToastVisible] = useState(false);
+  const [searchValue, setSearchValue] = useState("");
   const serversRef = useRef<McpServer[]>([]);
   const requestIdRef = useRef(0);
 
@@ -166,6 +168,26 @@ export default function McpPage() {
     [servers]
   );
 
+  const filteredServers = useMemo(() => {
+    const normalizedSearch = searchValue.trim().toLowerCase();
+    if (!normalizedSearch) {
+      return servers;
+    }
+
+    return servers.filter((server) =>
+      [
+        server.name,
+        server.server_url,
+        server.description,
+        server.auth_type,
+        server.auth_username,
+        server.metadata.transport,
+      ]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(normalizedSearch))
+    );
+  }, [searchValue, servers]);
+
   const handleCreateServer = async (
     payload: CreateMcpPayload
   ): Promise<McpActionResult> => {
@@ -253,7 +275,7 @@ export default function McpPage() {
                   src={mcpLogoSrc}
                 />
               </span>
-              Model Context Protocol
+              MCP Servers
             </h2>
             <p className="text-sm leading-6 text-[#5b6476]">
               Maintain a professional inventory of MCP servers, authentication setup,
@@ -299,23 +321,32 @@ export default function McpPage() {
 
       <section className="rounded-3xl bg-white px-8 py-7 shadow-[0_18px_50px_-38px_rgba(16,24,40,0.5)]">
         <div className="space-y-6">
-        <div className="max-w-3xl">
-          <h3 className="flex items-center gap-3 text-lg font-semibold text-[#111827]">
-            <img
-              src={mcpLogoSrc}
-              className="h-9 w-9 rounded-xl object-contain"
-              loading="lazy"
-              alt="MCP logo"
-            />
-            MCP Inventory
-          </h3>
-          <p className="mt-1 text-sm text-[#5b6476]">
-            Review all server, auth, metadata, tool, and schema details from one place.
-          </p>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="max-w-3xl">
+            <h3 className="flex items-center gap-3 text-lg font-semibold text-[#111827]">
+              <img
+                src={mcpLogoSrc}
+                className="h-9 w-9 rounded-xl object-contain"
+                loading="lazy"
+                alt="MCP logo"
+              />
+              MCP Servers Inventory
+            </h3>
+            <p className="mt-1 text-sm text-[#5b6476]">
+              Review all server, auth, metadata, tool, and schema details from one place.
+            </p>
+          </div>
+
+          <Searchbar
+            value={searchValue}
+            onChange={setSearchValue}
+            placeholder="Search MCP Servers.."
+            name="mcp_client_search"
+          />
         </div>
 
         <McpInventoryTable
-          servers={servers}
+          servers={filteredServers}
           isLoading={isLoading}
           loadError={loadError}
           selectedServerId={selectedServer?.mcp_server_id ?? null}

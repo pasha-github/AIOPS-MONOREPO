@@ -1,15 +1,16 @@
 "use client";
 
-import { type AgentLogEntry, type AgentSessionSummary } from "../dashboard/logs";
-import { Loader2 } from "lucide-react";
+import { Bot, Loader2, RefreshCw } from "lucide-react";
 import { useMemo, useState } from "react";
+import { type AgentLogEntry, type AgentSessionSummary } from "../dashboard/logs";
+import type { SessionTokenUsage } from "./observability";
 
 const entryIconStyles = {
   text: "bg-[#ecebff] text-[#5b4cf0]",
   request: "bg-[#fff1e8] text-[#ea580c]",
 } as const;
 
-const ROWS_PER_PAGE = 5;
+const ROWS_PER_PAGE = 6;
 
 const formatEntryDate = (timestamp: number) => {
   if (!Number.isFinite(timestamp) || timestamp <= 0) {
@@ -64,13 +65,42 @@ function TimelineSkeleton() {
   );
 }
 
+function EmptySessionsState() {
+  return (
+    <div className="relative flex flex-1 items-center justify-center overflow-hidden rounded-xl bg-[linear-gradient(180deg,#ffffff_0%,#fbfcff_100%)] px-6 py-10 text-center shadow-[0_24px_60px_-44px_rgba(15,23,42,0.45)]">
+      <div
+        className="pointer-events-none absolute inset-0 flex items-center justify-center"
+        aria-hidden="true"
+      >
+        <Bot className="h-56 w-56 text-[#4f49e2]/[0.06]" strokeWidth={1.2} />
+      </div>
+      <div className="relative z-10 mx-auto max-w-md">
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[1.5rem] bg-[#eef2ff] text-[#4f49e2] shadow-[0_18px_35px_-24px_rgba(79,73,226,0.7)]">
+          <Bot className="h-8 w-8" />
+        </div>
+        <h3 className="mt-6 text-3xl font-semibold tracking-tight text-[#111827]">
+          No Sessions Available
+        </h3>
+        <p className="mt-4 text-base leading-7 text-[#5f677a]">
+          Activity sessions will appear here after an agent runs, responds, or
+          records tool usage.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 type UserActivityTableProps = {
   isLoading: boolean;
   loadingSessionId: string | null;
   selectedSessionId: string | null;
   selectedSession: AgentSessionSummary | null;
+  isRefreshing: boolean;
   entries: AgentLogEntry[];
   selectedEntryId: string | null;
+  sessionTokenUsage: SessionTokenUsage | null;
+  isSessionTokenUsageLoading: boolean;
+  onRefresh: () => void;
   onSelectEntry: (entryId: string) => void;
 };
 
@@ -79,11 +109,16 @@ export default function UserActivityTable({
   loadingSessionId,
   selectedSessionId,
   selectedSession,
+  isRefreshing,
   entries,
   selectedEntryId,
+  sessionTokenUsage,
+  isSessionTokenUsageLoading,
+  onRefresh,
   onSelectEntry,
 }: UserActivityTableProps) {
   const [currentPage, setCurrentPage] = useState(1);
+  const numberFormatter = useMemo(() => new Intl.NumberFormat(), []);
 
   const totalPages = Math.max(1, Math.ceil(entries.length / ROWS_PER_PAGE));
   const visiblePage = Math.min(currentPage, totalPages);
@@ -93,42 +128,90 @@ export default function UserActivityTable({
   }, [entries, visiblePage]);
 
   return (
-    <div className="min-w-0">
+    <div className="flex h-full min-w-0 flex-col xl:h-[760px]">
       <div className="mb-6">
         <div className="mb-5 flex items-center gap-4">
           <span className="h-px w-full bg-[#dde4f1]" />
         </div>
-        <div className="flex items-end justify-between gap-4">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#7a8498]">
-              Activity Table
-            </p>
-            <h2 className="mt-2 text-2xl font-semibold text-[#111827]">
-              User activity
-            </h2>
-          </div>
-          {loadingSessionId && selectedSessionId === loadingSessionId ? (
-            <div className="inline-flex items-center gap-2 text-sm font-medium text-[#5f677a]">
-              <Loader2 className="h-4 w-4 animate-spin text-[#5b4cf0]" />
-              Syncing logs
+        <div className="grid gap-3">
+          <div className="flex flex-wrap items-start justify-between gap-4 xl:min-h-[112px]">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.32em] text-[#7a8498]">
+                Activity Table
+              </p>
+              <h2 className="mt-2 text-3xl font-semibold text-[#111827]">
+                User activity
+              </h2>
             </div>
-          ) : null}
+
+            <div className="flex items-center justify-end gap-3">
+              {loadingSessionId && selectedSessionId === loadingSessionId ? (
+                <div className="inline-flex items-center gap-2 text-sm font-medium text-[#5f677a]">
+                  <Loader2 className="h-4 w-4 animate-spin text-[#5b4cf0]" />
+                  Syncing logs
+                </div>
+              ) : null}
+              <button
+                type="button"
+                onClick={onRefresh}
+                disabled={isRefreshing}
+                className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-[#dbe4f5] bg-white text-[#4f49e2] shadow-[0_14px_30px_-22px_rgba(16,24,40,0.45)] transition hover:bg-[#eef2ff] disabled:cursor-not-allowed disabled:opacity-60"
+                aria-label="Refresh activity"
+                title="Refresh activity"
+              >
+                <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
+              </button>
+            </div>
+          </div>
+          <p className="text-sm text-[#5f677a]">
+            {isSessionTokenUsageLoading ? (
+              <span className="inline-flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin text-[#5b4cf0]" />
+                Loading token usage
+              </span>
+            ) : (
+              <>
+                Input Tokens -{" "}
+                <span className="font-semibold text-[#111827]">
+                  {sessionTokenUsage
+                    ? numberFormatter.format(sessionTokenUsage.input_tokens)
+                    : "-"}
+                </span>
+                , Output Tokens -{" "}
+                <span className="font-semibold text-[#111827]">
+                  {sessionTokenUsage
+                    ? numberFormatter.format(sessionTokenUsage.output_tokens)
+                    : "-"}
+                </span>
+                , Total Tokens -{" "}
+                <span className="font-semibold text-[#111827]">
+                  {sessionTokenUsage
+                    ? numberFormatter.format(sessionTokenUsage.total_tokens)
+                    : "-"}
+                </span>
+              </>
+            )}
+          </p>
         </div>
       </div>
 
       {isLoading ? (
-        <TimelineSkeleton />
+        <div className="flex-1">
+          <TimelineSkeleton />
+        </div>
       ) : selectedSessionId && loadingSessionId === selectedSessionId && entries.length === 0 ? (
-        <TimelineSkeleton />
+        <div className="flex-1">
+          <TimelineSkeleton />
+        </div>
       ) : !selectedSession ? (
-        <div className="py-10 text-sm text-[#687285]">No sessions available.</div>
+        <EmptySessionsState />
       ) : entries.length === 0 ? (
-        <div className="py-10 text-sm text-[#687285]">
+        <div className="flex flex-1 items-center rounded-xl bg-white px-6 py-10 text-sm text-[#687285] shadow-[0_24px_60px_-44px_rgba(15,23,42,0.45)]">
           No text or tool request parts were found in this activity.
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl bg-white shadow-[0_24px_60px_-44px_rgba(15,23,42,0.45)]">
-          <div className="overflow-x-auto">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl bg-white shadow-[0_24px_60px_-44px_rgba(15,23,42,0.45)]">
+          <div className="min-h-0 flex-1 overflow-x-auto">
             <table className="min-w-full border-collapse table-fixed">
               <colgroup>
                 <col className="w-[24%]" />

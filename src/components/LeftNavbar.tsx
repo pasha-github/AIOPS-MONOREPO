@@ -1,5 +1,6 @@
 "use client";
 
+import ComingSoon from "@/components/comingsoon";
 import {
   Activity,
   Bot,
@@ -67,7 +68,7 @@ const navSections: NavSection[] = [
         reloadOnNavigate: true,
       },
       {
-        label: "Model Context Protocol",
+        label: "MCP Servers",
         id: "integrations-model-context-protocol",
         icon: (
           <img
@@ -106,6 +107,7 @@ const navSections: NavSection[] = [
         id: "platform-user-management",
         icon: <Users className="h-5 w-5" />,
         href: "/user-management",
+        disabled: true,
       },
     ],
   },
@@ -202,8 +204,11 @@ export default function LeftNavbar() {
                         />
                       ) : null}
                     </span>
-                    <span className="w-0 overflow-hidden opacity-0 transition-all duration-300 group-hover:w-auto group-hover:opacity-100">
-                      {item.label}
+                    <span className="flex w-0 items-center gap-2 overflow-hidden opacity-0 transition-all duration-300 group-hover:w-auto group-hover:opacity-100">
+                      <span>{item.label}</span>
+                      {item.id === "platform-user-management" ? (
+                        <ComingSoon variant="badge" />
+                      ) : null}
                     </span>
                   </>
                 );

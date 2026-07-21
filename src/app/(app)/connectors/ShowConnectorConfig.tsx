@@ -1,7 +1,14 @@
 "use client";
 
+import {
+  ModalCard,
+  ModalCardBody,
+  ModalCardFooter,
+  ModalCardHeader,
+  ModalCardPanel,
+} from "@/components/modalcards";
 import { Check, Eye, EyeOff, ListTree, Pencil, Trash2, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 type ConfigValue = {
   name: string;
@@ -11,10 +18,8 @@ type ConfigValue = {
 type ConnectorConfigRecord = {
   created_at: string;
   config: ConfigValue[];
-  connector_id: string;
   name: string;
   connector_config_id: string;
-  description: string | null;
   updated_at: string;
 };
 
@@ -103,19 +108,15 @@ export default function ShowConnectorConfig({
   const [deleteSuccess, setDeleteSuccess] = useState("");
   const [deletingRecordId, setDeletingRecordId] = useState<string | null>(null);
 
-  const configUrl = useMemo(() => {
-    if (!connectorId) {
-      return "";
-    }
-    return `${connectorsApiBase}/connectors/${encodeURIComponent(connectorId)}/config`;
-  }, [connectorId, connectorsApiBase]);
-
   useEffect(() => {
-    if (!isOpen || !connectorId || !configUrl) {
+    if (!isOpen || !connectorId) {
       return;
     }
 
     const controller = new AbortController();
+    const configUrl = `${connectorsApiBase}/connectors/${encodeURIComponent(
+      connectorId
+    )}/config`;
 
     const loadConfig = async () => {
       setIsLoading(true);
@@ -147,7 +148,7 @@ export default function ShowConnectorConfig({
     });
 
     return () => controller.abort();
-  }, [configUrl, connectorId, isOpen]);
+  }, [connectorId, connectorsApiBase, isOpen]);
 
   if (!isOpen || !connectorId) {
     return null;
@@ -327,28 +328,16 @@ export default function ShowConnectorConfig({
   };
 
   return (
-    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/35 px-4 py-8 backdrop-blur-sm">
-      <div className="flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-[0_20px_60px_-35px_rgba(15,23,42,0.65)]">
-        <div className="flex items-center justify-between bg-[#4f49e2] px-6 py-4 text-white">
-          <div className="flex items-center gap-3">
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20">
-              <ListTree className="h-4 w-4" />
-            </span>
-            <div>
-              <p className="text-lg font-semibold">Show Config</p>
-              <p className="text-xs text-white/80">{connectorName || connectorId}</p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-white/15"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
+    <ModalCard>
+      <ModalCardPanel maxWidthClassName="max-w-5xl">
+        <ModalCardHeader
+          title="Show Config"
+          subtitle={connectorName || connectorId}
+          icon={<ListTree className="h-4 w-4" />}
+          onClose={onClose}
+        />
 
-        <div className="overflow-y-auto px-6 py-5">
+        <ModalCardBody className="overflow-y-auto">
           {isLoading ? (
             <div className="space-y-4">
               {Array.from({ length: 3 }).map((_, index) => (
@@ -417,7 +406,7 @@ export default function ShowConnectorConfig({
                         editingTarget?.recordId === record.connector_config_id &&
                         editingTarget.fieldName === item.name;
                       const isSaving = savingItemKey === itemKey;
-                      const hiddenValue = item.value ? "•".repeat(18) : "";
+                      const hiddenValue = item.value ? "*".repeat(18) : "";
 
                       return (
                         <div
@@ -473,43 +462,41 @@ export default function ShowConnectorConfig({
 
                           {!isEditing ? (
                             <div className="flex items-center gap-2">
-                              <>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleEditStart(
+                                    record.connector_config_id,
+                                    item.name,
+                                    item.value
+                                  )
+                                }
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[#cbd2ff] text-[#4f49e2] transition hover:bg-[#eef2ff]"
+                                aria-label={`Edit ${item.name}`}
+                                title={`Edit ${item.name}`}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </button>
+                              {secret ? (
                                 <button
                                   type="button"
                                   onClick={() =>
-                                    handleEditStart(
-                                      record.connector_config_id,
-                                      item.name,
-                                      item.value
-                                    )
+                                    setVisibleSecrets((prev) => ({
+                                      ...prev,
+                                      [itemKey]: !prev[itemKey],
+                                    }))
                                   }
                                   className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[#cbd2ff] text-[#4f49e2] transition hover:bg-[#eef2ff]"
-                                  aria-label={`Edit ${item.name}`}
-                                  title={`Edit ${item.name}`}
+                                  aria-label={`${isVisible ? "Hide" : "Show"} ${item.name}`}
+                                  title={`${isVisible ? "Hide" : "Show"} ${item.name}`}
                                 >
-                                  <Pencil className="h-4 w-4" />
+                                  {isVisible ? (
+                                    <EyeOff className="h-4 w-4" />
+                                  ) : (
+                                    <Eye className="h-4 w-4" />
+                                  )}
                                 </button>
-                                {secret ? (
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      setVisibleSecrets((prev) => ({
-                                        ...prev,
-                                        [itemKey]: !prev[itemKey],
-                                      }))
-                                    }
-                                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[#cbd2ff] text-[#4f49e2] transition hover:bg-[#eef2ff]"
-                                    aria-label={`${isVisible ? "Hide" : "Show"} ${item.name}`}
-                                    title={`${isVisible ? "Hide" : "Show"} ${item.name}`}
-                                  >
-                                    {isVisible ? (
-                                      <EyeOff className="h-4 w-4" />
-                                    ) : (
-                                      <Eye className="h-4 w-4" />
-                                    )}
-                                  </button>
-                                ) : null}
-                              </>
+                              ) : null}
                             </div>
                           ) : null}
                         </div>
@@ -526,12 +513,12 @@ export default function ShowConnectorConfig({
               ))}
             </div>
           )}
-        </div>
-      </div>
+        </ModalCardBody>
+      </ModalCardPanel>
 
       {deleteTarget ? (
-        <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/30 px-4 py-8 backdrop-blur-sm">
-          <div className="w-full max-w-xl overflow-hidden rounded-2xl bg-white shadow-[0_20px_60px_-35px_rgba(15,23,42,0.65)]">
+        <ModalCard zIndexClassName="z-[100]">
+          <ModalCardPanel maxWidthClassName="max-w-xl">
             <div className="flex items-center justify-between border-b border-[#fee2e2] bg-[#fff5f5] px-6 py-4">
               <div className="flex items-center gap-3 text-[#dc2626]">
                 <Trash2 className="h-5 w-5" />
@@ -551,7 +538,7 @@ export default function ShowConnectorConfig({
               </button>
             </div>
 
-            <div className="space-y-4 px-6 py-5">
+            <ModalCardBody className="space-y-4">
               <p className="text-base text-[#334155]">
                 Delete the current config for{" "}
                 <span className="rounded-md bg-[#fff1f2] px-2 py-1 font-semibold text-[#dc2626]">
@@ -572,9 +559,9 @@ export default function ShowConnectorConfig({
                   {deleteSuccess}
                 </div>
               ) : null}
-            </div>
+            </ModalCardBody>
 
-            <div className="flex items-center justify-end gap-3 border-t border-[#eef1f7] px-6 py-4">
+            <ModalCardFooter>
               <button
                 type="button"
                 onClick={handleDeleteCancel}
@@ -591,10 +578,10 @@ export default function ShowConnectorConfig({
               >
                 {deletingRecordId ? "Deleting..." : "Delete"}
               </button>
-            </div>
-          </div>
-        </div>
+            </ModalCardFooter>
+          </ModalCardPanel>
+        </ModalCard>
       ) : null}
-    </div>
+    </ModalCard>
   );
 }

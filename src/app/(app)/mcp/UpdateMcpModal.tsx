@@ -1,6 +1,14 @@
 "use client";
 
 import {
+  ModalCard,
+  ModalCardBody,
+  ModalCardFooter,
+  ModalCardHeader,
+  ModalCardPanel,
+  ModalCardRequiredNote,
+} from "@/components/modalcards";
+import {
   Check,
   ChevronDown,
   Eye,
@@ -91,6 +99,18 @@ const getRowLabel = (field: EditableField) => {
     case "auth_secret":
       return "AUTH SECRET";
   }
+};
+
+const isRequiredField = (field: EditableField, authType: McpAuthType) => {
+  if (field === "auth_username") {
+    return authType === "basic";
+  }
+
+  if (field === "auth_secret") {
+    return authType === "basic" || authType === "bearer";
+  }
+
+  return true;
 };
 
 const getDisplayValue = (field: EditableField, form: McpFormState) => {
@@ -606,28 +626,16 @@ export default function UpdateMcpModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/35 px-4 py-8 backdrop-blur-sm">
-      <div className="flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-[0_20px_60px_-35px_rgba(15,23,42,0.65)]">
-        <div className="flex items-center justify-between bg-[#4f49e2] px-6 py-4 text-white">
-          <div className="flex items-center gap-3">
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20">
-              <ListTree className="h-4 w-4" />
-            </span>
-            <div>
-              <p className="text-lg font-semibold">Update MCP Server</p>
-              <p className="text-xs text-white/80">{server?.name ?? mcpServerId}</p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-white/15"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
+    <ModalCard zIndexClassName="z-[100]">
+      <ModalCardPanel maxWidthClassName="max-w-5xl">
+        <ModalCardHeader
+          title="Update MCP Server"
+          subtitle={server?.name ?? mcpServerId}
+          icon={<ListTree className="h-4 w-4" />}
+          onClose={onClose}
+        />
 
-        <div className="overflow-y-auto px-6 py-5">
+        <ModalCardBody className="overflow-y-auto">
           {isLoading ? (
             <div className="space-y-4">
               {Array.from({ length: 5 }).map((_, index) => (
@@ -666,6 +674,7 @@ export default function UpdateMcpModal({
                   const isEditing = editingField === field;
                   const isSaving = savingField === field;
                   const isSecretField = field === "auth_secret";
+                  const isRequired = isRequiredField(field, form.auth_type);
 
                   return (
                     <div
@@ -675,6 +684,7 @@ export default function UpdateMcpModal({
                       <div className="min-w-0 flex-1">
                         <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[#64748b]">
                           {getRowLabel(field)}
+                          {isRequired ? <span className="ml-1 text-[#ef4444]">*</span> : null}
                         </p>
 
                         {isEditing ? (
@@ -770,8 +780,11 @@ export default function UpdateMcpModal({
               ) : null}
             </div>
           ) : null}
-        </div>
-      </div>
-    </div>
+        </ModalCardBody>
+        <ModalCardFooter className="justify-start">
+          <ModalCardRequiredNote />
+        </ModalCardFooter>
+      </ModalCardPanel>
+    </ModalCard>
   );
 }

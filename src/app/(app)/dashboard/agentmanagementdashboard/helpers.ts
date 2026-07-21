@@ -3,8 +3,17 @@ import { trimTrailingSlash } from "@/config/agent";
 import type { AgentListApiResponseItem, AgentRecord } from "./types";
 
 export const mapApiStatusToDashboardStatus = (
-  status: string | null | undefined
-) => (String(status ?? "").toLowerCase() === "active" ? "STARTED" : "STOPPED");
+  status: string | null | undefined,
+  isEnabled: boolean | null | undefined
+) => {
+  if (isEnabled === true) {
+    return "STARTED";
+  }
+  if (isEnabled === false) {
+    return "STOPPED";
+  }
+  return String(status ?? "").toLowerCase() === "active" ? "STARTED" : "STOPPED";
+};
 
 export const inferEnterprise = (
   name: string,
@@ -53,10 +62,12 @@ export const mapAgentListResponse = (
         agentId: id,
         name,
         port: null,
-        status: mapApiStatusToDashboardStatus(item.status),
+        status: mapApiStatusToDashboardStatus(item.status, item.isEnabled),
         enterprise: inferEnterprise(name, item.type),
         start_time: null,
         stop_time: null,
         updated_at: item.updated_at ?? null,
+        deployment_target: item.deployment_target ?? null,
+        vertex_stream_query_url: item.vertex_stream_query_url ?? null,
       };
     });

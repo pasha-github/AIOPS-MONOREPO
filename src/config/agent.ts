@@ -48,9 +48,28 @@ export const LLM_PROVIDER_MODELS = {
     "global.anthropic.claude-sonnet-4-6",
     "global.amazon.nova-2-lite-v1:0",
   ],
+  azure_ai: [
+    "claude-sonnet-4-6",
+    "claude-opus-4-8",
+    "gpt-5.5",
+    "gpt-5.4",
+    "gpt-5.3-codex",
+    "claude-haiku-4-5",
+    "grok-4-1-fast-reasoning",
+  ],
 } as const;
 
 export type LlmProviderKey = keyof typeof LLM_PROVIDER_MODELS;
+
+export const formatLlmProviderLabel = (provider: string) => {
+  if (provider === "azure_ai") {
+    return "Azure AI Foundry";
+  }
+
+  return provider.length > 0
+    ? provider[0].toUpperCase() + provider.slice(1)
+    : provider;
+};
 
 export const getProviderIconPath = (provider: string) =>
   `/img/${provider}.webp`;
