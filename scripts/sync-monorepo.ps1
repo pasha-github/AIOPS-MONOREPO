@@ -34,6 +34,19 @@ function Invoke-Git {
     return $LASTEXITCODE
 }
 
+# Finds the source-repo commit a given prefix was last synced to, by reading
+# the git-subtree-split trailer git-subtree itself writes on every add/pull.
+# Works whether that ancestor commit was a full-history merge (the original
+# imports) or a --squash commit (daily syncs) - the trailer is present either way.
+function Get-SubtreeSplit {
+    param([string]$Ref, [string]$Prefix)
+    $msg = & git log $Ref --grep="git-subtree-dir: $Prefix" -1 --format=%B 2>$null
+    if ($msg -match 'git-subtree-split:\s*([0-9a-f]{40})') {
+        return $matches[1]
+    }
+    return $null
+}
+
 $Repos = @(
     @{ Name = "aiops-agent-management"; Remote = "aiops-agent-management"; Url = "git@github-rc:royal-cyber-inc/aiops-agent-management.git"; Branch = "main"; Prefix = "aiops-agent-management" },
     @{ Name = "aiops-backend-mcps";     Remote = "aiops-backend-mcps";     Url = "git@github-rc:royal-cyber-inc/aiops-backend-mcps.git";     Branch = "main"; Prefix = "aiops-backend-mcps" },
@@ -82,11 +95,13 @@ if ($branchExists) {
 
 $Synced = @()
 $Skipped = @()
+$ChangeDetails = @{}
 
 foreach ($r in $Repos) {
     Log "----- Syncing $($r.Name) into $($r.Prefix)/ -----"
     $beforeHead = (& git rev-parse HEAD).Trim()
     $prefixExists = Test-Path (Join-Path $RepoRoot $r.Prefix)
+    $oldSplit = Get-SubtreeSplit -Ref $beforeHead -Prefix $r.Prefix
 
     if (-not $prefixExists) {
         Log "$($r.Prefix)/ does not exist yet - running initial 'subtree add'"
@@ -105,9 +120,25 @@ foreach ($r in $Repos) {
     $afterHead = (& git rev-parse HEAD).Trim()
     if ($afterHead -eq $beforeHead) {
         Log "$($r.Name) already up to date"
-    } else {
-        $Synced += $r.Name
+        continue
     }
+
+    $Synced += $r.Name
+    $newSplit = Get-SubtreeSplit -Ref $afterHead -Prefix $r.Prefix
+
+    $commitLines = @()
+    if ($oldSplit -and $newSplit -and ($oldSplit -ne $newSplit)) {
+        $commitLines = @(& git log --oneline --no-decorate "$oldSplit..$newSplit")
+    }
+    $diffStat = (& git diff --shortstat $beforeHead $afterHead -- $r.Prefix) -join ' '
+
+    $ChangeDetails[$r.Name] = @{
+        IsInitial   = (-not $oldSplit)
+        CommitCount = $commitLines.Count
+        Commits     = $commitLines
+        DiffStat    = $diffStat
+    }
+    Log "$($r.Name): $diffStat ($($commitLines.Count) commit(s) pulled)"
 }
 
 if ($Synced.Count -eq 0) {
@@ -129,22 +160,47 @@ if ($code -ne 0) {
     exit 1
 }
 
-$prBodyLines = @(
-    "Automated daily sync from royal-cyber-inc source repos.",
-    "",
-    "**Synced:** $($Synced -join ', ')"
-)
+$prBodyLines = @("Automated daily sync from royal-cyber-inc source repos.", "")
+
+foreach ($name in $Synced) {
+    $d = $ChangeDetails[$name]
+    $prBodyLines += "### $name"
+    if ($d.IsInitial) {
+        $prBodyLines += "_Initial import - $($d.DiffStat)_"
+    } elseif ($d.CommitCount -eq 0) {
+        $prBodyLines += "_$($d.DiffStat) (no distinct commits found - remote history may have been rewritten)_"
+    } else {
+        $prBodyLines += "$($d.DiffStat), $($d.CommitCount) commit(s):"
+        $prBodyLines += ""
+        $prBodyLines += "<details><summary>Commit list</summary>"
+        $prBodyLines += ""
+        $prBodyLines += '```'
+        $shown = $d.Commits
+        if ($shown.Count -gt 25) {
+            $prBodyLines += $shown[0..24]
+            $prBodyLines += "... and $($shown.Count - 25) more commit(s)"
+        } else {
+            $prBodyLines += $shown
+        }
+        $prBodyLines += '```'
+        $prBodyLines += "</details>"
+    }
+    $prBodyLines += ""
+}
+
 if ($Skipped.Count -gt 0) {
     $prBodyLines += "**Skipped (conflict - needs manual merge):** $($Skipped -join ', ')"
 }
 $prBody = $prBodyLines -join "`n"
+$prBodyFile = Join-Path $LogDir "pr-body-$Today.md"
+Set-Content -Path $prBodyFile -Value $prBody -Encoding utf8NoBOM
 
 Log "Switching gh CLI account to pasha-github to open the PR"
 & gh auth switch --user pasha-github --hostname github.com *>&1 | ForEach-Object { Log "  $_" }
 
 $prCode = 0
 try {
-    & gh pr create --repo pasha-github/AIOPS-MONOREPO --base main --head $BranchName --title "Daily sync: $Today" --body $prBody *>&1 | ForEach-Object { Log "  $_" }
+    & gh pr create --repo pasha-github/AIOPS-MONOREPO --base main --head $BranchName --title "Daily sync: $Today" --body-file $prBodyFile *>&1 | ForEach-Object { Log "  $_" }
     $prCode = $LASTEXITCODE
 } finally {
     & gh auth switch --user RCMPasha --hostname github.com *>&1 | ForEach-Object { Log "  $_" }
