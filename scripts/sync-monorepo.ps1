@@ -11,7 +11,7 @@ Source repos -> monorepo folder:
 Run manually with: powershell -File scripts\sync-monorepo.ps1
 #>
 
-$ErrorActionPreference = 'Stop'
+$ErrorActionPreference = 'Continue'
 $RepoRoot = "C:\Temp\AIOPS-MONOREPO"
 Set-Location $RepoRoot
 
