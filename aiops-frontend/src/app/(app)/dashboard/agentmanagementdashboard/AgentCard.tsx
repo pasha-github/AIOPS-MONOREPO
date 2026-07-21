@@ -1,6 +1,6 @@
 "use client";
 
-import { Bot, Eye, MessageCircle } from "lucide-react";
+import { Bot, MessageCircle } from "lucide-react";
 import { forwardRef } from "react";
 
 import { formatUpdatedAt } from "./helpers";
@@ -15,8 +15,7 @@ const AgentCard = forwardRef<HTMLDivElement, AgentCardProps>(function AgentCard(
   { agent, onOpenChat },
   ref
 ) {
-  const isRunning = agent.status?.toUpperCase() === "STARTED";
-  const isMule = (agent.enterprise ?? "").trim().toLowerCase() === "mule";
+  const isActive = agent.status?.toUpperCase() === "STARTED";
   const updatedAt = formatUpdatedAt(agent.updated_at);
 
   return (
@@ -36,50 +35,39 @@ const AgentCard = forwardRef<HTMLDivElement, AgentCardProps>(function AgentCard(
         </div>
 
         <div className="flex items-center gap-3 text-xs text-[#647087]">
-          <span>{isRunning ? "Running" : "Stopped"}</span>
+          <span className={isActive ? "text-[#4b5563]" : "text-[#f97316]"}>
+            {isActive ? "Active" : "Inactive"}
+          </span>
           <button
             type="button"
             disabled
-            aria-label={`${isRunning ? "Running" : "Stopped"} status`}
+            aria-label={`${isActive ? "Active" : "Inactive"} status`}
             className={`relative inline-flex h-5 w-10 cursor-default items-center rounded-full ${
-              isRunning ? "bg-[#5b4cf0]" : "bg-[#e3e6ee]"
+              isActive ? "bg-[#16a34a]" : "bg-[#f97316]"
             }`}
           >
             <span
               className={`absolute h-4 w-4 rounded-full bg-white shadow transition ${
-                isRunning ? "left-5" : "left-1"
+                isActive ? "left-5" : "left-1"
               }`}
             />
           </button>
         </div>
       </div>
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+      <div className="mt-4">
         <button
           type="button"
           onClick={() => onOpenChat(agent)}
-          disabled={!isRunning}
-          className={`flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-medium ${
-            isRunning
-              ? "bg-[#cfefff] text-[#0b7ed9]"
+          disabled={!isActive}
+          className={`flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2 text-center text-sm font-medium transition active:scale-[0.98] ${
+            isActive
+              ? "bg-[#cfefff] text-[#0b7ed9] hover:bg-[#bfe7ff] shadow-[0_12px_24px_-18px_rgba(11,126,217,0.45)]"
               : "cursor-not-allowed bg-[#e5e7eb] text-[#9ca3af]"
           }`}
         >
           <MessageCircle className="h-4 w-4" />
           Chat with agent
-        </button>
-
-        <button
-          type="button"
-          disabled={!isMule}
-          className={`flex items-center justify-center gap-2 rounded-xl border border-[#e1e5ef] px-4 py-2 text-sm font-medium text-[#3a4355] ${
-            isMule
-              ? "bg-white hover:bg-[#f3f4f6]"
-              : "cursor-not-allowed bg-[#f9fafb] opacity-60"
-          }`}
-        >
-          View Logs
-          <Eye className="h-4 w-4" />
         </button>
       </div>
     </div>

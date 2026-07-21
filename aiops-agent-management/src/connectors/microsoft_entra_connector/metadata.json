@@ -1,8 +1,8 @@
 {
   "id": "microsoft_entra_connector",
   "name": "Microsoft Entra",
-  "description": "Microsoft Entra ID password reset and account state workflows via Microsoft Graph.",
-  "version": "0.0.1",
+  "description": "Microsoft Entra ID user provisioning, license management, password reset, and account state workflows via Microsoft Graph.",
+  "version": "0.2.0",
   "config_variables": [
     {
       "name": "TENANT_ID",
@@ -34,6 +34,18 @@
     }
   ],
   "tools": [
+    {
+      "name": "create_user",
+      "documentation": "Create a new user in Microsoft Entra ID with a temporary password."
+    },
+    {
+      "name": "assign_license",
+      "documentation": "Assign a Microsoft 365 license to a user to activate Outlook, SharePoint, and Teams."
+    },
+    {
+      "name": "list_licenses",
+      "documentation": "List all Microsoft 365 license SKUs available in the tenant, with enabled, consumed, and available seat counts."
+    },
     {
       "name": "reset_user_password",
       "documentation": "Reset a Microsoft Entra ID user's password through Microsoft Graph."

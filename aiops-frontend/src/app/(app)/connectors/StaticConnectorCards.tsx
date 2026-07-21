@@ -1,27 +1,44 @@
 "use client";
 
-import { ChevronRight, Eye, Plug, Settings2 } from "lucide-react";
+import ComingSoon from "@/components/comingsoon";
+import { Link2 } from "lucide-react";
 
 type StaticConnectorCardsProps = {
-  searchTerm?: string;
+  connectors?: StaticConnector[];
 };
 
-type StaticConnector = {
+export type StaticConnector = {
   id: string;
   name: string;
   logoSrc: string;
 };
 
-const STATIC_CONNECTORS: StaticConnector[] = [
+export const STATIC_CONNECTORS: StaticConnector[] = [
+
+  {
+    id: "Oracle-Integration-Cloud",
+    name: "Oracle Integration Cloud",
+    logoSrc: "/img/Oracle-Integration-Cloud.png",
+  },
+  {
+    id: "Apache-Nifi",
+    name: "Apache Nifi",
+    logoSrc: "/img/Apache-NiFi.png",
+  },
+  {
+    id: "Oracle-Data-Integrator",
+    name: "Oracle Data Integrator",
+    logoSrc: "/img/Oracle-Data-Integrator.png",
+  },
+  {
+    id: "Oracle-Universal-Content-Management",
+    name: "Oracle Universal-Content Management",
+    logoSrc: "/img/Oracle-Universal-Content-Management.png",
+  },
   {
     id: "elasticsearch_static",
     name: "Elastic Search",
     logoSrc: "/img/elasticsearch.jpeg",
-  },
-  {
-    id: "ibm_ace_static",
-    name: "IBM ACE",
-    logoSrc: "/img/ibm_mq_connector.png",
   },
   {
     id: "informatica_static",
@@ -53,34 +70,40 @@ const STATIC_CONNECTORS: StaticConnector[] = [
     name: "Apache Kafka",
     logoSrc: "/img/apache-kafka.png",
   },
+  
 ];
 
-export default function StaticConnectorCards({
-  searchTerm,
-}: StaticConnectorCardsProps) {
+export function filterStaticConnectors(searchTerm?: string) {
   const normalizedSearch = (searchTerm ?? "").trim().toLowerCase();
-  const visibleConnectors = normalizedSearch
+  return normalizedSearch
     ? STATIC_CONNECTORS.filter((connector) =>
         connector.name.toLowerCase().includes(normalizedSearch)
       )
     : STATIC_CONNECTORS;
+}
 
+export default function StaticConnectorCards({
+  connectors = STATIC_CONNECTORS,
+}: StaticConnectorCardsProps) {
   return (
     <>
-      {visibleConnectors.map((connector) => (
+      {connectors.map((connector) => (
         <div
           key={connector.id}
-          className="relative rounded-2xl bg-white p-5 shadow-[0_12px_30px_-24px_rgba(16,24,40,0.35)] ring-1 ring-[#eef1f7] transition-all duration-200 hover:shadow-[0_20px_34px_-24px_rgba(79,73,226,0.45)] hover:ring-[#d7defe]"
+          className="relative rounded-2xl bg-white px-5 py-6 shadow-[0_12px_30px_-24px_rgba(16,24,40,0.22)] ring-1 ring-[#eef1f7] transition-all duration-200 hover:shadow-[0_20px_34px_-24px_rgba(79,73,226,0.28)] hover:ring-[#d7defe]"
         >
-          <div className="flex items-start justify-between gap-4">
+          <ComingSoon />
+          <div className="flex items-center justify-between gap-4">
             <div className="flex-1">
               <div className="flex items-center gap-3">
                 <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#eef2ff] text-[#4f49e2]">
-                  <Plug className="h-4 w-4" />
+                  <Link2 className="h-4 w-4" />
                 </span>
-                <p className="text-xl font-semibold text-[#111827]">
-                  {connector.name}
-                </p>
+                <div>
+                  <p className="text-[22px] font-semibold text-[#111827]">
+                    {connector.name}
+                  </p>
+                </div>
               </div>
             </div>
             <img
@@ -89,39 +112,6 @@ export default function StaticConnectorCards({
               className="h-12 w-24 object-contain"
               loading="lazy"
             />
-          </div>
-
-          <div className="mt-6 grid grid-cols-3 gap-2">
-            <button
-              type="button"
-              disabled
-              className="inline-flex w-full cursor-not-allowed items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-[#4f49e2] px-3 py-2 text-sm font-semibold text-white opacity-60 shadow-[0_10px_22px_-14px_rgba(79,73,226,0.85)]"
-              aria-label={`Set config for ${connector.name}`}
-              title="Static connector preview"
-            >
-              <Settings2 className="h-4 w-4" />
-              Set Config
-            </button>
-            <button
-              type="button"
-              disabled
-              className="inline-flex w-full cursor-not-allowed items-center justify-center gap-2 whitespace-nowrap rounded-lg border border-[#cbd2ff] px-3 py-2 text-sm font-semibold text-[#4f49e2] opacity-60 shadow-[0_6px_16px_-12px_rgba(79,73,226,0.8)]"
-              aria-label={`Show config for ${connector.name}`}
-              title="Static connector preview"
-            >
-              <Eye className="h-4 w-4" />
-              Show Config
-            </button>
-            <button
-              type="button"
-              disabled
-              className="inline-flex w-full cursor-not-allowed items-center justify-center gap-2 whitespace-nowrap rounded-lg border border-[#cbd2ff] px-3 py-2 text-sm font-semibold text-[#4f49e2] opacity-60 shadow-[0_6px_16px_-12px_rgba(79,73,226,0.8)]"
-              aria-label={`View details about ${connector.name}`}
-              title="Static connector preview"
-            >
-              View Details
-              <ChevronRight className="h-4 w-4" />
-            </button>
           </div>
         </div>
       ))}

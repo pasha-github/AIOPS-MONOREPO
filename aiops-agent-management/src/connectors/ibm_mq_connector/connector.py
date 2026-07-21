@@ -3,15 +3,19 @@ IBM MQ Connector v0.1.0
 -----------------------
 Connector for IBM MQ administrative operations and support endpoints.
 Provides queue manager discovery, MQSC execution, MQ log retrieval,
-and SSH command execution via Paramiko.
+and SSH command execution via Paramiko or a bridge endpoint.
 """
 
+import logging
 from typing import Any
+from urllib.parse import urlsplit
 
 import paramiko
 import requests
 from base_connector import BaseConnector, connector_tool
 from google.adk.tools.tool_context import ToolContext
+
+logger = logging.getLogger(__name__)
 
 
 class IbmMqConnector(BaseConnector):
@@ -34,6 +38,7 @@ class IbmMqConnector(BaseConnector):
         SSH_HOSTNAME: str,
         SSH_USERNAME: str,
         SSH_PASSWORD: str,
+        SSH_URL: str = "",
         VERIFY_TLS: str = "false",
         prefix: str = "",
     ):
@@ -45,6 +50,7 @@ class IbmMqConnector(BaseConnector):
         self.ssh_hostname = SSH_HOSTNAME.strip()
         self.ssh_username = SSH_USERNAME.strip()
         self.ssh_password = SSH_PASSWORD
+        self.ssh_url = SSH_URL.strip()
         self.verify_tls = self._parse_bool(VERIFY_TLS)
 
     def _parse_bool(self, value: Any) -> bool:
@@ -69,7 +75,15 @@ class IbmMqConnector(BaseConnector):
         basic_auth: bool = False,
     ) -> requests.Response:
         auth = (self.username, self.password) if basic_auth else None
-        return requests.request(
+        safe_url = urlsplit(url)
+        logger.info(
+            "IBM MQ connector request: method=%s host=%s path=%s basic_auth=%s",
+            method,
+            safe_url.netloc,
+            safe_url.path,
+            basic_auth,
+        )
+        response = requests.request(
             method=method,
             url=url,
             headers=headers,
@@ -78,6 +92,14 @@ class IbmMqConnector(BaseConnector):
             timeout=timeout,
             verify=self.verify_tls,
         )
+        logger.info(
+            "IBM MQ connector response: method=%s host=%s path=%s status=%s",
+            method,
+            safe_url.netloc,
+            safe_url.path,
+            response.status_code,
+        )
+        return response
 
     def _error_result(
         self, message: str, response: requests.Response | None = None
@@ -177,6 +199,7 @@ class IbmMqConnector(BaseConnector):
     @connector_tool
     def dspmq(self, tool_context: ToolContext | None = None) -> dict[str, Any]:
         """Lists queue managers available to the configured mqweb server and reports whether each one is running."""
+        logger.info("IBM MQ tool called: dspmq")
         result = self._perform_mq_request("qmgr/")
         if result["status"] != "success":
             return result
@@ -196,6 +219,7 @@ class IbmMqConnector(BaseConnector):
         tool_context: ToolContext | None = None,
     ) -> dict[str, Any]:
         """Runs an MQSC command against a specific queue manager and returns normalized command output."""
+        logger.info("IBM MQ tool called: runmqsc qmgr_name=%s", qmgr_name)
         result = self._perform_mq_request(
             endpoint=f"action/qmgr/{qmgr_name}/mqsc",
             method="POST",
@@ -219,6 +243,9 @@ class IbmMqConnector(BaseConnector):
     @connector_tool
     def get_mq_logs(self, tool_context: ToolContext | None = None) -> dict[str, Any]:
         """Fetches IBM MQ log status and any detected issues such as channel failures or connectivity problems."""
+        logger.info(
+            "IBM MQ tool called: get_mq_logs configured=%s", bool(self.logs_url)
+        )
         if not self.logs_url:
             return {"status": "error", "message": "LOGS_URL is not configured."}
 
@@ -245,7 +272,38 @@ class IbmMqConnector(BaseConnector):
         command: str,
         tool_context: ToolContext | None = None,
     ) -> dict[str, Any]:
-        """Runs a command over SSH using Paramiko and returns stdout/stderr."""
+        """Runs a command over configured SSH access and returns stdout/stderr."""
+        logger.info(
+            "IBM MQ tool called: run_commands_ssh ssh_url=%s ssh_hostname=%s",
+            bool(self.ssh_url),
+            bool(self.ssh_hostname),
+        )
+        if self.ssh_url:
+            try:
+                response = self._request(
+                    url=self.ssh_url,
+                    method="POST",
+                    json_data={"command": command},
+                    timeout=60.0,
+                )
+            except requests.RequestException as exc:
+                return {
+                    "status": "error",
+                    "message": f"Failed to run SSH command: {exc}",
+                }
+
+            if response.status_code >= 400:
+                return self._error_result("Failed to run SSH command", response)
+
+            try:
+                payload = response.json()
+            except ValueError:
+                return self._error_result(
+                    "SSH endpoint did not return valid JSON", response
+                )
+
+            return self._format_ssh_response(payload)
+
         if not self.ssh_hostname:
             return {"status": "error", "message": "SSH_HOSTNAME is not configured."}
         if not self.ssh_username:

@@ -23,7 +23,7 @@ export default function ChatHeader({
           </h4>
 
           <p className="text-sm text-[#6b7280] truncate">
-            {appName || "Agent"} • {selectedSessionLabel}
+            {selectedSessionLabel}
           </p>
         </div>
       </div>

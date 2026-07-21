@@ -1,0 +1,53 @@
+{
+  "id": "confluence_connector",
+  "name": "Confluence",
+  "description": "Read pages and spaces from Confluence Cloud using Atlassian API token authentication.",
+  "version": "1.0.0",
+  "config_variables": [
+    {
+      "name": "CF_DOMAIN",
+      "label": "Confluence Domain",
+      "required": true,
+      "secret": false,
+      "placeholder": "yourcompany.atlassian.net"
+    },
+    {
+      "name": "CF_EMAIL",
+      "label": "Atlassian Account Email",
+      "required": true,
+      "secret": false,
+      "placeholder": "you@yourcompany.com"
+    },
+    {
+      "name": "CF_API_TOKEN",
+      "label": "API Token",
+      "required": true,
+      "secret": true,
+      "placeholder": "Your Atlassian API token"
+    },
+    {
+      "name": "CF_SPACE_KEY",
+      "label": "Space Key",
+      "required": true,
+      "secret": false,
+      "placeholder": "e.g. TS, NOC, ENG"
+    },
+    {
+      "name": "prefix",
+      "label": "Prefix",
+      "required": false,
+      "secret": false,
+      "placeholder": "Confluence"
+    }
+  ],
+  "tools": [
+    {
+      "name": "list_pages",
+      "documentation": "List pages in a Confluence space. If CF_SPACE_KEY is configured, lists pages in that space. Otherwise lists all available spaces."
+    },
+    {
+      "name": "get_page_content",
+      "documentation": "Get the plain text content of a Confluence page by its page ID or title."
+    }
+  ]
+}

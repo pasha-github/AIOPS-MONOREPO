@@ -8,6 +8,7 @@ from src.plugins.session_summary_plugin import (
     SUMMARY_FALLBACKS_KEY,
     SessionSummaryPlugin,
     _extract_user_text,
+    _litellm_summary_model,
 )
 
 
@@ -22,6 +23,24 @@ def _request_with_text(*texts: str):
 def test_extract_user_text_joins_text_parts():
     request = _request_with_text("Investigate", " MQ backlog ")
     assert _extract_user_text(request) == "Investigate MQ backlog"
+
+
+def test_litellm_summary_model_uses_gemini_api_prefix_for_agentcore(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setenv("GOOGLE_API_KEY", "test-key")
+    monkeypatch.delenv("GOOGLE_GENAI_USE_VERTEXAI", raising=False)
+
+    assert _litellm_summary_model("gemini-2.5-flash") == "gemini/gemini-2.5-flash"
+
+
+def test_litellm_summary_model_keeps_vertex_gemini_when_configured(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setenv("GOOGLE_API_KEY", "test-key")
+    monkeypatch.setenv("GOOGLE_GENAI_USE_VERTEXAI", "true")
+
+    assert _litellm_summary_model("gemini-2.5-flash") == "gemini-2.5-flash"
 
 
 def test_session_summary_plugin_sets_summary_once(monkeypatch: pytest.MonkeyPatch):

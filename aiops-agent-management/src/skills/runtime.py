@@ -148,8 +148,8 @@ def build_skill_model(skill: Skill) -> skill_models.Skill:
     if skill.tools:
         metadata["adk_additional_tools"] = skill.tools
 
-    references = cast(dict[str, str | bytes], dict(skill.references or {}))
-    assets = cast(dict[str, str | bytes], dict(skill.assets or {}))
+    references = dict(skill.references or {})
+    assets = dict(skill.assets or {})
 
     return skill_models.Skill(
         frontmatter=skill_models.Frontmatter(
@@ -159,8 +159,8 @@ def build_skill_model(skill: Skill) -> skill_models.Skill:
         ),
         instructions=skill.instructions,
         resources=skill_models.Resources(
-            references=references,
-            assets=assets,
+            references=cast(Any, references),
+            assets=cast(Any, assets),
             scripts={
                 script_name: skill_models.Script(src=script_src)
                 for script_name, script_src in (skill.scripts or {}).items()

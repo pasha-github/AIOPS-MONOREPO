@@ -1,0 +1,6 @@
+.git
+.claude
+*.exe
+README.md
+Dockerfile
+.dockerignore

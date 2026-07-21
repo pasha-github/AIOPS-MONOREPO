@@ -1,10 +1,13 @@
 package com.rc.aroyacruise.mcp;
 
 
-import com.rc.aroyacruise.dto.request.AroyaLoginRequest;
-import com.rc.aroyacruise.dto.request.AvailableVoyagesRequest;
+import com.rc.aroyacruise.dto.request.*;
 import com.rc.aroyacruise.dto.response.AroyaLoginResponse;
 import com.rc.aroyacruise.service.AroyaService;
+import com.rc.aroyacruise.service.NodeAroyaGuestService;
+import com.rc.aroyacruise.service.NodeAroyaReservationService;
+import com.rc.aroyacruise.service.NodeAroyaVoyageService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.ai.mcp.annotation.McpTool;
 import org.springframework.ai.mcp.annotation.McpToolParam;
 import org.springframework.stereotype.Component;
@@ -13,13 +16,14 @@ import tools.jackson.databind.JsonNode;
 import java.util.List;
 
 @Component
+@RequiredArgsConstructor
 public class AroyaMcpTools {
 
     private final AroyaService aroyaService;
+    private final NodeAroyaVoyageService voyageService;
+    private final NodeAroyaGuestService nodeAroyaGuestService;
+    private final NodeAroyaReservationService nodeAroyaReservationService;
 
-    public AroyaMcpTools(AroyaService aroyaService) {
-        this.aroyaService = aroyaService;
-    }
 
     /*@McpTool(
             name = "aroya_login",
@@ -57,7 +61,7 @@ public class AroyaMcpTools {
         return aroyaService.getDestinations();
     }
 
-    @McpTool(
+    /*@McpTool(
             name = "aroya_get_available_voyages",
             description = "Fetch available voyages for the provided date range, destinations, and departure ports using the stored token."
     )
@@ -75,5 +79,86 @@ public class AroyaMcpTools {
                         departurePorts
                 ),null
         );
+    }*/
+
+    @McpTool(
+            name = "aroya_get_available_voyages",
+            description = "Fetch available voyages for the provided date range, destinations, and departure ports using the stored token."
+    )
+    public JsonNode getAvailableVoyages(
+            @McpToolParam(description = "Start date range from, format yyyy-MM-dd", required = true) String startDateFrom,
+            @McpToolParam(description = "Start date range to, format yyyy-MM-dd", required = true) String startDateTo,
+            @McpToolParam(description = "List of destination codes, for example [\"Red\", \"GUL\"]", required = true) List<String> destinations,
+            @McpToolParam(description = "List of departure port codes, for example [\"SAJED\", \"AEDXB\"]", required = true) List<String> departurePorts
+    ) {
+        return voyageService.getAvailableVoyages(
+                new NodeAvailableVoyagesRequest(
+                        0,
+                        10,
+                        startDateFrom,
+                        startDateTo,
+                        destinations,
+                        departurePorts
+                )
+        );
     }
+
+    @McpTool(
+            name = "aroya_add_guests",
+            description = """
+                Add one or more guests to Aroya and return the processing status and client ID for each guest.
+                """
+    )
+    public JsonNode addGuests(
+
+            @McpToolParam(
+                    description = """
+                List of guests to create in Aroya.
+                Fill each guest object using the field-level descriptions and examples.
+                """,
+                    required = true
+            )
+            List<NodeGuestRequest> guests
+    ) {
+        return nodeAroyaGuestService.addGuests(
+                new NodeAddGuestsRequest(guests)
+        );
+    }
+
+    @McpTool(
+            name = "aroya_create_reservation",
+            description = """
+                Create an Aroya cruise reservation for one or more guests and selected voyages/cabins.
+                """
+    )
+    public JsonNode createReservation(
+
+            @McpToolParam(
+                    description = """
+                Guests included in the reservation.
+                Fill each guest object using the field-level descriptions and examples.
+                """,
+                    required = true
+            )
+            List<NodeReservationGuestRequest> guests,
+
+            @McpToolParam(
+                    description = """
+                Voyage and cabins to reserve.
+                Fill each voyage object using the field-level descriptions and examples.
+                """,
+                    required = true
+            )
+            List<NodeReservationVoyageRequest> voyages
+    ) {
+        return nodeAroyaReservationService.createReservation(
+                new NodeCreateReservationRequest(
+                        guests,
+                        voyages
+                ),
+                null
+        );
+    }
+
+
 }

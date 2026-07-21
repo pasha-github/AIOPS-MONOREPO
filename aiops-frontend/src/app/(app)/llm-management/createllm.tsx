@@ -1,11 +1,20 @@
 "use client";
 
 import {
+  formatLlmProviderLabel,
   getProviderIconPath,
   LLM_PROVIDER_MODELS,
   type LlmProviderKey,
 } from "@/config/agent";
-import { ChevronDown, Eye, EyeOff, Loader2, X } from "lucide-react";
+import {
+  ModalCard,
+  ModalCardBody,
+  ModalCardFooter,
+  ModalCardHeader,
+  ModalCardPanel,
+  ModalCardRequiredNote,
+} from "@/components/modalcards";
+import { ChevronDown, Eye, EyeOff, Loader2, Settings2 } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ActionResult } from "./llmHelpers";
@@ -29,6 +38,9 @@ export type CreateLlmPayload = {
   name: string;
   description: string;
   api_key: string;
+  extra_config?: {
+    api_base: string;
+  };
 };
 
 type CreateLlmModalProps = {
@@ -37,9 +49,6 @@ type CreateLlmModalProps = {
 };
 
 const DESCRIPTION_MIN_LENGTH = 10;
-
-const toLabel = (value: string) =>
-  value.length > 0 ? value[0].toUpperCase() + value.slice(1) : value;
 
 const toIdentifierPart = (value: string) =>
   value
@@ -177,8 +186,10 @@ export default function CreateLlmModal({
   const [selectedModelName, setSelectedModelName] = useState("");
   const [description, setDescription] = useState("");
   const [apiKey, setApiKey] = useState("");
+  const [apiBase, setApiBase] = useState("");
   const [isDescriptionTouched, setIsDescriptionTouched] = useState(false);
   const [isApiKeyTouched, setIsApiKeyTouched] = useState(false);
+  const [isApiBaseTouched, setIsApiBaseTouched] = useState(false);
   const [isSubmitAttempted, setIsSubmitAttempted] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
@@ -244,7 +255,7 @@ export default function CreateLlmModal({
     () =>
       (Object.keys(LLM_PROVIDER_MODELS) as ProviderKey[]).map((provider) => ({
         value: provider,
-        label: toLabel(provider),
+        label: formatLlmProviderLabel(provider),
         iconSrc: getProviderIconPath(provider),
       })),
     []
@@ -261,21 +272,27 @@ export default function CreateLlmModal({
   const selectedProviderIconSrc = selectedProvider
     ? getProviderIconPath(selectedProvider)
     : null;
+  const isAzureAiProvider = selectedProvider === "azure_ai";
 
   const normalizedDescription = description.trim();
   const normalizedApiKey = apiKey.trim();
+  const normalizedApiBase = apiBase.trim();
   const isDescriptionValid = normalizedDescription.length >= DESCRIPTION_MIN_LENGTH;
   const isApiKeyValid = normalizedApiKey.length > 0;
+  const isApiBaseValid = !isAzureAiProvider || normalizedApiBase.length > 0;
   const shouldShowDescriptionError =
     (isDescriptionTouched || isSubmitAttempted) && !isDescriptionValid;
   const shouldShowApiKeyError =
     (isApiKeyTouched || isSubmitAttempted) && !isApiKeyValid;
+  const shouldShowApiBaseError =
+    isAzureAiProvider && (isApiBaseTouched || isSubmitAttempted) && !isApiBaseValid;
 
   const isCreateDisabled =
     !selectedProvider ||
     !selectedModelName ||
     !isDescriptionValid ||
     !isApiKeyValid ||
+    !isApiBaseValid ||
     isCreating;
 
   const handleCreateLlm = async () => {
@@ -283,6 +300,7 @@ export default function CreateLlmModal({
       setIsSubmitAttempted(true);
       setIsDescriptionTouched(true);
       setIsApiKeyTouched(true);
+      setIsApiBaseTouched(true);
       return;
     }
 
@@ -296,6 +314,13 @@ export default function CreateLlmModal({
       name: selectedModelName,
       description: normalizedDescription,
       api_key: normalizedApiKey,
+      ...(isAzureAiProvider
+        ? {
+            extra_config: {
+              api_base: normalizedApiBase,
+            },
+          }
+        : {}),
     };
 
     const result = await onCreate(payload);
@@ -310,36 +335,30 @@ export default function CreateLlmModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[75] flex items-center justify-center bg-black/40 px-4 py-8 backdrop-blur-sm">
-      <div
+    <ModalCard zIndexClassName="z-[75]">
+      <ModalCardPanel
         ref={createModalRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="create-llm-title"
-        className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-[0_18px_50px_-30px_rgba(15,23,42,0.6)]"
+        maxWidthClassName="max-w-lg"
       >
-        <div className="flex items-center justify-between border-b border-[#eef1f7] px-6 py-4">
-          <h4 id="create-llm-title" className="text-lg font-semibold text-[#111827]">
-            Create LLM
-          </h4>
-          <button
-            type="button"
-            onClick={() => {
-              if (!isCreating) {
-                onClose();
-              }
-            }}
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-[#f3f4f6] text-[#111827]"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
+        <ModalCardHeader
+          title="Configure LLM"
+          subtitle="Set provider, model, description, and credentials."
+          icon={<Settings2 className="h-4 w-4" />}
+          onClose={() => {
+            if (!isCreating) {
+              onClose();
+            }
+          }}
+        />
 
-        <div className="space-y-4 px-6 py-4">
+        <ModalCardBody className="space-y-4 py-4">
           <div className="grid items-start gap-4 md:grid-cols-2">
             <div className="flex h-full flex-col">
               <label className="min-h-[24px] text-sm font-semibold text-[#111827]">
-                Provider
+                Provider <span className="text-[#ef4444]">*</span>
               </label>
               <RoundedSelect
                 value={selectedProvider}
@@ -349,6 +368,8 @@ export default function CreateLlmModal({
                   const provider = value as ProviderKey | "";
                   setSelectedProvider(provider);
                   setSelectedModelName("");
+                  setApiBase("");
+                  setIsApiBaseTouched(false);
                 }}
               />
               <p className="mt-2 min-h-[36px] text-xs text-[#8b95ad]">
@@ -359,10 +380,11 @@ export default function CreateLlmModal({
             <div className="flex h-full flex-col">
               <span className="inline-flex min-h-[24px] items-center gap-2 text-sm font-semibold text-[#111827]">
                 Model name
+                <span className="text-[#ef4444]">*</span>
                 {selectedProviderIconSrc ? (
                   <Image
                     src={selectedProviderIconSrc}
-                    alt={`${toLabel(selectedProvider)} logo`}
+                    alt={`${formatLlmProviderLabel(selectedProvider)} logo`}
                     width={14}
                     height={14}
                     className="h-3.5 w-3.5 object-contain"
@@ -376,7 +398,9 @@ export default function CreateLlmModal({
                 disabled={!selectedProvider}
                 leadingIconSrc={selectedProviderIconSrc ?? undefined}
                 leadingIconAlt={
-                  selectedProvider ? `${toLabel(selectedProvider)} logo` : "provider logo"
+                  selectedProvider
+                    ? `${formatLlmProviderLabel(selectedProvider)} logo`
+                    : "provider logo"
                 }
                 onChange={setSelectedModelName}
               />
@@ -466,12 +490,43 @@ export default function CreateLlmModal({
             </p>
           </div>
 
+          {isAzureAiProvider ? (
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-[#111827]">
+                API Base <span className="text-[#ef4444]">*</span>
+              </label>
+              <input
+                type="text"
+                value={apiBase}
+                onChange={(event) => setApiBase(event.target.value)}
+                onBlur={() => setIsApiBaseTouched(true)}
+                placeholder="Enter Azure AI Foundry API base"
+                className={`w-full rounded-xl border bg-white px-4 py-2.5 text-sm text-[#111827] outline-none transition placeholder:text-[#9ca3af] focus:ring-2 ${
+                  shouldShowApiBaseError
+                    ? "border-[#fca5a5] focus:border-[#ef4444] focus:ring-[#ef4444]/20"
+                    : "border-[#e0e5f0] focus:border-[#4f49e2] focus:ring-[#4f49e2]/20"
+                }`}
+              />
+              <p
+                className={`text-xs ${
+                  shouldShowApiBaseError ? "text-[#dc2626]" : "text-[#8b95ad]"
+                }`}
+              >
+                {shouldShowApiBaseError
+                  ? "API Base is required for Azure AI Foundry."
+                  : "Used as extra_config.api_base in the create request."}
+              </p>
+            </div>
+          ) : null}
+
           {createError ? (
             <p className="text-sm font-medium text-[#dc2626]">{createError}</p>
           ) : null}
-        </div>
+        </ModalCardBody>
 
-        <div className="flex items-center justify-end gap-3 border-t border-[#eef1f7] px-6 py-4">
+        <ModalCardFooter className="justify-between">
+          <ModalCardRequiredNote />
+          <div className="flex items-center gap-3">
           <button
             type="button"
             onClick={() => {
@@ -494,10 +549,11 @@ export default function CreateLlmModal({
             }`}
           >
             {isCreating ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            {isCreating ? "Creating..." : "Create LLM"}
+            {isCreating ? "Configuring..." : "Configure LLM"}
           </button>
-        </div>
-      </div>
-    </div>
+          </div>
+        </ModalCardFooter>
+      </ModalCardPanel>
+    </ModalCard>
   );
 }

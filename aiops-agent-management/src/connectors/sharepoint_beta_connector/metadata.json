@@ -1,0 +1,84 @@
+{
+  "id": "sharepoint_beta_connector",
+  "name": "SharePoint Beta",
+  "description": "SharePoint connector with .docx support for content read/write and comment management via Microsoft Graph.",
+  "version": "1.0.0",
+  "config_variables": [
+    {
+      "name": "SHP_ID_APP",
+      "label": "App Client ID",
+      "required": true,
+      "secret": false,
+      "placeholder": "Enter Azure AD app client ID"
+    },
+    {
+      "name": "SHP_ID_APP_SECRET",
+      "label": "App Client Secret",
+      "required": true,
+      "secret": true,
+      "placeholder": "Enter Azure AD app client secret"
+    },
+    {
+      "name": "SHP_TENANT_ID",
+      "label": "Tenant ID",
+      "required": true,
+      "secret": false,
+      "placeholder": "Enter Microsoft tenant ID"
+    },
+    {
+      "name": "SHP_SITE_URL",
+      "label": "SharePoint Site URL",
+      "required": true,
+      "secret": false,
+      "placeholder": "https://yourtenant.sharepoint.com/sites/yoursite"
+    },
+    {
+      "name": "SHP_DOC_LIBRARY",
+      "label": "Document Library Folder",
+      "required": true,
+      "secret": false,
+      "placeholder": "mcp_server"
+    },
+    {
+      "name": "prefix",
+      "label": "Prefix",
+      "required": false,
+      "secret": false,
+      "placeholder": "SharePoint"
+    }
+  ],
+  "tools": [
+    {
+      "name": "list_documents",
+      "documentation": "List documents in the configured SharePoint library scope."
+    },
+    {
+      "name": "get_document_content",
+      "documentation": "Get document content. .md returns plain text, .docx returns extracted plain text, others return Base64."
+    },
+    {
+      "name": "create_document",
+      "documentation": "Create a new document in SharePoint. Supports .md and .docx. For .docx, content is markdown rendered into a formatted Word document (headings, bold/italic, lists, tables, code, blockquotes)."
+    },
+    {
+      "name": "update_document",
+      "documentation": "Update an existing document in SharePoint. Supports .md and .docx. For .docx, content is markdown rendered into a formatted Word document while preserving existing comments."
+    },
+    {
+      "name": "get_document_comments",
+      "documentation": "Get all comments embedded in a .docx document, including ID, author, date, and text."
+    },
+    {
+      "name": "update_document_comment",
+      "documentation": "Update the text of a specific comment in a .docx document by its comment ID."
+    },
+    {
+      "name": "reply_to_comment",
+      "documentation": "Add a threaded reply to an existing comment in a .docx document by its comment ID."
+    },
+    {
+      "name": "add_comment",
+      "documentation": "Add a new comment anchored to a specific line of text in a .docx document."
+    }
+  ]
+}

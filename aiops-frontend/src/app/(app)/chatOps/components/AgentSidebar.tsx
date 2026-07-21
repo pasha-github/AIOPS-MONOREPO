@@ -1,9 +1,13 @@
-import { Bot, ChevronDown, Settings } from "lucide-react";
-import { AgentSidebarProps } from "../types";
+import { Bot, Settings } from "lucide-react";
+import { isSelectableStatus } from "../agentStatus";
+import { AgentSidebarProps, AppItem } from "../types";
+
+const getStatusDotClass = (app: AppItem) => {
+  return isSelectableStatus(app) ? "bg-[#16a34a]" : "bg-[#f97316]";
+};
 
 export default function AgentSidebar({
   assistantDisplayName,
-  appName,
   apps,
   selectedApp,
   onSelectApp,
@@ -30,30 +34,36 @@ export default function AgentSidebar({
       <div className="flex-1 p-6 overflow-y-auto">
         {apps.length > 0 && (
           <div>
-            <div className="flex items-center justify-between mb-4">
-              <h4 className="text-xs font-semibold uppercase tracking-[0.5px] text-gray-500">
-                Quick Switch
-              </h4>
-              <ChevronDown className="h-4 w-4 text-gray-400" />
-            </div>
-
             <div className="space-y-1.5">
               {apps.map((app) => {
                 const isSelected = selectedApp?.agent_id === app.agent_id;
+                const isSelectable = isSelectableStatus(app);
                 return (
                   <button
                     key={app.agent_id}
-                    onClick={() => onSelectApp(app)}
+                    type="button"
+                    disabled={!isSelectable}
+                    onClick={() => {
+                      if (isSelectable) {
+                        onSelectApp(app);
+                      }
+                    }}
                     className={`
                       w-full group flex items-center gap-3 px-4 py-3.5 rounded-2xl text-left
                       transition-all duration-200
                       ${isSelected 
                         ? "bg-blue-600 text-white shadow-sm" 
-                        : "hover:bg-gray-100 text-gray-700 hover:text-gray-900"
+                        : isSelectable
+                          ? "hover:bg-gray-100 text-gray-700 hover:text-gray-900"
+                          : "cursor-not-allowed text-gray-400 opacity-80"
                       }
                     `}
                   >
-                    <div className={`h-2 w-2 rounded-full flex-shrink-0 ${isSelected ? "bg-white" : "bg-emerald-400"}`} />
+                      <div
+                        className={`h-2 w-2 rounded-full flex-shrink-0 ${
+                         isSelected ? "bg-white" : getStatusDotClass(app)
+                        }`}
+                      />
                     <span className="font-medium text-sm tracking-tight">
                       {app.name}
                     </span>

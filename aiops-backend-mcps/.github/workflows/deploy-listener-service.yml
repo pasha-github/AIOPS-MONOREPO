@@ -1,0 +1,86 @@
+# Deploy the listener microservice to Cloud Run as a SINGLE PINNED INSTANCE.
+#
+# The service holds long-lived consumer goroutines and an embedded BoltDB file,
+# so it MUST run as exactly one instance (min=max=1). On plain Cloud Run the
+# filesystem is ephemeral; mount a volume for BOLT_DB_PATH (gen2 + Cloud Storage
+# FUSE) or run on GKE/Compute Engine for durable local state. The reconcile loop
+# rebuilds state from AIOps on boot, so an ephemeral DB still works (it just
+# loses dead-letter history on restart).
+
+name: Build & Deploy Listener Service (Cloud Run)
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  PROJECT_ID: rc-ai-ops-internal
+  REGION: us-central1
+  REGISTRY: us-central1-docker.pkg.dev
+  REPOSITORY: aiops-registry
+  SERVICE_NAME: agent-listener-service
+  IMAGE: agent-listener-service
+
+jobs:
+  build-and-deploy:
+    name: Build, Push & Deploy
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud (SA Key)
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGISTRY }} --quiet
+
+      - name: Build Docker image
+        # The image supports both Kafka and IBM MQ (cgo + IBM MQ C client baked in).
+        run: |
+          docker build \
+            --tag ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE }}:${{ github.sha }} \
+            --tag ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE }}:latest \
+            listener-service
+
+      - name: Push image to Artifact Registry
+        run: |
+          docker push ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE }}:${{ github.sha }}
+          docker push ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE }}:latest
+
+      - name: Deploy to Cloud Run (single pinned instance)
+        run: |
+          gcloud run deploy ${{ env.SERVICE_NAME }} \
+            --image=${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE }}:${{ github.sha }} \
+            --region=${{ env.REGION }} \
+            --project=${{ env.PROJECT_ID }} \
+            --port=8080 \
+            --min-instances=1 \
+            --max-instances=1 \
+            --no-cpu-throttling \
+            --set-env-vars="\
+              AIOPS_BASE_URL=${{ secrets.AIOPS_BASE_URL }},\
+              LISTENER_SERVICE_SECRET=${{ secrets.LISTENER_SERVICE_SECRET }},\
+              LISTENER_CALLBACK_SECRET=${{ secrets.LISTENER_CALLBACK_SECRET }},\
+              BOLT_DB_PATH=/data/listener.db,\
+              RECONCILE_INTERVAL_SECONDS=300" \
+            --quiet
+
+      - name: Get Service URL
+        run: |
+          URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} \
+            --region=${{ env.REGION }} \
+            --project=${{ env.PROJECT_ID }} \
+            --format='value(status.url)')
+          echo "✅ Deployed to: $URL"

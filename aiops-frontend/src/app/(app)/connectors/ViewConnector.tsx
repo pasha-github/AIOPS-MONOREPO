@@ -1,6 +1,12 @@
 "use client";
 
-import { ChevronDown, Plug, X } from "lucide-react";
+import {
+  ModalCard,
+  ModalCardBody,
+  ModalCardHeader,
+  ModalCardPanel,
+} from "@/components/modalcards";
+import { ChevronDown, Plug } from "lucide-react";
 import { useEffect, useState } from "react";
 import { renderMarkdownBlocks } from "../dashboard/logs";
 import {
@@ -62,27 +68,15 @@ export default function ViewConnector({
   }
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/35 px-4 py-8 backdrop-blur-sm">
-      <div className="flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-white shadow-[0_20px_60px_-35px_rgba(15,23,42,0.65)]">
-        <div className="flex items-center justify-between bg-[#4f49e2] px-6 py-4 text-white">
-          <div className="flex items-center gap-3">
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20">
-              <Plug className="h-4 w-4" />
-            </span>
-            <div>
-              <p className="text-lg font-semibold">{connectorName}</p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-white/15"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
+    <ModalCard zIndexClassName="z-[80]">
+      <ModalCardPanel maxWidthClassName="max-w-4xl">
+        <ModalCardHeader
+          title={connectorName || connectorId}
+          icon={<Plug className="h-4 w-4" />}
+          onClose={onClose}
+        />
 
-        <div className="overflow-y-auto px-6 py-5">
+        <ModalCardBody className="overflow-y-auto">
           {isLoading ? (
             <div className="space-y-4">
               {Array.from({ length: 3 }).map((_, index) => (
@@ -197,8 +191,8 @@ export default function ViewConnector({
               </section>
             </div>
           ) : null}
-        </div>
-      </div>
-    </div>
+        </ModalCardBody>
+      </ModalCardPanel>
+    </ModalCard>
   );
 }

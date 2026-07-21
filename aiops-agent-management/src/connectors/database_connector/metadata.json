@@ -1,0 +1,26 @@
+{
+  "id": "database_connector",
+  "name": "Database",
+  "category": "helper",
+  "description": "Read-only SQL connector. Supports PostgreSQL, MySQL, SQLite, MSSQL, and any SQLAlchemy-compatible database.",
+  "version": "1.0.0",
+  "config_variables": [
+    {
+      "name": "DATABASE_URL",
+      "label": "Database URL",
+      "required": true,
+      "secret": true,
+      "placeholder": "postgresql://user:password@host:5432/dbname"
+    }
+  ],
+  "tools": [
+    {
+      "name": "run_query",
+      "documentation": "Executes a SELECT query and returns rows as a list of dicts."
+    },
+    {
+      "name": "get_schema",
+      "documentation": "Returns all table names with their column names and types."
+    }
+  ]
+}

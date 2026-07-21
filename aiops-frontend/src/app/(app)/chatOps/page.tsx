@@ -34,8 +34,20 @@ import ChatHeader from "./components/ChatHeader";
 import ChatInput from "./components/ChatInput";
 import ChatMessages from "./components/ChatMessages";
 import ChatSidebar from "./components/ChatSidebar";
+import Fallbackpage from "./Fallbackpage";
+import { isSelectableStatus } from "./agentStatus";
+import { awsAgentChat } from "./AWSAgent/AWSAgentChat";
+import { createSessionAWSAgent } from "./AWSAgent/CreateSessionAWSAgent";
+import { createSessionVertexAgent } from "./VertexAgent/CreateSessionVertexAgent";
+import { deleteSessionAWSAgent } from "./AWSAgent/DeleteSessionAWSAgent";
+import { deleteSessionVertexAgent } from "./VertexAgent/DeleteSessionVertexAgent";
+import { listSessionsAWSAgent } from "./AWSAgent/ListSessionAWSAgent";
+import { restoreChatForSessionAWSAgent } from "./AWSAgent/RestoreChatForSession";
+import { listSessionsVertexAgent } from "./VertexAgent/ListSessionsVertexAgent";
+import { restoreChatForSession as restoreVertexChatForSession } from "./VertexAgent/RestoreChatForSession";
+import { vertexAgentChat } from "./VertexAgent/VertexAgentChat";
 
-export default function chatOps({
+export default function ChatOps({
     agent,
     onClose,
 }: AgentChatWorkspaceProps) {
@@ -63,6 +75,8 @@ export default function chatOps({
     const [streamingText, setStreamingText] = useState("");
     const [streamSteps, setStreamSteps] = useState<StreamStep[]>([]);
     const [pendingUserMessage, setPendingUserMessage] = useState<ChatMessage | null>(null);
+    const [activeStreamingSessionId, setActiveStreamingSessionId] = useState<string | null>(null);
+    const [isDraftStreaming, setIsDraftStreaming] = useState(false);
     const [messageMilestones, setMessageMilestones] = useState<Record<string, StreamStep[]>>({});
     const [expandedMilestones, setExpandedMilestones] = useState<Record<string, boolean>>({});
 
@@ -75,17 +89,22 @@ export default function chatOps({
     // App state
     const [apps, setApps] = useState<AppItem[]>([]);
     const [selectedApp, setSelectedApp] = useState<AppItem | null>(null);
+    const [hasLoadedApps, setHasLoadedApps] = useState(false);
 
     // ============ REFS ============
 
     const messageListRef = useRef<HTMLDivElement | null>(null);
+    const messagesRef = useRef<ChatMessage[]>([]);
+    const pendingUserMessageRef = useRef<ChatMessage | null>(null);
     const selectedSessionIdRef = useRef<string | null>(null);
     const copyResetTimerRef = useRef<number | null>(null);
+    const providerResponseMessageRef = useRef<ChatMessage | null>(null);
     const streamStepCounterRef = useRef(0);
     const streamStepsRef = useRef<StreamStep[]>([]);
     const streamTargetTextRef = useRef("");
     const streamRenderedTextRef = useRef("");
     const streamAnimationFrameRef = useRef<number | null>(null);
+    const suppressNextAutoScrollRef = useRef(false);
 
     // ============ COMPUTED VALUES ============
 
@@ -96,6 +115,13 @@ export default function chatOps({
         (safeAgent.name ?? "").trim() ||
         appName ||
         "Agent";
+    const deploymentTarget = String(selectedApp?.deployment_target ?? "").toLowerCase();
+    const isVertexAgent =
+        deploymentTarget === "vertex" ||
+        Boolean(selectedApp?.vertex_stream_query_url);
+    const isAwsAgentCoreAgent =
+        deploymentTarget === "bedrock_agentcore" || deploymentTarget === "bedrock_agent";
+    const vertexStreamQueryUrl = selectedApp?.vertex_stream_query_url ?? "";
 
     // ============ EFFECTS ============
 
@@ -119,13 +145,22 @@ export default function chatOps({
 
                     setApps(visibleApps);
 
+                    const selectableApps = visibleApps.filter((app) =>
+                        isSelectableStatus(app)
+                    );
                     const defaultApp =
-                        visibleApps.find((a) => a.agent_id === "supervisor") || visibleApps[0] || null;
+                        selectableApps.find((app) => app.agent_id === "supervisor") ||
+                        selectableApps[0] ||
+                        visibleApps.find((a) => a.agent_id === "supervisor") ||
+                        visibleApps[0] ||
+                        null;
 
                     setSelectedApp(defaultApp);
                 }
             } catch (error) {
                 console.error("Error fetching apps:", error);
+            } finally {
+                setHasLoadedApps(true);
             }
         };
 
@@ -136,6 +171,14 @@ export default function chatOps({
     useEffect(() => {
         selectedSessionIdRef.current = selectedSessionId;
     }, [selectedSessionId]);
+
+    useEffect(() => {
+        messagesRef.current = messages;
+    }, [messages]);
+
+    useEffect(() => {
+        pendingUserMessageRef.current = pendingUserMessage;
+    }, [pendingUserMessage]);
 
     // Close menu when clicking outside
     useEffect(() => {
@@ -148,13 +191,30 @@ export default function chatOps({
 
     // Auto-scroll to bottom
     useEffect(() => {
+        if (suppressNextAutoScrollRef.current) {
+            suppressNextAutoScrollRef.current = false;
+            return;
+        }
+
+        if (activeStreamingSessionId && selectedSessionId !== activeStreamingSessionId) {
+            return;
+        }
+
         if (messageListRef.current) {
             messageListRef.current.scrollTo({
                 top: messageListRef.current.scrollHeight,
                 behavior: "smooth",
             });
         }
-    }, [messages, pendingUserMessage, streamingText, isSending]);
+    }, [
+        activeStreamingSessionId,
+        isDraftSession,
+        isDraftStreaming,
+        messages,
+        pendingUserMessage,
+        selectedSessionId,
+        streamingText,
+    ]);
 
     // Cleanup on unmount
     useEffect(() => {
@@ -164,19 +224,43 @@ export default function chatOps({
         };
     }, []);
 
-    // Load sessions when app changes
-    useEffect(() => {
-        if (!selectedApp) return;
-        setSelectedSessionId(null);
-        setIsDraftSession(true);
-        setMessages([]);
-        setMessageMilestones({});
-        setExpandedMilestones({});
-
-        loadSessions();
-    }, [selectedApp]);
-
     // ============ CORE FUNCTIONS ============
+    const applyRestoredMessages = useCallback(
+        (
+            mapped: {
+                messages: ChatMessage[];
+                milestonesByMessageId: Record<string, StreamStep[]>;
+            },
+            options?: { silent?: boolean }
+        ) => {
+            const silent = Boolean(options?.silent);
+            const pendingUserMessage = pendingUserMessageRef.current;
+            const hasPendingUserInRestoredHistory =
+                !pendingUserMessage ||
+                mapped.messages.some(
+                    (message) =>
+                        message.role === "user" &&
+                        message.text.trim() === pendingUserMessage.text.trim()
+                );
+            const visibleLocalMessageCount =
+                messagesRef.current.length + (pendingUserMessage ? 1 : 0);
+
+            if (
+                silent &&
+                (mapped.messages.length < visibleLocalMessageCount ||
+                    !hasPendingUserInRestoredHistory)
+            ) {
+                return false;
+            }
+
+            setMessages(mapped.messages);
+            setMessageMilestones(mapped.milestonesByMessageId);
+            setExpandedMilestones({});
+            return true;
+        },
+        []
+    );
+
     const loadSessionMessages = useCallback(
         async (sessionId: string, options?: { silent?: boolean }) => {
             const silent = Boolean(options?.silent);
@@ -184,6 +268,31 @@ export default function chatOps({
             setMessagesError("");
 
             try {
+                if (isVertexAgent) {
+                    const mapped = await restoreVertexChatForSession({
+                        baseUrl: adkBaseUrl1,
+                        agentId: appName,
+                        sessionId,
+                        userId,
+                    });
+
+                    const applied = applyRestoredMessages(mapped, { silent });
+
+                    return applied ? mapped.messages : messagesRef.current;
+                }
+
+                if (isAwsAgentCoreAgent) {
+                    const mapped = await restoreChatForSessionAWSAgent({
+                        baseUrl: adkBaseUrl1,
+                        agentId: appName,
+                        sessionId,
+                        userId,
+                    });
+
+                    const applied = applyRestoredMessages(mapped, { silent });
+                    return applied ? mapped.messages : messagesRef.current;
+                }
+
                 const url = getSessionUrl(adkBaseUrl, appName, userId, sessionId);
                 // console.log("Loading messages from:", url);
 
@@ -198,11 +307,9 @@ export default function chatOps({
                 const payload = (await response.json()) as AdkSession;
                 const mapped = mapEventsToMessages(payload.events);
 
-                setMessages(mapped.messages);
-                setMessageMilestones(mapped.milestonesByMessageId);
-                setExpandedMilestones({});
+                const applied = applyRestoredMessages(mapped, { silent });
 
-                return mapped.messages;
+                return applied ? mapped.messages : messagesRef.current;
             } catch (error) {
                 console.error("Error loading messages:", error);
                 if (!silent) {
@@ -216,46 +323,62 @@ export default function chatOps({
                 if (!silent) setIsLoadingMessages(false);
             }
         },
-        [adkBaseUrl, appName, userId]
+        [adkBaseUrl, adkBaseUrl1, appName, isAwsAgentCoreAgent, isVertexAgent, userId, applyRestoredMessages]
     );
 
     const loadSessions = useCallback(
-        async (options?: { preferredSessionId?: string | null; silent?: boolean }) => {
+        async (options?: { preferredSessionId?: string | null; silent?: boolean; skipMessages?: boolean }) => {
             const silent = Boolean(options?.silent);
             if (!silent) setIsLoadingSessions(true);
             setSessionsError("");
 
             try {
-                const url = getSessionsUrl(adkBaseUrl, appName, userId);
-                 console.log("Loading sessions from:", url);
+                const payload = isVertexAgent
+                    ? await listSessionsVertexAgent({
+                        baseUrl: adkBaseUrl1,
+                        agentId: appName,
+                        userId,
+                    })
+                    : isAwsAgentCoreAgent
+                      ? await listSessionsAWSAgent({
+                          baseUrl: adkBaseUrl1,
+                          agentId: appName,
+                          userId,
+                        })
+                    : await (async () => {
+                        const url = getSessionsUrl(adkBaseUrl, appName, userId);
+                        const response = await fetch(url, {
+                            headers: { accept: "application/json" },
+                        });
 
-                const response = await fetch(url, {
-                    headers: { accept: "application/json" },
-                });
+                        if (!response.ok) {
+                            throw new Error(`Failed to load sessions: ${response.status}`);
+                        }
 
-                if (!response.ok) {
-                    throw new Error(`Failed to load sessions: ${response.status}`);
-                }
+                        const responsePayload = await response.json();
+                        if (!Array.isArray(responsePayload)) {
+                            throw new Error("Invalid session response - expected array");
+                        }
 
-                const payload = await response.json();
-                //console.log("Raw sessions payload:", payload);
-                if (!Array.isArray(payload)) {
-                    throw new Error("Invalid session response - expected array");
-                }
-
+                        return responsePayload as AdkSession[];
+                    })();
                 const sorted = sortSessions(payload);
                 setSessions(sorted);
 
                 const selectedIdToKeep =
-                    options?.preferredSessionId ?? selectedSessionIdRef.current;
+                    options && "preferredSessionId" in options
+                        ? options.preferredSessionId
+                        : selectedSessionIdRef.current;
 
                 const nextSessionId = sorted.find((item) => item.id === selectedIdToKeep)?.id ?? null;
 
                 setSelectedSessionId(nextSessionId);
                 setIsDraftSession(!nextSessionId);
 
-                if (nextSessionId) {
+                if (nextSessionId && !options?.skipMessages) {
                     return await loadSessionMessages(nextSessionId, { silent });
+                } else if (nextSessionId) {
+                    return [];
                 } else {
                     if (!silent) {
                         setMessages([]);
@@ -281,8 +404,20 @@ export default function chatOps({
                 if (!silent) setIsLoadingSessions(false);
             }
         },
-        [adkBaseUrl, appName, userId, loadSessionMessages]
+        [adkBaseUrl, adkBaseUrl1, appName, isAwsAgentCoreAgent, isVertexAgent, userId, loadSessionMessages]
     );
+
+    // Load sessions when app changes
+    useEffect(() => {
+        if (!selectedApp) return;
+        setSelectedSessionId(null);
+        setIsDraftSession(true);
+        setMessages([]);
+        setMessageMilestones({});
+        setExpandedMilestones({});
+
+        void loadSessions();
+    }, [loadSessions, selectedApp]);
 
     // ============ STREAMING FUNCTIONS ============
 
@@ -511,6 +646,45 @@ export default function chatOps({
 
     const runPromptSse = useCallback(
         async (sessionId: string, prompt: string) => {
+            if (isVertexAgent) {
+                if (!vertexStreamQueryUrl) {
+                    setSendError("Vertex agent endpoint is not configured.");
+                    return false;
+                }
+
+                addRunningStep("Sending request to Vertex Agent");
+                const responseMessage = await vertexAgentChat({
+                    baseUrl: adkBaseUrl1,
+                    streamQueryUrl: vertexStreamQueryUrl,
+                    sessionId,
+                    message: prompt,
+                    userId,
+                    onText: updateStreamingTargetText,
+                });
+
+                providerResponseMessageRef.current = responseMessage;
+                updateStreamingTargetText(responseMessage.text);
+                completeLastRunningStep();
+                return true;
+            }
+
+            if (isAwsAgentCoreAgent) {
+                addRunningStep("Sending request to AWS AgentCore");
+                const responseMessage = await awsAgentChat({
+                    baseUrl: adkBaseUrl1,
+                    agentId: appName,
+                    sessionId,
+                    message: prompt,
+                    userId,
+                    onText: updateStreamingTargetText,
+                });
+
+                providerResponseMessageRef.current = responseMessage;
+                updateStreamingTargetText(responseMessage.text);
+                completeLastRunningStep();
+                return true;
+            }
+
             const url = getRunSseUrl(adkBaseUrl);
             console.log("Sending prompt to:", url);
 
@@ -581,43 +755,73 @@ export default function chatOps({
             completeLastRunningStep();
             return streamOk;
         },
-        [adkBaseUrl, appName, userId, processSseFrame, completeLastRunningStep]
+        [
+            adkBaseUrl,
+            adkBaseUrl1,
+            appName,
+            userId,
+            isAwsAgentCoreAgent,
+            isVertexAgent,
+            vertexStreamQueryUrl,
+            addRunningStep,
+            updateStreamingTargetText,
+            processSseFrame,
+            completeLastRunningStep,
+        ]
     );
 
     // ============ SESSION FUNCTIONS ============
 
-    const createSession = useCallback(async () => {
+    const createSession = useCallback(async (options?: { persist?: boolean }) => {
+        const persist = options?.persist ?? true;
         setSessionsError("");
 
         try {
-            const url = getSessionsUrl(adkBaseUrl, appName, userId);
-            // console.log("Creating session at:", url);
+            const payload = isVertexAgent
+                ? await createSessionVertexAgent({
+                    baseUrl: adkBaseUrl1,
+                    streamQueryUrl: vertexStreamQueryUrl,
+                    userId,
+                })
+                : isAwsAgentCoreAgent
+                  ? await createSessionAWSAgent({
+                      baseUrl: adkBaseUrl1,
+                      agentId: appName,
+                      userId,
+                    })
+                : await (async () => {
+                    const url = getSessionsUrl(adkBaseUrl, appName, userId);
 
-            const response = await fetch(url, {
-                method: "POST",
-                headers: {
-                    accept: "application/json",
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({}),
-            });
+                    const response = await fetch(url, {
+                        method: "POST",
+                        headers: {
+                            accept: "application/json",
+                            "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify({}),
+                    });
 
-            const payload = (await response.json()) as AdkSession;
+                    const responsePayload = (await response.json()) as AdkSession;
 
-            if (!response.ok || !payload?.id) {
-                throw new Error("Failed to create session");
+                    if (!response.ok || !responsePayload?.id) {
+                        throw new Error("Failed to create session");
+                    }
+
+                    return responsePayload;
+                })();
+
+            if (persist) {
+                setSessions((prev) =>
+                    sortSessions([payload, ...prev.filter((item) => item.id !== payload.id)])
+                );
+                setSelectedSessionId(payload.id);
+                setIsDraftSession(false);
+
+                const mapped = mapEventsToMessages(payload.events);
+                setMessages(mapped.messages);
+                setMessageMilestones(mapped.milestonesByMessageId);
+                setExpandedMilestones({});
             }
-
-            setSessions((prev) =>
-                sortSessions([payload, ...prev.filter((item) => item.id !== payload.id)])
-            );
-            setSelectedSessionId(payload.id);
-            setIsDraftSession(false);
-
-            const mapped = mapEventsToMessages(payload.events);
-            setMessages(mapped.messages);
-            setMessageMilestones(mapped.milestonesByMessageId);
-            setExpandedMilestones({});
 
             return payload.id;
         } catch (error) {
@@ -625,13 +829,79 @@ export default function chatOps({
             setSessionsError("Unable to create session.");
             return null;
         }
-    }, [adkBaseUrl, appName, userId]);
+    }, [adkBaseUrl, adkBaseUrl1, appName, isAwsAgentCoreAgent, isVertexAgent, userId, vertexStreamQueryUrl]);
 
     const deleteSession = useCallback(
         async (sessionId: string) => {
             setSessionsError("");
 
             try {
+                if (isVertexAgent) {
+                    const deletedSelectedSession = selectedSessionId === sessionId;
+
+                    await deleteSessionVertexAgent({
+                        baseUrl: adkBaseUrl1,
+                        agentId: appName,
+                        sessionId,
+                        userId,
+                    });
+
+                    const nextSessions = sessions.filter((item) => item.id !== sessionId);
+                    setSessions(nextSessions);
+
+                    if (deletedSelectedSession) {
+                        const nextId = nextSessions[0]?.id ?? null;
+                        setSelectedSessionId(nextId);
+                        setIsDraftSession(!nextId);
+                        setPendingUserMessage(null);
+                        setMessagesError("");
+                        setSendError("");
+                        resetStreamingText();
+
+                        if (nextId) {
+                            await loadSessionMessages(nextId);
+                        } else {
+                            setMessages([]);
+                            setMessageMilestones({});
+                            setExpandedMilestones({});
+                        }
+                    }
+                    return;
+                }
+
+                if (isAwsAgentCoreAgent) {
+                    const deletedSelectedSession = selectedSessionId === sessionId;
+
+                    await deleteSessionAWSAgent({
+                        baseUrl: adkBaseUrl1,
+                        agentId: appName,
+                        sessionId,
+                        userId,
+                    });
+
+                    const nextSessions = sessions.filter((item) => item.id !== sessionId);
+                    setSessions(nextSessions);
+
+                    if (deletedSelectedSession) {
+                        const nextId = nextSessions[0]?.id ?? null;
+                        setSelectedSessionId(nextId);
+                        setIsDraftSession(!nextId);
+                        setPendingUserMessage(null);
+                        setMessagesError("");
+                        setSendError("");
+                        resetStreamingText();
+
+                        if (nextId) {
+                            await loadSessionMessages(nextId);
+                        } else {
+                            setMessages([]);
+                            setMessageMilestones({});
+                            setExpandedMilestones({});
+                        }
+                    }
+                    return;
+                }
+
                 const url = getSessionUrl(adkBaseUrl, appName, userId, sessionId);
                 // console.log("Deleting session at:", url);
 
@@ -664,7 +934,18 @@ export default function chatOps({
                 setSessionsError("Unable to delete session.");
             }
         },
-        [adkBaseUrl, appName, userId, sessions, selectedSessionId, loadSessionMessages]
+        [
+            adkBaseUrl,
+            adkBaseUrl1,
+            appName,
+            userId,
+            sessions,
+            selectedSessionId,
+            loadSessionMessages,
+            isVertexAgent,
+            isAwsAgentCoreAgent,
+            resetStreamingText,
+        ]
     );
 
     const startNewChat = useCallback(() => {
@@ -689,6 +970,8 @@ export default function chatOps({
         async (prompt: string, options?: { optimisticUser?: boolean }) => {
             const text = prompt.trim();
             if (!text || isSending) return false;
+            const startedFromDraft = !selectedSessionId;
+            const initialSessionId = selectedSessionId;
 
             if (options?.optimisticUser) {
                 setPendingUserMessage({
@@ -701,18 +984,28 @@ export default function chatOps({
 
             setSendError("");
             setIsSending(true);
+            setActiveStreamingSessionId(initialSessionId);
+            setIsDraftStreaming(startedFromDraft);
             startStreamingState();
+            let completedStreamingSessionId: string | null = initialSessionId;
 
             try {
                 let sessionId = selectedSessionId;
 
                 if (!sessionId) {
                     // console.log("No session, creating new one...");
-                    sessionId = await createSession();
+                    sessionId = await createSession(
+                        isAwsAgentCoreAgent ? { persist: false } : undefined
+                    );
                 }
 
                 if (!sessionId) {
                     throw new Error("Could not create or get session");
+                }
+                setActiveStreamingSessionId(sessionId);
+                completedStreamingSessionId = sessionId;
+                if (!(startedFromDraft && isAwsAgentCoreAgent)) {
+                    setIsDraftStreaming(false);
                 }
 
                 // console.log("Sending message to session:", sessionId);
@@ -724,17 +1017,122 @@ export default function chatOps({
                     return false;
                 }
 
-                await loadSessions({ preferredSessionId: sessionId, silent: true });
-                setPendingUserMessage(null);
+                const providerResponseMessage = providerResponseMessageRef.current;
+                providerResponseMessageRef.current = null;
+                const stillViewingStreamSession = selectedSessionIdRef.current === sessionId;
+                const shouldDisplayDirectResponse = stillViewingStreamSession || startedFromDraft;
+
+                if ((isVertexAgent || isAwsAgentCoreAgent) && providerResponseMessage) {
+                    if (shouldDisplayDirectResponse) {
+                        setIsStreamingReply(false);
+                        resetStreamingText();
+                        streamStepsRef.current = [];
+                        setStreamSteps([]);
+
+                        const userMessage: ChatMessage = {
+                            id: `vertex-user-${sessionId}-${Date.now()}`,
+                            role: "user",
+                            text,
+                            timeLabel: formatTime(),
+                        };
+
+                        setMessages((currentMessages) => {
+                            const hasUserMessage = currentMessages.some(
+                                (message) => message.role === "user" && message.text === text
+                            );
+                            const hasAgentMessage = currentMessages.some(
+                                (message) => message.id === providerResponseMessage.id
+                            );
+
+                            return [
+                                ...currentMessages,
+                                ...(hasUserMessage ? [] : [userMessage]),
+                                ...(hasAgentMessage ? [] : [providerResponseMessage]),
+                            ];
+                        });
+                        setSelectedSessionId(sessionId);
+                        setIsDraftSession(false);
+                        setIsDraftStreaming(false);
+                        setPendingUserMessage(null);
+                        await loadSessions({ preferredSessionId: sessionId, silent: true, skipMessages: true });
+                    } else {
+                        suppressNextAutoScrollRef.current = true;
+                        await loadSessions({
+                            preferredSessionId: selectedSessionIdRef.current,
+                            silent: true,
+                            skipMessages: true,
+                        });
+                    }
+                } else {
+                    const restoredMessages = await loadSessions({
+                        preferredSessionId: stillViewingStreamSession ? sessionId : selectedSessionIdRef.current,
+                        silent: true,
+                        skipMessages: !stillViewingStreamSession,
+                    });
+                    const restoredHasUserMessage = restoredMessages.some(
+                        (message) => message.role === "user" && message.text.trim() === text
+                    );
+                    if (restoredHasUserMessage) {
+                        setPendingUserMessage(null);
+                    } else {
+                        const streamedResponseText = streamTargetTextRef.current.trim();
+                        if (streamedResponseText) {
+                            setMessages((currentMessages) => {
+                                const hasUserMessage = currentMessages.some(
+                                    (message) => message.role === "user" && message.text.trim() === text
+                                );
+                                const hasAgentMessage = currentMessages.some(
+                                    (message) =>
+                                        message.role === "agent" &&
+                                        message.text.trim() === streamedResponseText
+                                );
+
+                                return [
+                                    ...currentMessages,
+                                    ...(hasUserMessage
+                                        ? []
+                                        : [
+                                              {
+                                                  id: `local-user-${sessionId}-${Date.now()}`,
+                                                  role: "user" as const,
+                                                  text,
+                                                  timeLabel: formatTime(),
+                                              },
+                                          ]),
+                                    ...(hasAgentMessage
+                                        ? []
+                                        : [
+                                              {
+                                                  id: `local-agent-${sessionId}-${Date.now()}`,
+                                                  role: "agent" as const,
+                                                  text: streamedResponseText,
+                                                  timeLabel: formatTime(),
+                                              },
+                                          ]),
+                                ];
+                            });
+                            setPendingUserMessage(null);
+                        }
+                    }
+                }
                 return true;
             } catch (error) {
                 console.error("Error sending prompt:", error);
+                providerResponseMessageRef.current = null;
                 setSendError("Unable to send message.");
                 setPendingUserMessage(null);
                 return false;
             } finally {
+                if (
+                    completedStreamingSessionId &&
+                    selectedSessionIdRef.current !== completedStreamingSessionId
+                ) {
+                    suppressNextAutoScrollRef.current = true;
+                }
                 setIsSending(false);
                 setIsStreamingReply(false);
+                setActiveStreamingSessionId(null);
+                setIsDraftStreaming(false);
                 resetStreamingText();
                 streamStepsRef.current = [];
                 setStreamSteps([]);
@@ -742,6 +1140,8 @@ export default function chatOps({
         },
         [
             selectedSessionId,
+            isAwsAgentCoreAgent,
+            isVertexAgent,
             isSending,
             createSession,
             runPromptSse,
@@ -808,8 +1208,17 @@ export default function chatOps({
         [selectedSessionId, isDraftSession]
     );
 
+    const isStreamingVisibleForCurrentSession = useMemo(() => {
+        if (!isStreamingReply) return false;
+        if (selectedSessionId) {
+            return selectedSessionId === activeStreamingSessionId;
+        }
+
+        return isDraftSession && isDraftStreaming;
+    }, [activeStreamingSessionId, isDraftSession, isDraftStreaming, isStreamingReply, selectedSessionId]);
+
     const visibleMessages = useMemo(() => {
-        if (!pendingUserMessage) return messages;
+        if (!pendingUserMessage || !isStreamingVisibleForCurrentSession) return messages;
 
         const last = messages[messages.length - 1];
 
@@ -817,81 +1226,93 @@ export default function chatOps({
             return messages;
 
         return [...messages, pendingUserMessage];
-    }, [messages, pendingUserMessage]);
+    }, [isStreamingVisibleForCurrentSession, messages, pendingUserMessage]);
 
     const isInitialSessionView =
-        !isLoadingMessages && !isStreamingReply && visibleMessages.length === 0;
+        !isLoadingMessages && !isStreamingVisibleForCurrentSession && visibleMessages.length === 0;
+    const hasSelectableApps = useMemo(
+        () => apps.some((app) => isSelectableStatus(app)),
+        [apps]
+    );
+    const showFallbackPage = hasLoadedApps && apps.length > 0 && !hasSelectableApps;
 
     // ============ RENDER ============
 
     return (
         <div className="-m-10 flex h-[calc(100vh-73px)] min-h-0 overflow-hidden bg-white">
-            {/* Left Sidebar - Sessions */}
-            <ChatSidebar
-                sessions={sessions}
-                selectedSessionId={selectedSessionId}
-                isLoadingSessions={isLoadingSessions}
-                sessionsError={sessionsError}
-                isSending={isSending}
-                onNewChat={startNewChat}
-                onSelectSession={(id) => {
-                    setSelectedSessionId(id);
-                    setIsDraftSession(false);
-                    void loadSessionMessages(id);
-                }}
-                onDeleteSession={deleteSession}
-            />
-
-            {/* Center - Chat Area */}
-            <section className="flex min-w-0 flex-1 min-h-0 flex-col overflow-hidden">
-                <ChatHeader
-                    assistantDisplayName={assistantDisplayName}
-                    appName={appName}
-                    selectedSessionLabel={selectedSessionLabel}
-                    onClose={onClose}
-                />
-
-                <ChatMessages
-                    ref={messageListRef}
-                    isLoadingMessages={isLoadingMessages}
-                    isInitialSessionView={isInitialSessionView}
-                    visibleMessages={visibleMessages}
-                    isStreamingReply={isStreamingReply}
-                    streamingText={streamingText}
-                    streamSteps={streamSteps}
-                    messageMilestones={messageMilestones}
-                    expandedMilestones={expandedMilestones}
-                    assistantDisplayName={assistantDisplayName}
-                    copiedMessageId={copiedMessageId}
-                    lastUserPrompt={lastUserPrompt}
-                    isSending={isSending}
-                    sendError={sendError}
-                    draft={draft}
-                    onDraftChange={setDraft}
-                    onSend={() => void sendMessage()}
-                    onToggleMilestone={toggleMilestoneExpansion}
-                    onCopyMessage={copyMessage}
-                    onRetry={retryLastPrompt}
-                />
-
-                {!isInitialSessionView && (
-                    <ChatInput
-                        draft={draft}
+            {showFallbackPage ? (
+                <Fallbackpage disabledAgentCount={apps.length} />
+            ) : (
+                <>
+                    {/* Left Sidebar - Sessions */}
+                    <ChatSidebar
+                        sessions={sessions}
+                        selectedSessionId={selectedSessionId}
+                        isLoadingSessions={isLoadingSessions}
+                        sessionsError={sessionsError}
                         isSending={isSending}
-                        messagesError={messagesError}
-                        sendError={sendError}
-                        onDraftChange={setDraft}
-                        onSend={sendMessage}
+                        onNewChat={() => void startNewChat()}
+                        onSelectSession={(id) => {
+                            setSelectedSessionId(id);
+                            setIsDraftSession(false);
+                            void loadSessionMessages(id);
+                        }}
+                        onDeleteSession={deleteSession}
                     />
-                )}
-            </section>
+
+                    {/* Center - Chat Area */}
+                    <section className="flex min-w-0 flex-1 min-h-0 flex-col overflow-hidden">
+                        <ChatHeader
+                            assistantDisplayName={assistantDisplayName}
+                            appName={appName}
+                            selectedSessionLabel={selectedSessionLabel}
+                            onClose={onClose}
+                        />
+
+                        <ChatMessages
+                            ref={messageListRef}
+                            isLoadingMessages={isLoadingMessages}
+                            isInitialSessionView={isInitialSessionView}
+                            visibleMessages={visibleMessages}
+                            isStreamingReply={isStreamingVisibleForCurrentSession}
+                            streamingText={isStreamingVisibleForCurrentSession ? streamingText : ""}
+                            streamSteps={isStreamingVisibleForCurrentSession ? streamSteps : []}
+                            messageMilestones={messageMilestones}
+                            expandedMilestones={expandedMilestones}
+                            assistantDisplayName={assistantDisplayName}
+                            copiedMessageId={copiedMessageId}
+                            lastUserPrompt={lastUserPrompt}
+                            isSending={isSending}
+                            sendError={sendError}
+                            draft={draft}
+                            onDraftChange={setDraft}
+                            onSend={() => void sendMessage()}
+                            onToggleMilestone={toggleMilestoneExpansion}
+                            onCopyMessage={copyMessage}
+                            onRetry={retryLastPrompt}
+                        />
+
+                        {!isInitialSessionView && (
+                            <ChatInput
+                                draft={draft}
+                                isSending={isSending}
+                                messagesError={messagesError}
+                                sendError={sendError}
+                                onDraftChange={setDraft}
+                                onSend={sendMessage}
+                            />
+                        )}
+                    </section>
+                </>
+            )}
 
             {/* Right Sidebar - Apps */}
             <AgentSidebar
-                assistantDisplayName={assistantDisplayName}
-                appName={appName}
+                assistantDisplayName={
+                    showFallbackPage ? "No active agent selected" : assistantDisplayName
+                }
                 apps={apps}
-                selectedApp={selectedApp}
+                selectedApp={showFallbackPage ? null : selectedApp}
                 onSelectApp={setSelectedApp}
             />
         </div>

@@ -16,7 +16,13 @@ type McpInventoryTableProps = {
 };
 
 const COLUMN_TEMPLATE =
-  "minmax(220px,1.55fr) minmax(260px,1.95fr) minmax(160px,0.95fr) minmax(170px,0.9fr) minmax(170px,0.95fr) minmax(96px,0.65fr)";
+  "minmax(220px,1.45fr) minmax(240px,1.8fr) minmax(150px,0.9fr) minmax(150px,0.82fr) minmax(120px,0.72fr) minmax(150px,0.9fr) minmax(96px,0.62fr)";
+
+const LIVE_STATUS_TONE = {
+  text: "text-[#166534]",
+  bg: "bg-transparent",
+  dot: "bg-[#16a34a]",
+};
 
 export default function McpInventoryTable({
   servers,
@@ -33,18 +39,32 @@ export default function McpInventoryTable({
         {isLoading ? (
           <div className="bg-white">
             <div
-              className="grid items-center divide-x divide-[#d7e0ee] bg-[#f3f6fb] px-4 py-3 text-xs font-semibold uppercase tracking-[0.08em] text-[#111827]"
+              className="grid items-center divide-x divide-[#d7e0ee] bg-[#f3f6fb] px-4 py-3 text-xs font-semibold tracking-[0.08em] text-[#111827]"
               style={{
                 gridTemplateColumns: COLUMN_TEMPLATE,
               }}
             >
-              <span className="px-4">Server</span>
-              
-              <span className="px-4">Description</span>
-              <span className="px-4">Auth</span>
-              <span className="px-4 text-center">Secret</span>
-              <span className="px-4">Updated</span>
-              <span className="px-3 text-right">Action</span>
+              <span className="flex h-full items-center px-4 leading-tight capitalize">
+                Server
+              </span>
+              <span className="flex h-full items-center px-4 leading-tight capitalize">
+                Description
+              </span>
+              <span className="flex h-full items-center px-4 leading-tight capitalize">
+                Auth
+              </span>
+              <span className="flex h-full items-center justify-center px-4 text-center leading-tight capitalize">
+                Secret
+              </span>
+              <span className="flex h-full items-center justify-center px-4 text-center leading-tight capitalize">
+                Status
+              </span>
+              <span className="flex h-full items-center px-4 leading-tight capitalize">
+                Updated
+              </span>
+              <span className="flex h-full items-center justify-end px-3 text-right leading-tight capitalize">
+                Action
+              </span>
             </div>
 
             <div className="divide-y divide-[#eef1f7]">
@@ -71,6 +91,9 @@ export default function McpInventoryTable({
                   </div>
                   <div className="flex justify-center px-4">
                     <div className="h-7 w-28 rounded-full bg-[#edf2f9]" />
+                  </div>
+                  <div className="flex justify-center px-4">
+                    <div className="h-6 w-16 rounded bg-[#edf2f9]" />
                   </div>
                   <div className="px-4">
                     <div className="h-4 w-28 rounded bg-[#edf2f9]" />
@@ -105,17 +128,32 @@ export default function McpInventoryTable({
         ) : (
           <div className="min-w-[1160px]">
             <div
-              className="grid items-center divide-x divide-[#d7e0ee] bg-[#f3f6fb] px-4 py-3 text-xs font-semibold uppercase tracking-[0.08em] text-[#111827]"
+              className="grid items-center divide-x divide-[#d7e0ee] bg-[#f3f6fb] px-4 py-3 text-xs font-semibold tracking-[0.08em] text-[#111827]"
               style={{
                 gridTemplateColumns: COLUMN_TEMPLATE,
               }}
             >
-              <span className="px-4">Server</span>
-              <span className="px-4">Description</span>
-              <span className="px-4">Auth</span>
-              <span className="px-4 text-center">Secret</span>
-              <span className="px-4">Updated</span>
-              <span className="px-3 text-right">Action</span>
+              <span className="flex h-full items-center px-4 leading-tight capitalize">
+                Server
+              </span>
+              <span className="flex h-full items-center px-4 leading-tight capitalize">
+                Description
+              </span>
+              <span className="flex h-full items-center px-4 leading-tight capitalize">
+                Auth
+              </span>
+              <span className="flex h-full items-center justify-center px-4 text-center leading-tight capitalize">
+                Secret
+              </span>
+              <span className="flex h-full items-center justify-center px-4 text-center leading-tight capitalize">
+                Status
+              </span>
+              <span className="flex h-full items-center px-4 leading-tight capitalize">
+                Updated
+              </span>
+              <span className="flex h-full items-center justify-end px-3 text-right leading-tight capitalize">
+                Action
+              </span>
             </div>
 
             <div className="divide-y divide-[#eef1f7] bg-white">
@@ -167,6 +205,15 @@ export default function McpInventoryTable({
                           Not set
                         </span>
                       )}
+                    </div>
+
+                    <div className="flex h-full items-center justify-center px-3 text-center">
+                      <span
+                        className={`inline-flex items-center gap-2 px-2.5 py-1 text-xs font-semibold ${LIVE_STATUS_TONE.bg} ${LIVE_STATUS_TONE.text}`}
+                      >
+                        <span className={`h-2 w-2 rounded-full ${LIVE_STATUS_TONE.dot}`} />
+                        Live
+                      </span>
                     </div>
 
                     <div className="px-4 text-[#4b5563]">

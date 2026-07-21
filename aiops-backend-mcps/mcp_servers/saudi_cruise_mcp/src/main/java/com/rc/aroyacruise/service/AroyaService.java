@@ -106,7 +106,7 @@ public class AroyaService {
         return Utility.removeNulls(response.data());
     }
 
-    private String resolveToken(String bearerToken) {
+    public String resolveToken(String bearerToken) {
         if (StringUtils.hasText(bearerToken)) {
             return stripBearerPrefix(bearerToken);
         }

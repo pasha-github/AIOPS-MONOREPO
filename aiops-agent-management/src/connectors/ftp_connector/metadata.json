@@ -1,0 +1,61 @@
+{
+  "id": "ftp_connector",
+  "name": "FTP",
+  "category": "helper",
+  "description": "Connect to an FTP server to list directories and read text files.",
+  "version": "1.0.0",
+  "config_variables": [
+    {
+      "name": "FTP_HOST",
+      "label": "FTP Host",
+      "required": true,
+      "secret": false,
+      "placeholder": "127.0.0.1 or ftp.example.com"
+    },
+    {
+      "name": "FTP_PORT",
+      "label": "FTP Port",
+      "required": false,
+      "secret": false,
+      "placeholder": "21"
+    },
+    {
+      "name": "FTP_USERNAME",
+      "label": "Username",
+      "required": true,
+      "secret": false,
+      "placeholder": "testuser"
+    },
+    {
+      "name": "FTP_PASSWORD",
+      "label": "Password",
+      "required": true,
+      "secret": true,
+      "placeholder": "Your FTP password"
+    },
+    {
+      "name": "FTP_DIRECTORY",
+      "label": "Directory",
+      "required": true,
+      "secret": false,
+      "placeholder": "e.g. / or /docs"
+    },
+    {
+      "name": "prefix",
+      "label": "Prefix",
+      "required": false,
+      "secret": false,
+      "placeholder": "FTP"
+    }
+  ],
+  "tools": [
+    {
+      "name": "list_files",
+      "documentation": "List files and directories on the FTP server. Lists from FTP_DIRECTORY if configured, otherwise from root."
+    },
+    {
+      "name": "read_file",
+      "documentation": "Read the content of a text file from the FTP server by file name."
+    }
+  ]
+}

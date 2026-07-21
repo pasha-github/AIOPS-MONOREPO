@@ -7,7 +7,7 @@ export async function GET() {
 
   if (serverState.faults.isDbLatencyHigh) {
     addLog('database', 'High latency detected on product queries', 'warn');
-    await new Promise(resolve => setTimeout(resolve, 3000)); // 3 seconds latency
+    await new Promise(resolve => setTimeout(resolve, 60000)); // 1 minute latency
   }
 
   return NextResponse.json(products);

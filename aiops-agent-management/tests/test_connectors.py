@@ -1,7 +1,9 @@
+import asyncio
 import sys
 from pathlib import Path
 from uuid import uuid4
 
+import cloudpickle
 import pytest
 from fastapi.testclient import TestClient
 
@@ -49,6 +51,19 @@ def test_get_connector_details_success(client: TestClient):
     assert "config_variables" in data
     assert isinstance(data["tools"], list)
     assert isinstance(data["config_variables"], list)
+
+
+def test_get_connector_details_uses_metadata_file(client: TestClient):
+    response = client.get("/connectors/datadog_connector")
+    assert response.status_code == 200
+
+    data = response.json()
+    config_vars = {item["name"]: item for item in data["config_variables"]}
+
+    assert data["documentation"].startswith("# Datadog Connector")
+    assert config_vars["DD_API_KEY"]["label"] == "API Key"
+    assert config_vars["DD_API_KEY"]["secret"] is True
+    assert config_vars["DD_API_KEY"]["placeholder"] == "Enter Datadog API key"
 
 
 def test_get_connector_details_not_found_404(client: TestClient):
@@ -398,6 +413,49 @@ def test_ibm_mq_connector_details_include_expected_tools(client: TestClient):
     assert config_vars["VERIFY_TLS"] is False
 
 
+def test_ibm_mq_connector_tools_survive_cloudpickle_round_trip():
+    cfg = ConnectorConfig(
+        name="IBM MQ Config",
+        connector_id="ibm_mq_connector",
+        config=[
+            {"name": "URL_BASE", "value": "https://mq.example.com/ibmmq/rest/v3/admin"},
+            {"name": "USER_NAME", "value": "mq-user"},
+            {"name": "PASSWORD", "value": "mq-password"},
+            {"name": "LOGS_URL", "value": "https://mq.example.com/logs"},
+            {"name": "SSH_HOSTNAME", "value": "mq-host"},
+            {"name": "SSH_USERNAME", "value": "mq-ssh-user"},
+            {"name": "SSH_PASSWORD", "value": "mq-ssh-password"},
+        ],
+    )
+    module_name = "connectors.ibm_mq_connector.connector"
+
+    tools = resolve_connector_tools(cfg)
+    dspmq_tool = next(tool for tool in tools if tool.name == "dspmq")
+
+    assert dspmq_tool.func.__module__ == module_name
+    assert module_name in sys.modules
+
+    round_tripped_tools = cloudpickle.loads(cloudpickle.dumps(tools))
+    round_tripped_dspmq = next(
+        tool for tool in round_tripped_tools if tool.name == "dspmq"
+    )
+    assert round_tripped_dspmq.func.__module__ == module_name
+
+    connector = round_tripped_dspmq.func.__self__
+    connector._perform_mq_request = lambda endpoint: {
+        "status": "success",
+        "data": {"qmgr": [{"name": "QM1", "state": "running"}]},
+    }
+
+    result = asyncio.run(round_tripped_dspmq.run_async(args={}, tool_context=None))
+
+    assert result == {
+        "status": "success",
+        "count": 1,
+        "queue_managers": [{"name": "QM1", "running": "running"}],
+    }
+
+
 def test_resolve_connector_tools_missing_file_raises():
     cfg = ConnectorConfig(
         name="bad",
@@ -424,7 +482,10 @@ class TempConnector(BaseConnector):
         return "pong"
 
     def get_tools(self):
-        return [self.ping]
+        class Tool:
+            name = "ping"
+
+        return [Tool()]
 '''
     base_source = """
 def connector_tool(func):
@@ -472,8 +533,11 @@ def test_resolve_connector_tools_microsoft_entra_connector_exposes_account_tools
     tools = resolve_connector_tools(cfg)
 
     assert [tool.name for tool in tools] == [
+        "assign_license",
+        "create_user",
         "disable_user",
         "enable_user",
+        "list_licenses",
         "reset_user_password",
     ]
 
@@ -492,7 +556,11 @@ def test_resolve_connector_tools_outlook_connector_exposes_reply_tool():
 
     tools = resolve_connector_tools(cfg)
 
-    assert [tool.name for tool in tools] == ["reply_to_email"]
+    assert [tool.name for tool in tools] == [
+        "create_calendar_event",
+        "reply_to_email",
+        "send_email",
+    ]
 
 
 def test_resolve_connector_tools_no_baseconnector_subclass_raises(
@@ -551,7 +619,11 @@ def test_outlook_connector_exposes_reply_tool():
         MAILBOX_USER="noc_rcaiops@ai.royalcyber.org",
     )
 
-    assert connector.tool_names == ["reply_to_email"]
+    assert connector.tool_names == [
+        "create_calendar_event",
+        "reply_to_email",
+        "send_email",
+    ]
 
 
 def test_outlook_connector_replies_to_email(

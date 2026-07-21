@@ -1,0 +1,24 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --color-bg-base: #d6d9e2;
+  --color-fg-base: #0f1115;
+  --color-rc-blue: #1c2c80;
+  --color-rc-blue-light: #2a3eb1;
+  --color-rc-accent: #0ea5e9;
+  --font-sans: "Poppins", "Segoe UI", Arial, sans-serif;
+  --font-mono: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+}
+
+:root {
+  --background: #d6d9e2;
+  --foreground: #0f1115;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans-fallback, "Poppins", "Segoe UI", Arial, sans-serif);
+}
+

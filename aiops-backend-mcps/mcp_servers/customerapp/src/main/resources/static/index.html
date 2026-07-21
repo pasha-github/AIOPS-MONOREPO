@@ -1,101 +1,252 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Status App</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer App Status</title>
     <style>
+        :root {
+            --primary-color: #4f46e5;
+            --success-color: #10b981;
+            --danger-color: #ef4444;
+            --idle-color: #6b7280;
+            --bg-gradient: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+            --card-bg: #ffffff;
+            --text-main: #111827;
+            --text-muted: #6b7280;
+        }
+
         body {
-            font-family: Arial;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: var(--bg-gradient);
+            min-height: 100vh;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-main);
+        }
+
+        .container {
+            background: var(--card-bg);
+            padding: 2.5rem;
+            border-radius: 1.5rem;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
             text-align: center;
-            margin-top: 100px;
+            width: 100%;
+            max-width: 400px;
+            transition: transform 0.3s ease;
         }
 
-        .status-box {
-            font-size: 32px;
-            padding: 25px;
-            border-radius: 10px;
-            display: inline-block;
-            min-width: 250px;
-            font-weight: bold;
+        .container:hover {
+            transform: translateY(-5px);
         }
 
-        .start {
-            background-color: #4CAF50;
+        h1 {
+            margin-bottom: 0.5rem;
+            font-weight: 800;
+            font-size: 1.875rem;
+            letter-spacing: -0.025em;
+        }
+
+        p.subtitle {
+            color: var(--text-muted);
+            margin-bottom: 2rem;
+            font-size: 0.875rem;
+        }
+
+        .status-display {
+            margin-bottom: 2.5rem;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.75rem 2rem;
+            border-radius: 9999px;
+            font-size: 1.25rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            min-width: 160px;
+            justify-content: center;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .status-badge.start {
+            background-color: var(--success-color);
+            color: white;
+            animation: pulse-green 2s infinite;
+        }
+
+        .status-badge.stop {
+            background-color: var(--danger-color);
             color: white;
         }
 
-        .stop {
-            background-color: #f44336;
+        .status-badge.idle {
+            background-color: var(--idle-color);
             color: white;
         }
 
-        .idle {
-            background-color: #9e9e9e;
-            color: white;
+        @keyframes pulse-green {
+            0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+            70% { box-shadow: 0 0 0 15px rgba(16, 185, 129, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+
+        .button-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
         }
 
         button {
-            margin-top: 40px;
-            padding: 14px 25px;
-            font-size: 18px;
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 0.75rem;
+            font-size: 1rem;
+            font-weight: 600;
             cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        #startBtn {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        #startBtn:hover:not(:disabled) {
+            background-color: #4338ca;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+        }
+
+        #stopBtn {
+            background-color: #f3f4f6;
+            color: var(--text-main);
+            border: 1px solid #e5e7eb;
+        }
+
+        #stopBtn:hover:not(:disabled) {
+            background-color: #e5e7eb;
+            transform: translateY(-2px);
+        }
+
+        button:active:not(:disabled) {
+            transform: translateY(0);
         }
 
         button:disabled {
-            background-color: #cccccc;
+            opacity: 0.5;
             cursor: not-allowed;
+            filter: grayscale(1);
+        }
+
+        .loading-dots:after {
+            content: '.';
+            animation: dots 1.5s steps(5, end) infinite;
+        }
+
+        @keyframes dots {
+            0%, 20% { content: '.'; }
+            40% { content: '..'; }
+            60% { content: '...'; }
+            80%, 100% { content: ''; }
         }
     </style>
 </head>
 <body>
 
-<h1>Application Status</h1>
+<div class="container">
+    <h1>App Status</h1>
+    <p class="subtitle">Real-time system monitoring</p>
 
-<div id="statusBox" class="status-box idle">
-    Loading...
+    <div class="status-display">
+        <div id="statusBox" class="status-badge idle">
+            <span id="statusText">Loading</span><span class="loading-dots"></span>
+        </div>
+    </div>
+
+    <div class="button-group">
+        <button id="startBtn" onclick="startApp()">
+            <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            Start
+        </button>
+        <button id="stopBtn" onclick="stopApp()">
+            <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H10a1 1 0 01-1-1v-4z"/>
+            </svg>
+            Stop
+        </button>
+    </div>
 </div>
 
-<br/>
-
-<button id="startBtn" onclick="startApp()">Start App</button>
-<button id="stopBtn" onclick="stopApp()">Stop App</button>
-
 <script>
-
     async function fetchStatus() {
-        const response = await fetch('/api/status');
-        const data = await response.json();
+        try {
+            const response = await fetch('/api/status');
+            const data = await response.json();
+            const status = data.status;
 
-        const status = data.status;
+            const box = document.getElementById('statusBox');
+            const statusText = document.getElementById('statusText');
+            const startBtn = document.getElementById('startBtn');
+            const stopBtn = document.getElementById('stopBtn');
 
-        const box = document.getElementById('statusBox');
-        const btn = document.getElementById('startBtn');
+            box.className = 'status-badge ' + status.toLowerCase();
+            statusText.innerText = status;
+            
+            // Remove loading dots if status is fetched
+            const dots = box.querySelector('.loading-dots');
+            if (dots) dots.remove();
 
-        box.className = 'status-box ' + status.toLowerCase();
-        box.innerText = status;
+            // Disable Start button if already started
+            startBtn.disabled = (status === 'START');
+            // Disable Stop button if already stopped or idle
+            stopBtn.disabled = (status === 'STOP' || status === 'IDLE');
 
-        // Button active only if STOP
-        if (status === 'STOP' || status === 'IDLE') {
-            btn.disabled = false;
-        } else {
-            btn.disabled = true;
+        } catch (error) {
+            console.error('Failed to fetch status:', error);
+            document.getElementById('statusText').innerText = 'OFFLINE';
+            document.getElementById('statusBox').className = 'status-badge stop';
         }
     }
 
     async function startApp() {
+        setLoadingState('startBtn');
         await fetch('/api/start', { method: 'POST' });
-        fetchStatus();
-    }
-     async function stopApp() {
-        await fetch('/api/stop', { method: 'POST' });
-        fetchStatus();
+        await fetchStatus();
     }
 
-    // Auto refresh every 3 seconds
+    async function stopApp() {
+        setLoadingState('stopBtn');
+        await fetch('/api/stop', { method: 'POST' });
+        await fetchStatus();
+    }
+
+    function setLoadingState(btnId) {
+        const btn = document.getElementById(btnId);
+        btn.disabled = true;
+        const originalText = btn.innerHTML;
+        btn.innerText = '...';
+        setTimeout(() => { if(btn.innerText === '...') btn.innerHTML = originalText; }, 2000);
+    }
+
+    // Auto refresh every 5 seconds
     setInterval(fetchStatus, 5000);
 
     // Initial load
     fetchStatus();
-
 </script>
 
 </body>

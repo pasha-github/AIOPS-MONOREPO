@@ -1,12 +1,7 @@
 "use client";
 
-import { ArrowRight, Check } from "lucide-react";
+import { Bot, Check } from "lucide-react";
 import { renderMarkdownBlocks, type AgentLogEntry, type AgentSessionDetail } from "../dashboard/logs";
-
-const levelStyles = {
-  text: "bg-[#eef2ff] text-[#4338ca]",
-  request: "bg-[#fff7ed] text-[#ea580c]",
-} as const;
 
 const formatToolPayload = (value: unknown) => {
   if (value === null || value === undefined) {
@@ -58,38 +53,51 @@ export default function AgentLogDetails({
   selectedEntry,
 }: AgentLogDetailsProps) {
   return (
-    <>
-      <div className="hidden self-start justify-center pt-40 xl:flex">
-        <div className="flex h-12 w-12 items-center justify-center rounded-full border border-[#d9e2f3] bg-white text-[#4f49e2] shadow-[0_18px_35px_-24px_rgba(15,23,42,0.45)]">
-          <ArrowRight className="h-5 w-5" />
-        </div>
-      </div>
-
-      <div className="min-w-0">
+      <div className="flex h-full min-w-0 flex-col xl:h-[760px]">
         <div className="mb-6">
           <div className="mb-5 flex items-center gap-4">
             <span className="h-px w-full bg-[#dde4f1]" />
           </div>
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#7a8498]">
-              Detail View
-            </p>
-            <h2 className="mt-2 text-2xl font-semibold text-[#111827]">
-              Event details
-            </h2>
+          <div className="flex flex-wrap items-start justify-between gap-4 xl:min-h-[112px]">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.32em] text-[#7a8498]">
+                Detail View
+              </p>
+              <h2 className="mt-2 text-3xl font-semibold text-[#111827]">
+                Event details
+              </h2>
+            </div>
+            <div />
           </div>
         </div>
 
         {isLoading || (selectedSessionId && loadingSessionId === selectedSessionId && !selectedDetail) ? (
-          <DetailSkeleton />
+          <div className="flex-1">
+            <DetailSkeleton />
+          </div>
         ) : !selectedEntry ? (
-          <div className="rounded-xl bg-[linear-gradient(180deg,#ffffff_0%,#fbfcff_100%)] p-8 shadow-[0_24px_60px_-44px_rgba(15,23,42,0.45)]">
-            <p className="text-sm text-[#687285]">
-              Select an activity event from the left to inspect its full content.
-            </p>
+          <div className="relative flex flex-1 items-center justify-center overflow-hidden rounded-xl bg-[linear-gradient(180deg,#ffffff_0%,#fbfcff_100%)] p-8 shadow-[0_24px_60px_-44px_rgba(15,23,42,0.45)]">
+            <div
+              className="pointer-events-none absolute inset-0 flex items-center justify-center"
+              aria-hidden="true"
+            >
+              <Bot className="h-56 w-56 text-[#4f49e2]/[0.06]" strokeWidth={1.2} />
+            </div>
+            <div className="relative z-10 mx-auto max-w-md text-center">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[1.5rem] bg-[#eef2ff] text-[#4f49e2] shadow-[0_18px_35px_-24px_rgba(79,73,226,0.7)]">
+                <Bot className="h-8 w-8" />
+              </div>
+              <h3 className="mt-6 text-3xl font-semibold tracking-tight text-[#111827]">
+                No Activity Selected
+              </h3>
+              <p className="mt-4 text-base leading-7 text-[#5f677a]">
+                Select a user activity from the table to view the full event
+                details, tool usage, and response content here.
+              </p>
+            </div>
           </div>
         ) : (
-          <div className="overflow-hidden rounded-xl bg-[linear-gradient(180deg,#ffffff_0%,#fbfcff_100%)] shadow-[0_24px_60px_-44px_rgba(15,23,42,0.45)]">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl bg-[linear-gradient(180deg,#ffffff_0%,#fbfcff_100%)] shadow-[0_24px_60px_-44px_rgba(15,23,42,0.45)]">
             <div className="border-b border-[#edf1f7] px-7 py-6">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#7a8498]">
                 {selectedEntry.authorLabel}
@@ -99,17 +107,9 @@ export default function AgentLogDetails({
               </h3>
               <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-[#687285]">
                 <span>{selectedEntry.timestampLabel}</span>
-                <span className="text-[#c8cfdb]">/</span>
-                <div>{renderMarkdownBlocks(selectedSessionSummary ?? "")}</div>
               </div>
               <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg px-4 py-3">
-                <span
-                  className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${
-                    levelStyles[selectedEntry.source]
-                  }`}
-                >
-                  {selectedEntry.source}
-                </span>
+                
                 <span className="text-[11px] uppercase tracking-[0.16em] text-[#a0abc0]">
                   Activity ID
                 </span>
@@ -119,7 +119,7 @@ export default function AgentLogDetails({
               </div>
             </div>
 
-            <div className="soft-scrollbar max-h-[70vh] overflow-y-auto px-7 py-6">
+            <div className="soft-scrollbar min-h-0 flex-1 overflow-y-auto px-7 py-6">
               {selectedEntry.tools.length > 0 ? (
                 <div className="mb-6  p-4">
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7a8498]">
@@ -152,7 +152,6 @@ export default function AgentLogDetails({
             </div>
           </div>
         )}
-      </div>
-    </>
+    </div>
   );
 }

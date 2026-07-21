@@ -3,7 +3,6 @@
 import { useRuntimeConfig } from "@/config/runtime-config";
 import {
   Activity,
-  ArrowRight,
   Bell,
   Bot,
   ChevronDown,
@@ -26,9 +25,9 @@ import {
   type AgentSessionDetail,
   type AgentSessionSummary,
   type AutomationAgentOption,
-  fetchAutomationAgents,
   fetchAgentSessionDetail,
   fetchAgentSessions,
+  fetchAutomationAgents,
   renderMarkdownBlocks,
   resolveAgentManagerApiBase,
   resolveLogsApiBase,
@@ -46,6 +45,31 @@ const entryIconStyles = {
 
 const REVEAL_INTERVAL_MS = 140;
 const DASHBOARD_SESSION_LIMIT = 5;
+
+function EmptyAutomationSessionsState() {
+  return (
+    <div className="relative flex min-h-[220px] items-center justify-center overflow-hidden rounded-2xl bg-[linear-gradient(180deg,#ffffff_0%,#fbfcff_100%)] px-6 py-10 text-center">
+      <div
+        className="pointer-events-none absolute inset-0 flex items-center justify-center"
+        aria-hidden="true"
+      >
+        <Activity className="h-48 w-48 text-[#16a34a]/[0.07]" strokeWidth={1.2} />
+      </div>
+      <div className="relative z-10 mx-auto max-w-md">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-[1.35rem] bg-[#e6f9ee] text-[#16a34a] shadow-[0_18px_35px_-24px_rgba(22,163,74,0.7)]">
+          <Activity className="h-7 w-7" />
+        </div>
+        <h3 className="mt-5 text-2xl font-semibold tracking-tight text-[#111827]">
+          No Automation Sessions
+        </h3>
+        <p className="mt-3 text-sm leading-6 text-[#5f677a]">
+          Automation activity will appear here after the selected agent runs,
+          triggers a workflow, or records session events.
+        </p>
+      </div>
+    </div>
+  );
+}
 
 export default function AgentActivityLog() {
   const { agentAdkBaseUrl, llmManagerApiBaseUrl } = useRuntimeConfig();
@@ -390,7 +414,7 @@ export default function AgentActivityLog() {
         </div>
       </div>
 
-      <div className="mt-6 flex items-center justify-between gap-4">
+      <div className="mt-6">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#8a94a6]">
             Latest Sessions
@@ -401,13 +425,6 @@ export default function AgentActivityLog() {
               : `Showing the latest ${DASHBOARD_SESSION_LIMIT} sessions.`}
           </p>
         </div>
-        <Link
-          href="/activity"
-          className="inline-flex items-center gap-2 rounded-full border border-[#dbe4f5] bg-[#f8faff] px-4 py-2 text-sm font-semibold text-[#4f49e2] transition hover:bg-[#eef2ff]"
-        >
-          View all logs
-          <ArrowRight className="h-4 w-4" />
-        </Link>
       </div>
 
       <div className="soft-scrollbar mt-5 min-h-0 flex-1 space-y-3 overflow-y-auto pr-2">
@@ -583,10 +600,17 @@ export default function AgentActivityLog() {
         ) : null}
 
         {!isLoading && sessions.length === 0 && !error ? (
-          <div className="rounded-2xl border border-dashed border-[#d8deec] bg-[#fafbff] px-4 py-8 text-center text-sm text-[#748096]">
-            No automation sessions are available right now.
-          </div>
+          <EmptyAutomationSessionsState />
         ) : null}
+      </div>
+
+      <div className="mt-auto pt-5">
+        <Link
+          href="/activity"
+          className="block w-full rounded-xl bg-[#4f49e2] py-3 text-center text-sm font-semibold text-white shadow-[0_12px_24px_-14px_rgba(79,73,226,0.6)]"
+        >
+          Inspect All Logs
+        </Link>
       </div>
 
       {activeEntry ? (

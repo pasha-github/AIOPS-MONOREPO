@@ -1,13 +1,47 @@
 "use client";
 
+import DualListPicker from "@/components/DualListPicker";
+import {
+    ModalCard,
+    ModalCardBody,
+    ModalCardFooter,
+    ModalCardHeader,
+    ModalCardPanel,
+    ModalCardRequiredNote,
+} from "@/components/modalcards";
 import { trimTrailingSlash } from "@/config/agent";
 import { useRuntimeConfig } from "@/config/runtime-config";
-import { Bot, ChevronDown, Plus, Trash2, X } from "lucide-react";
+import { Bot, ChevronDown, Link2, LucideIcon, Plus, Sparkles, Trash2, Workflow } from "lucide-react";
 import Image from "next/image";
 import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { getProviderIconSrc } from "../llm-management/llmHelpers";
-import { DynamicDropdownField, inputClass, SimpleDropdownField } from "./DynamicConnector";
-import type { AgentRecord } from "./types";
+import AddKnowledge from "./agentform/addknowledge";
+import {
+    uploadKnowledgeFile,
+    type KnowledgeFileRecord,
+} from "./agentform/addknowledge/file-upload";
+import GuardrailInput, {
+    DEFAULT_GUARDRAIL_PII_PATTERNS,
+    type GuardrailPiiPattern,
+} from "./agentform/guardrail-input";
+import AwsCredentialDropdown from "./AwsCredentialDropdown";
+import { fetchAwsCredentialOptions, type AwsCredentialOption } from "./awsCredentials";
+import {
+    DynamicDropdownField,
+    inputClass,
+    SimpleDropdownField,
+    ThemedSingleDropdown,
+} from "./DynamicConnector";
+import {
+    AGENT_TYPE_OPTIONS,
+    DEPLOYMENT_TARGET_OPTIONS,
+    MEMORY_BANK_OPTIONS,
+    MEMORY_RETRIEVAL_OPTIONS,
+    PROMPT_FIELD_DEFINITIONS,
+    type AgentLookupOption,
+    type AgentRecord,
+    type PromptFieldKey,
+} from "./types";
 
 type UpdateAgentProps = {
     agent: AgentRecord;
@@ -34,11 +68,23 @@ type LlmSlotKey = "primary" | "secondary" | "tertiary";
 type UpdateAgentForm = {
     agentName: string;
     description: string;
-    instruction: string;
+    deploymentTarget: string;
+    agentType: string;
+    memoryEnabled: string;
+    memoryToolType: string;
+    prompt_role: string;
+    prompt_objectives: string;
+    prompt_behavior: string;
+    prompt_output_format: string;
+    prompt_constraints: string;
+    prompt_safety: string;
+    prompt_tools_instructions: string;
+    prompt_policy: string;
+    prompt_examples: string;
+    prompt_additional_info: string;
     tools: string;
     mcpServers: string;
     connectorConfigIds: string;
-    subAgents: string;
     isEnabled: boolean;
 };
 
@@ -64,6 +110,113 @@ const normalizeModelId = (value: unknown) => {
     return trimmed.length > 0 ? trimmed : null;
 };
 
+const normalizeDeploymentTarget = (value: unknown) => {
+    if (typeof value !== "string") {
+        return DEPLOYMENT_TARGET_OPTIONS[0]?.value ?? "internal";
+    }
+
+    const trimmed = value.trim().toLowerCase();
+    if (
+        trimmed === "vertex" ||
+        trimmed === "vertex_ai_agent_engine" ||
+        trimmed === "vertex ai agent engine"
+    ) {
+        return "vertex";
+    }
+    if (
+        trimmed === "bedrock_agentcore" ||
+        trimmed === "aws_agentcore" ||
+        trimmed === "aws agentcore"
+    ) {
+        return "bedrock_agentcore";
+    }
+    if (trimmed === "internal" || trimmed === "internal_runtime" || trimmed === "internal runtime") {
+        return "internal";
+    }
+
+    return trimmed || DEPLOYMENT_TARGET_OPTIONS[0]?.value || "internal";
+};
+
+const normalizeBooleanString = (value: unknown) => {
+    if (typeof value === "boolean") {
+        return String(value);
+    }
+    if (typeof value === "string") {
+        const trimmed = value.trim().toLowerCase();
+        if (trimmed === "true") return "true";
+        if (trimmed === "false") return "false";
+    }
+    return String(MEMORY_BANK_OPTIONS[1]?.value ?? false);
+};
+
+const normalizePiiPatterns = (
+    value: unknown,
+    fallback: GuardrailPiiPattern[] = DEFAULT_GUARDRAIL_PII_PATTERNS
+): GuardrailPiiPattern[] => {
+    if (!Array.isArray(value)) {
+        return fallback;
+    }
+
+    const allowed = new Set<GuardrailPiiPattern>(DEFAULT_GUARDRAIL_PII_PATTERNS);
+    const patterns = value.filter(
+        (item): item is GuardrailPiiPattern =>
+            typeof item === "string" && allowed.has(item as GuardrailPiiPattern)
+    );
+
+    return patterns;
+};
+
+const normalizeStringArray = (value: unknown): string[] => {
+    if (!Array.isArray(value)) {
+        return [];
+    }
+
+    return value
+        .map((item) => (typeof item === "string" ? item.trim() : ""))
+        .filter(Boolean);
+};
+
+const normalizeKnowledgeFile = (value: unknown): KnowledgeFileRecord | null => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+        return null;
+    }
+
+    const record = value as Record<string, unknown>;
+    const id = typeof record.id === "string" ? record.id.trim() : "";
+    const filename =
+        typeof record.filename === "string" ? record.filename.trim() : "";
+
+    if (!id || !filename) {
+        return null;
+    }
+
+    return {
+        id,
+        filename,
+        content_type:
+            typeof record.content_type === "string" ? record.content_type : "",
+        size: typeof record.size === "number" ? record.size : 0,
+        created_at:
+            typeof record.created_at === "string" ? record.created_at : "",
+    };
+};
+
+const formatSensitivePatternsText = (value: unknown) =>
+    normalizeStringArray(value)
+        .map((pattern) => `"${pattern}"`)
+        .join("\n");
+
+const normalizeSensitivePatterns = (value: string) =>
+    value
+        .split(/\r?\n/)
+        .map((line) => line.trim().replace(/,$/, "").trim())
+        .map((line) =>
+            line.length >= 2 && line.startsWith('"') && line.endsWith('"')
+                ? line.slice(1, -1)
+                : line
+        )
+        .filter(Boolean);
+
 const normalizeLlmDefaults = (value: unknown): LlmDefaults | null => {
     if (!value || typeof value !== "object" || Array.isArray(value)) {
         return null;
@@ -74,6 +227,41 @@ const normalizeLlmDefaults = (value: unknown): LlmDefaults | null => {
         primary_model_id: normalizeModelId(payload.primary_model_id),
         secondary_model_id: normalizeModelId(payload.secondary_model_id),
         tertiary_model_id: normalizeModelId(payload.tertiary_model_id),
+    };
+};
+
+const getEndpointArray = (value: unknown): string[] => {
+    if (Array.isArray(value)) {
+        return value.flatMap((item) => getEndpointArray(item));
+    }
+
+    if (typeof value === "string") {
+        const trimmed = value.trim();
+        return trimmed ? [trimmed] : [];
+    }
+
+    if (value && typeof value === "object") {
+        const record = value as Record<string, unknown>;
+        return getEndpointArray(
+            record.server_url ??
+            record.serverUrl ??
+            record.url ??
+            record.endpoint ??
+            record.mcp_server_url
+        );
+    }
+
+    return [];
+};
+
+const getInitialMcpSelections = (agent: AgentRecord) => {
+    const serverIds = getEndpointArray(agent.mcp_server_ids);
+    const servers = getEndpointArray(agent.mcp_servers);
+
+    return {
+        customServers: servers,
+        registeredServers: serverIds.length ? serverIds.map(() => "") : [""],
+        registeredServerIds: serverIds.length ? serverIds : [""],
     };
 };
 
@@ -91,7 +279,7 @@ function Field({
     required,
     children,
 }: {
-    label: string;
+    label: React.ReactNode;
     hint?: string;
     required?: boolean;
     children: React.ReactNode;
@@ -244,15 +432,28 @@ export default function UpdateAgent({
     const [form, setForm] = useState<UpdateAgentForm>({
         agentName: "",
         description: "",
-        instruction: "",
+        deploymentTarget: DEPLOYMENT_TARGET_OPTIONS[0]?.value ?? "",
+        agentType: AGENT_TYPE_OPTIONS[1]?.value ?? "agent",
+        memoryEnabled: String(MEMORY_BANK_OPTIONS[1]?.value ?? false),
+        memoryToolType: "",
+        prompt_role: "",
+        prompt_objectives: "",
+        prompt_behavior: "",
+        prompt_output_format: "",
+        prompt_constraints: "",
+        prompt_safety: "",
+        prompt_tools_instructions: "",
+        prompt_policy: "",
+        prompt_examples: "",
+        prompt_additional_info: "",
         tools: "",
         mcpServers: "",
         connectorConfigIds: "",
-        subAgents: "",
         isEnabled: true,
     });
     const [modelOptions, setModelOptions] = useState<ModelOption[]>([]);
     const [defaultModels, setDefaultModels] = useState<LlmDefaults | null>(null);
+    const [customMcpServers, setCustomMcpServers] = useState<string[]>([]);
     const [mcpServers, setMcpServers] = useState<string[]>([""]);
     const [mcpServerIds, setMcpServerIds] = useState<string[]>([""]);
     const [mcpOptions, setMcpOptions] = useState<
@@ -267,6 +468,23 @@ export default function UpdateAgent({
     const [skillIds, setSkillIds] = useState<string[]>([""]);
     const [skillOptions, setSkillOptions] = useState<{ value: string; label: string }[]>([]);
     const [isSkillsLoading, setIsSkillsLoading] = useState(false);
+    const [subAgentIds, setSubAgentIds] = useState<string[]>([]);
+    const [agentOptions, setAgentOptions] = useState<AgentLookupOption[]>([]);
+    const [isAgentOptionsLoading, setIsAgentOptionsLoading] = useState(false);
+    const [guardrailsEnabled, setGuardrailsEnabled] = useState(false);
+    const [guardrailPiiPatterns, setGuardrailPiiPatterns] = useState<
+        GuardrailPiiPattern[]
+    >(DEFAULT_GUARDRAIL_PII_PATTERNS);
+    const [guardrailSensitivePatternsText, setGuardrailSensitivePatternsText] =
+        useState("");
+    const [guardrailHarmfulKeywords, setGuardrailHarmfulKeywords] = useState<
+        string[]
+    >([]);
+    const [knowledgeFiles, setKnowledgeFiles] = useState<File[]>([]);
+    const [existingKnowledgeFiles, setExistingKnowledgeFiles] = useState<
+        KnowledgeFileRecord[]
+    >([]);
+    const [deletedKnowledgeFileIds, setDeletedKnowledgeFileIds] = useState<string[]>([]);
     const [primaryUseCustom, setPrimaryUseCustom] = useState(false);
     const [secondaryUseCustom, setSecondaryUseCustom] = useState(false);
     const [tertiaryUseCustom, setTertiaryUseCustom] = useState(false);
@@ -279,6 +497,30 @@ export default function UpdateAgent({
     const [isUpdating, setIsUpdating] = useState(false);
     const [error, setError] = useState("");
     const [success, setSuccess] = useState("");
+    const [toastMessage, setToastMessage] = useState("");
+    const [toastTone, setToastTone] = useState<"success" | "error">("success");
+    const [isToastVisible, setIsToastVisible] = useState(false);
+    const [awsCredentialId, setAwsCredentialId] = useState("");
+    const [awsCredentialOptions, setAwsCredentialOptions] = useState<AwsCredentialOption[]>([]);
+    const [isAwsCredentialsLoading, setIsAwsCredentialsLoading] = useState(false);
+    const [awsCredentialsLoadError, setAwsCredentialsLoadError] = useState("");
+    const isAwsAgentCoreSelected = form.deploymentTarget === "bedrock_agentcore";
+    const isVertexAgentEngineSelected = form.deploymentTarget === "vertex";
+
+    const showToast = useCallback(
+        (message: string, tone: "success" | "error" = "success") => {
+            setToastMessage(message);
+            setToastTone(tone);
+            setIsToastVisible(true);
+        },
+        []
+    );
+
+    useEffect(() => {
+        if (!isToastVisible) return;
+        const timer = setTimeout(() => setIsToastVisible(false), 3000);
+        return () => clearTimeout(timer);
+    }, [isToastVisible]);
 
     const resolveModelOption = (modelId: string | null) => {
         if (!modelId) {
@@ -313,17 +555,31 @@ export default function UpdateAgent({
     const isFormValid =
         Boolean(form.agentName) &&
         Boolean(form.description) &&
-        Boolean(form.instruction) &&
+        PROMPT_FIELD_DEFINITIONS.every(
+            (field) =>
+                !field.required || Boolean(normalizeString(form[field.key]))
+        ) &&
         effectivePrimaryModelId.length > 0 &&
         (!primaryUseCustom || primaryModelId.length > 0) &&
         (!secondaryUseCustom || secondaryModelId.length > 0) &&
-        (!tertiaryUseCustom || tertiaryModelId.length > 0);
+        (!tertiaryUseCustom || tertiaryModelId.length > 0) &&
+        (!isAwsAgentCoreSelected || Boolean(awsCredentialId)) &&
+        (!isVertexAgentEngineSelected ||
+            form.memoryEnabled !== "true" ||
+            Boolean(form.memoryToolType));
 
     const updateField = <K extends keyof UpdateAgentForm>(
         key: K,
         value: UpdateAgentForm[K]
     ) =>
         setForm((prev) => ({ ...prev, [key]: value }));
+
+    const updatePromptField = useCallback(
+        (key: PromptFieldKey, value: string) => {
+            updateField(key, value);
+        },
+        []
+    );
 
     const updateList = (
         setter: Dispatch<SetStateAction<string[]>>,
@@ -344,14 +600,11 @@ export default function UpdateAgent({
         values.flat().map((value) => value.trim()).filter(Boolean);
     const normalizeMcpServerIds = (values: string[]) =>
         values.map((value) => value.trim()).filter(Boolean);
-    const normalizeManualMcpServers = (urls: string[], ids: string[]) =>
-        urls
-            .map((url, index) => {
-                const trimmedUrl = url.trim();
-                const id = ids[index]?.trim() ?? "";
-                return id ? "" : trimmedUrl;
-            })
-            .filter(Boolean);
+    const normalizeManualMcpServers = () =>
+        normalizeList([
+            ...customMcpServers,
+            ...mcpServers.filter((_, index) => !mcpServerIds[index]?.trim()),
+        ]);
 
     const updateConnectorList = (index: number, value: string[]) => {
         setConnectorConfigIds((previous) =>
@@ -397,21 +650,30 @@ export default function UpdateAgent({
 
     useEffect(() => {
         if (!isOpen || !agent) return;
-        const initialMcpServers = agent.mcp_servers?.length ? agent.mcp_servers : [""];
-        const initialMcpServerIds = agent.mcp_server_ids?.length
-            ? agent.mcp_server_ids
-            : (agent.mcp_servers?.length ? agent.mcp_servers.map(() => "") : [""]);
+        const initialMcpSelections = getInitialMcpSelections(agent);
 
         setForm({
             agentName: agent.name || "",
             description: agent.description || "",
-            instruction: agent.instruction || "",
+            deploymentTarget: normalizeDeploymentTarget(agent.deployment_target),
+            agentType: agent.type?.trim() || AGENT_TYPE_OPTIONS[1]?.value || "agent",
+            memoryEnabled: normalizeBooleanString(agent.memory_enabled),
+            memoryToolType: agent.memory_tool_type?.trim() || "",
+            prompt_role: agent.prompt_role || "",
+            prompt_objectives: agent.prompt_objectives || "",
+            prompt_behavior: agent.prompt_behavior || "",
+            prompt_output_format: agent.prompt_output_format || "",
+            prompt_constraints: agent.prompt_constraints || "",
+            prompt_safety: agent.prompt_safety || "",
+            prompt_tools_instructions: agent.prompt_tools_instructions || "",
+            prompt_policy: agent.prompt_policy || "",
+            prompt_examples: agent.prompt_examples || "",
+            prompt_additional_info: agent.prompt_additional_info || "",
             tools: Array.isArray(agent.tools)
                 ? agent.tools.join(", ")
                 : agent.tools || "",
-            mcpServers: (initialMcpServers || []).join(", "),
+            mcpServers: initialMcpSelections.customServers.join(", "),
             connectorConfigIds: (agent.connector_config_ids || []).join(", "),
-            subAgents: (agent.sub_agents || []).join(", "),
             isEnabled: agent.isEnabled ?? true,
         });
         const initialPrimaryModelId =
@@ -424,20 +686,99 @@ export default function UpdateAgent({
         setPrimaryModelId(initialPrimaryModelId);
         setSecondaryModelId(normalizeModelId(agent.secondary_model_id) ?? "");
         setTertiaryModelId(normalizeModelId(agent.tertiary_model_id) ?? "");
-        setMcpServers(initialMcpServers);
-        setMcpServerIds(initialMcpServerIds);
+        setCustomMcpServers(initialMcpSelections.customServers);
+        setMcpServers(initialMcpSelections.registeredServers);
+        setMcpServerIds(initialMcpSelections.registeredServerIds);
         setConnectorConfigIds(
             agent.connector_config_ids?.length
                 ? agent.connector_config_ids.map((value: string) => [value])
                 : [[]]
         );
         setSkillIds(agent.skill_ids?.length ? agent.skill_ids : [""]);
+        setSubAgentIds(agent.sub_agents?.length ? agent.sub_agents : []);
+        setGuardrailsEnabled(Boolean(agent.guardrail_sensitive_data));
+        setGuardrailPiiPatterns(
+            normalizePiiPatterns(agent.guardrails_config?.pii_patterns)
+        );
+        setGuardrailSensitivePatternsText(
+            formatSensitivePatternsText(agent.guardrails_config?.sensitive_patterns)
+        );
+        setGuardrailHarmfulKeywords(
+            normalizeStringArray(agent.guardrails_config?.harmful_keywords)
+        );
+        setKnowledgeFiles([]);
+        setExistingKnowledgeFiles([]);
+        setDeletedKnowledgeFileIds([]);
+        localStorage.setItem("DeleteIDs", JSON.stringify([]));
         setConfigDataMap({});
         setDefaultModels(null);
         setDefaultsLoadError("");
+        setAwsCredentialId(agent.aws_credential_id?.trim() || "");
+        setAwsCredentialOptions([]);
+        setAwsCredentialsLoadError("");
         setError("");
         setSuccess("");
     }, [isOpen, agent]);
+
+    useEffect(() => {
+        if (!isOpen || !isAwsAgentCoreSelected) return;
+        const ctrl = new AbortController();
+        (async () => {
+            setIsAwsCredentialsLoading(true);
+            setAwsCredentialsLoadError("");
+            try {
+                const options = await fetchAwsCredentialOptions(base, ctrl.signal);
+                setAwsCredentialOptions(options);
+            } catch (error: unknown) {
+                if (!(error instanceof DOMException && error.name === "AbortError")) {
+                    setAwsCredentialOptions([]);
+                    setAwsCredentialsLoadError(
+                        error instanceof Error ? error.message : "Unable to load AWS credentials."
+                    );
+                }
+            } finally {
+                setIsAwsCredentialsLoading(false);
+            }
+        })();
+        return () => ctrl.abort();
+    }, [base, isAwsAgentCoreSelected, isOpen]);
+
+    useEffect(() => {
+        if (!isOpen || !agent.agent_id) return;
+        const ctrl = new AbortController();
+        (async () => {
+            try {
+                const agentId = encodeURIComponent(agent.agent_id ?? "");
+                const res = await fetch(`${base}/agent/${agentId}/files`, {
+                    headers: { accept: "application/json" },
+                    signal: ctrl.signal,
+                });
+                const data = await res.json().catch(() => null);
+
+                if (!res.ok || !Array.isArray(data)) {
+                    setExistingKnowledgeFiles([]);
+                    return;
+                }
+
+                setExistingKnowledgeFiles(
+                    data
+                        .map(normalizeKnowledgeFile)
+                        .filter(Boolean) as KnowledgeFileRecord[]
+                );
+            } catch (error: unknown) {
+                if (!(error instanceof DOMException && error.name === "AbortError")) {
+                    setExistingKnowledgeFiles([]);
+                }
+            }
+        })();
+        return () => ctrl.abort();
+    }, [agent.agent_id, base, isOpen]);
+
+    useEffect(() => {
+        if (!isAwsAgentCoreSelected) {
+            setAwsCredentialId("");
+        }
+    }, [isAwsAgentCoreSelected]);
 
     useEffect(() => {
         if (!isOpen || !mcpOptions.length) return;
@@ -451,6 +792,57 @@ export default function UpdateAgent({
             })
         );
     }, [isOpen, mcpOptions, mcpServerIds]);
+
+    useEffect(() => {
+        if (!isOpen) return;
+        const ctrl = new AbortController();
+        (async () => {
+            setIsAgentOptionsLoading(true);
+            try {
+                const res = await fetch(`${base}/agent/`, {
+                    headers: { accept: "application/json" },
+                    signal: ctrl.signal,
+                });
+                const data = await res.json().catch(() => null);
+                if (res.ok && Array.isArray(data)) {
+                    const nextAgentOptions: AgentLookupOption[] = data.flatMap(
+                        (item: unknown) => {
+                            const record = item as Record<string, unknown>;
+                            const id =
+                                typeof record.agent_id === "string" ? record.agent_id.trim() : "";
+                            const name =
+                                typeof record.name === "string" ? record.name.trim() : "";
+
+                            if (!id || !name) {
+                                return [];
+                            }
+
+                            return [
+                                {
+                                    id,
+                                    name,
+                                    description:
+                                        typeof record.description === "string"
+                                            ? record.description.trim()
+                                            : "",
+                                },
+                            ];
+                        }
+                    );
+                    setAgentOptions(nextAgentOptions);
+                } else {
+                    setAgentOptions([]);
+                }
+            } catch (error: unknown) {
+                if (!(error instanceof DOMException && error.name === "AbortError")) {
+                    setAgentOptions([]);
+                }
+            } finally {
+                setIsAgentOptionsLoading(false);
+            }
+        })();
+        return () => ctrl.abort();
+    }, [base, isOpen]);
 
     useEffect(() => {
         if (!isOpen) return;
@@ -663,6 +1055,7 @@ export default function UpdateAgent({
         setModelId: Dispatch<SetStateAction<string>>;
         effectiveModelId: string;
         defaultOption: ModelOption | null;
+        Logo?: LucideIcon;
     }> = [
         {
             key: "primary",
@@ -672,6 +1065,7 @@ export default function UpdateAgent({
             setModelId: setPrimaryModelId,
             effectiveModelId: effectivePrimaryModelId,
             defaultOption: primaryDefaultOption,
+            Logo: Workflow
         },
         {
             key: "secondary",
@@ -681,6 +1075,7 @@ export default function UpdateAgent({
             setModelId: setSecondaryModelId,
             effectiveModelId: effectiveSecondaryModelId,
             defaultOption: secondaryDefaultOption,
+            Logo: Workflow
         },
         {
             key: "tertiary",
@@ -690,8 +1085,99 @@ export default function UpdateAgent({
             setModelId: setTertiaryModelId,
             effectiveModelId: effectiveTertiaryModelId,
             defaultOption: tertiaryDefaultOption,
+            Logo: Workflow
         },
     ];
+
+    const getGuardrailsConfig = () => {
+        if (!guardrailsEnabled) {
+            return null;
+        }
+
+        return {
+            pii_patterns: guardrailPiiPatterns,
+            sensitive_patterns: normalizeSensitivePatterns(
+                guardrailSensitivePatternsText
+            ),
+            harmful_keywords: guardrailHarmfulKeywords,
+        };
+    };
+
+    const uploadKnowledgeFiles = async () => {
+        if (knowledgeFiles.length === 0) {
+            return [];
+        }
+
+        const uploadedFiles = await Promise.all(
+            knowledgeFiles.map((file) => uploadKnowledgeFile(base, file))
+        );
+        return uploadedFiles.map((file) => file.id);
+    };
+
+    const getRemainingKnowledgeFileIds = () =>
+        existingKnowledgeFiles.map((file) => file.id).filter(Boolean);
+
+    const handleDownloadKnowledgeFile = async (file: KnowledgeFileRecord) => {
+        try {
+            const res = await fetch(`${base}/agent/files/${encodeURIComponent(file.id)}`);
+            if (!res.ok) {
+                throw new Error(`Unable to download ${file.filename}.`);
+            }
+
+            const blob = await res.blob();
+            const url = window.URL.createObjectURL(blob);
+            const anchor = document.createElement("a");
+            anchor.href = url;
+            anchor.download = file.filename;
+            document.body.appendChild(anchor);
+            anchor.click();
+            anchor.remove();
+            window.URL.revokeObjectURL(url);
+            showToast(`${file.filename} downloaded successfully.`);
+        } catch (error: unknown) {
+            showToast(
+                error instanceof Error
+                    ? error.message
+                    : `Unable to download ${file.filename}.`,
+                "error"
+            );
+        }
+    };
+
+    const handleRemoveExistingKnowledgeFile = (file: KnowledgeFileRecord) => {
+        setExistingKnowledgeFiles((previous) =>
+            previous.filter((item) => item.id !== file.id)
+        );
+        setDeletedKnowledgeFileIds((previous) => {
+            const next = previous.includes(file.id) ? previous : [...previous, file.id];
+            localStorage.setItem("DeleteIDs", JSON.stringify(next));
+            return next;
+        });
+    };
+
+    const deleteQueuedKnowledgeFiles = async () => {
+        const idsFromStorage = JSON.parse(
+            localStorage.getItem("DeleteIDs") || "[]"
+        ) as unknown;
+        const ids = Array.isArray(idsFromStorage)
+            ? idsFromStorage.filter((id): id is string => typeof id === "string")
+            : deletedKnowledgeFileIds;
+
+        if (ids.length === 0) return;
+
+        await Promise.all(
+            ids.map(async (id) => {
+                const res = await fetch(`${base}/agent/files/${encodeURIComponent(id)}`, {
+                    method: "DELETE",
+                });
+                if (!res.ok) {
+                    throw new Error("Unable to delete one or more knowledge files.");
+                }
+            })
+        );
+        localStorage.setItem("DeleteIDs", JSON.stringify([]));
+        setDeletedKnowledgeFileIds([]);
+    };
 
     const handleUpdate = async () => {
         if (!isFormValid) return;
@@ -699,6 +1185,15 @@ export default function UpdateAgent({
         setError("");
         setSuccess("");
         try {
+            const uploadedKnowledgeFileIds = await uploadKnowledgeFiles();
+            if (uploadedKnowledgeFileIds.length > 0) {
+                showToast("Knowledge file uploaded successfully.");
+            }
+            await deleteQueuedKnowledgeFiles();
+            const knowledgeFileIds = [
+                ...getRemainingKnowledgeFileIds(),
+                ...uploadedKnowledgeFileIds,
+            ];
             const res = await fetch(`${base}/agent/${agent.agent_id}`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
@@ -706,7 +1201,30 @@ export default function UpdateAgent({
                     agent_id: agent.agent_id,
                     name: normalizeString(form.agentName),
                     description: normalizeString(form.description),
-                    instruction: normalizeString(form.instruction),
+                    deployment_target: form.deploymentTarget || null,
+                    aws_credential_id: isAwsAgentCoreSelected ? awsCredentialId || null : null,
+                    prompt_role: normalizeString(form.prompt_role),
+                    prompt_objectives: normalizeString(form.prompt_objectives),
+                    prompt_behavior: normalizeString(form.prompt_behavior),
+                    prompt_output_format: normalizeString(form.prompt_output_format),
+                    prompt_constraints: normalizeString(form.prompt_constraints),
+                    prompt_safety: normalizeString(form.prompt_safety),
+                    prompt_tools_instructions: normalizeString(
+                        form.prompt_tools_instructions
+                    ),
+                    prompt_policy: normalizeString(form.prompt_policy),
+                    prompt_examples: normalizeString(form.prompt_examples),
+                    prompt_additional_info: normalizeString(
+                        form.prompt_additional_info
+                    ),
+                    memory_enabled: isVertexAgentEngineSelected
+                        ? form.memoryEnabled === "true"
+                        : false,
+                    memory_tool_type:
+                        isVertexAgentEngineSelected && form.memoryEnabled === "true"
+                            ? form.memoryToolType || null
+                            : null,
+                    type: form.agentType || "agent",
                     primary_use_global: !primaryUseCustom,
                     primary_model_id: primaryUseCustom ? effectivePrimaryModelId || null : null,
                     secondary_use_global: !secondaryUseCustom,
@@ -716,12 +1234,13 @@ export default function UpdateAgent({
                     tools: form.tools || "",
                     skill_ids: normalizeList(skillIds),
                     mcp_server_ids: normalizeMcpServerIds(mcpServerIds),
-                    mcp_servers: normalizeManualMcpServers(mcpServers, mcpServerIds),
+                    mcp_servers: normalizeManualMcpServers(),
                     connector_config_ids: normalizeNestedList(connectorConfigIds),
-                    sub_agents: form.subAgents
-                        ? form.subAgents.split(",").map((s) => s.trim())
-                        : [],
+                    sub_agents: subAgentIds,
                     isEnabled: form.isEnabled,
+                    guardrail_sensitive_data: guardrailsEnabled,
+                    guardrails_config: getGuardrailsConfig(),
+                    knowledge_file_ids: knowledgeFileIds,
                 }),
             });
             const data = await res.json().catch(() => null);
@@ -730,12 +1249,18 @@ export default function UpdateAgent({
                 return;
             }
             setSuccess("Agent updated successfully!");
+            showToast("Agent updated successfully.");
             setTimeout(() => {
                 onClose();
                 onUpdateSuccess?.();
             }, 1500);
-        } catch {
-            setError("Something went wrong. Please check your connection and try again.");
+        } catch (error: unknown) {
+            const message =
+                error instanceof Error
+                    ? error.message
+                    : "Something went wrong. Please check your connection and try again.";
+            setError(message);
+            showToast(message, "error");
         } finally {
             setIsUpdating(false);
         }
@@ -744,33 +1269,17 @@ export default function UpdateAgent({
     if (!isOpen) return null;
 
     return (
-        <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
-            onClick={(e) => e.target === e.currentTarget && onClose()}
-        >
-            <div className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
-                <div className="flex shrink-0 items-center gap-3 border-b border-gray-100 px-6 py-4">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
-                        <Bot size={18} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                        <h2 className="text-sm font-semibold text-gray-900 leading-tight">
-                            Update Agent
-                        </h2>
-                        <p className="mt-0.5 text-xs text-gray-400">
-                            Modify agent configuration and settings
-                        </p>
-                    </div>
-                    <button
-                        onClick={onClose}
-                        aria-label="Close"
-                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-500 transition hover:bg-gray-200"
-                    >
-                        <X size={14} />
-                    </button>
-                </div>
+        <>
+        <ModalCard zIndexClassName="z-50" onBackdropClick={onClose}>
+            <ModalCardPanel maxWidthClassName="max-w-2xl" className="max-h-[92vh]">
+                <ModalCardHeader
+                    title="Update Agent"
+                    subtitle="Modify agent configuration and settings"
+                    icon={<Bot className="h-4 w-4" />}
+                    onClose={onClose}
+                />
 
-                <div className="flex flex-col gap-4 overflow-y-auto px-6 py-5">
+                <ModalCardBody className="flex flex-col gap-4 overflow-y-auto">
                     <SectionLabel>Identity</SectionLabel>
 
                     <Field label="Agent Name" required hint="Human-readable display name">
@@ -781,6 +1290,103 @@ export default function UpdateAgent({
                             placeholder="e.g. Support Bot"
                         />
                     </Field>
+
+                    <div className="grid grid-cols-2 gap-3">
+                        <Field
+                            label="Deployment Target"
+                            hint="Select where this agent will run"
+                        >
+                            <ThemedSingleDropdown
+                                value={form.deploymentTarget}
+                                options={DEPLOYMENT_TARGET_OPTIONS.map((option) => ({
+                                    value: option.value,
+                                    label: option.key,
+                                }))}
+                                placeholder="Select deployment target"
+                                onChange={(value) =>
+                                    setForm((prev) => ({
+                                        ...prev,
+                                        deploymentTarget: value,
+                                        memoryEnabled:
+                                            value === "vertex"
+                                                ? prev.memoryEnabled
+                                                : String(MEMORY_BANK_OPTIONS[1]?.value ?? false),
+                                        memoryToolType:
+                                            value === "vertex" ? prev.memoryToolType : "",
+                                    }))
+                                }
+                            />
+                        </Field>
+                        <Field
+                            label="Type"
+                            hint="Select the agent classification"
+                        >
+                            <ThemedSingleDropdown
+                                value={form.agentType}
+                                options={AGENT_TYPE_OPTIONS.map((option) => ({
+                                    value: option.value,
+                                    label: option.key,
+                                }))}
+                                placeholder="Select type"
+                                onChange={(value) => updateField("agentType", value)}
+                            />
+                        </Field>
+                    </div>
+
+                      {isAwsAgentCoreSelected ? (
+                          <AwsCredentialDropdown
+                              value={awsCredentialId}
+                              options={awsCredentialOptions}
+                              loading={isAwsCredentialsLoading}
+                              error={awsCredentialsLoadError}
+                              onChange={setAwsCredentialId}
+                          />
+                      ) : null}
+
+                      {isVertexAgentEngineSelected ? (
+                          <div className="grid grid-cols-2 gap-3">
+                              <Field
+                                  label="Memory Bank"
+                                  hint="Enable or disable memory for this Vertex agent"
+                              >
+                                      <ThemedSingleDropdown
+                                          value={form.memoryEnabled}
+                                          options={MEMORY_BANK_OPTIONS.map((option) => ({
+                                              value: String(option.value),
+                                              label: option.key,
+                                          }))}
+                                      placeholder="Select memory bank"
+                                      onChange={(value) =>
+                                          setForm((prev) => ({
+                                              ...prev,
+                                              memoryEnabled: value,
+                                              memoryToolType:
+                                                  value === "true" ? prev.memoryToolType : "",
+                                          }))
+                                      }
+                                  />
+                              </Field>
+
+                              {form.memoryEnabled === "true" ? (
+                                  <Field
+                                      label="Memory Retrieval"
+                                      hint="Choose how memory is retrieved for this Vertex agent"
+                                  >
+                                      <ThemedSingleDropdown
+                                          value={form.memoryToolType}
+                                          options={MEMORY_RETRIEVAL_OPTIONS.map((option) => ({
+                                              value: option.value,
+                                              label: option.key,
+                                          }))}
+                                          placeholder="Select memory retrieval"
+                                          onChange={(value) => updateField("memoryToolType", value)}
+                                      />
+                                  </Field>
+                              ) : (
+                                  <div />
+                              )}
+                          </div>
+                      ) : null}
 
                     <Field
                         label="Description"
@@ -797,21 +1403,27 @@ export default function UpdateAgent({
 
                     <SectionLabel>Behaviour</SectionLabel>
 
-                    <Field
-                        label="System Instruction"
-                        required
-                        hint="System prompt that defines this agent's personality and behaviour"
-                    >
-                        <textarea
-                            className={`${inputClass} min-h-[108px] resize-y`}
-                            value={form.instruction}
-                            onChange={(e) => updateField("instruction", e.target.value)}
-                            placeholder="You are a helpful assistant that..."
-                        />
-                    </Field>
+                    <div className="grid grid-cols-2 gap-3">
+                        {PROMPT_FIELD_DEFINITIONS.map((field) => (
+                            <Field
+                                key={field.key}
+                                label={field.label}
+                                required={field.required}
+                                hint={`Define the ${field.label.toLowerCase()} for this agent`}
+                            >
+                                <textarea
+                                    className={`${inputClass} min-h-[108px] resize-y`}
+                                    value={form[field.key]}
+                                    onChange={(e) => updatePromptField(field.key, e.target.value)}
+                                    placeholder={`Enter ${field.label.toLowerCase()}`}
+                                />
+                            </Field>
+                        ))}
+                    </div>
 
                     <div className="grid gap-3">
                         {llmFields.map((field) => {
+                            const Icon = field.Logo
                             const selectedOption =
                                 modelOptions.find((option) => option.value === field.effectiveModelId) ??
                                 field.defaultOption;
@@ -832,6 +1444,7 @@ export default function UpdateAgent({
                                     <div className="flex items-start justify-between gap-4">
                                         <div className="flex flex-col gap-1">
                                             <label className="flex items-center gap-1 text-sm font-medium text-gray-700">
+                                                {Icon ? <Icon className="h-4 w-4" /> : null}
                                                 {field.label}
                                                 {field.key === "primary" ? (
                                                     <span className="text-red-500">*</span>
@@ -925,9 +1538,21 @@ export default function UpdateAgent({
                     <SectionLabel>Capabilities</SectionLabel>
 
                     <div className="grid grid-cols-2 items-start gap-4">
-                        <Field
-                            label="MCP Servers"
-                            hint="Type custom URL or select from registered MCP servers"
+                    <Field
+                        label={
+                        <span className="flex items-center gap-2">
+                        <span className="relative h-4 w-4 shrink-0">
+                        <Image
+                            src="/img/mcp.png"
+                            alt="MCP"
+                            fill
+                            className="object-contain"
+                            />
+                        </span>
+                        <span>MCP Servers</span>
+                        </span>
+                        }
+                        hint="Type custom URL or select from registered MCP servers"
                         >
                             <div className="flex flex-col gap-2">
                                 {mcpServers.map((val, index) => (
@@ -1026,9 +1651,40 @@ export default function UpdateAgent({
                                         ) : null}
                                     </div>
                                 ))}
+                                {customMcpServers.map((val, index) => (
+                                    <div key={`custom-${index}`} className="flex items-center gap-2">
+                                        <input
+                                            className={inputClass}
+                                            value={val}
+                                            placeholder="https://mcp.example.com/sse"
+                                            onChange={(e) =>
+                                                updateList(setCustomMcpServers, index, e.target.value)
+                                            }
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => addToList(setCustomMcpServers)}
+                                            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-600 transition hover:bg-indigo-100"
+                                        >
+                                            <Plus size={14} />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                setCustomMcpServers((previous) =>
+                                                    previous.filter((_, idx) => idx !== index)
+                                                )
+                                            }
+                                            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-500 transition hover:bg-red-100"
+                                        >
+                                            <Trash2 size={14} />
+                                        </button>
+                                    </div>
+                                ))}
                             </div>
                         </Field>
                         <DynamicDropdownField
+                            Logo={Link2}
                             label="Connector Config"
                             hint="Choose from pre-configured connectors"
                             values={connectorConfigIds}
@@ -1042,6 +1698,7 @@ export default function UpdateAgent({
                             }
                         />
                         <SimpleDropdownField
+                            Logo={Sparkles}
                             label="Skill"
                             hint={
                                 isSkillsLoading
@@ -1064,6 +1721,57 @@ export default function UpdateAgent({
                                     previous.map((item, idx) => (idx === index ? value : item))
                                 )
                             }
+                        />
+                        <div className="col-span-2">
+                            
+                             <Field
+                                label={
+                                <span className="flex items-center gap-2">
+                                <Bot size={18} />
+                                <span>Sub-Agents</span>
+                                </span>
+                                }
+                                hint="Choose child agents to include with this agent"
+                                >
+                                
+                                <DualListPicker
+                                    availableTitle="Available Agents"
+                                    selectedTitle="Selected Sub-Agents"
+                                    items={agentOptions
+                                        .filter((option) => option.id !== agent.agent_id)
+                                        .map((option) => ({
+                                            id: option.id,
+                                            name: option.name,
+                                            secondary: option.id,
+                                        }))}
+                                    selectedIds={subAgentIds}
+                                    disabled={isAgentOptionsLoading}
+                                    emptyAvailableMessage={
+                                        isAgentOptionsLoading
+                                            ? "Loading agents..."
+                                            : "No agents available"
+                                    }
+                                    emptySelectedMessage="No sub-agents selected"
+                                    onChange={setSubAgentIds}
+                                />
+                            </Field>
+                        </div>
+                        <GuardrailInput
+                            enabled={guardrailsEnabled}
+                            piiPatterns={guardrailPiiPatterns}
+                            sensitivePatternsText={guardrailSensitivePatternsText}
+                            harmfulKeywords={guardrailHarmfulKeywords}
+                            onEnabledChange={setGuardrailsEnabled}
+                            onPiiPatternsChange={setGuardrailPiiPatterns}
+                            onSensitivePatternsTextChange={setGuardrailSensitivePatternsText}
+                            onHarmfulKeywordsChange={setGuardrailHarmfulKeywords}
+                        />
+                        <AddKnowledge
+                            files={knowledgeFiles}
+                            onFilesChange={setKnowledgeFiles}
+                            existingFiles={existingKnowledgeFiles}
+                            onDownloadExistingFile={handleDownloadKnowledgeFile}
+                            onRemoveExistingFile={handleRemoveExistingKnowledgeFile}
                         />
                     </div>
 
@@ -1132,14 +1840,10 @@ export default function UpdateAgent({
                             </div>
                         </div>
                     )}
-                </div>
+                </ModalCardBody>
 
-                <div className="flex shrink-0 items-center justify-between border-t border-gray-100 px-6 py-4">
-                    <p className="text-xs text-gray-400">
-                        {!isFormValid && !success
-                            ? <>Fields marked <span className="text-red-400">*</span> are required</>
-                            : null}
-                    </p>
+                <ModalCardFooter className="shrink-0 justify-between">
+                    <ModalCardRequiredNote visible={!success} />
 
                     <div className="flex gap-2.5">
                         <button
@@ -1178,6 +1882,7 @@ export default function UpdateAgent({
                                         />
                                     </svg>
                                     Updating...
+                                
                                 </>
                             ) : success ? (
                                 <>
@@ -1193,14 +1898,35 @@ export default function UpdateAgent({
                                         />
                                     </svg>
                                     Updated!
+                                
                                 </>
                             ) : (
                                 "Update Agent"
+                                
                             )}
+                            <Bot size={18}/>
                         </button>
                     </div>
+                </ModalCardFooter>
+            </ModalCardPanel>
+        </ModalCard>
+        {isToastVisible ? (
+            <div className="fixed bottom-6 right-6 z-[80]">
+                <div
+                    className={`toast-fade relative rounded-2xl px-5 py-3 text-sm font-semibold text-white shadow-[0_14px_30px_-18px_rgba(79,73,226,0.8)] ${
+                        toastTone === "success" ? "bg-green-600" : "bg-red-500"
+                    }`}
+                >
+                    <div className="flex items-center gap-3">
+                        <span className="relative flex h-2.5 w-2.5">
+                            <span className="toast-dot-fill absolute inset-0 rounded-full bg-white" />
+                        </span>
+                        <span>{toastMessage}</span>
+                    </div>
+                    <span className="toast-progress-bar mt-2 block h-0.5 w-full bg-white/70" />
                 </div>
             </div>
-        </div>
+        ) : null}
+        </>
     );
 }

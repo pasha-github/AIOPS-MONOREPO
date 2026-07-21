@@ -26,7 +26,7 @@ def _create_agent(
             "agent_id": agent_id,
             "name": "Agent 1",
             "description": "desc",
-            "instruction": "instr",
+            "prompt_additional_info": "instr",
             "primary_use_global": False,
             "primary_model_id": model_id,
             "isEnabled": True,
@@ -105,7 +105,7 @@ def test_list_agents(client: TestClient):
     assert response.status_code == 200
     data = response.json()
     assert len(data) >= 1
-    assert data[0]["name"] == "Agent 1"
+    assert any(a["name"] == "Agent 1" for a in data)
 
 
 def test_delete_agent_success(client: TestClient):
@@ -163,7 +163,6 @@ def test_update_agent_name_only(client: TestClient):
             "agent_id": "a1",
             "name": "Agent 1",
             "description": "desc",
-            "instruction": "instr",
             "model_id": "gemini-pro",
             "isEnabled": True,
         },
@@ -175,7 +174,6 @@ def test_update_agent_name_only(client: TestClient):
     assert data["agent_id"] == "a1"
     assert data["name"] == "Agent 1 Updated"
     assert data["description"] == "desc"
-    assert data["instruction"] == "instr"
 
 
 def test_create_agent_missing_required_field_422(client: TestClient):
@@ -183,10 +181,7 @@ def test_create_agent_missing_required_field_422(client: TestClient):
     response = client.post(
         "/agent/",
         json={
-            "agent_id": "a1",
-            "name": "Agent 1",
-            "description": "desc",
-            # missing instruction
+            # missing agent_id, name, description
             "primary_use_global": False,
             "primary_model_id": "gemini-pro",
         },
@@ -222,9 +217,9 @@ def test_update_agent_description_only(client: TestClient):
 def test_update_agent_instruction_only(client: TestClient):
     _create_model(client)
     _create_agent(client)
-    response = client.patch("/agent/a1", json={"instruction": "new-instr"})
+    response = client.patch("/agent/a1", json={"prompt_additional_info": "new-instr"})
     assert response.status_code == 200
-    assert response.json()["instruction"] == "new-instr"
+    assert response.json()["prompt_additional_info"] == "new-instr"
 
 
 def test_update_agent_model_id_only(client: TestClient):
@@ -256,6 +251,75 @@ def test_update_agent_status_only(client: TestClient):
     response = client.patch("/agent/a1", json={"isEnabled": False})
     assert response.status_code == 200
     assert response.json()["isEnabled"] is False
+
+
+def test_disable_bedrock_agentcore_agent_sets_disabling_status(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setattr(
+        "src.routers.agents.enqueue_agent_runtime_reconcile",
+        lambda *args, **kwargs: None,
+    )
+    client.post(
+        "/aws/credentials/",
+        json={
+            "name": "default",
+            "access_key_id": "AKIADEFAULT",
+            "secret_access_key": "secret",
+            "region": "us-east-1",
+        },
+    )
+    create_response = client.post(
+        "/agent/",
+        json={
+            "agent_id": "bedrock-agent",
+            "name": "Bedrock Agent",
+            "description": "desc",
+            "instruction": "instr",
+            "deployment_target": "bedrock_agentcore",
+        },
+    )
+    assert create_response.status_code == 200
+
+    response = client.patch("/agent/bedrock-agent", json={"isEnabled": False})
+
+    assert response.status_code == 200
+    assert response.json()["isEnabled"] is False
+    assert response.json()["bedrock_agentcore_deployment_status"] == "disabling"
+
+
+def test_enable_bedrock_agentcore_agent_blocked_while_disabling(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setattr(
+        "src.routers.agents.enqueue_agent_runtime_reconcile",
+        lambda *args, **kwargs: None,
+    )
+    client.post(
+        "/aws/credentials/",
+        json={
+            "name": "default",
+            "access_key_id": "AKIADEFAULT",
+            "secret_access_key": "secret",
+            "region": "us-east-1",
+        },
+    )
+    client.post(
+        "/agent/",
+        json={
+            "agent_id": "bedrock-agent",
+            "name": "Bedrock Agent",
+            "description": "desc",
+            "instruction": "instr",
+            "deployment_target": "bedrock_agentcore",
+        },
+    )
+    client.patch("/agent/bedrock-agent", json={"isEnabled": False})
+
+    response = client.patch("/agent/bedrock-agent", json={"isEnabled": True})
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Bedrock AgentCore agent is still disabling"
 
 
 def test_update_agent_tools_only(client: TestClient):
@@ -403,7 +467,7 @@ def test_update_agent_multiple_fields(client: TestClient):
         json={
             "name": "Agent Updated",
             "description": "desc-updated",
-            "instruction": "instr-updated",
+            "prompt_additional_info": "instr-updated",
             "isEnabled": False,
         },
     )
@@ -411,7 +475,7 @@ def test_update_agent_multiple_fields(client: TestClient):
     data = response.json()
     assert data["name"] == "Agent Updated"
     assert data["description"] == "desc-updated"
-    assert data["instruction"] == "instr-updated"
+    assert data["prompt_additional_info"] == "instr-updated"
     assert data["isEnabled"] is False
 
 
@@ -429,7 +493,7 @@ def test_update_agent_empty_body_no_change(client: TestClient):
     data = response.json()
     assert data["name"] == "Agent 1"
     assert data["description"] == "desc"
-    assert data["instruction"] == "instr"
+    assert data["prompt_additional_info"] == "instr"
     assert data["primary_model_id"] == "gemini-pro"
     assert data["isEnabled"] is True
 
@@ -452,40 +516,52 @@ def test_update_agent_overwrites_list_fields(client: TestClient):
     assert data["sub_agents"] == ["child-new"]
 
 
-def test_update_agent_invalidates_cache(
+def test_update_agent_enqueues_runtime_reconcile(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ):
     _create_model(client)
     _create_agent(client)
 
-    called = {"value": None}
+    called = {"value": None, "previous_agent_id": None}
 
-    def fake_invalidate(agent_id: str):
+    def fake_enqueue(background_tasks, *, agent_id: str | None, previous_agent=None):
         called["value"] = agent_id
+        called["previous_agent_id"] = (
+            previous_agent.agent_id if previous_agent is not None else None
+        )
 
-    monkeypatch.setattr("src.routers.agents.invalidate_cache", fake_invalidate)
+    monkeypatch.setattr(
+        "src.routers.agents.enqueue_agent_runtime_reconcile", fake_enqueue
+    )
 
     response = client.patch("/agent/a1", json={"name": "x"})
     assert response.status_code == 200
     assert called["value"] == "a1"
+    assert called["previous_agent_id"] == "a1"
 
 
-def test_delete_agent_invalidates_cache(
+def test_delete_agent_enqueues_runtime_cleanup(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ):
     _create_model(client)
     _create_agent(client)
 
-    called = {"value": None}
+    called = {"value": "sentinel", "previous_agent_id": None}
 
-    def fake_invalidate(agent_id: str):
+    def fake_enqueue(background_tasks, *, agent_id: str | None, previous_agent=None):
         called["value"] = agent_id
+        called["previous_agent_id"] = (
+            previous_agent.agent_id if previous_agent is not None else None
+        )
 
-    monkeypatch.setattr("src.routers.agents.invalidate_cache", fake_invalidate)
+    monkeypatch.setattr(
+        "src.routers.agents.enqueue_agent_runtime_reconcile", fake_enqueue
+    )
 
     response = client.delete("/agent/a1")
     assert response.status_code == 200
-    assert called["value"] == "a1"
+    assert called["value"] is None
+    assert called["previous_agent_id"] == "a1"
 
 
 def test_create_agent_with_invalid_model_id_returns_400(client: TestClient):

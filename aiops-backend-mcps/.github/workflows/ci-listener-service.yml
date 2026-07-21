@@ -1,0 +1,15 @@
+# PR checks for the listener service. Runs the shared checks (format, vet, test,
+# lint, IBM MQ compile) on pull requests that touch the service.
+
+name: Listener Service CI
+
+on:
+  pull_request:
+    paths:
+      - "listener-service/**"
+      - ".github/workflows/ci-listener-service.yml"
+      - ".github/workflows/listener-service-checks.yml"
+
+jobs:
+  checks:
+    uses: ./.github/workflows/listener-service-checks.yml

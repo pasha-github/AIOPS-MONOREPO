@@ -1,6 +1,7 @@
 "use client";
 
-import { Bot, CheckCircle2, ChevronDown, Loader2, RefreshCw, Zap } from "lucide-react";
+import { getProviderIconPath, LLM_PROVIDER_MODELS } from "@/config/agent";
+import { Brain, ChevronDown, Loader2, Network, Pencil, RefreshCw, SlidersHorizontal } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -20,12 +21,15 @@ type SelectOption = {
 };
 
 type DefaultSelectorProps = {
+  slot: LlmDefaultSlot;
   title: string;
   value: string | null;
   options: SelectOption[];
   isLoading: boolean;
   isUpdating: boolean;
-  onChange: (value: string) => void;
+  isEditable: boolean;
+  onEditToggle: (slot: LlmDefaultSlot) => void;
+  onChange: (value: string) => Promise<void>;
 };
 
 type LLMOverviewSectionProps = {
@@ -45,11 +49,14 @@ type LLMOverviewSectionProps = {
 };
 
 function DefaultSelector({
+  slot,
   title,
   value,
   options,
   isLoading,
   isUpdating,
+  isEditable,
+  onEditToggle,
   onChange,
 }: DefaultSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -76,14 +83,35 @@ function DefaultSelector({
   const selectedOption = options.find((option) => option.value === value) ?? null;
   const placeholder = isLoading ? "Loading models..." : "Select model";
   const displayLabel = selectedOption?.label || placeholder;
+  const isSelectorDisabled =
+    isLoading || isUpdating || options.length === 0 || !isEditable;
 
   return (
     <div className="flex h-full min-h-[190px] flex-col rounded-2xl bg-white p-5 shadow-[0_12px_30px_-28px_rgba(16,24,40,0.45)] ring-1 ring-[#eef1f7]">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#8b95ad]">
-            {title}
-          </p>
+          <div className="flex items-center gap-2">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#8b95ad]">
+              {title}
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setIsOpen(false);
+                onEditToggle(slot);
+              }}
+              disabled={isLoading || isUpdating}
+              className={`inline-flex h-6 w-6 items-center justify-center rounded-md border transition ${
+                isEditable
+                  ? "border-[#c7c4f7] bg-[#eef2ff] text-[#4f49e2]"
+                  : "border-[#e3e7f2] bg-white text-[#8b95ad] hover:bg-[#f8faff]"
+              } disabled:cursor-not-allowed disabled:opacity-60`}
+              aria-label={`${isEditable ? "Disable" : "Enable"} ${title} editing`}
+              title={`${isEditable ? "Disable" : "Enable"} ${title} editing`}
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+          </div>
           <p className="mt-2 text-sm text-[#5b6476]">
             Choose the {title} model.
           </p>
@@ -110,12 +138,12 @@ function DefaultSelector({
       <div ref={containerRef} className="relative mt-auto pt-6">
         <button
           type="button"
-          disabled={isLoading || isUpdating || options.length === 0}
+          disabled={isSelectorDisabled}
           onClick={() => setIsOpen((previous) => !previous)}
-          className={`flex w-full items-center justify-between rounded-xl border px-4 py-3 text-left text-sm outline-none transition focus-within:border-[#4f49e2] focus-within:ring-2 focus-within:ring-[#4f49e2]/20 ${
-            isLoading || isUpdating || options.length === 0
-              ? "cursor-not-allowed border-[#e0e5f0] bg-white/90"
-              : "border-[#e0e5f0] bg-white"
+          className={`flex w-full items-center justify-between px-4 py-3 text-left text-sm outline-none transition focus-within:border-[#4f49e2] focus-within:ring-2 focus-within:ring-[#4f49e2]/20 ${
+            isSelectorDisabled
+              ? "cursor-not-allowed border-[#e0e5f0] bg-white/90" 
+              : "rounded-xl border border-[#e0e5f0] bg-white"
           }`}
         >
           <span
@@ -137,15 +165,15 @@ function DefaultSelector({
           <ChevronDown className="h-4 w-4 shrink-0 text-[#9ca3af]" />
         </button>
 
-        {isOpen ? (
+        {isOpen && isEditable ? (
           <div className="absolute z-30 mt-2 w-full overflow-hidden rounded-xl border border-[#e5e7eb] bg-white shadow-[0_12px_24px_-20px_rgba(15,23,42,0.35)]">
             <div className="max-h-64 overflow-auto">
               {options.map((option) => (
                 <button
                   key={option.value}
                   type="button"
-                  onClick={() => {
-                    onChange(option.value);
+                  onClick={async () => {
+                    await onChange(option.value);
                     setIsOpen(false);
                   }}
                   className={`w-full px-4 py-3 text-left text-sm ${
@@ -195,52 +223,42 @@ export default function LLMOverviewSection({
   onCreateClick,
   onDefaultChange,
 }: LLMOverviewSectionProps) {
-  const { totalCount, providerCount, describedCount } = useMemo(() => {
+  const [editableSlot, setEditableSlot] = useState<LlmDefaultSlot | null>(null);
+  const {
+    totalCount,
+    activeProviderCount,
+    totalProviderCount,
+    providerBreakdown,
+  } = useMemo(() => {
     const total = llms.length;
-    const providers = new Set(
-      llms
-        .map((item) => formatCellValue(item.provider).toLowerCase())
-        .filter((provider) => provider !== "-")
-    ).size;
-    const described = llms.filter((item) => {
-      const descriptionValue = item.description;
-      return Boolean(
-        descriptionValue && String(descriptionValue).trim().length > 0
-      );
-    }).length;
+    const providerKeys = Object.keys(LLM_PROVIDER_MODELS) as Array<
+      keyof typeof LLM_PROVIDER_MODELS
+    >;
+    const providerCounts = new Map<string, number>();
+
+    llms.forEach((item) => {
+      const provider = formatCellValue(item.provider).toLowerCase();
+      if (provider === "-" || !providerKeys.includes(provider as keyof typeof LLM_PROVIDER_MODELS)) {
+        return;
+      }
+
+      providerCounts.set(provider, (providerCounts.get(provider) ?? 0) + 1);
+    });
+
+    const breakdown = providerKeys.map((provider) => ({
+      key: provider,
+      label: provider.charAt(0).toUpperCase() + provider.slice(1),
+      iconSrc: getProviderIconPath(provider),
+      count: providerCounts.get(provider) ?? 0,
+    }));
+
     return {
       totalCount: total,
-      providerCount: providers,
-      describedCount: described,
+      activeProviderCount: breakdown.filter((provider) => provider.count > 0).length,
+      totalProviderCount: providerKeys.length,
+      providerBreakdown: breakdown,
     };
   }, [llms]);
-
-  const statCards = [
-    {
-      title: "Providers",
-      value: providerCount,
-      note: "Model sources",
-      icon: CheckCircle2,
-      tone: "from-[#18c964] to-[#00b56c]",
-      noteColor: "text-[#16a34a]",
-    },
-    {
-      title: "With description",
-      value: describedCount,
-      note: "Documented models",
-      icon: Zap,
-      tone: "from-[#2f80ff] to-[#1aa7ff]",
-      noteColor: "text-[#3b82f6]",
-    },
-    {
-      title: "Total LLMs",
-      value: totalCount,
-      note: "Available now",
-      icon: Bot,
-      tone: "from-[#b45cff] to-[#ff5ac8]",
-      noteColor: "text-[#e11d8d]",
-    },
-  ];
 
   const modelOptions = useMemo<SelectOption[]>(
     () =>
@@ -306,7 +324,8 @@ export default function LLMOverviewSection({
               onClick={onCreateClick}
               className="inline-flex items-center gap-2 rounded-xl bg-[#4f49e2] px-5 py-3 text-sm font-semibold text-white shadow-[0_12px_24px_-14px_rgba(79,73,226,0.6)] transition hover:bg-[#3f39d6] active:scale-95"
             >
-              + Create LLM
+              <SlidersHorizontal className="h-4 w-4" />
+              Configure LLM
             </button>
             <button
               type="button"
@@ -324,50 +343,87 @@ export default function LLMOverviewSection({
           </div>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {statCards.map((card) => {
-            const Icon = card.icon;
-            return (
-              <div
-                key={card.title}
-                className="flex h-full min-h-[190px] min-w-[220px] flex-col rounded-2xl bg-white p-5 shadow-[0_12px_30px_-28px_rgba(16,24,40,0.45)] ring-1 ring-[#eef1f7]"
-              >
-                <div className="flex items-center justify-between">
-                  <div
-                    className={`flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br ${card.tone} text-white shadow-[0_10px_20px_-12px_rgba(0,0,0,0.45)]`}
-                  >
-                    <Icon className="h-5 w-5" />
-                  </div>
-                  <span className={`text-xs font-semibold ${card.noteColor}`}>
-                    {card.note}
-                  </span>
-                </div>
-                <p className="mt-5 text-sm font-semibold text-[#5a6476]">
-                  {card.title}
-                </p>
-                <p className="mt-auto pt-6 flex items-center gap-2 text-3xl font-semibold text-[#0f1115]">
-                  {isLoading || isRefreshing ? (
-                    <Loader2 className="h-6 w-6 animate-spin text-[#5b4cf0]" />
-                  ) : (
-                    card.value
-                  )}
-                </p>
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(320px,0.8fr)]">
+          <div className="flex h-full min-h-[190px] min-w-[220px] flex-col rounded-2xl bg-white p-5 shadow-[0_12px_30px_-28px_rgba(16,24,40,0.45)] ring-1 ring-[#eef1f7]">
+            <div className="flex items-center justify-between">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-[#18c964] to-[#00b56c] text-white shadow-[0_10px_20px_-12px_rgba(0,0,0,0.45)]">
+                <Network className="h-5 w-5" />
               </div>
-            );
-          })}
+          
+            </div>
+            <p className="mt-5 text-sm font-semibold text-[#5a6476]">
+              Providers
+            </p>
+            <div className="mt-auto flex flex-col gap-5 pt-6 lg:flex-row lg:items-end lg:justify-between">
+              <p className="flex items-center gap-2 text-3xl font-semibold text-[#0f1115]">
+                {isLoading || isRefreshing ? (
+                  <Loader2 className="h-6 w-6 animate-spin text-[#5b4cf0]" />
+                ) : (
+                  `${activeProviderCount}/${totalProviderCount}`
+                )}
+              </p>
+              <div className="grid flex-1 grid-cols-5 gap-3 lg:max-w-[540px]">
+                {providerBreakdown.map((provider) => (
+                  <div
+                    key={provider.key}
+                    className="flex flex-col items-center justify-end gap-2 rounded-xl px-2 py-3 ring-[#eef1f7]"
+                  >
+                    <Image
+                      src={provider.iconSrc}
+                      alt={`${provider.label} logo`}
+                      width={26}
+                      height={26}
+                      className={`h-12 w-12 object-contain`}
+                    />
+                    <span
+                      className={`text-sm font-semibold`}
+                    >
+                      {provider.count}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex h-full min-h-[190px] min-w-[220px] flex-col rounded-2xl bg-white p-5 shadow-[0_12px_30px_-28px_rgba(16,24,40,0.45)] ring-1 ring-[#eef1f7]">
+            <div className="flex items-center justify-between">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-[#b45cff] to-[#ff5ac8] text-white shadow-[0_10px_20px_-12px_rgba(0,0,0,0.45)]">
+                <Brain className="h-5 w-5" />
+              </div>
+            </div>
+            <p className="mt-5 text-sm font-semibold text-[#5a6476]">
+              Total LLMs Configured
+            </p>
+            <p className="mt-auto pt-6 flex items-center gap-2 text-3xl font-semibold text-[#0f1115]">
+              {isLoading || isRefreshing ? (
+                <Loader2 className="h-6 w-6 animate-spin text-[#5b4cf0]" />
+              ) : (
+                totalCount
+              )}
+            </p>
+          </div>
         </div>
 
         <div className="grid gap-4 xl:grid-cols-3">
           {defaultSelectors.map((selector) => (
             <DefaultSelector
               key={selector.slot}
+              slot={selector.slot}
               title={selector.title}
               value={selector.value}
               options={modelOptions}
               isLoading={isDefaultsLoading || isLoading}
               isUpdating={updatingDefaultSlot === selector.slot}
-              onChange={(modelId) => {
-                void onDefaultChange(selector.slot, modelId);
+              isEditable={editableSlot === selector.slot}
+              onEditToggle={(slot) => {
+                setEditableSlot((current) => (current === slot ? null : slot));
+              }}
+              onChange={async (modelId) => {
+                const result = await onDefaultChange(selector.slot, modelId);
+                if (result.ok) {
+                  setEditableSlot(null);
+                }
               }}
             />
           ))}

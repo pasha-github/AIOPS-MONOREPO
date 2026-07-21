@@ -1,0 +1,67 @@
+{
+  "id": "onedrive_connector",
+  "name": "OneDrive",
+  "description": "Read documents from a user's OneDrive for Business via Microsoft Graph API using existing SharePoint credentials.",
+  "version": "1.0.0",
+  "config_variables": [
+    {
+      "name": "OD_ID_APP",
+      "label": "App Client ID",
+      "required": true,
+      "secret": false,
+      "placeholder": "Enter Azure AD app client ID"
+    },
+    {
+      "name": "OD_ID_APP_SECRET",
+      "label": "App Client Secret",
+      "required": true,
+      "secret": true,
+      "placeholder": "Enter Azure AD app client secret"
+    },
+    {
+      "name": "OD_TENANT_ID",
+      "label": "Tenant ID",
+      "required": true,
+      "secret": false,
+      "placeholder": "Enter Microsoft tenant ID"
+    },
+    {
+      "name": "OD_TENANT",
+      "label": "Tenant Name",
+      "required": true,
+      "secret": false,
+      "placeholder": "e.g. rcyber (from rcyber.sharepoint.com)"
+    },
+    {
+      "name": "OD_USER_EMAIL",
+      "label": "User Email",
+      "required": true,
+      "secret": false,
+      "placeholder": "hassaan.jahangir@royalcyber.com"
+    },
+    {
+      "name": "OD_FOLDER",
+      "label": "Folder Path",
+      "required": true,
+      "secret": false,
+      "placeholder": "e.g. Documents, Desktop"
+    },
+    {
+      "name": "prefix",
+      "label": "Prefix",
+      "required": false,
+      "secret": false,
+      "placeholder": "OneDrive"
+    }
+  ],
+  "tools": [
+    {
+      "name": "list_documents",
+      "documentation": "List documents in the user's OneDrive. Lists from OD_FOLDER if configured, otherwise from root."
+    },
+    {
+      "name": "get_document_content",
+      "documentation": "Get document content from OneDrive by file name or item ID. .docx returns extracted plain text, .pdf returns extracted plain text, .md returns plain text, others return Base64."
+    }
+  ]
+}

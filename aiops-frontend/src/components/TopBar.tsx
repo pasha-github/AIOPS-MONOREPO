@@ -8,8 +8,10 @@ import {
   Settings,
   UserRound,
 } from "lucide-react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { clearAccessToken, redirectToLogin } from "@/app/login/loginlogic";
+import SettingModal from "@/components/setting/SettingModal";
 
 function formatTitle(pathname: string) {
   const clean = pathname.split("?")[0].split("#")[0];
@@ -45,8 +47,10 @@ function formatTitle(pathname: string) {
 
 export default function TopBar() {
   const pathname = usePathname();
+  const router = useRouter();
   const title = useMemo(() => formatTitle(pathname), [pathname]);
   const [open, setOpen] = useState(false);
+  const [isSettingModalOpen, setIsSettingModalOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -122,6 +126,10 @@ export default function TopBar() {
             </button>
             <button
               type="button"
+              onClick={() => {
+                setOpen(false);
+                setIsSettingModalOpen(true);
+              }}
               className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-[#1b1f2a] hover:bg-[#f6f7fb]"
               role="menuitem"
             >
@@ -130,6 +138,11 @@ export default function TopBar() {
             </button>
             <button
               type="button"
+              onClick={() => {
+                clearAccessToken();
+                setOpen(false);
+                redirectToLogin(router);
+              }}
               className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-[#1b1f2a] hover:bg-[#f6f7fb]"
               role="menuitem"
             >
@@ -139,6 +152,10 @@ export default function TopBar() {
           </div>
         ) : null}
       </div>
+      <SettingModal
+        isOpen={isSettingModalOpen}
+        onClose={() => setIsSettingModalOpen(false)}
+      />
     </header>
   );
 }

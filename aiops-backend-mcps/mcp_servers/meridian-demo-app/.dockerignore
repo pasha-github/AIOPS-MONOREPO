@@ -1,0 +1,15 @@
+# Ignore dependency and environment folders
+**/node_modules
+**/.venv
+**/__pycache__
+**/.git
+
+# Ignore build outputs
+**/dist
+**/playwright-report
+**/test-results
+
+# Ignore Docker metadata
+**/.dockerignore
+Dockerfile
+docker-compose.yml

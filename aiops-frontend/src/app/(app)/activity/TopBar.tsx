@@ -1,7 +1,6 @@
 "use client";
 import {
   Activity,
-  Bot,
   Check,
   ChevronDown,
   Loader2,
@@ -148,9 +147,9 @@ export default function TopBar({
                         {isAgentsLoading ? (
                           <Loader2 className="h-5 w-5 animate-spin" />
                         ) : (
-                          <Bot
+                          <ChevronDown
                             className={`h-5 w-5 transition-transform ${
-                              isAgentMenuOpen ? "scale-105" : ""
+                              isAgentMenuOpen ? "rotate-180" : ""
                             }`}
                           />
                         )}

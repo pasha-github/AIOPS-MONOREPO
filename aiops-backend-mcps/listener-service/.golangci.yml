@@ -1,0 +1,23 @@
+version: "2"
+
+run:
+  timeout: 5m
+  # Lint the default (Kafka) build. The IBM MQ file (internal/consumer/ibmmq.go)
+  # is behind the `ibmmq` build tag and needs the MQ C client, so it is excluded
+  # here and covered by the tagged `go vet`/`go build` job in CI instead.
+
+linters:
+  # Standard set: errcheck, govet, ineffassign, staticcheck, unused.
+  default: standard
+  enable:
+    - misspell
+    - unconvert
+  exclusions:
+    # Idiomatic unchecked errors (e.g. deferred Body.Close(), fmt.Fprint to a
+    # ResponseWriter) — don't flag them.
+    presets:
+      - std-error-handling
+
+formatters:
+  enable:
+    - gofmt
