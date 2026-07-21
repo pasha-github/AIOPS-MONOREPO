@@ -1,20 +1,47 @@
+import {
+  ModalCard,
+  ModalCardBody,
+  ModalCardFooter,
+  ModalCardHeader,
+  ModalCardPanel,
+} from "@/components/modalcards";
 import { trimTrailingSlash } from "@/config/agent";
 import { useRuntimeConfig } from "@/config/runtime-config";
-import { Bot, ChevronDown, LayoutTemplate, Plus, Trash2 } from "lucide-react";
-import Image from "next/image";
+import { Bot, ChevronDown, LayoutTemplate, Plus, Workflow } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { getProviderIconSrc } from "../llm-management/llmHelpers";
-import { DynamicDropdownField, inputClass, SimpleDropdownField } from "./DynamicConnector";
-import ModelSelect, { ModelOption } from "./ModelSelect";
-import { CreateNewAgentProps, ModelTemplate } from "./types";
+import { uploadKnowledgeFile } from "./agentform/addknowledge/file-upload";
+import AgentFormPages from "./agentform/AgentFormPages";
+import Capabilities from "./agentform/Capabilities";
+import Deployment from "./agentform/Deployment";
+import Guardrails from "./agentform/Guardrails";
+import Identity from "./agentform/Identity";
+import KnowledgeSources from "./agentform/KnowledgeSources";
+import Models, { type LlmFieldConfig } from "./agentform/Models";
+import PromptInstructions from "./agentform/PromptInstructions";
+import SubAgents from "./agentform/SubAgents";
+import {
+  DEFAULT_GUARDRAIL_PII_PATTERNS,
+  type GuardrailPiiPattern,
+} from "./agentform/guardrail-input";
+import type { ModelOption } from "./ModelSelect";
+import { fetchAwsCredentialOptions, type AwsCredentialOption } from "./awsCredentials";
+import {
+  AGENT_TYPE_OPTIONS,
+  CreateNewAgentProps,
+  DEPLOYMENT_TARGET_OPTIONS,
+  MEMORY_BANK_OPTIONS,
+  PROMPT_FIELD_DEFINITIONS,
+  type AgentLookupOption,
+  type ModelTemplate,
+  type PromptFieldKey,
+} from "./types";
 
 type LlmDefaults = {
   primary_model_id: string | null;
   secondary_model_id: string | null;
   tertiary_model_id: string | null;
 };
-
-type LlmSlotKey = "primary" | "secondary" | "tertiary";
 
 const toSnakeCase = (value: string) =>
   value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
@@ -59,9 +86,29 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
   const base = trimTrailingSlash(llmManagerApiBaseUrl);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [activeAgentFormTab, setActiveAgentFormTab] = useState(0);
   const [agentName, setAgentName] = useState("");
   const [description, setDescription] = useState("");
-  const [instruction, setInstruction] = useState("");
+  const [promptFields, setPromptFields] = useState<Record<PromptFieldKey, string>>({
+    prompt_role: "",
+    prompt_objectives: "",
+    prompt_behavior: "",
+    prompt_output_format: "",
+    prompt_constraints: "",
+    prompt_safety: "",
+    prompt_tools_instructions: "",
+    prompt_policy: "",
+    prompt_examples: "",
+    prompt_additional_info: "",
+  });
+  const [deploymentTarget, setDeploymentTarget] = useState(
+    DEPLOYMENT_TARGET_OPTIONS[0]?.value ?? ""
+  );
+  const [agentType, setAgentType] = useState(AGENT_TYPE_OPTIONS[1]?.value ?? "agent");
+  const [memoryEnabledValue, setMemoryEnabledValue] = useState(
+    String(MEMORY_BANK_OPTIONS[1]?.value ?? false)
+  );
+  const [memoryToolType, setMemoryToolType] = useState("");
   const [primaryUseCustom, setPrimaryUseCustom] = useState(false);
   const [secondaryUseCustom, setSecondaryUseCustom] = useState(false);
   const [tertiaryUseCustom, setTertiaryUseCustom] = useState(false);
@@ -97,8 +144,33 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
   const [skillIds, setSkillIds] = useState<string[]>([""]);
   const [skillOptions, setSkillOptions] = useState<{ value: string; label: string }[]>([]);
   const [isSkillsLoading, setIsSkillsLoading] = useState(false);
+  const [subAgentIds, setSubAgentIds] = useState<string[]>([]);
+  const [agentOptions, setAgentOptions] = useState<AgentLookupOption[]>([]);
+  const [isAgentOptionsLoading, setIsAgentOptionsLoading] = useState(false);
+  const [guardrailsEnabled, setGuardrailsEnabled] = useState(false);
+  const [guardrailPiiPatterns, setGuardrailPiiPatterns] = useState<
+    GuardrailPiiPattern[]
+  >(DEFAULT_GUARDRAIL_PII_PATTERNS);
+  const [guardrailSensitivePatternsText, setGuardrailSensitivePatternsText] =
+    useState("");
+  const [guardrailHarmfulKeywords, setGuardrailHarmfulKeywords] = useState<
+    string[]
+  >([]);
+  const [knowledgeFiles, setKnowledgeFiles] = useState<File[]>([]);
+  const [awsCredentialId, setAwsCredentialId] = useState("");
+  const [awsCredentialOptions, setAwsCredentialOptions] = useState<AwsCredentialOption[]>([]);
+  const [isAwsCredentialsLoading, setIsAwsCredentialsLoading] = useState(false);
+  const [awsCredentialsLoadError, setAwsCredentialsLoadError] = useState("");
 
   const agentId = useMemo(() => toSnakeCase(agentName), [agentName]);
+  const isAwsAgentCoreSelected = deploymentTarget === "bedrock_agentcore";
+  const isVertexAgentEngineSelected = deploymentTarget === "vertex";
+  const updatePromptField = useCallback(
+    (key: PromptFieldKey, value: string) => {
+      setPromptFields((prev) => ({ ...prev, [key]: value }));
+    },
+    []
+  );
 
   // Fetch connectors
   useEffect(() => {
@@ -138,6 +210,57 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
         if (!(error instanceof DOMException && error.name === "AbortError")) {
           setConnectorOptions([]);
         }
+      }
+    })();
+    return () => ctrl.abort();
+  }, [base, isModalOpen]);
+
+  useEffect(() => {
+    if (!isModalOpen) return;
+    const ctrl = new AbortController();
+    (async () => {
+      setIsAgentOptionsLoading(true);
+      try {
+        const res = await fetch(`${base}/agent/`, {
+          headers: { accept: "application/json" },
+          signal: ctrl.signal,
+        });
+          const data = await res.json().catch(() => null);
+          if (res.ok && Array.isArray(data)) {
+            const nextAgentOptions: AgentLookupOption[] = data.flatMap(
+              (item: unknown) => {
+                const record = item as Record<string, unknown>;
+                const id =
+                  typeof record.agent_id === "string" ? record.agent_id.trim() : "";
+                const name =
+                  typeof record.name === "string" ? record.name.trim() : "";
+
+                if (!id || !name) {
+                  return [];
+                }
+
+                return [
+                  {
+                    id,
+                    name,
+                    description:
+                      typeof record.description === "string"
+                        ? record.description.trim()
+                        : "",
+                  },
+                ];
+              }
+            );
+            setAgentOptions(nextAgentOptions);
+          } else {
+            setAgentOptions([]);
+          }
+      } catch (error: unknown) {
+        if (!(error instanceof DOMException && error.name === "AbortError")) {
+          setAgentOptions([]);
+        }
+      } finally {
+        setIsAgentOptionsLoading(false);
       }
     })();
     return () => ctrl.abort();
@@ -225,20 +348,6 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
     return () => ctrl.abort();
   }, [base, isModalOpen]);
 
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (openMcpDropdownIndex === null) return;
-      const activeContainer = mcpDropdownRefs.current[openMcpDropdownIndex];
-      if (!activeContainer) return;
-      if (!activeContainer.contains(event.target as Node)) {
-        setOpenMcpDropdownIndex(null);
-      }
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [openMcpDropdownIndex]);
-
   const fetchConnectorConfig = useCallback(async (value: string) => {
     if (!value || configDataMap[value] !== undefined) return;
     setConfigDataMap((prev) => ({ ...prev, [value]: null }));
@@ -307,11 +416,18 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
     normalizeString(agentName).length > 0 &&
     agentId.length > 0 &&
     normalizeString(description).length > 0 &&
-    normalizeString(instruction).length > 0 &&
+    PROMPT_FIELD_DEFINITIONS.every(
+      (field) =>
+        !field.required || normalizeString(promptFields[field.key]).length > 0
+    ) &&
     effectivePrimaryModelId.length > 0 &&
     (!primaryUseCustom || primaryModelId.length > 0) &&
     (!secondaryUseCustom || secondaryModelId.length > 0) &&
-    (!tertiaryUseCustom || tertiaryModelId.length > 0);
+    (!tertiaryUseCustom || tertiaryModelId.length > 0) &&
+    (!isAwsAgentCoreSelected || Boolean(awsCredentialId)) &&
+    (!isVertexAgentEngineSelected ||
+      memoryEnabledValue !== "true" ||
+      Boolean(memoryToolType));
 
   // Toast auto hide
   useEffect(() => {
@@ -367,6 +483,51 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
     })();
     return () => ctrl.abort();
   }, [base, isModalOpen]);
+
+  useEffect(() => {
+    if (!isModalOpen || !isAwsAgentCoreSelected) {
+      return;
+    }
+
+    const ctrl = new AbortController();
+    (async () => {
+      setIsAwsCredentialsLoading(true);
+      setAwsCredentialsLoadError("");
+      try {
+        const options = await fetchAwsCredentialOptions(base, ctrl.signal);
+        setAwsCredentialOptions(options);
+      } catch (error: unknown) {
+        if (!(error instanceof DOMException && error.name === "AbortError")) {
+          setAwsCredentialOptions([]);
+          setAwsCredentialsLoadError(
+            error instanceof Error ? error.message : "Unable to load AWS credentials."
+          );
+        }
+      } finally {
+        setIsAwsCredentialsLoading(false);
+      }
+    })();
+
+    return () => ctrl.abort();
+  }, [base, isAwsAgentCoreSelected, isModalOpen]);
+
+  useEffect(() => {
+    if (!isVertexAgentEngineSelected) {
+      setMemoryEnabledValue(String(MEMORY_BANK_OPTIONS[1]?.value ?? false));
+      setMemoryToolType("");
+      return;
+    }
+
+    if (memoryEnabledValue !== "true") {
+      setMemoryToolType("");
+    }
+  }, [isVertexAgentEngineSelected, memoryEnabledValue]);
+
+  useEffect(() => {
+    if (!isAwsAgentCoreSelected) {
+      setAwsCredentialId("");
+    }
+  }, [isAwsAgentCoreSelected]);
 
   useEffect(() => {
     if (!isModalOpen) return;
@@ -443,7 +604,18 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
     if (!t) return;
     setAgentName(t.name || "");
     setDescription(t.description || "");
-    setInstruction(t.instruction || "");
+    setPromptFields({
+      prompt_role: t.prompt_role || t.instruction || "",
+      prompt_objectives: t.prompt_objectives || "",
+      prompt_behavior: t.prompt_behavior || "",
+      prompt_output_format: t.prompt_output_format || "",
+      prompt_constraints: t.prompt_constraints || "",
+      prompt_safety: t.prompt_safety || "",
+      prompt_tools_instructions: t.prompt_tools_instructions || "",
+      prompt_policy: t.prompt_policy || "",
+      prompt_examples: t.prompt_examples || "",
+      prompt_additional_info: t.prompt_additional_info || "",
+    });
     setPrimaryUseCustom(Boolean(t.model_id?.trim()));
     setPrimaryModelId(t.model_id?.trim() || "");
     setSecondaryUseCustom(false);
@@ -454,8 +626,24 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
 
   const resetForm = () => {
     setAgentName("");
+    setActiveAgentFormTab(0);
     setDescription("");
-    setInstruction("");
+    setPromptFields({
+      prompt_role: "",
+      prompt_objectives: "",
+      prompt_behavior: "",
+      prompt_output_format: "",
+      prompt_constraints: "",
+      prompt_safety: "",
+      prompt_tools_instructions: "",
+      prompt_policy: "",
+      prompt_examples: "",
+      prompt_additional_info: "",
+    });
+    setDeploymentTarget(DEPLOYMENT_TARGET_OPTIONS[0]?.value ?? "");
+    setAgentType(AGENT_TYPE_OPTIONS[1]?.value ?? "agent");
+    setMemoryEnabledValue(String(MEMORY_BANK_OPTIONS[1]?.value ?? false));
+    setMemoryToolType("");
     setPrimaryUseCustom(false);
     setSecondaryUseCustom(false);
     setTertiaryUseCustom(false);
@@ -466,12 +654,21 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
     setMcpServerIds([""]);
     setConnectorConfigIds([[]]);
     setSkillIds([""]);
+    setSubAgentIds([]);
+    setGuardrailsEnabled(false);
+    setGuardrailPiiPatterns(DEFAULT_GUARDRAIL_PII_PATTERNS);
+    setGuardrailSensitivePatternsText("");
+    setGuardrailHarmfulKeywords([]);
+    setKnowledgeFiles([]);
     setConfigDataMap({});
     setDefaultModels(null);
     setDefaultsLoadError("");
     setSubmitError("");
     setSuccess("");
     setSelectedTemplateId("");
+    setAwsCredentialId("");
+    setAwsCredentialOptions([]);
+    setAwsCredentialsLoadError("");
   };
 
   const openModal = () => { resetForm(); setIsModalOpen(true); };
@@ -509,6 +706,42 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
       })
       .filter(Boolean);
 
+  const normalizeSensitivePatterns = (value: string) =>
+    value
+      .split(/\r?\n/)
+      .map((line) => line.trim().replace(/,$/, "").trim())
+      .map((line) =>
+        line.length >= 2 && line.startsWith('"') && line.endsWith('"')
+          ? line.slice(1, -1)
+          : line
+      )
+      .filter(Boolean);
+
+  const getGuardrailsConfig = () => {
+    if (!guardrailsEnabled) {
+      return { additionalProp1: {} };
+    }
+
+    return {
+      pii_patterns: guardrailPiiPatterns,
+      sensitive_patterns: normalizeSensitivePatterns(
+        guardrailSensitivePatternsText
+      ),
+      harmful_keywords: guardrailHarmfulKeywords,
+    };
+  };
+
+  const uploadKnowledgeFiles = async () => {
+    if (knowledgeFiles.length === 0) {
+      return [];
+    }
+
+    const uploadedFiles = await Promise.all(
+      knowledgeFiles.map((file) => uploadKnowledgeFile(base, file))
+    );
+    return uploadedFiles.map((file) => file.id);
+  };
+
   const handleCreate = async () => {
     if (!isFormValid) {
       setSubmitError("Please fill all required fields.");
@@ -518,6 +751,7 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
     setSubmitError("");
     setSuccess("");
     try {
+      const knowledgeFileIds = await uploadKnowledgeFiles();
       const res = await fetch(`${base}/agent/`, {
         method: "POST",
         headers: { accept: "application/json", "Content-Type": "application/json" },
@@ -525,7 +759,6 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
           agent_id: agentId,
           name: normalizeString(agentName),
           description: normalizeString(description),
-          instruction: normalizeString(instruction),
           primary_use_global: !primaryUseCustom,
           primary_model_id: primaryUseCustom ? effectivePrimaryModelId || null : null,
           secondary_use_global: !secondaryUseCustom,
@@ -536,10 +769,36 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
           skill_ids: normalizeList(skillIds),
           mcp_server_ids: normalizeMcpServerIds(mcpServerIds),
           mcp_servers: normalizeManualMcpServers(mcpServers, mcpServerIds),
-          connector_config_ids: connectorConfigIds.flat(),
-          isEnabled: true,
-          sub_agents: [],
-          type: "agent",
+            connector_config_ids: connectorConfigIds.flat(),
+            deployment_target: deploymentTarget || null,
+            aws_credential_id: isAwsAgentCoreSelected ? awsCredentialId || null : null,
+            prompt_role: normalizeString(promptFields.prompt_role),
+            prompt_objectives: normalizeString(promptFields.prompt_objectives),
+            prompt_behavior: normalizeString(promptFields.prompt_behavior),
+            prompt_output_format: normalizeString(promptFields.prompt_output_format),
+            prompt_constraints: normalizeString(promptFields.prompt_constraints),
+            prompt_safety: normalizeString(promptFields.prompt_safety),
+            prompt_tools_instructions: normalizeString(
+              promptFields.prompt_tools_instructions
+            ),
+            prompt_policy: normalizeString(promptFields.prompt_policy),
+            prompt_examples: normalizeString(promptFields.prompt_examples),
+            prompt_additional_info: normalizeString(
+              promptFields.prompt_additional_info
+            ),
+            memory_enabled: isVertexAgentEngineSelected
+              ? memoryEnabledValue === "true"
+              : false,
+            memory_tool_type:
+              isVertexAgentEngineSelected && memoryEnabledValue === "true"
+                ? memoryToolType || null
+                : null,
+            isEnabled: true,
+            sub_agents: subAgentIds,
+            type: agentType || "agent",
+            guardrail_sensitive_data: guardrailsEnabled,
+            guardrails_config: getGuardrailsConfig(),
+            knowledge_file_ids: knowledgeFileIds,
         }),
       });
       const data = await res.json().catch(() => null);
@@ -554,8 +813,10 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
         setToastMessage("Agent created successfully.");
         setIsToastVisible(true);
       }, 1400);
-    } catch {
-      setSubmitError("Unable to create agent.");
+    } catch (error: unknown) {
+      setSubmitError(
+        error instanceof Error ? error.message : "Unable to create agent."
+      );
     } finally {
       setIsCreating(false);
     }
@@ -579,15 +840,7 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
     );
   };
 
-  const llmFields: Array<{
-    key: LlmSlotKey;
-    label: string;
-    useCustom: boolean;
-    setUseCustom: Dispatch<SetStateAction<boolean>>;
-    setModelId: Dispatch<SetStateAction<string>>;
-    effectiveModelId: string;
-    defaultOption: ModelOption | null;
-  }> = [
+  const llmFields: LlmFieldConfig[] = [
     {
       key: "primary",
       label: "Primary LLM",
@@ -596,6 +849,7 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
       setModelId: setPrimaryModelId,
       effectiveModelId: effectivePrimaryModelId,
       defaultOption: primaryDefaultOption,
+      Logo: Workflow
     },
     {
       key: "secondary",
@@ -605,6 +859,7 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
       setModelId: setSecondaryModelId,
       effectiveModelId: effectiveSecondaryModelId,
       defaultOption: secondaryDefaultOption,
+      Logo: Workflow,
     },
     {
       key: "tertiary",
@@ -614,9 +869,10 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
       setModelId: setTertiaryModelId,
       effectiveModelId: effectiveTertiaryModelId,
       defaultOption: tertiaryDefaultOption,
+      Logo: Workflow,
     },
+    
   ];
-
   return (
     <>
       {/* Trigger Button */}
@@ -625,360 +881,186 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
         onClick={openModal}
         className="inline-flex items-center gap-2 rounded-xl bg-[#4f49e2] px-5 py-3 text-sm font-semibold text-white shadow-[0_12px_24px_-14px_rgba(79,73,226,0.6)] transition hover:bg-[#3f39d6] active:scale-95"
       >
-        <Plus size={18} />
+        <Plus size={18} />  
         Create New Agent
+        <Bot size={18}/>
       </button>
 
       {/* Modal */}
       {isModalOpen && (
-        <div
-          className="fixed inset-0 z-[75] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
-          onClick={(e) => e.target === e.currentTarget && closeModal()}
-        >
-          <div className="relative w-full max-w-2xl max-h-[92vh] flex flex-col bg-white rounded-2xl shadow-2xl overflow-hidden">
-
-            {/* Header */}
-            <div className="border-b border-gray-100 px-6 py-4 flex items-center justify-between bg-white/80 backdrop-blur-md sticky top-0 z-10">
-              <div className="flex items-center gap-3">
-                <div className="h-9 w-9 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600">
-                  <Bot size={18} />
-                </div>
-                <div>
-                  <h1 className="text-sm font-semibold text-gray-900 leading-tight">Create New Agent</h1>
-                  <p className="text-xs text-gray-400 mt-0.5">Fill the details below</p>
-                </div>
-              </div>
-
-              <div className="relative flex items-center">
-                <LayoutTemplate size={14} className="pointer-events-none absolute left-2.5 text-indigo-400" />
-                <select
-                  value={selectedTemplateId}
-                  onChange={(e) => setSelectedTemplateId(e.target.value)}
-                  disabled={isTemplatesLoading || modelTemplates.length === 0}
-                  title={templatesLoadError || undefined}
-                  className={`appearance-none rounded-lg pl-8 pr-7 py-1.5 text-xs font-medium outline-none transition focus:ring-2 focus:ring-indigo-500/10 ${templatesLoadError
-                      ? "cursor-not-allowed border border-red-200 bg-red-50 text-red-500"
-                      : isTemplatesLoading || modelTemplates.length === 0
-                        ? "cursor-not-allowed border border-indigo-100 bg-indigo-50 text-indigo-300"
-                        : "border border-indigo-200 bg-indigo-50 text-indigo-700 hover:border-indigo-300"
+        <ModalCard zIndexClassName="z-[75]" onBackdropClick={closeModal}>
+          <ModalCardPanel maxWidthClassName="max-w-5xl" className="max-h-[92vh]">
+            <ModalCardHeader
+              title="Create New Agent"
+              subtitle="Fill the details below"
+              icon={<Bot className="h-4 w-4" />}
+              actions={
+                <div className="relative flex items-center">
+                  <LayoutTemplate size={14} className="pointer-events-none absolute left-2.5 text-white/70" />
+                  <select
+                    value={selectedTemplateId}
+                    onChange={(e) => setSelectedTemplateId(e.target.value)}
+                    disabled={isTemplatesLoading || modelTemplates.length === 0}
+                    title={templatesLoadError || undefined}
+                    className={`appearance-none rounded-lg pl-8 pr-7 py-1.5 text-xs font-medium outline-none transition focus:ring-2 focus:ring-white/20 ${
+                      templatesLoadError
+                        ? "cursor-not-allowed border border-red-200/60 bg-white/10 text-white/70"
+                        : isTemplatesLoading || modelTemplates.length === 0
+                          ? "cursor-not-allowed border border-white/15 bg-white/10 text-white/45"
+                          : "border border-white/20 bg-white/10 text-white hover:border-white/35"
                     }`}
-                >
-                  <option value="">
-                    {isTemplatesLoading
-                      ? "Loading templates..."
-                      : templatesLoadError
-                        ? "Templates unavailable"
-                        : modelTemplates.length === 0
-                          ? "No templates available"
-                          : "Use a template"}
-                  </option>
-                  {modelTemplates.map((t) => (
-                    <option key={t.template_id} value={t.template_id}>
-                      {t.name}
+                  >
+                    <option value="" className="text-slate-900">
+                      {isTemplatesLoading
+                        ? "Loading templates..."
+                        : templatesLoadError
+                          ? "Templates unavailable"
+                          : modelTemplates.length === 0
+                            ? "No templates available"
+                            : "Use a template"}
                     </option>
-                  ))}
-                </select>
-                <ChevronDown size={12} className="pointer-events-none absolute right-2 text-indigo-400" />
-              </div>
-            </div>
+                    {modelTemplates.map((t) => (
+                      <option key={t.template_id} value={t.template_id} className="text-slate-900">
+                        {t.name}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown size={12} className="pointer-events-none absolute right-2 text-white/70" />
+                </div>
+              }
+              onClose={closeModal}
+            />
 
             {/* Form Content */}
-            <div className="flex-1 overflow-y-auto px-6 py-5 flex flex-col gap-4">
+            <ModalCardBody className="flex-1 overflow-y-auto flex flex-col gap-4">
 
-              {/* Identity */}
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">Identity</p>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="flex items-center gap-1 text-sm font-medium text-gray-700">
-                  Agent Name <span className="text-red-500">*</span>
-                </label>
-                <p className="text-xs leading-snug text-gray-400">Human-readable display name for this agent</p>
-                <input
-                  type="text"
-                  value={agentName}
-                  onChange={(e) => setAgentName(e.target.value)}
-                  placeholder="e.g., Customer Support Assistant"
-                  className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-900 placeholder-gray-400 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/10"
-                />
-              </div>
-
-              {/* Behaviour */}
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">Behaviour</p>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="flex flex-col gap-1.5">
-                  <label className="flex items-center gap-1 text-sm font-medium text-gray-700">
-                    Description <span className="text-red-500">*</span>
-                  </label>
-                  <p className="text-xs leading-snug text-gray-400">Brief summary of what this agent does</p>
-                  <textarea
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    placeholder="What does this agent do?"
-                    rows={3}
-                    className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-900 placeholder-gray-400 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/10 resize-y"
+              <AgentFormPages
+                activeTab={activeAgentFormTab}
+                onTabChange={setActiveAgentFormTab}
+                identity={(
+                  <Identity
+                    agentName={agentName}
+                    description={description}
+                    onAgentNameChange={setAgentName}
+                    onDescriptionChange={setDescription}
                   />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className="flex items-center gap-1 text-sm font-medium text-gray-700">
-                    System Instruction <span className="text-red-500">*</span>
-                  </label>
-                  <p className="text-xs leading-snug text-gray-400">System prompt defining personality and behaviour</p>
-                  <textarea
-                    value={instruction}
-                    onChange={(e) => setInstruction(e.target.value)}
-                    placeholder="You are a helpful AI assistant that..."
-                    rows={3}
-                    className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-900 placeholder-gray-400 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/10 resize-y"
-                  />
-                </div>
-              </div>
-
-              {/* Model */}
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">Model</p>
-
-              <div className="grid gap-3">
-                {llmFields.map((field) => {
-                  const selectedOption =
-                    modelOptions.find((option) => option.value === field.effectiveModelId) ??
-                    field.defaultOption;
-                  const dropdownOptions =
-                    !field.useCustom && field.defaultOption
-                      ? [field.defaultOption, ...modelOptions.filter((option) => option.value !== field.defaultOption?.value)]
-                      : modelOptions;
-
-                  return (
-                    <div
-                      key={field.key}
-                    >
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex flex-col gap-1">
-                          <label className="flex items-center gap-1 text-sm font-medium text-gray-700">
-                            {field.label}
-                            {field.key === "primary" ? (
-                              <span className="text-red-500">*</span>
-                            ) : null}
-                          </label>
-                          <p className="text-xs leading-snug text-gray-400">
-                            {field.useCustom
-                              ? `Choose a specific ${field.label.toLowerCase()} for this agent`
-                              : `Uses the global ${field.label.toLowerCase()} from LLM management`}
-                          </p>
-                        </div>
-
-                        <label className="inline-flex shrink-0 items-center gap-2 py-1.5 text-xs font-medium text-indigo-700">
-                          <input
-                            type="checkbox"
-                            checked={field.useCustom}
-                            onChange={(event) => {
-                              field.setUseCustom(event.target.checked);
-                              if (!event.target.checked) {
-                                field.setModelId("");
-                              }
-                            }}
-                            className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                          />
-                          Custom LLM
-                        </label>
-                      </div>
-
-                      <div className="mt-3">
-                        <ModelSelect
-                          value={field.effectiveModelId}
-                          options={dropdownOptions}
-                          placeholder={
-                            field.useCustom
-                              ? `Choose ${field.label.toLowerCase()}`
-                              : selectedOption
-                                ? "Using global default"
-                                : "No global default configured"
-                          }
-                          loading={isModelsLoading || isDefaultsLoading}
-                          disabled={
-                            !field.useCustom ||
-                            isModelsLoading ||
-                            isDefaultsLoading ||
-                            modelOptions.length === 0
-                          }
-                          onChange={field.setModelId}
-                        />
-                      </div>
-
-                      <div className="mt-2 flex items-start justify-between gap-3">
-                        <p className="text-xs text-gray-400">
-                          {field.useCustom
-                            ? "Checkbox enabled: this agent uses the selected LLM."
-                            : selectedOption
-                              ? `Global default: ${selectedOption.label}`
-                              : "Global default is not configured for this slot."}
-                        </p>
-                        {selectedOption?.iconSrc ? (
-                          <Image
-                            src={selectedOption.iconSrc}
-                            alt=""
-                            width={20}
-                            height={20}
-                            className="h-5 w-5 shrink-0 object-contain"
-                          />
-                        ) : null}
-                      </div>
-                    </div>
-                  );
-                })}
-
-                {(modelsLoadError || defaultsLoadError) && (
-                  <p className="flex items-center gap-1.5 text-xs text-red-600">
-                    <svg className="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clipRule="evenodd" />
-                    </svg>
-                    {modelsLoadError || defaultsLoadError}
-                  </p>
                 )}
-              </div>
-
-              {/* Capabilities */}
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">Capabilities</p>
-
-                <div className="space-y-4">
-                <div className="flex flex-col gap-1.5">
-                  <label className="flex items-center gap-1 text-sm font-medium text-gray-700">
-                    MCP Servers
-                  </label>
-                  <p className="text-xs leading-snug text-gray-400">
-                    Type a custom URL or choose from registered MCP servers
-                  </p>
-                  <div className="flex flex-col gap-2">
-                    {mcpServers.map((val, i) => (
-                      <div key={i} className="flex items-center gap-2">
-                        <div
-                          ref={(node) => {
-                            mcpDropdownRefs.current[i] = node;
-                          }}
-                          className="relative w-full"
-                        >
-                          <input
-                            type="text"
-                            value={val}
-                            onChange={(e) => updateMcpServer(i, e.target.value)}
-                            placeholder="https://mcp.example.com/sse"
-                            className={`${inputClass} pr-10`}
-                          />
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setOpenMcpDropdownIndex((current) => (current === i ? null : i))
-                            }
-                            className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500"
-                          >
-                            <ChevronDown size={16} />
-                          </button>
-
-                          {openMcpDropdownIndex === i ? (
-                            <div className="absolute z-50 mt-1 w-full rounded-lg border bg-white shadow-lg max-h-60 overflow-auto">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setMcpServerIds((prev) =>
-                                    prev.map((x, idx) => (idx === i ? "" : x))
-                                  );
-                                  setMcpServers((prev) =>
-                                    prev.map((x, idx) => (idx === i ? "" : x))
-                                  );
-                                  setOpenMcpDropdownIndex(null);
-                                }}
-                                className="w-full px-3 py-2 text-left text-sm text-gray-500 hover:bg-gray-50"
-                              >
-                                Show MCP
-                              </button>
-                              {isMcpLoading ? (
-                                <div className="px-3 py-2 text-sm text-gray-500">Loading MCP servers...</div>
-                              ) : mcpOptions.length === 0 ? (
-                                <div className="px-3 py-2 text-sm text-gray-500">No MCP servers found</div>
-                              ) : (
-                                mcpOptions.map((option) => (
-                                  <button
-                                    key={option.id}
-                                    type="button"
-                                    onClick={() => {
-                                      setMcpServers((prev) =>
-                                        prev.map((x, idx) =>
-                                          idx === i ? (option.name || option.serverUrl) : x
-                                        )
-                                      );
-                                      setMcpServerIds((prev) =>
-                                        prev.map((x, idx) => (idx === i ? option.id : x))
-                                      );
-                                      setOpenMcpDropdownIndex(null);
-                                    }}
-                                    className="w-full border-b px-3 py-2 text-left hover:bg-gray-50"
-                                  >
-                                    <div className="text-sm font-medium text-gray-900">{option.name || option.serverUrl}</div>
-                                    <div className="text-xs text-gray-500 break-all">{option.serverUrl}</div>
-                                  </button>
-                                ))
-                              )}
-                            </div>
-                          ) : null}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            addToList(setMcpServers);
-                            addToList(setMcpServerIds);
-                          }}
-                          title="Add"
-                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-600 transition hover:bg-indigo-100"
-                        >
-                          <Plus size={14} />
-                        </button>
-                        {mcpServers.length > 1 ? (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              removeFromList(setMcpServers, i);
-                              removeFromList(setMcpServerIds, i);
-                              setOpenMcpDropdownIndex(null);
-                            }}
-                            title="Remove"
-                            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-500 transition hover:bg-red-100"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        ) : null}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <DynamicDropdownField
-                  label="Connector Config"
-                  values={connectorConfigIds}
-                  options={connectorOptions}
-                  configDataMap={configDataMap}
-                  onAdd={(): void => addConnector()}
-                  onRemove={(i: number): void => removeConnector(i)}
-                  onChange={(i: number, v: string[] | string): void =>
-                  updateList(i, Array.isArray(v) ? v : [v])
-                  }
-                />
-                <SimpleDropdownField
-                  label="Skill"
-                  hint={
-                    isSkillsLoading
-                      ? "Loading registered skills"
-                      : "Choose from registered skills"
-                  }
-                  values={skillIds}
-                  options={skillOptions}
-                  placeholder="Select skill"
-                  onAdd={addSkill}
-                  onRemove={removeSkill}
-                  onChange={(index, value) =>
-                    setSkillIds((prev) => prev.map((item, i) => (i === index ? value : item)))
-                  }
-                />
-                </div>
-
+                deployment={(
+                  <Deployment
+                    deploymentTarget={deploymentTarget}
+                    agentType={agentType}
+                    memoryEnabledValue={memoryEnabledValue}
+                    memoryToolType={memoryToolType}
+                    awsCredentialId={awsCredentialId}
+                    awsCredentialOptions={awsCredentialOptions}
+                    isAwsCredentialsLoading={isAwsCredentialsLoading}
+                    awsCredentialsLoadError={awsCredentialsLoadError}
+                    isAwsAgentCoreSelected={isAwsAgentCoreSelected}
+                    isVertexAgentEngineSelected={isVertexAgentEngineSelected}
+                    onDeploymentTargetChange={setDeploymentTarget}
+                    onAgentTypeChange={setAgentType}
+                    onMemoryEnabledValueChange={setMemoryEnabledValue}
+                    onMemoryToolTypeChange={setMemoryToolType}
+                    onAwsCredentialIdChange={setAwsCredentialId}
+                  />
+                )}
+                promptInstructions={(
+                  <PromptInstructions
+                    promptFields={promptFields}
+                    onPromptFieldChange={updatePromptField}
+                  />
+                )}
+                models={(
+                  <Models
+                    llmFields={llmFields}
+                    modelOptions={modelOptions}
+                    isModelsLoading={isModelsLoading}
+                    isDefaultsLoading={isDefaultsLoading}
+                    modelsLoadError={modelsLoadError}
+                    defaultsLoadError={defaultsLoadError}
+                  />
+                )}
+                capabilities={(
+                  <Capabilities
+                    mcpServers={mcpServers}
+                    mcpOptions={mcpOptions}
+                    isMcpLoading={isMcpLoading}
+                    openMcpDropdownIndex={openMcpDropdownIndex}
+                    mcpDropdownRefs={mcpDropdownRefs}
+                    connectorConfigIds={connectorConfigIds}
+                    connectorOptions={connectorOptions}
+                    configDataMap={configDataMap}
+                    skillIds={skillIds}
+                    skillOptions={skillOptions}
+                    isSkillsLoading={isSkillsLoading}
+                    onMcpValueChange={updateMcpServer}
+                    onMcpDropdownToggle={(index) =>
+                      setOpenMcpDropdownIndex((current) => (current === index ? null : index))
+                    }
+                    onMcpDropdownClose={() => setOpenMcpDropdownIndex(null)}
+                    onMcpClear={(index) => {
+                      setMcpServerIds((prev) => prev.map((value, i) => (i === index ? "" : value)));
+                      setMcpServers((prev) => prev.map((value, i) => (i === index ? "" : value)));
+                      setOpenMcpDropdownIndex(null);
+                    }}
+                    onMcpSelect={(index, option) => {
+                      setMcpServers((prev) =>
+                        prev.map((value, i) => (i === index ? option.name || option.serverUrl : value))
+                      );
+                      setMcpServerIds((prev) =>
+                        prev.map((value, i) => (i === index ? option.id : value))
+                      );
+                      setOpenMcpDropdownIndex(null);
+                    }}
+                    onMcpAdd={() => {
+                      addToList(setMcpServers);
+                      addToList(setMcpServerIds);
+                    }}
+                    onMcpRemove={(index) => {
+                      removeFromList(setMcpServers, index);
+                      removeFromList(setMcpServerIds, index);
+                      setOpenMcpDropdownIndex(null);
+                    }}
+                    onConnectorAdd={addConnector}
+                    onConnectorRemove={removeConnector}
+                    onConnectorChange={(index, value) =>
+                      updateList(index, Array.isArray(value) ? value : [value])
+                    }
+                    onSkillAdd={addSkill}
+                    onSkillRemove={removeSkill}
+                    onSkillChange={(index, value) =>
+                      setSkillIds((prev) => prev.map((item, i) => (i === index ? value : item)))
+                    }
+                  />
+                )}
+                subAgents={(
+                  <SubAgents
+                    agentId={agentId}
+                    subAgentIds={subAgentIds}
+                    agentOptions={agentOptions}
+                    isAgentOptionsLoading={isAgentOptionsLoading}
+                    onChange={setSubAgentIds}
+                  />
+                )}
+                guardrails={(
+                  <Guardrails
+                    enabled={guardrailsEnabled}
+                    piiPatterns={guardrailPiiPatterns}
+                    sensitivePatternsText={guardrailSensitivePatternsText}
+                    harmfulKeywords={guardrailHarmfulKeywords}
+                    onEnabledChange={setGuardrailsEnabled}
+                    onPiiPatternsChange={setGuardrailPiiPatterns}
+                    onSensitivePatternsTextChange={setGuardrailSensitivePatternsText}
+                    onHarmfulKeywordsChange={setGuardrailHarmfulKeywords}
+                  />
+                )}
+                knowledgeSources={(
+                  <KnowledgeSources
+                    files={knowledgeFiles}
+                    onFilesChange={setKnowledgeFiles}
+                  />
+                )}
+              />
               {/* Error */}
               {submitError && (
                 <div className="flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -1004,10 +1086,10 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
                   </div>
                 </div>
               )}
-            </div>
+            </ModalCardBody>
 
             {/* Footer */}
-            <div className="border-t border-gray-100 px-6 py-4 bg-slate-50 flex justify-between items-center">
+            <ModalCardFooter className="justify-between bg-slate-50">
               <p className="text-xs text-gray-400">
                 {!isFormValid && !success
                   ? <>Fields marked <span className="text-red-400">*</span> are required</>
@@ -1045,11 +1127,12 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
                   ) : (
                     "Create Agent"
                   )}
+                  <Bot size={18}/>
                 </button>
               </div>
-            </div>
-          </div>
-        </div>
+            </ModalCardFooter>
+          </ModalCardPanel>
+        </ModalCard>
       )}
 
       {/* Toast */}
@@ -1069,3 +1152,4 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
     </>
   );
 }
+

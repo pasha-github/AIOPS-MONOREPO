@@ -7,6 +7,8 @@ export type AgentRecord = {
   start_time: string | null;
   stop_time: string | null;
   updated_at: string | null;
+  deployment_target?: string | null;
+  vertex_stream_query_url?: string | null;
 };
 
 export type AgentListApiResponseItem = {
@@ -14,7 +16,10 @@ export type AgentListApiResponseItem = {
   agent_id?: string | null;
   updated_at?: string | null;
   status?: string | null;
+  isEnabled?: boolean | null;
   type?: string | null;
+  deployment_target?: string | null;
+  vertex_stream_query_url?: string | null;
 };
 
 export type AgentFilter = "all" | "running" | "stopped";

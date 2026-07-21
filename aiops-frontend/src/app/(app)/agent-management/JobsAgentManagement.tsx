@@ -2,25 +2,18 @@
 
 import { trimTrailingSlash } from "@/config/agent";
 import { useRuntimeConfig } from "@/config/runtime-config";
-import { Plus, Trash2, X } from "lucide-react";
+import { Bot, BriefcaseBusiness, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import AgentAutomationJobsPage from "./AgentAutomationJobs/page";
+import type {
+  ApiCheckRequestPayload,
+  JobDeleteTarget,
+  JobRecord,
+} from "./AgentAutomationJobs/types";
 
 type AgentRecord = {
   agent_id: string | null;
   name: string;
-};
-
-type JobRecord = {
-  job_id: string;
-  agent_id: string;
-  prompt: string;
-  cron_expression: string;
-  interval_seconds: number;
-};
-
-type JobDeleteTarget = {
-  agentId: string;
-  jobId: string;
 };
 
 type JobsAgentManagementProps = {
@@ -129,7 +122,7 @@ export default function JobsAgentManagement({
     return () => controller.abort();
   }, [loadJobs]);
 
-  const handleCreateJob = async () => {
+  const handleCreateJob = async (apiCheckPayload?: ApiCheckRequestPayload) => {
     if (isCreatingJob) {
       return;
     }
@@ -173,6 +166,7 @@ export default function JobsAgentManagement({
             prompt,
             cron_expression: cron,
             interval_seconds: interval ?? 0,
+            ...(apiCheckPayload ?? {}),
           }),
         }
       );
@@ -255,197 +249,47 @@ export default function JobsAgentManagement({
   return (
     <>
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 px-4 py-8 backdrop-blur-md">
-        <div className="w-full max-w-5xl overflow-hidden rounded-[28px] bg-white shadow-[0_24px_70px_-36px_rgba(15,23,42,0.65)]">
-          <div className="flex items-start justify-between border-b border-[#eef1f7] px-6 py-4">
+        <div className="w-full max-w-[1480px] overflow-hidden rounded-[28px] bg-white shadow-[0_24px_70px_-36px_rgba(15,23,42,0.65)]">
+          <div className="flex items-start justify-between bg-[#4f49e2] px-6 py-4 text-white">
             <div className="space-y-1">
               <div className="flex items-center gap-3">
-                <h4 className="text-lg font-semibold text-[#111827]">Jobs</h4>
-                <span className="rounded-full border border-[#dbe3f0] bg-[#f8fafc] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#64748b]">
-                  Agent tools
+                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-white">
+                  <BriefcaseBusiness className="h-4 w-4" />
                 </span>
+                <h4 className="text-lg font-semibold">Jobs</h4>
               </div>
-              <p className="text-sm text-[#6b7280]">{agent.name}</p>
-              
+              <p className="flex items-center gap-2 text-sm text-white/85">
+                <Bot className="h-4 w-4" />
+                {agent.name}
+              </p>
             </div>
             <button
               type="button"
               onClick={onClose}
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-[#e5e7eb] text-[#475569] transition hover:bg-[#f8fafc]"
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-white transition hover:bg-white/25"
             >
               <X className="h-4 w-4" />
             </button>
           </div>
 
           <div className="max-h-[70vh] overflow-y-auto px-6 py-5">
-            <div className="grid gap-5 lg:grid-cols-[1.15fr_0.85fr]">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h5 className="text-sm font-semibold text-[#111827]">Jobs</h5>
-                    <p className="text-xs text-[#64748b]">Create and review jobs for this agent.</p>
-                  </div>
-                  <span className="rounded-xl border border-[#e5e7eb] px-3 py-2 text-xs font-semibold text-[#374151]">
-                    List Jobs
-                  </span>
-                </div>
-                <div className="overflow-hidden rounded-2xl border border-[#eef1f7]">
-                  <div className="grid grid-cols-[1.5fr_1.5fr_1fr_0.6fr] bg-[#eaf0f8] px-4 py-3 text-xs font-semibold uppercase tracking-[0.08em] text-[#0f172a]">
-                    <span>Prompt</span>
-                    <span>Cron expression</span>
-                    <span>Intervals</span>
-                    <span className="text-right">Action</span>
-                  </div>
-                  {isJobsLoading ? (
-                    <div className="divide-y divide-[#eef1f7] bg-white">
-                      {Array.from({ length: 3 }).map((_, index) => (
-                        <div
-                          key={`job-skeleton-${index}`}
-                          className="grid animate-pulse grid-cols-[1.5fr_1.5fr_1fr_0.6fr] px-4 py-4"
-                        >
-                          {Array.from({ length: 3 }).map((__, cellIndex) => (
-                            <span
-                              key={`job-skeleton-cell-${index}-${cellIndex}`}
-                              className="mr-4 h-4 rounded bg-[#edf2f9]"
-                            />
-                          ))}
-                          <span className="ml-auto h-8 w-8 rounded-xl bg-[#edf2f9]" />
-                        </div>
-                      ))}
-                    </div>
-                  ) : jobs.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center gap-2 bg-white px-4 py-10 text-center">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#eef2ff] text-[#4f49e2]">
-                        <Plus className="h-5 w-5" />
-                      </div>
-                      <p className="text-sm font-semibold text-[#111827]">
-                        No jobs found
-                      </p>
-                      <p className="max-w-sm text-sm text-[#6b7280]">
-                        Create the first job to schedule work for this agent.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="divide-y divide-[#eef1f7] bg-white">
-                      {jobs.map((job) => (
-                        <div
-                          key={job.job_id}
-                          className="grid grid-cols-[1.5fr_1.5fr_1fr_0.6fr] px-4 py-4 text-sm text-[#2b3341]"
-                        >
-                          <div className="break-words whitespace-normal leading-snug text-[#334155]">
-                            {job.prompt}
-                          </div>
-                          <div className="break-words whitespace-normal leading-snug text-[#334155]">
-                            {job.cron_expression || "-"}
-                          </div>
-                          <div className="break-words whitespace-normal leading-snug text-[#334155]">
-                            {job.interval_seconds}
-                          </div>
-                          <div className="flex justify-end">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setJobDeleteTarget({ agentId, jobId: job.job_id })
-                              }
-                              className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[#f3c7c7] text-[#ef4444] transition hover:bg-[#fff1f2] hover:shadow-[0_10px_18px_-14px_rgba(239,68,68,0.45)]"
-                              aria-label={`Delete job ${job.job_id}`}
-                              title="Delete"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-[#eef1f7] bg-[#fbfcfe] p-5">
-                <div className="mb-5">
-                  <h5 className="text-sm font-semibold text-[#111827]">Create Job</h5>
-                  <p className="mt-1 text-xs text-[#64748b]">
-                    Submit a prompt and schedule fields to create a new job.
-                  </p>
-                </div>
-                <div className="space-y-5">
-                  <div>
-                    <label className="mb-2 block text-sm font-semibold text-[#111827]">
-                      Prompt
-                    </label>
-                    <p className="mb-2 text-xs text-[#64748b]">
-                      This prompt is stored with the job definition.
-                    </p>
-                    <textarea
-                      value={jobPrompt}
-                      onChange={(event) => setJobPrompt(event.target.value)}
-                      rows={4}
-                      placeholder="Enter job prompt"
-                      className="min-h-[140px] w-full rounded-2xl border border-[#dbe3f0] bg-[#fbfcfe] px-4 py-3 text-sm text-[#111827] outline-none transition placeholder:text-[#9ca3af] focus:border-[#4f49e2] focus:bg-white focus:shadow-[0_0_0_4px_rgba(79,73,226,0.08)]"
-                    />
-                  </div>
-
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div>
-                      <label className="mb-2 block text-sm font-semibold text-[#111827]">
-                        Cron expression
-                      </label>
-                      <input
-                        value={cronExpression}
-                        onChange={(event) => setCronExpression(event.target.value)}
-                        placeholder="*/5 * * * *"
-                        className="w-full rounded-2xl border border-[#dbe3f0] bg-[#fbfcfe] px-4 py-3 text-sm text-[#111827] outline-none transition placeholder:text-[#9ca3af] focus:border-[#4f49e2] focus:bg-white focus:shadow-[0_0_0_4px_rgba(79,73,226,0.08)]"
-                      />
-                    </div>
-                    <div>
-                      <label className="mb-2 block text-sm font-semibold text-[#111827]">
-                        Interval seconds
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        step="1"
-                        value={intervalSeconds}
-                        onChange={(event) => setIntervalSeconds(event.target.value)}
-                        placeholder="60"
-                        className="w-full rounded-2xl border border-[#dbe3f0] bg-[#fbfcfe] px-4 py-3 text-sm text-[#111827] outline-none transition placeholder:text-[#9ca3af] focus:border-[#4f49e2] focus:bg-white focus:shadow-[0_0_0_4px_rgba(79,73,226,0.08)]"
-                      />
-                    </div>
-                  </div>
-
-                  {jobCreateError ? (
-                    <p className="text-sm text-[#dc2626]">{jobCreateError}</p>
-                  ) : null}
-
-                  <div className="flex items-center justify-end gap-3 pt-2">
-                    <button
-                      type="button"
-                      onClick={onClose}
-                      className="rounded-xl border border-[#e5e7eb] px-5 py-2 text-sm font-semibold text-[#374151] transition hover:bg-[#f8fafc]"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleCreateJob}
-                      disabled={isCreatingJob}
-                      className={`inline-flex items-center gap-2 rounded-xl px-5 py-2 text-sm font-semibold text-white shadow-[0_10px_24px_-18px_rgba(79,73,226,0.8)] transition ${
-                        isCreatingJob
-                          ? "cursor-not-allowed bg-[#a5b4fc]"
-                          : "bg-[#4f49e2] hover:bg-[#4338ca]"
-                      }`}
-                    >
-                    
-                      {isCreatingJob ? "Creating..." : "Create Job"}
-                    </button>
-                  </div>
-                </div>
-              </div>
-              {jobsError ? (
-                <div className="mt-4 rounded-2xl border border-[#fee2e2] bg-[#fff5f5] px-4 py-3 text-sm text-[#b91c1c]">
-                  {jobsError}
-                </div>
-              ) : null}
-            </div>
+            <AgentAutomationJobsPage
+              jobs={jobs}
+              isJobsLoading={isJobsLoading}
+              jobsError={jobsError}
+              agentId={agentId}
+              jobPrompt={jobPrompt}
+              cronExpression={cronExpression}
+              intervalSeconds={intervalSeconds}
+              isCreatingJob={isCreatingJob}
+              jobCreateError={jobCreateError}
+              onDeleteRequest={setJobDeleteTarget}
+              onJobPromptChange={setJobPrompt}
+              onCronExpressionChange={setCronExpression}
+              onIntervalSecondsChange={setIntervalSeconds}
+              onCreateJob={handleCreateJob}
+              onCancel={onClose}
+            />
           </div>
         </div>
       </div>

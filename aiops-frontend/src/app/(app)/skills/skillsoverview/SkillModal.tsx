@@ -1,5 +1,14 @@
 "use client";
 
+import {
+  ModalCard,
+  ModalCardBody,
+  ModalCardFooter,
+  ModalCardHeader,
+  ModalCardPanel,
+  ModalCardRequiredNote,
+} from "@/components/modalcards";
+import TabUserinterface from "@/components/Tab-Userinterface";
 import { trimTrailingSlash } from "@/config/agent";
 import { useRuntimeConfig } from "@/config/runtime-config";
 import {
@@ -72,6 +81,11 @@ type DropdownOption = {
   secondary?: string;
 };
 
+type ToolSource = {
+  kind: "MCP" | "Connector";
+  label: string;
+};
+
 const emptySkillDetail = (): SkillDetail => ({
   id: "",
   name: "",
@@ -108,6 +122,52 @@ const toUniqueValues = (values: string[]) => {
   });
 
   return result;
+};
+
+const createToolSourceKey = (tool: string, kind: ToolSource["kind"], label: string) =>
+  `${tool}::${kind}::${label}`;
+
+const buildToolSourceMap = (
+  mcpServerIds: string[],
+  connectorConfigIds: string[],
+  mcpOptions: McpLookupOption[],
+  connectorOptions: ConnectorConfigLookupOption[]
+) => {
+  const sourceMap = new Map<string, ToolSource[]>();
+
+  mcpServerIds.forEach((id) => {
+    const match = mcpOptions.find((option) => option.id === id);
+    if (!match) {
+      return;
+    }
+
+    const label = match.name || match.serverUrl;
+    match.tools.forEach((tool) => {
+      const nextSource = { kind: "MCP" as const, label };
+      const current = sourceMap.get(tool) ?? [];
+      if (!current.some((item) => createToolSourceKey(tool, item.kind, item.label) === createToolSourceKey(tool, nextSource.kind, nextSource.label))) {
+        sourceMap.set(tool, [...current, nextSource]);
+      }
+    });
+  });
+
+  connectorConfigIds.forEach((id) => {
+    const match = connectorOptions.find((option) => option.connectorConfigId === id);
+    if (!match) {
+      return;
+    }
+
+    const label = match.configName || match.connectorName;
+    match.tools.forEach((tool) => {
+      const nextSource = { kind: "Connector" as const, label };
+      const current = sourceMap.get(tool) ?? [];
+      if (!current.some((item) => createToolSourceKey(tool, item.kind, item.label) === createToolSourceKey(tool, nextSource.kind, nextSource.label))) {
+        sourceMap.set(tool, [...current, nextSource]);
+      }
+    });
+  });
+
+  return sourceMap;
 };
 
 let referenceRowCounter = 0;
@@ -149,7 +209,7 @@ const getModalTitle = (mode: SkillModalMode) => {
     return "Update Skill";
   }
 
-  return "Create Skill";
+  return "Configure Skill";
 };
 
 const isEditable = (mode: SkillModalMode, editingSection: EditingSection | null, section: EditingSection) => {
@@ -568,6 +628,12 @@ export default function SkillModal({
   });
   const toolUniverse = toUniqueValues([...resolvedMcpTools, ...resolvedConnectorTools]);
   const availableTools = toolUniverse.filter((tool) => !draft.tools.includes(tool));
+  const toolSourceMap = buildToolSourceMap(
+    draft.mcpServerIds,
+    draft.connectorConfigIds,
+    mcpOptions,
+    connectorOptions
+  );
 
   const updateDraft = (patch: Partial<SkillDetail>) => {
     setDraft((current) => ({
@@ -668,13 +734,13 @@ export default function SkillModal({
 
       const payload = await response.json().catch(() => null);
       if (!response.ok) {
-        throw new Error(getSkillErrorMessage(payload, "Unable to create skill."));
+        throw new Error(getSkillErrorMessage(payload, "Unable to Configure skill."));
       }
 
       await onSaved?.();
       onClose();
     } catch (error) {
-      setSaveError(error instanceof Error ? error.message : "Unable to create skill.");
+      setSaveError(error instanceof Error ? error.message : "Unable to Configure skill.");
     } finally {
       setIsSaving(false);
     }
@@ -750,56 +816,25 @@ export default function SkillModal({
   const headerName = detail.name || draft.name || skillId || "Skill";
 
   return (
-    <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/35 px-4 py-8 backdrop-blur-sm"
-      onClick={(event) => {
-        if (event.target === event.currentTarget) {
-          onClose();
-        }
-      }}
-    >
-      <div className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-[0_20px_60px_-35px_rgba(15,23,42,0.65)]">
-        <div className="flex items-center justify-between bg-[#4f49e2] px-6 py-4 text-white">
-          <div className="flex items-center gap-3">
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20">
-              {mode === "view" ? <Eye className="h-4 w-4" /> : <ListTree className="h-4 w-4" />}
-            </span>
-            <div>
-              <p className="text-lg font-semibold">{getModalTitle(mode)}</p>
-              <p className="text-xs text-white/80">{headerName}</p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-white/15"
-          >
-            <X className="h-4 w-4" />
-          </button>
+    <ModalCard zIndexClassName="z-[100]" onBackdropClick={onClose}>
+      <ModalCardPanel maxWidthClassName="max-w-5xl" className="max-h-[92vh]">
+        <ModalCardHeader
+          title={getModalTitle(mode)}
+          subtitle={headerName}
+          icon={mode === "view" ? <Eye className="h-4 w-4" /> : <ListTree className="h-4 w-4" />}
+          onClose={onClose}
+        />
+
+        <div className="px-6 py-3">
+          <TabUserinterface
+            tabs={skillTabs}
+            activeIndex={activeTab}
+            onChange={setActiveTab}
+            gridClassName="grid-cols-5"
+          />
         </div>
 
-        <div className=" px-6 py-3">
-          <div className="w-full overflow-x-auto rounded-xl p-1">
-            <div className="grid min-w-[560px]  grid-cols-5 gap-1">
-              {skillTabs.map((tab, index) => (
-                <button
-                  key={tab}
-                  type="button"
-                  onClick={() => setActiveTab(index)}
-                  className={`whitespace-nowrap bg-[#f8faff] rounded-lg px-3 py-2 text-sm font-semibold transition-all duration-200 ${
-                    activeTab === index
-                      ? "bg-white text-[#4f49e2] shadow-sm bg-[#f8faff]"
-                      : "text-[#6b7280] hover:bg-white/70"
-                  }`}
-                >
-                  {tab}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="soft-scrollbar flex-1 overflow-y-auto px-6 py-5 bg-[#f8faff]">
+        <ModalCardBody className="soft-scrollbar flex-1 overflow-y-auto bg-[#f8faff]">
           {isLoading ? (
             <div className="space-y-4">
               {Array.from({ length: 4 }).map((_, index) => (
@@ -1038,9 +1073,14 @@ export default function SkillModal({
                 <div className="space-y-4">
                   <div className="grid items-center gap-4 md:grid-cols-[1fr_auto_1fr]">
                     <div className="h-[260px] rounded-2xl border border-[#dce3f0] bg-[#fcfdff] p-3">
-                      <p className="px-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#7a8498]">
-                        Available tools
-                      </p>
+                      <div className="flex items-center gap-2 px-1">
+                        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7a8498]">
+                          Available tools
+                        </p>
+                        <span className="inline-flex min-w-6 items-center justify-center rounded-md border border-indigo-200 bg-indigo-50 px-1.5 py-0.5 text-[11px] font-semibold leading-none text-indigo-600">
+                          {availableTools.length}
+                        </span>
+                      </div>
                       <div className="mt-2 h-[200px] overflow-y-auto pr-1">
                         {availableTools.length === 0 ? (
                           <p className="px-2 py-2 text-sm text-[#8a94a6]">No tools available</p>
@@ -1055,13 +1095,27 @@ export default function SkillModal({
                                 }
                                 setActiveAvailableTool(tool);
                               }}
-                              className={`mb-1 flex w-full items-center rounded-lg px-3 py-2 text-left text-sm transition ${
+                              className={`mb-1 flex w-full items-start rounded-lg px-3 py-2 text-left text-sm transition ${
                                 activeAvailableTool === tool
                                   ? "bg-[#eef2ff] text-[#4f49e2]"
                                   : "text-[#44506a] hover:bg-[#f4f7ff]"
                               } ${!canEditCurrentSection ? "cursor-default" : ""}`}
                             >
-                              {tool}
+                              <div className="min-w-0">
+                                <div className="break-words font-medium">{tool}</div>
+                                {toolSourceMap.get(tool)?.length ? (
+                                  <div className="mt-1 flex flex-wrap gap-1.5">
+                                    {toolSourceMap.get(tool)?.map((source) => (
+                                      <span
+                                        key={`${tool}-${source.kind}-${source.label}`}
+                                        className="inline-flex items-center rounded-full bg-white/80 px-2 py-0.5 text-[11px] font-medium text-[#60708b]"
+                                      >
+                                        {source.kind}: {source.label}
+                                      </span>
+                                    ))}
+                                  </div>
+                                ) : null}
+                              </div>
                             </button>
                           ))
                         )}
@@ -1108,9 +1162,14 @@ export default function SkillModal({
                     </div>
 
                     <div className="h-[260px] rounded-2xl border border-[#dce3f0] bg-[#fcfdff] p-3">
-                      <p className="px-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#7a8498]">
-                        Selected tools
-                      </p>
+                      <div className="flex items-center gap-2 px-1">
+                        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7a8498]">
+                          Selected tools
+                        </p>
+                        <span className="inline-flex min-w-6 items-center justify-center rounded-md border border-indigo-200 bg-indigo-50 px-1.5 py-0.5 text-[11px] font-semibold leading-none text-indigo-600">
+                          {draft.tools.length}
+                        </span>
+                      </div>
                       <div className="mt-2 h-[200px] overflow-y-auto pr-1">
                         {draft.tools.length === 0 ? (
                           <p className="px-2 py-2 text-sm text-[#8a94a6]">No tools selected</p>
@@ -1125,13 +1184,27 @@ export default function SkillModal({
                                 }
                                 setActiveSelectedTool(tool);
                               }}
-                              className={`mb-1 flex w-full items-center rounded-lg px-3 py-2 text-left text-sm transition ${
+                              className={`mb-1 flex w-full items-start rounded-lg px-3 py-2 text-left text-sm transition ${
                                 activeSelectedTool === tool
                                   ? "bg-[#eef2ff] text-[#4f49e2]"
                                   : "text-[#44506a] hover:bg-[#f4f7ff]"
                               } ${!canEditCurrentSection ? "cursor-default" : ""}`}
                             >
-                              {tool}
+                              <div className="min-w-0">
+                                <div className="break-words font-medium">{tool}</div>
+                                {toolSourceMap.get(tool)?.length ? (
+                                  <div className="mt-1 flex flex-wrap gap-1.5">
+                                    {toolSourceMap.get(tool)?.map((source) => (
+                                      <span
+                                        key={`${tool}-${source.kind}-${source.label}`}
+                                        className="inline-flex items-center rounded-full bg-white/80 px-2 py-0.5 text-[11px] font-medium text-[#60708b]"
+                                      >
+                                        {source.kind}: {source.label}
+                                      </span>
+                                    ))}
+                                  </div>
+                                ) : null}
+                              </div>
                             </button>
                           ))
                         )}
@@ -1204,9 +1277,10 @@ export default function SkillModal({
               ) : null}
             </div>
           )}
-        </div>
+        </ModalCardBody>
 
-        <div className="flex justify-end border-t border-[#ebeff8] px-6 py-4">
+        <ModalCardFooter className="justify-between">
+          <ModalCardRequiredNote visible={mode === "create" || mode === "update"} />
           {mode === "create" ? (
             <button
               type="button"
@@ -1217,7 +1291,7 @@ export default function SkillModal({
               className="inline-flex items-center rounded-xl bg-[#4f49e2] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_10px_24px_-16px_rgba(79,73,226,0.8)] transition hover:bg-[#3f39d6] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-[#4f49e2]"
             >
               {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              <span className={isSaving ? "ml-2" : ""}>Create Skill</span>
+              <span className={isSaving ? "ml-2" : ""}>Configure Skill</span>
             </button>
           ) : (
             <button
@@ -1228,8 +1302,8 @@ export default function SkillModal({
               Close
             </button>
           )}
-        </div>
-      </div>
-    </div>
+        </ModalCardFooter>
+      </ModalCardPanel>
+    </ModalCard>
   );
 }

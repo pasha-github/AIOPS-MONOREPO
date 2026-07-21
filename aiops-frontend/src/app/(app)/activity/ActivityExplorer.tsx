@@ -1,6 +1,7 @@
 "use client";
 
 import { useRuntimeConfig } from "@/config/runtime-config";
+import { ArrowRight } from "lucide-react";
 import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type {
@@ -16,7 +17,12 @@ import {
   resolveAgentManagerApiBase,
   resolveLogsApiBase,
 } from "../dashboard/logs";
+import {
+  fetchSessionTokenUsage,
+  type SessionTokenUsage,
+} from "./observability";
 import AgentLogDetails from "./AgentLogDetails";
+import SpansComponent from "./SpansComponent";
 import TopBar from "./TopBar";
 import UserActivityTable from "./UserActivityTable";
 
@@ -34,6 +40,10 @@ export default function ActivityExplorer() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [loadingSessionId, setLoadingSessionId] = useState<string | null>(null);
+  const [sessionTokenUsage, setSessionTokenUsage] = useState<SessionTokenUsage | null>(
+    null
+  );
+  const [isSessionTokenUsageLoading, setIsSessionTokenUsageLoading] = useState(false);
   const [error, setError] = useState("");
   const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null);
   const sessionDetailsRef = useRef<Record<string, AgentSessionDetail>>({});
@@ -263,6 +273,47 @@ export default function ActivityExplorer() {
     }
   }, [selectedDetail, selectedEntryId]);
 
+  useEffect(() => {
+    if (!selectedAgentId || !selectedSessionId) {
+      setSessionTokenUsage(null);
+      setIsSessionTokenUsageLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
+
+    void Promise.resolve()
+      .then(() => {
+        if (!controller.signal.aborted) {
+          setIsSessionTokenUsageLoading(true);
+        }
+      })
+      .then(() =>
+        fetchSessionTokenUsage(
+          selectedAgentId,
+          selectedSessionId,
+          agentManagerApiBaseUrl,
+          controller.signal
+        )
+      )
+      .then((nextSessionTokenUsage) => {
+        setSessionTokenUsage(nextSessionTokenUsage);
+      })
+      .catch((loadError) => {
+        if (loadError instanceof DOMException && loadError.name === "AbortError") {
+          return;
+        }
+        setSessionTokenUsage(null);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setIsSessionTokenUsageLoading(false);
+        }
+      });
+
+    return () => controller.abort();
+  }, [agentManagerApiBaseUrl, selectedAgentId, selectedSessionId]);
+
   const timelineEntries = selectedDetail?.entries ?? [];
 
   return (
@@ -295,24 +346,40 @@ export default function ActivityExplorer() {
         </div>
       ) : null}
 
-      <section className="grid items-start gap-6 xl:grid-cols-[minmax(0,1.08fr)_64px_minmax(380px,0.84fr)]">
-        <UserActivityTable
-          key={selectedSessionId ?? "no-session"}
-          isLoading={isLoading}
-          loadingSessionId={loadingSessionId}
-          selectedSessionId={selectedSessionId}
-          selectedSession={selectedSession}
-          entries={timelineEntries}
-          selectedEntryId={selectedEntryId}
-          onSelectEntry={setSelectedEntryId}
-        />
-        <AgentLogDetails
-          isLoading={isLoading}
-          loadingSessionId={loadingSessionId}
-          selectedSessionId={selectedSessionId}
-          selectedSessionSummary={selectedSession?.summary}
-          selectedDetail={selectedDetail}
-          selectedEntry={selectedEntry}
+      <section className="space-y-8">
+        <div className="grid items-stretch gap-6 xl:grid-cols-[minmax(0,1.08fr)_72px_minmax(380px,0.84fr)] xl:gap-3">
+          <UserActivityTable
+            key={selectedSessionId ?? "no-session"}
+            isLoading={isLoading}
+            loadingSessionId={loadingSessionId}
+            selectedSessionId={selectedSessionId}
+            selectedSession={selectedSession}
+            isRefreshing={isRefreshing}
+            entries={timelineEntries}
+            selectedEntryId={selectedEntryId}
+            sessionTokenUsage={sessionTokenUsage}
+            isSessionTokenUsageLoading={isSessionTokenUsageLoading}
+            onRefresh={handleRefresh}
+            onSelectEntry={setSelectedEntryId}
+          />
+          <div className="hidden items-center justify-center xl:flex">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full border border-[#d9e2f3] bg-white text-[#4f49e2] shadow-[0_18px_35px_-24px_rgba(15,23,42,0.35)]">
+              <ArrowRight className="h-5 w-5" />
+            </div>
+          </div>
+          <AgentLogDetails
+            isLoading={isLoading}
+            loadingSessionId={loadingSessionId}
+            selectedSessionId={selectedSessionId}
+            selectedSessionSummary={selectedSession?.summary}
+            selectedDetail={selectedDetail}
+            selectedEntry={selectedEntry}
+          />
+        </div>
+        <SpansComponent
+          baseUrl={agentManagerApiBaseUrl}
+          agentId={selectedAgentId}
+          sessionId={selectedSessionId}
         />
       </section>
     </div>

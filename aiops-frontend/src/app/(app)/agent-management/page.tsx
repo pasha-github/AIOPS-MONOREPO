@@ -1,13 +1,13 @@
 "use client";
 
+import { trimTrailingSlash } from "@/config/agent";
+import { useRuntimeConfig } from "@/config/runtime-config";
+import { Bot, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { RefreshCw } from "lucide-react";
 import AgentRegistry from "./AgentRegistry";
 import AgentStats from "./AgentStats";
 import CreateNewAgent from "./createnewagent";
 import type { AgentRecord } from "./types";
-import { trimTrailingSlash } from "@/config/agent";
-import { useRuntimeConfig } from "@/config/runtime-config";
 
 const isOnlineStatus = (statusValue: string | null | undefined) => {
   const normalized = statusValue?.trim().toLowerCase() ?? "";
@@ -35,6 +35,43 @@ const getStringArray = (value: unknown) => {
     .filter((item): item is string => typeof item === "string")
     .map((item) => item.trim())
     .filter(Boolean);
+};
+
+const getMcpServerEndpoints = (value: unknown): string[] => {
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => getMcpServerEndpoints(item));
+  }
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed ? [trimmed] : [];
+  }
+
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    return getMcpServerEndpoints(
+      record.server_url ??
+        record.serverUrl ??
+        record.url ??
+        record.endpoint ??
+        record.mcp_server_url
+    );
+  }
+
+  return [];
+};
+
+const getGuardrailsConfig = (value: unknown): AgentRecord["guardrails_config"] => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  const record = value as Record<string, unknown>;
+  return {
+    pii_patterns: getStringArray(record.pii_patterns),
+    sensitive_patterns: getStringArray(record.sensitive_patterns),
+    harmful_keywords: getStringArray(record.harmful_keywords),
+  };
 };
 
 const getLoadErrorMessage = (payload: unknown, fallback: string) => {
@@ -216,6 +253,16 @@ export default function AgentManagementPage() {
             ? llmByModelId.get(tertiaryModelId.toLowerCase())
             : undefined;
           const type = getStringOrNull(record.type) ?? "agent";
+          const deploymentTarget = getStringOrNull(record.deployment_target);
+          const awsCredentialId = getStringOrNull(record.aws_credential_id);
+          const memoryEnabled =
+            typeof record.memory_enabled === "boolean"
+              ? record.memory_enabled
+              : null;
+          const memoryToolType = getStringOrNull(record.memory_tool_type);
+          const vertexDeploymentStatus = getStringOrNull(record.vertex_deployment_status);
+          const vertexDeploymentError = getStringOrNull(record.vertex_deployment_error);
+          const vertexResourceName = getStringOrNull(record.vertex_resource_name);
 
           return {
             agentId:
@@ -224,12 +271,33 @@ export default function AgentManagementPage() {
             port: typeof record.port === "number" ? record.port : null,
             status,
             type,
+            deployment_target: deploymentTarget,
+            aws_credential_id: awsCredentialId,
+            memory_enabled: memoryEnabled,
+            memory_tool_type: memoryToolType,
+            vertex_deployment_status: vertexDeploymentStatus,
+            vertex_deployment_error: vertexDeploymentError,
+            vertex_resource_name: vertexResourceName,
             enterprise: type,
             start_time: getStringOrNull(record.start_time),
             stop_time: getStringOrNull(record.stop_time),
             agent_id: getStringOrNull(record.agent_id),
             description: getStringOrNull(record.description),
             instruction: getStringOrNull(record.instruction),
+            prompt_role: getStringOrNull(record.prompt_role),
+            prompt_objectives: getStringOrNull(record.prompt_objectives),
+            prompt_behavior: getStringOrNull(record.prompt_behavior),
+            prompt_output_format: getStringOrNull(record.prompt_output_format),
+            prompt_constraints: getStringOrNull(record.prompt_constraints),
+            prompt_safety: getStringOrNull(record.prompt_safety),
+            prompt_tools_instructions: getStringOrNull(
+              record.prompt_tools_instructions
+            ),
+            prompt_policy: getStringOrNull(record.prompt_policy),
+            prompt_examples: getStringOrNull(record.prompt_examples),
+            prompt_additional_info: getStringOrNull(
+              record.prompt_additional_info
+            ),
             model_id: modelId,
             modelName: llmRecord?.name ?? modelId,
             modelProvider: llmRecord?.provider ?? null,
@@ -252,10 +320,16 @@ export default function AgentManagementPage() {
               : getStringOrNull(record.tools) ?? "",
             skill_ids: getStringArray(record.skill_ids),
             mcp_server_ids: getStringArray(record.mcp_server_ids),
-            mcp_servers: getStringArray(record.mcp_servers),
+            mcp_servers: getMcpServerEndpoints(record.mcp_servers),
             connector_config_ids: getStringArray(record.connector_config_ids),
             sub_agents: getStringArray(record.sub_agents),
+            knowledge_file_ids: getStringArray(record.knowledge_file_ids),
             isEnabled: isEnabledFromApi,
+            guardrail_sensitive_data:
+              typeof record.guardrail_sensitive_data === "boolean"
+                ? record.guardrail_sensitive_data
+                : null,
+            guardrails_config: getGuardrailsConfig(record.guardrails_config),
           } satisfies AgentRecord;
         });
 
@@ -336,7 +410,8 @@ export default function AgentManagementPage() {
               <h2 className="text-xl font-semibold text-[#111827]">
                 Agent Management
               </h2>
-              <p className="mt-2 text-sm text-[#5b6476]">
+              <p className="mt-2 text-sm text-[#5b6476] inline-flex items-center gap-3">
+                <Bot size={18}/>
                 Lifecycle, versioning, and health of deployed agents.
               </p>
             </div>
@@ -355,6 +430,7 @@ export default function AgentManagementPage() {
                   className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`}
                 />
                 Refresh Agents
+                <Bot size={18}/>
               </button>
             </div>
             <AgentStats

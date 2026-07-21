@@ -1,12 +1,20 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import Searchbar from "@/components/Searchbar";
+import { trimTrailingSlash } from "@/config/agent";
+import { useRuntimeConfig } from "@/config/runtime-config";
+import { Bot, Loader2, Pencil, Trash2, X } from "lucide-react";
 import Image from "next/image";
-import { Bot, ChevronDown, Loader2, Pencil, Search, Trash2, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  fetchModelTokenUsageMap,
+  type ModelTokenUsage,
+} from "../agent-management/Observability";
 import {
   formatCellValue,
   formatDateTime,
   formatHeaderLabel,
+  formatProviderValue,
   getProviderIconSrc,
   type ActionResult,
   type LLMRecord,
@@ -32,17 +40,31 @@ export default function LLMTableSection({
   loadError,
   onDeleteModel,
 }: LLMTableSectionProps) {
+  const { llmManagerApiBaseUrl } = useRuntimeConfig();
+  const llmApiBase = trimTrailingSlash(llmManagerApiBaseUrl);
   const [searchValue, setSearchValue] = useState("");
-  const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [daysInput, setDaysInput] = useState("30");
+  const [days, setDays] = useState(30);
+  const [daysError, setDaysError] = useState("");
   const [sortKey, setSortKey] = useState<SortableHeader>("created_at");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [deleteTarget, setDeleteTarget] = useState<LLMRecord | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
   const [updateTarget, setUpdateTarget] = useState<LlmRecord | null>(null);
+  const [tokenUsageByModelId, setTokenUsageByModelId] = useState<
+    Record<string, ModelTokenUsage>
+  >({});
+  const [isTokenUsageLoading, setIsTokenUsageLoading] = useState(false);
   const isUpdateModalOpen = updateTarget !== null;
   const getHeaderLabel = (header: string) =>
-    header === "name" ? "Model Name" : formatHeaderLabel(header);
+    header === "name"
+      ? "Name"
+      : header === "token"
+        ? "Tokens"
+        : header === "pricing"
+          ? "Pricing (USD)"
+        : formatHeaderLabel(header);
  
 
   const tableHeaders = useMemo(() => {
@@ -60,11 +82,16 @@ export default function LLMTableSection({
     return [...ordered, ...extras];
   }, [llms]);
 
-  const visibleHeaders = tableHeaders;
+  const visibleHeaders = useMemo(() => {
+    const headersWithoutDescription = tableHeaders.filter(
+      (header) => header !== "description"
+    );
+    return [...headersWithoutDescription, "token", "pricing", "description"];
+  }, [tableHeaders]);
   const loadingHeaders =
     visibleHeaders.length > 0
       ? visibleHeaders
-      : ["name", "provider", "created_at", "description"];
+      : ["name", "provider", "created_at", "token", "pricing", "description"];
 
   const handleSort = (header: SortableHeader) => {
     if (sortKey === header) {
@@ -114,6 +141,210 @@ export default function LLMTableSection({
     return rows;
   }, [filteredLlms, sortDirection, sortKey]);
 
+  const numberFormatter = useMemo(() => new Intl.NumberFormat(), []);
+  const currencyFormatter = useMemo(
+    () =>
+      new Intl.NumberFormat(undefined, {
+        style: "currency",
+        currency: "USD",
+        maximumFractionDigits: 6,
+      }),
+    []
+  );
+
+  const renderTokenUsage = (modelName: string) => {
+    const tokenUsage = tokenUsageByModelId[modelName];
+    const rows = [
+      {
+        label: "Input Tokens",
+        value:
+          tokenUsage && !Number.isNaN(tokenUsage.input_tokens)
+            ? numberFormatter.format(tokenUsage.input_tokens)
+            : "-",
+      },
+      {
+        label: "Output Tokens",
+        value:
+          tokenUsage && !Number.isNaN(tokenUsage.output_tokens)
+            ? numberFormatter.format(tokenUsage.output_tokens)
+            : "-",
+      },
+      {
+        label: "Total Tokens",
+        value:
+          tokenUsage && !Number.isNaN(tokenUsage.total_tokens)
+            ? numberFormatter.format(tokenUsage.total_tokens)
+            : "-",
+      },
+    ];
+
+    if (isTokenUsageLoading && !tokenUsage) {
+      return (
+        <div className="grid gap-2">
+          {rows.map((row) => (
+            <div key={`${modelName}-${row.label}`} className="space-y-1">
+              <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-[#64748b]">
+                {row.label}
+              </span>
+              <span className="block h-4 w-20 animate-pulse rounded bg-[#edf2f9]" />
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    return (
+      <div className="grid gap-2">
+        {rows.map((row) => (
+          <div key={`${modelName}-${row.label}`} className="min-w-0 text-left">
+            <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-[#64748b]">
+              {row.label}
+            </span>
+            <span className="block break-words whitespace-normal font-semibold leading-snug text-[#0f172a]">
+              {row.value}
+            </span>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  const renderPricingUsage = (modelName: string) => {
+    const tokenUsage = tokenUsageByModelId[modelName];
+    const rows = [
+      {
+        label: "Input Cost",
+        value:
+          tokenUsage && !Number.isNaN(tokenUsage.input_cost)
+            ? currencyFormatter.format(tokenUsage.input_cost)
+            : "-",
+      },
+      {
+        label: "Output Cost",
+        value:
+          tokenUsage && !Number.isNaN(tokenUsage.output_cost)
+            ? currencyFormatter.format(tokenUsage.output_cost)
+            : "-",
+      },
+      {
+        label: "Total Cost",
+        value:
+          tokenUsage && !Number.isNaN(tokenUsage.total_cost)
+            ? currencyFormatter.format(tokenUsage.total_cost)
+            : "-",
+      },
+    ];
+
+    if (isTokenUsageLoading && !tokenUsage) {
+      return (
+        <div className="grid gap-2">
+          {rows.map((row) => (
+            <div key={`${modelName}-${row.label}`} className="space-y-1">
+              <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-[#64748b]">
+                {row.label}
+              </span>
+              <span className="block h-4 w-20 animate-pulse rounded bg-[#edf2f9]" />
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    return (
+      <div className="grid gap-2">
+        {rows.map((row) => (
+          <div key={`${modelName}-${row.label}`} className="min-w-0 text-left">
+            <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-[#64748b]">
+              {row.label}
+            </span>
+            <span className="block break-words whitespace-normal font-semibold leading-snug text-[#0f172a]">
+              {row.value}
+            </span>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  const renderExtraConfig = (
+    extraConfigValue: string | number | boolean | null | undefined
+  ) => {
+    const formattedValue = formatCellValue(extraConfigValue);
+
+    if (formattedValue === "-") {
+      return <span className="text-[#2b3341]">None</span>;
+    }
+
+    try {
+      const parsed = JSON.parse(formattedValue) as Record<string, unknown>;
+      const entries = Object.entries(parsed).filter(
+        ([, value]) => value !== null && value !== undefined && String(value).trim() !== ""
+      );
+
+      if (entries.length === 0) {
+        return <span className="text-[#2b3341]">-</span>;
+      }
+
+      return (
+        <div className="grid gap-2">
+          {entries.map(([key, value]) => (
+            <div key={key} className="min-w-0 text-left">
+              <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-[#64748b]">
+                {formatHeaderLabel(key)}
+              </span>
+              <span className="block break-words whitespace-normal leading-snug text-[#0f172a]">
+                {String(value)}
+              </span>
+            </div>
+          ))}
+        </div>
+      );
+    } catch {
+      return (
+        <span
+          className="block break-words whitespace-normal text-[#2b3341]"
+          title={formattedValue}
+        >
+          {formattedValue}
+        </span>
+      );
+    }
+  };
+
+  useEffect(() => {
+    if (!llmApiBase) {
+      return;
+    }
+
+    const controller = new AbortController();
+
+    void Promise.resolve()
+      .then(() => {
+        if (!controller.signal.aborted) {
+          setIsTokenUsageLoading(true);
+        }
+      })
+      .then(() =>
+        fetchModelTokenUsageMap(llmApiBase, days, controller.signal)
+      )
+      .then((nextTokenUsageByModelId) => {
+        setTokenUsageByModelId(nextTokenUsageByModelId);
+      })
+      .catch((error) => {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          return;
+        }
+        setTokenUsageByModelId({});
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setIsTokenUsageLoading(false);
+        }
+      });
+
+    return () => controller.abort();
+  }, [days, llmApiBase]);
+
   const handleConfirmDelete = async () => {
     if (!deleteTarget || isDeleting) {
       return;
@@ -151,42 +382,87 @@ export default function LLMTableSection({
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <div
-            className={`flex items-center gap-2 rounded-xl bg-[#eef2ff] px-4 py-2 text-sm text-[#4f49e2] transition-all duration-200 ${isSearchFocused ? "w-72" : "w-52"
-              }`}
+          <form
+            className="flex flex-wrap items-center gap-3"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (isUpdateModalOpen) {
+                return;
+              }
+
+              const nextDays = Number.parseInt(daysInput.trim(), 10);
+              if (
+                !Number.isFinite(nextDays) ||
+                !Number.isInteger(nextDays) ||
+                nextDays <= 0
+              ) {
+                setDaysError("Days must be a positive integer.");
+                return;
+              }
+
+              setDaysError("");
+              setDays(nextDays);
+            }}
           >
-            <Search className="h-4 w-4" />
-            <input
-              type="text"
-              value={searchValue}
-              onChange={(event) => {
-                if (isUpdateModalOpen) {
-                  return;
-                }
-                setSearchValue(event.target.value);
-              }}
-              placeholder="Search Models.."
-              name="llm_model_search"
-              autoComplete="new-password"
-              autoCorrect="off"
-              autoCapitalize="none"
-              spellCheck={false}
-              data-form-type="other"
-              data-lpignore="true"
-              readOnly={isUpdateModalOpen}
-              onFocus={() => setIsSearchFocused(true)}
-              onBlur={() => setIsSearchFocused(false)}
-              className="w-full bg-transparent text-sm text-[#4f49e2] placeholder:text-[#4f49e2] focus:outline-none"
-            />
-          </div>
+            <div className="flex items-center gap-3">
+              <label className="flex items-center gap-2 rounded-xl bg-[#eef2ff] px-4 py-2 text-sm text-[#4f49e2]">
+                <span className="text-xs font-semibold uppercase tracking-[0.08em] text-[#4f49e2]">
+                  Days
+                </span>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={daysInput}
+                  onChange={(event) => {
+                    if (isUpdateModalOpen) {
+                      return;
+                    }
+                    setDaysInput(event.target.value);
+                    setDaysError("");
+                  }}
+                  placeholder="30"
+                  name="token_usage_days"
+                  autoComplete="off"
+                  readOnly={isUpdateModalOpen}
+                  className="w-20 bg-transparent text-sm font-semibold text-[#4f49e2] placeholder:text-[#4f49e2]/70 focus:outline-none"
+                />
+              </label>
+              <button
+                type="submit"
+                disabled={isUpdateModalOpen}
+                className={`rounded-xl px-4 py-2 text-sm font-semibold text-white shadow-[0_12px_26px_-20px_rgba(79,73,226,0.9)] ${isUpdateModalOpen ? "cursor-not-allowed bg-[#a5b4fc]" : "bg-[#4f49e2] hover:bg-[#4338ca]"}`}
+              >
+                Get Tokens & Pricing
+              </button>
+            </div>
+          </form>
+          <Searchbar
+            value={searchValue}
+            onChange={(nextValue) => {
+              if (isUpdateModalOpen) {
+                return;
+              }
+              setSearchValue(nextValue);
+            }}
+            placeholder="Search Models.."
+            name="llm_model_search"
+            autoComplete="new-password"
+            readOnly={isUpdateModalOpen}
+            collapsedWidthClass="w-52"
+            expandedWidthClass="w-72"
+          />
         </div>
       </div>
+
+      {daysError ? (
+        <p className="mt-3 text-sm font-semibold text-[#dc2626]">{daysError}</p>
+      ) : null}
 
       <div className="mt-6 overflow-x-auto rounded-2xl border border-[#eef1f7]">
         {isLoading ? (
           <div className="bg-white">
             <div
-              className="grid divide-x divide-[#d7e0ee] bg-[#f3f6fb] px-4 py-3 text-xs font-semibold text-[#111827]"
+              className="grid divide-x divide-[#d7e0ee] bg-[#f3f6fb] px-4 py-3 text-xs font-semibold tracking-[0.08em] text-[#111827]"
               style={{
                 gridTemplateColumns: `repeat(${loadingHeaders.length}, minmax(0, 1fr)) 96px`,
               }}
@@ -194,12 +470,12 @@ export default function LLMTableSection({
               {loadingHeaders.map((header) => (
                 <span
                   key={`loading-header-${header}`}
-                  className="px-3 break-words whitespace-normal uppercase tracking-[0.08em]"
+                  className="flex h-full items-center justify-center px-3 text-center break-words whitespace-normal leading-tight capitalize"
                 >
                   {getHeaderLabel(header)}
                 </span>
               ))}
-              <span className="px-3 break-words whitespace-normal text-right uppercase tracking-[0.08em]">
+              <span className="flex h-full items-center justify-center px-3 text-center break-words whitespace-normal leading-tight capitalize">
                 Action
               </span>
             </div>
@@ -258,7 +534,7 @@ export default function LLMTableSection({
         ) : (
           <div className="min-w-[1100px]">
             <div
-              className="sticky top-0 z-10 grid divide-x divide-[#d7e0ee] bg-[#f3f6fb] px-4 py-3 text-xs font-semibold text-[#111827]"
+              className="sticky top-0 z-10 grid divide-x divide-[#d7e0ee] bg-[#f3f6fb] px-4 py-3 text-xs font-semibold tracking-[0.08em] text-[#111827]"
               style={{
                 gridTemplateColumns: `repeat(${visibleHeaders.length}, minmax(0, 1fr)) 96px`,
               }}
@@ -268,7 +544,7 @@ export default function LLMTableSection({
                   return (
                     <span
                       key={header}
-                      className="px-3 break-words whitespace-normal uppercase tracking-[0.08em]"
+                      className="flex h-full items-center justify-center px-3 text-center leading-tight whitespace-normal break-words capitalize"
                     >
                       {getHeaderLabel(header)}
                     </span>
@@ -280,19 +556,14 @@ export default function LLMTableSection({
                     key={header}
                     type="button"
                     onClick={() => handleSort(header)}
-                    className="inline-flex items-center gap-1 px-3 break-words whitespace-normal text-left uppercase tracking-[0.08em] text-[#111827] transition hover:text-[#4f49e2]"
+                    className="inline-flex h-full w-full items-center justify-center gap-1 px-3 text-center leading-tight whitespace-normal break-words capitalize text-[#111827] transition"
                   >
                     {getHeaderLabel(header)}
-                    <ChevronDown
-                      className={`h-3.5 w-3.5 transition ${isActiveSort
-                        ? `${sortDirection === "asc" ? "rotate-180" : ""} text-[#4f49e2]`
-                        : "text-[#a3aed0]"
-                        }`}
-                    />
+              
                   </button>
                 );
               })}
-              <span className="px-3 break-words whitespace-normal text-right uppercase tracking-[0.08em]">
+              <span className="flex h-full items-center justify-center px-3 text-center leading-tight whitespace-normal break-words capitalize">
                 Action
               </span>
             </div>
@@ -300,6 +571,7 @@ export default function LLMTableSection({
               {sortedLlms.map((item, index) => {
                 const rowKey = `${formatCellValue(item.model_id)}-${index}`;
                 const modelId = formatCellValue(item.model_id);
+                const modelName = formatCellValue(item.name);
                 return (
                   <div
                     key={rowKey}
@@ -322,7 +594,7 @@ export default function LLMTableSection({
                       }
 
                       if (header === "provider") {
-                        const providerValue = formatCellValue(item[header]);
+                        const providerValue = formatProviderValue(item[header]);
                         const providerIcon = getProviderIconSrc(item[header]);
                         return (
                           <span key={`${header}-${index}`} className="px-3">
@@ -344,6 +616,14 @@ export default function LLMTableSection({
                         );
                       }
 
+                      if (header === "extra_config") {
+                        return (
+                          <div key={`${header}-${index}`} className="px-3">
+                            {renderExtraConfig(item[header])}
+                          </div>
+                        );
+                      }
+
                       if (header === "created_at") {
                         const rawValue = formatCellValue(item[header]);
                         const formattedDate = formatDateTime(item[header]);
@@ -355,6 +635,22 @@ export default function LLMTableSection({
                           >
                             {formattedDate}
                           </span>
+                        );
+                      }
+
+                      if (header === "token") {
+                        return (
+                          <div key={`${header}-${index}`} className="px-3">
+                            {renderTokenUsage(modelName)}
+                          </div>
+                        );
+                      }
+
+                      if (header === "pricing") {
+                        return (
+                          <div key={`${header}-${index}`} className="px-3">
+                            {renderPricingUsage(modelName)}
+                          </div>
                         );
                       }
 
@@ -393,6 +689,10 @@ export default function LLMTableSection({
                               item.api_key === null || item.api_key === undefined
                                 ? undefined
                                 : String(item.api_key),
+                            extra_config:
+                              item.extra_config === null || item.extra_config === undefined
+                                ? undefined
+                                : String(item.extra_config),
                           };
                           setSearchValue("");
                           requestAnimationFrame(() => setSearchValue(""));

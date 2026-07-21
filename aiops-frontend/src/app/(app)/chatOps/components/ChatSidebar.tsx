@@ -73,15 +73,8 @@ export default function ChatSidebar({
                                     {/* Select Session Button */}
                                     <div className="flex min-w-0 flex-1 items-start gap-2 text-left">
                                         <MessageSquare className="mt-0.5 h-4 w-4 shrink-0 text-[#4f49e2]" />
-                                        <span className="line-clamp-2 text-xs font-semibold text-[#1f2937]">
-                                            {session.state?.first_message_summary ? (
-                                                session.state.first_message_summary
-                                            ) : (
-                                                <span className="flex items-center gap-2 text-[#9ca3af]">
-                                                    <span className="h-2 w-2 animate-pulse rounded-full bg-[#c7d2fe]" />
-                                                    thinking...
-                                                </span>
-                                            )}
+                                        <span className="line-clamp-2 break-all text-xs font-semibold text-[#1f2937]">
+                                            {session.state?.first_message_summary || session.id}
                                         </span>
                                     </div>
 
@@ -106,7 +99,8 @@ export default function ChatSidebar({
                                             <div className="absolute right-0 z-20 mt-1 w-28 overflow-hidden rounded-lg border border-[#e5e7eb] bg-white shadow-[0_12px_24px_-20px_rgba(15,23,42,0.35)]">
                                                 <button
                                                     type="button"
-                                                    onClick={async () => {
+                                                    onClick={async (event) => {
+                                                        event.stopPropagation();
                                                         setDeletingSessionId(session.id);
                                                         await onDeleteSession(session.id);
                                                         setOpenMenuSessionId(null);

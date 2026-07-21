@@ -1,3 +1,5 @@
+import { formatLlmProviderLabel } from "@/config/agent";
+
 export type LLMRecord = Record<string, string | number | boolean | null>;
 
 export type ActionResult = {
@@ -57,14 +59,18 @@ export const normalizeLlmRecord = (value: unknown): LLMRecord | null => {
 };
 
 export const getErrorMessage = (payload: unknown, fallback: string) => {
-  if (
-    payload &&
-    typeof payload === "object" &&
-    "message" in payload &&
-    typeof (payload as { message?: unknown }).message === "string"
-  ) {
-    return (payload as { message: string }).message;
+  if (!payload || typeof payload !== "object") {
+    return fallback;
   }
+
+  const data = payload as { message?: unknown; detail?: unknown };
+  if (typeof data.message === "string" && data.message.trim().length > 0) {
+    return data.message;
+  }
+  if (typeof data.detail === "string" && data.detail.trim().length > 0) {
+    return data.detail;
+  }
+
   return fallback;
 };
 
@@ -125,7 +131,18 @@ export const getProviderIconSrc = (
   providerValue: string | number | boolean | null | undefined
 ) => {
   const normalized = formatCellValue(providerValue).toLowerCase();
-  const supportedProviders = ["google", "openai", "anthropic", "groq", "bedrock"];
+  const supportedProviders = [
+    "google",
+    "openai",
+    "anthropic",
+    "groq",
+    "bedrock",
+    "azure_ai",
+  ];
   return supportedProviders.includes(normalized) ? `/img/${normalized}.webp` : null;
 };
+
+export const formatProviderValue = (
+  providerValue: string | number | boolean | null | undefined
+) => formatLlmProviderLabel(formatCellValue(providerValue).toLowerCase());
 

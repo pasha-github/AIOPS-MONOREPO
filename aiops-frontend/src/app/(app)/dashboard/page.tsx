@@ -1,4 +1,4 @@
-import VisualizerPage from "../visualizer/page";
+import VisualizerView from "../visualizer/visualizer";
 import AgentActivityLog from "./AgentActivityLog";
 import AgentManagementSection from "./AgentManagementSection";
 import DashboardOverview from "./DashboardOverview";
@@ -13,7 +13,7 @@ export default function DashboardPage() {
       </section>
 
       <div className="space-y-8 overflow-hidden rounded-[32px] border border-[#d9deea] px-6 pt-8 pb-6">
-        <VisualizerPage />
+        <VisualizerView showAgentSwitcher={false} showDetailsPanel={false} />
       </div>
     </div>
   );

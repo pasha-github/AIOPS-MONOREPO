@@ -1,7 +1,6 @@
 "use client";
 
-import { Loader2, Plus, Sparkles } from "lucide-react";
-
+import { Loader2, SlidersHorizontal, Sparkles } from "lucide-react";
 type SkillsTopbarProps = {
   totalSkills: number;
   totalTools: number;
@@ -69,8 +68,8 @@ export default function SkillsTopbar({
               onClick={onCreate}
               className="inline-flex items-center gap-2 rounded-xl bg-[#4f49e2] px-5 py-3 text-sm font-semibold text-white shadow-[0_12px_24px_-14px_rgba(79,73,226,0.6)] transition hover:bg-[#3f39d6] active:scale-95"
             >
-              <Plus className="h-4 w-4" />
-              Create Skill
+              <span className="h-4 w-4"><SlidersHorizontal className="h-4 w-4" /></span>
+              Configure Skill
             </button>
           </div>
         </div>

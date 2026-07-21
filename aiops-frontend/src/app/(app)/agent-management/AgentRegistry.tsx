@@ -1,5 +1,14 @@
 "use client";
 
+import ActionMenu, { type ActionMenuItem } from "@/components/ActionMenu";
+import ExpandableMarkdownText from "@/components/ExpandableMarkdownText";
+import Searchbar from "@/components/Searchbar";
+import {
+  ModalCard,
+  ModalCardBody,
+  ModalCardFooter,
+  ModalCardPanel,
+} from "@/components/modalcards";
 import { trimTrailingSlash } from "@/config/agent";
 import { useRuntimeConfig } from "@/config/runtime-config";
 import {
@@ -8,18 +17,21 @@ import {
   ChevronDown,
   Pencil,
   Power,
-  Search,
   Trash2,
   Webhook,
   X,
 } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
-import { renderMarkdownBlocks } from "../dashboard/logs";
 import { formatDateTime, getProviderIconSrc } from "../llm-management/llmHelpers";
 import JobsAgentManagement from "./JobsAgentManagement";
+import {
+  fetchAgentTokenUsageMap,
+  type AgentTokenUsage,
+} from "./Observability";
 import WebhookAgentManagement from "./WebhookAgentManagement";
 import type { AgentRecord } from "./types";
+import DropdownAgentType, { type AgentDropdownType } from "./dropdownagenttype";
 import UpdateAgent from "./updateagent";
 type AgentRegistryProps = {
   agents: AgentRecord[];
@@ -29,7 +41,9 @@ type AgentRegistryProps = {
   onStatusUpdateSuccess?: () => void | Promise<void>;
 };
 
-type SortKey = "name" | "created_at" | "updated_at" | "status";
+type SortKey = "name" | "updated_at" | "status";
+const EMPTY_VALUE_LABEL = "None";
+
 export default function AgentRegistry({
   agents,
   isLoading,
@@ -38,14 +52,11 @@ export default function AgentRegistry({
   onStatusUpdateSuccess,
 }: AgentRegistryProps) {
   const { llmManagerApiBaseUrl } = useRuntimeConfig();
+  const [agentTypeFilter, setAgentTypeFilter] = useState<AgentDropdownType>("agent");
   const [filter, setFilter] = useState<"all" | "online" | "offline">("all");
   const [sortKey, setSortKey] = useState<SortKey>("updated_at");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [searchValue, setSearchValue] = useState("");
-  const [isSearchFocused, setIsSearchFocused] = useState(false);
-  const [openActionMenuKey, setOpenActionMenuKey] = useState<string | null>(
-    null
-  );
   const [deleteTarget, setDeleteTarget] = useState<AgentRecord | null>(null);
   const [statusUpdateError, setStatusUpdateError] = useState("");
   const [updatingStatusRowKey, setUpdatingStatusRowKey] = useState<string | null>(
@@ -60,6 +71,10 @@ export default function AgentRegistry({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [jobsTarget, setJobsTarget] = useState<AgentRecord | null>(null);
   const [webhookTarget, setWebhookTarget] = useState<AgentRecord | null>(null);
+  const [tokenUsageByAgentId, setTokenUsageByAgentId] = useState<
+    Record<string, AgentTokenUsage>
+  >({});
+  const [isTokenUsageLoading, setIsTokenUsageLoading] = useState(false);
   const [instructionDialogTarget, setInstructionDialogTarget] =
     useState<{ title: string; content: string } | null>(null);
 
@@ -85,6 +100,25 @@ export default function AgentRegistry({
       return String(agent.agentId);
     }
     return `${agent.name}-${fallbackIndex}`;
+  };
+
+  const getAgentDisplayStatus = (agent: AgentRecord) => {
+    const target = agent.deployment_target?.trim().toLowerCase();
+    if (target === "vertex") {
+      return agent.vertex_deployment_status ?? agent.status;
+    }
+    return agent.status;
+  };
+
+  const getDeploymentTargetLabel = (agent: AgentRecord) => {
+    const target = agent.deployment_target?.trim();
+    if (!target) {
+      return EMPTY_VALUE_LABEL;
+    }
+    return target
+      .split("_")
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+      .join(" ");
   };
 
   const isOnlineStatus = (statusValue: string | null | undefined) => {
@@ -132,13 +166,22 @@ export default function AgentRegistry({
 
   const filteredAgents = useMemo(() => {
     const normalizedSearch = searchValue.trim().toLowerCase();
+    const typeFiltered =
+      agentTypeFilter === "all"
+        ? agents
+        : agents.filter((agent) => {
+            const normalizedType = agent.type?.trim().toLowerCase();
+            return agentTypeFilter === "automation"
+              ? normalizedType === "automation"
+              : normalizedType !== "automation";
+          });
     const statusFiltered =
       filter === "all"
-        ? agents
-        : agents.filter((agent) =>
+        ? typeFiltered
+        : typeFiltered.filter((agent) =>
             filter === "online"
-              ? isOnlineStatus(agent.status)
-              : !isOnlineStatus(agent.status)
+              ? isOnlineStatus(getAgentDisplayStatus(agent))
+              : !isOnlineStatus(getAgentDisplayStatus(agent))
           );
     if (!normalizedSearch) {
       return statusFiltered;
@@ -152,13 +195,16 @@ export default function AgentRegistry({
         agent.primary_model_id,
         agent.secondary_model_id,
         agent.tertiary_model_id,
+        agent.deployment_target,
         agent.instruction,
         agent.status,
+        agent.type,
+        getAgentDisplayStatus(agent),
       ]
         .filter((value): value is string => Boolean(value))
         .some((value) => value.toLowerCase().includes(normalizedSearch))
     );
-  }, [agents, filter, searchValue]);
+  }, [agentTypeFilter, agents, filter, searchValue]);
 
   const sortedAgents = useMemo(() => {
     const rows = [...filteredAgents];
@@ -174,8 +220,8 @@ export default function AgentRegistry({
       }
 
       if (sortKey === "status") {
-        const leftValue = formatStatusLabel(left.status);
-        const rightValue = formatStatusLabel(right.status);
+        const leftValue = formatStatusLabel(getAgentDisplayStatus(left));
+        const rightValue = formatStatusLabel(getAgentDisplayStatus(right));
         const compare = leftValue.localeCompare(rightValue, undefined, {
           numeric: true,
           sensitivity: "base",
@@ -183,10 +229,8 @@ export default function AgentRegistry({
         return sortDirection === "asc" ? compare : -compare;
       }
 
-      const leftDate =
-        sortKey === "created_at" ? left.created_at : left.updated_at;
-      const rightDate =
-        sortKey === "created_at" ? right.created_at : right.updated_at;
+      const leftDate = left.updated_at;
+      const rightDate = right.updated_at;
       const leftTime = leftDate ? new Date(leftDate).getTime() : 0;
       const rightTime = rightDate ? new Date(rightDate).getTime() : 0;
       const leftSafe = Number.isNaN(leftTime) ? 0 : leftTime;
@@ -198,6 +242,19 @@ export default function AgentRegistry({
     return rows;
   }, [filteredAgents, sortDirection, sortKey]);
 
+  const agentTypeCounts = useMemo(
+    () => ({
+      all: agents.length,
+      automation: agents.filter(
+        (agent) => agent.type?.trim().toLowerCase() === "automation"
+      ).length,
+      conversational: agents.filter(
+        (agent) => agent.type?.trim().toLowerCase() !== "automation"
+      ).length,
+    }),
+    [agents]
+  );
+
   const handleSort = (nextKey: SortKey) => {
     if (sortKey === nextKey) {
       setSortDirection((previous) => (previous === "asc" ? "desc" : "asc"));
@@ -207,28 +264,9 @@ export default function AgentRegistry({
     setSortDirection(nextKey === "name" || nextKey === "status" ? "asc" : "desc");
   };
 
-  const getPreviewText = (
-    value: string | null | undefined,
-    limit = 180
-  ) => {
-    const content = value?.trim() || "";
-    if (content.length <= limit) {
-      return content;
-    }
-    return `${content.slice(0, limit).trimEnd()}...`;
-  };
-
-  const openInstructionDialog = (title: string, content: string | null | undefined) => {
-    const trimmed = content?.trim();
-    if (!trimmed) {
-      return;
-    }
-    setInstructionDialogTarget({ title, content: trimmed });
-  };
-
   const splitDateTime = (formattedValue: string) => {
-    if (formattedValue === "-") {
-      return { date: "-", time: "" };
+    if (formattedValue === EMPTY_VALUE_LABEL) {
+      return { date: EMPTY_VALUE_LABEL, time: "" };
     }
     const splitAt = formattedValue.lastIndexOf(", ");
     if (splitAt === -1) {
@@ -269,8 +307,8 @@ export default function AgentRegistry({
       <div className={`grid gap-2 ${options?.mobile ? "" : "w-full"}`}>
         {slots.map((slot) => {
           const providerIcon = getProviderIconSrc(slot.provider);
-          const providerLabel = slot.provider?.trim() || "-";
-          const modelLabel = slot.modelLabel?.trim() || "-";
+          const providerLabel = slot.provider?.trim() || EMPTY_VALUE_LABEL;
+          const modelLabel = slot.modelLabel?.trim() || EMPTY_VALUE_LABEL;
           return (
             <div
               key={`${agent.agent_id || agent.name}-${slot.label}`}
@@ -292,7 +330,7 @@ export default function AgentRegistry({
                   {slot.label}
                 </span>
                 <span
-                  className="block break-words whitespace-normal font-semibold leading-snug text-[#0f172a]"
+                  className="block break-words whitespace-normal font-semibold leading-snug text-[#111827]"
                   title={modelLabel}
                 >
                   {modelLabel}
@@ -301,6 +339,72 @@ export default function AgentRegistry({
             </div>
           );
         })}
+      </div>
+    );
+  };
+
+  const renderTokenUsage = (
+    agent: AgentRecord,
+    options?: { mobile?: boolean }
+  ) => {
+    const tokenUsage = agent.agent_id
+      ? tokenUsageByAgentId[agent.agent_id.trim()]
+      : undefined;
+    const numberFormatter = new Intl.NumberFormat();
+    const rows = [
+      {
+        label: "Input Tokens",
+        value:
+          tokenUsage && !Number.isNaN(tokenUsage.input_tokens)
+            ? numberFormatter.format(tokenUsage.input_tokens)
+            : EMPTY_VALUE_LABEL,
+      },
+      {
+        label: "Output Tokens",
+        value:
+          tokenUsage && !Number.isNaN(tokenUsage.output_tokens)
+            ? numberFormatter.format(tokenUsage.output_tokens)
+            : EMPTY_VALUE_LABEL,
+      },
+      {
+        label: "Total Tokens",
+        value:
+          tokenUsage && !Number.isNaN(tokenUsage.total_tokens)
+            ? numberFormatter.format(tokenUsage.total_tokens)
+            : EMPTY_VALUE_LABEL,
+      },
+    ];
+
+    if (isTokenUsageLoading && !tokenUsage) {
+      return (
+        <div className={`grid gap-2 ${options?.mobile ? "" : "w-full"}`}>
+          {rows.map((row) => (
+            <div key={`${agent.agent_id || agent.name}-${row.label}`} className="space-y-1">
+              <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-[#64748b]">
+                {row.label}
+              </span>
+              <span className="block h-4 w-20 animate-pulse rounded bg-[#edf2f9]" />
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    return (
+      <div className={`grid gap-2 ${options?.mobile ? "" : "w-full"}`}>
+        {rows.map((row) => (
+          <div
+            key={`${agent.agent_id || agent.name}-${row.label}`}
+            className="min-w-0 text-left"
+          >
+            <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-[#64748b]">
+              {row.label}
+            </span>
+            <span className="block break-words whitespace-normal font-semibold leading-snug text-[#111827]">
+              {row.value}
+            </span>
+          </div>
+        ))}
       </div>
     );
   };
@@ -314,7 +418,7 @@ export default function AgentRegistry({
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [agents.length, filter, searchValue, sortDirection, sortKey]);
+  }, [agentTypeFilter, agents.length, filter, searchValue, sortDirection, sortKey]);
 
   useEffect(() => {
     if (!isToastVisible) {
@@ -327,21 +431,41 @@ export default function AgentRegistry({
   }, [isToastVisible]);
 
   useEffect(() => {
-    if (!openActionMenuKey) {
-      return;
+    const controller = new AbortController();
+    const agentIds = agents
+      .map((agent) => agent.agent_id?.trim() || "")
+      .filter(Boolean);
+
+    if (agentIds.length === 0) {
+      setTokenUsageByAgentId({});
+      setIsTokenUsageLoading(false);
+      return () => controller.abort();
     }
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as HTMLElement | null;
-      if (!target?.closest("[data-action-menu='true']")) {
-        setOpenActionMenuKey(null);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [openActionMenuKey]);
 
+    setIsTokenUsageLoading(true);
 
-  const agentCount = agents.length;
+    void fetchAgentTokenUsageMap(
+      agentIds,
+      agentManagerBaseUrl,
+      controller.signal
+    )
+      .then((nextTokenUsageByAgentId) => {
+        setTokenUsageByAgentId(nextTokenUsageByAgentId);
+      })
+      .catch((error) => {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          return;
+        }
+        setTokenUsageByAgentId({});
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setIsTokenUsageLoading(false);
+        }
+      });
+
+    return () => controller.abort();
+  }, [agentManagerBaseUrl, agents]);
 
   const handleConfirmDelete = async () => {
     if (!deleteTarget || isDeleting) {
@@ -398,21 +522,23 @@ export default function AgentRegistry({
       return false;
     }
 
-    setUpdatingStatusRowKey(rowKey);
-    setStatusUpdateError("");
+      setUpdatingStatusRowKey(rowKey);
+      setStatusUpdateError("");
 
-    try {
-      const response = await fetch(`${agentManagerBaseUrl}/agent/`, {
-        method: "PATCH",
-        headers: {
-          accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          agent_id: agent.agent_id,
-          isEnabled: nextStatus === "active",
-        }),
-      });
+      try {
+        const response = await fetch(
+          `${agentManagerBaseUrl}/agent/${encodeURIComponent(agent.agent_id)}`,
+          {
+          method: "PATCH",
+          headers: {
+            accept: "application/json",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            isEnabled: nextStatus === "active",
+          }),
+          }
+        );
 
       let data: unknown = null;
       try {
@@ -426,14 +552,14 @@ export default function AgentRegistry({
         return false;
       }
 
-      setToastMessage(
-        nextStatus === "active"
-          ? "Agent enabled successfully."
-          : "Agent disabled successfully."
-      );
-      setIsToastVisible(true);
-      await onStatusUpdateSuccess?.();
-      return true;
+        setToastMessage(
+          nextStatus === "active"
+            ? "Agent enabled successfully."
+            : "Agent disabled successfully."
+        );
+        setIsToastVisible(true);
+        await onStatusUpdateSuccess?.();
+        return true;
     } catch {
       setStatusUpdateError("Unable to update status.");
       return false;
@@ -447,38 +573,52 @@ export default function AgentRegistry({
     setIsModalOpen(true);
   };
 
+  const getToggleActionItem = (
+    agent: AgentRecord,
+    rowKey: string,
+    nextStatus: "active" | "inactive"
+  ): ActionMenuItem => {
+    const isEnableAction = nextStatus === "active";
+
+    return {
+      label: isEnableAction ? "Enable" : "Disable",
+      icon: Power,
+      onClick: () => {
+        void handleToggleAgentEnabled(agent, rowKey, nextStatus);
+      },
+      tone: isEnableAction
+        ? "bg-[#ecfdf5] text-[#15803d]"
+        : "bg-[#fff7ed] text-[#ea580c]",
+      hoverTone: isEnableAction
+        ? "hover:bg-[#dcfce7]"
+        : "hover:bg-[#ffedd5]",
+      disabled: updatingStatusRowKey === rowKey,
+      disabledTitle:
+        updatingStatusRowKey === rowKey ? "Status update in progress" : undefined,
+    };
+  };
+
   const isAutomationAgent = (agent: AgentRecord) =>
     agent.type.trim().toLowerCase() === "automation";
 
   return (
     <section className="rounded-3xl bg-white p-6 shadow-[0_18px_50px_-38px_rgba(16,24,40,0.5)]">
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <h3 className="text-lg font-semibold text-[#111827]">
-            Agent Registry
-          </h3>
-          <span className="rounded-md border border-[#cbd2ff] px-2 py-0.5 text-xs font-semibold text-[#5b4cf0]">
-            {agentCount}
-          </span>
-        </div>
+        <DropdownAgentType
+          value={agentTypeFilter}
+          onChange={setAgentTypeFilter}
+          allCount={agentTypeCounts.all}
+          conversationalCount={agentTypeCounts.conversational}
+          automationCount={agentTypeCounts.automation}
+        />
 
         <div className="flex flex-wrap items-center gap-3">
-          <div
-            className={`flex items-center gap-2 rounded-xl bg-[#eef2ff] px-4 py-2 text-sm text-[#4f49e2] transition-all duration-200 ${
-              isSearchFocused ? "w-64" : "w-44"
-            }`}
-          >
-            <Search className="h-4 w-4" />
-            <input
-              type="text"
-              value={searchValue}
-              onChange={(event) => setSearchValue(event.target.value)}
-              onFocus={() => setIsSearchFocused(true)}
-              onBlur={() => setIsSearchFocused(false)}
-              placeholder="Search Agents.."
-              className="w-full bg-transparent text-sm text-[#4f49e2] placeholder:text-[#4f49e2] focus:outline-none"
-            />
-          </div>
+          <Searchbar
+            value={searchValue}
+            onChange={setSearchValue}
+            placeholder="Search Agents.."
+            name="agent_search"
+          />
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -523,32 +663,33 @@ export default function AgentRegistry({
         </div>
       ) : null}
 
-      <div className="mt-5 overflow-visible rounded-2xl border border-[#eef1f7]">
+      <div className="mt-5 overflow-x-auto overflow-hidden rounded-2xl border border-[#eef1f7]">
         {isLoading ? (
           <div className="bg-white">
-            <div className="hidden grid-cols-[1.1fr_1.2fr_1.5fr_1.4fr_0.9fr_0.9fr_0.8fr_0.62fr] bg-[#eaf0f8] px-4 py-3 text-xs font-semibold uppercase tracking-[0.08em] text-[#0f172a] md:grid">
-              <span>Name</span>
-              <span>Description</span>
-              <span>Models</span>
-              <span>Instructions</span>
-              <span>Created at</span>
-              <span>Updated at</span>
-              <span>Status</span>
-              <span className="text-right">Action</span>
+            <div className="hidden grid-cols-[1fr_1.05fr_1.25fr_1.12fr_0.95fr_0.9fr_0.72fr_0.8fr_0.46fr] items-center divide-x divide-[#d7e0ee] bg-[#f3f6fb] px-4 py-3 text-xs font-semibold tracking-[0.08em] text-[#111827] md:grid">
+              <span className="px-3">Name</span>
+              <span className="px-3">Description</span>
+              <span className="px-3">Models</span>
+              <span className="px-3">Role</span>
+              <span className="px-3">Timestamps</span>
+              <span className="px-3">Token</span>
+              <span className="px-3">Deployment Target</span>
+              <span className="px-3 text-center">Status</span>
+              <span className="px-3 text-right">Action</span>
             </div>
             <div className="hidden divide-y divide-[#eef1f7] md:block">
               {Array.from({ length: 4 }).map((_, index) => (
                 <div
                   key={`desktop-skeleton-${index}`}
-                  className="grid animate-pulse grid-cols-[1.1fr_1.2fr_1.5fr_1.4fr_0.9fr_0.9fr_0.8fr_0.62fr] items-center px-4 py-3"
+                  className="grid animate-pulse grid-cols-[1fr_1.05fr_1.25fr_1.12fr_0.95fr_0.9fr_0.72fr_0.8fr_0.46fr] items-center divide-x divide-[#e8eef7] px-4 py-3"
                 >
-                  {Array.from({ length: 7 }).map((__, cellIndex) => (
+                  {Array.from({ length: 8 }).map((__, cellIndex) => (
                     <span
                       key={`desktop-skeleton-cell-${index}-${cellIndex}`}
-                      className="mr-3 h-4 rounded bg-[#edf2f9]"
+                      className="mx-3 h-4 rounded bg-[#edf2f9]"
                     />
                   ))}
-                  <span className="ml-auto h-8 w-24 rounded-lg bg-[#edf2f9]" />
+                  <span className="mx-3 h-8 w-24 rounded-lg bg-[#edf2f9]" />
                 </div>
               ))}
             </div>
@@ -601,165 +742,129 @@ export default function AgentRegistry({
         ) : (
           <>
             <div className="hidden md:block">
-              <div className="grid grid-cols-[1.1fr_1.2fr_1.5fr_1.4fr_0.9fr_0.9fr_0.8fr_0.62fr] items-stretch divide-x divide-[#d7e0ee] bg-[#eaf0f8] px-4 py-3 text-xs font-semibold uppercase tracking-[0.08em] text-[#0f172a]">
+              <div className="grid grid-cols-[1fr_1.05fr_1.25fr_1.12fr_0.95fr_0.9fr_0.72fr_0.8fr_0.46fr] items-stretch divide-x divide-[#d7e0ee] bg-[#f3f6fb] px-4 py-3 text-xs font-semibold tracking-[0.02em] text-[#111827]">
                 <button
                   type="button"
                   onClick={() => handleSort("name")}
-                  className="inline-flex h-full w-full items-center justify-start gap-1 px-3 text-left leading-tight whitespace-normal break-words transition hover:text-[#4f49e2]"
+                  className="inline-flex h-full w-full items-center justify-center gap-1 px-3 text-center leading-tight whitespace-normal break-words transition"
                 >
                   Name
-                  <ChevronDown
-                    className={`h-3.5 w-3.5 transition ${
-                      sortKey === "name"
-                        ? `${sortDirection === "asc" ? "rotate-180" : ""} text-[#4f49e2]`
-                        : "text-[#94a3b8]"
-                    }`}
-                  />
+
                 </button>
-                <div className="flex h-full items-center capitalize px-3 text-left leading-tight whitespace-normal break-words">
+                <div className="flex h-full items-center justify-center px-3 text-center leading-tight whitespace-normal break-words">
                   Description
                 </div>
-                <div className="flex h-full items-center capitalize px-3 text-left leading-tight whitespace-normal break-words">
+                <div className="flex h-full items-center justify-center px-3 text-center leading-tight whitespace-normal break-words">
                   Models
                 </div>
-                <div className="flex h-full items-center capitalize px-3 text-left leading-tight whitespace-normal break-words">
-                  Instructions
+                <div className="flex h-full items-center justify-center px-3 text-center leading-tight whitespace-normal break-words">
+                  Role
                 </div>
-                <button
-                  type="button"
-                  onClick={() => handleSort("created_at")}
-                  className="inline-flex h-full w-full capitalize items-center justify-start gap-1 px-3 text-left leading-tight whitespace-normal break-words transition hover:text-[#4f49e2]"
-                >
-                  Created at
-                  <ChevronDown
-                    className={`h-3.5 w-3.5 transition ${
-                      sortKey === "created_at"
-                        ? `${sortDirection === "asc" ? "rotate-180" : ""} text-[#4f49e2]`
-                        : "text-[#94a3b8]"
-                    }`}
-                  />
-                </button>
                 <button
                   type="button"
                   onClick={() => handleSort("updated_at")}
-                  className="inline-flex h-full w-full capitalize items-center justify-start gap-1 px-3 text-left leading-tight whitespace-normal break-words transition hover:text-[#4f49e2]"
+                  className="inline-flex h-full w-full items-center justify-center gap-1 px-3 text-center leading-tight whitespace-normal break-words transition"
                 >
-                  Updated at
-                  <ChevronDown
-                    className={`h-3.5 w-3.5 transition ${
-                      sortKey === "updated_at"
-                        ? `${sortDirection === "asc" ? "rotate-180" : ""} text-[#4f49e2]`
-                        : "text-[#94a3b8]"
-                    }`}
-                  />
+                  Timestamps
+            
                 </button>
+                <div className="flex h-full items-center justify-center px-3 text-center leading-tight whitespace-normal break-words">
+                  Token
+                </div>
+                <div className="flex h-full items-center justify-center px-3 text-center leading-tight whitespace-normal break-words">
+                  Deployment Target
+                </div>
                 <button
                   type="button"
                   onClick={() => handleSort("status")}
-                  className="inline-flex h-full w-full capitalize items-center justify-center gap-1 px-3 text-center leading-tight whitespace-normal break-words transition hover:text-[#4f49e2]"
+                  className="inline-flex h-full w-full items-center justify-center gap-1 px-3 text-center leading-tight whitespace-normal break-words transition"
                 >
                   Status
-                  <ChevronDown
-                    className={`h-3.5 w-3.5 transition ${
-                      sortKey === "status"
-                        ? `${sortDirection === "asc" ? "rotate-180" : ""} text-[#4f49e2]`
-                        : "text-[#94a3b8]"
-                    }`}
-                  />
                 </button>
-                <div className="flex h-full items-center capitalize justify-end px-3 text-right leading-tight whitespace-normal break-words">
+                <div className="flex h-full items-center justify-center px-3 text-center leading-tight whitespace-normal break-words">
                   Action
                 </div>
               </div>
               <div className="divide-y divide-[#eef1f7] bg-white">
                 {pagedAgents.map((agent, index) => {
                   const rowKey = getAgentRowKey(agent, index);
-                  const createdAt = formatDateTime(agent.created_at);
-                  const updatedAt = formatDateTime(agent.updated_at);
+                  const createdAt = (() => {
+                    const value = formatDateTime(agent.created_at);
+                    return value === "-" ? EMPTY_VALUE_LABEL : value;
+                  })();
+                  const updatedAt = (() => {
+                    const value = formatDateTime(agent.updated_at);
+                    return value === "-" ? EMPTY_VALUE_LABEL : value;
+                  })();
                   const createdDateParts = splitDateTime(createdAt);
                   const updatedDateParts = splitDateTime(updatedAt);
-                  const statusLabel = formatStatusLabel(agent.status);
-                  const statusTone = getStatusTone(agent.status);
-                  const nextStatus = isOnlineStatus(agent.status)
+                  const displayStatus = getAgentDisplayStatus(agent);
+                  const statusLabel = formatStatusLabel(displayStatus);
+                  const statusTone = getStatusTone(displayStatus);
+                  const nextStatus = isOnlineStatus(displayStatus)
                     ? "inactive"
                     : "active";
                   return (
                     <div
                       key={`desktop-row-${rowKey}`}
-                      className="grid grid-cols-[1.1fr_1.2fr_1.5fr_1.4fr_0.9fr_0.9fr_0.8fr_0.62fr] items-stretch divide-x divide-[#e8eef7] px-4 py-3 text-sm text-[#2b3341] transition-colors hover:bg-[#f8fbff]"
+                      className="grid grid-cols-[1fr_1.05fr_1.25fr_1.12fr_0.95fr_0.9fr_0.72fr_0.8fr_0.46fr] items-stretch divide-x divide-[#e8eef7] px-4 py-3 text-sm text-[#2b3341] transition-colors hover:bg-[#f8f9fd]"
                     >
                       <div className="flex h-full items-start px-3">
                         <span
-                          className="block break-words whitespace-normal font-semibold leading-snug text-[#0f172a]"
-                          title={agent.name || "-"}
+                          className="block break-words whitespace-normal font-semibold leading-snug text-[#111827]"
+                          title={agent.name || EMPTY_VALUE_LABEL}
                         >
-                          {agent.name || "-"}
+                          {agent.name || EMPTY_VALUE_LABEL}
                         </span>
                       </div>
                       <div className="flex h-full items-start px-3">
-                        <div className="space-y-1">
-                          <p className="break-words whitespace-normal leading-snug text-[#2b3341]">
-                            {getPreviewText(agent.description, 140) || "-"}
-                          </p>
-                          {agent.description && agent.description.trim().length > 140 ? (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                openInstructionDialog(
-                                  `${agent.name} description`,
-                                  agent.description
-                                )
-                              }
-                              className="text-xs font-semibold text-[#4f49e2] transition hover:text-[#4338ca]"
-                            >
-                              See more
-                            </button>
-                          ) : null}
-                        </div>
+                        <ExpandableMarkdownText
+                          value={agent.description}
+                          title={`${agent.name} description`}
+                          limit={140}
+                        />
                       </div>
                       <div className="flex h-full min-w-0 items-start px-3">
                         {renderAgentLlmList(agent)}
                       </div>
                       <div className="flex h-full items-start px-3">
-                        <div className="space-y-1">
-                          <p className="break-words whitespace-normal leading-snug text-[#2b3341]">
-                            {getPreviewText(agent.instruction) || "-"}
+                        <ExpandableMarkdownText
+                          value={agent.instruction}
+                          title={`${agent.name} instructions`}
+                          emptyFallback=""
+                        />
+                      </div>
+                      <div className="flex h-full min-w-0 flex-col items-start justify-center gap-2 px-3 text-left text-[#334155]">
+                        <div title={agent.created_at || EMPTY_VALUE_LABEL}>
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#64748b]">
+                            Created
                           </p>
-                          {agent.instruction && agent.instruction.trim().length > 180 ? (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                openInstructionDialog(
-                                  `${agent.name} instructions`,
-                                  agent.instruction
-                                )
-                              }
-                              className="text-xs font-semibold text-[#4f49e2] transition hover:text-[#4338ca]"
-                            >
-                              See more
-                            </button>
+                          <span className="mt-0.5 block leading-tight">{createdDateParts.date}</span>
+                          {createdDateParts.time ? (
+                            <span className="mt-0.5 block text-xs leading-tight text-[#64748b]">
+                              {createdDateParts.time}
+                            </span>
+                          ) : null}
+                        </div>
+                        <div title={agent.updated_at || EMPTY_VALUE_LABEL}>
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#64748b]">
+                            Updated
+                          </p>
+                          <span className="mt-0.5 block leading-tight">{updatedDateParts.date}</span>
+                          {updatedDateParts.time ? (
+                            <span className="mt-0.5 block text-xs leading-tight text-[#64748b]">
+                              {updatedDateParts.time}
+                            </span>
                           ) : null}
                         </div>
                       </div>
-                      <div className="flex h-full min-w-0 flex-col items-start justify-center px-3 text-left text-[#334155]" title={agent.created_at || "-"}>
-                        <span className="block leading-tight">
-                          {createdDateParts.date}
-                        </span>
-                        {createdDateParts.time ? (
-                          <span className="mt-0.5 block text-xs leading-tight text-[#64748b]">
-                            {createdDateParts.time}
-                          </span>
-                        ) : null}
+                      <div className="flex h-full min-w-0 items-start px-3">
+                        {renderTokenUsage(agent)}
                       </div>
-                      <div className="flex h-full min-w-0 flex-col items-start justify-center px-3 text-left text-[#334155]" title={agent.updated_at || "-"}>
-                        <span className="block leading-tight">
-                          {updatedDateParts.date}
+                      <div className="flex h-full items-center justify-center px-3 text-center text-[#334155]">
+                        <span className="break-words whitespace-normal leading-tight">
+                          {getDeploymentTargetLabel(agent)}
                         </span>
-                        {updatedDateParts.time ? (
-                          <span className="mt-0.5 block text-xs leading-tight text-[#64748b]">
-                            {updatedDateParts.time}
-                          </span>
-                        ) : null}
                       </div>
                       <div className="flex h-full items-center justify-center px-3 text-center">
                         <span
@@ -769,96 +874,69 @@ export default function AgentRegistry({
                           {statusLabel}
                         </span>
                       </div>
-                      <div className="flex h-full items-center justify-end px-3">
-                        <div className="relative" data-action-menu="true">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setOpenActionMenuKey((previous) =>
-                                previous === rowKey ? null : rowKey
-                              )
-                            }
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[#d8e1f0] text-[#475569] transition hover:bg-[#eef2ff] hover:text-[#4f49e2]"
-                            aria-label={`Open actions for ${agent.name}`}
-                            title="Actions"
-                          >
-                            <ChevronDown
-                              className={`h-4 w-4 transition ${
-                                openActionMenuKey === rowKey
-                                  ? "rotate-180 text-[#4f49e2]"
-                                  : ""
-                              }`}
-                            />
-                          </button>
-
-                          {openActionMenuKey === rowKey ? (
-                            <div className="absolute right-0 z-30 mt-2 w-44 overflow-hidden rounded-xl border border-[#e2e8f0] bg-white shadow-[0_12px_24px_-20px_rgba(15,23,42,0.45)]">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  handleToggleAgentEnabled(agent, rowKey, nextStatus);
-                                  setOpenActionMenuKey(null);
-                                }}
-                                disabled
-                                title="Temporarily disabled"
-                                className="flex w-full cursor-not-allowed items-center gap-2 bg-[#f8fafc] px-3 py-2 text-left text-sm text-[#94a3b8]"
-                              >
-                                <Power className="h-4 w-4" />
-                                {isOnlineStatus(agent.status) ? "Disable" : "Enable"}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
+                      <div className="flex h-full items-center justify-center px-3">
+                        <ActionMenu
+                          align="right"
+                            estimatedMenuHeight={isAutomationAgent(agent) ? 212 : 156}
+                            actions={[
+                              getToggleActionItem(agent, rowKey, nextStatus),
+                              {
+                                label: "Delete",
+                                icon: Trash2,
+                                onClick: () => {
                                   setDeleteTarget(agent);
-                                  setDeleteError("");
-                                  setOpenActionMenuKey(null);
-                                }}
-                                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[#b91c1c] hover:bg-[#fff1f2]"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                                Delete
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  handleUpdateClick(agent);
-                                  setOpenActionMenuKey(null);
-                                }}
-                                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[#2563eb] hover:bg-[#eff6ff]"
-                              >
-                                <Pencil className="h-4 w-4" />
-                                Update
-                              </button>
-                              {isAutomationAgent(agent) ? (
-                                <>
-                                  <div className="my-1 border-t border-[#eef1f7]" />
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setJobsTarget(agent);
-                                      setOpenActionMenuKey(null);
-                                    }}
-                                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[#2563eb] hover:bg-[#eff6ff]"
-                                  >
-                                    <BriefcaseBusiness className="h-4 w-4" />
-                                    Jobs
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setWebhookTarget(agent);
-                                      setOpenActionMenuKey(null);
-                                    }}
-                                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[#2563eb] hover:bg-[#eff6ff]"
-                                  >
-                                    <Webhook className="h-4 w-4" />
-                                    Webhook
-                                  </button>
-                                </>
-                              ) : null}
-                            </div>
-                          ) : null}
-                        </div>
+                                setDeleteError("");
+                              },
+                              tone: "text-[#b91c1c]",
+                              hoverTone: "hover:bg-[#fff1f2]",
+                            },
+                            {
+                              label: "Update",
+                              icon: Pencil,
+                              onClick: () => handleUpdateClick(agent),
+                              tone: "text-[#2563eb]",
+                              hoverTone: "hover:bg-[#eff6ff]",
+                            },
+                            ...(isAutomationAgent(agent)
+                              ? ([
+                                  {
+                                    label: "Jobs",
+                                    icon: BriefcaseBusiness,
+                                    onClick: () => setJobsTarget(agent),
+                                    tone: "text-[#2563eb]",
+                                    hoverTone: "hover:bg-[#eff6ff]",
+                                  },
+                                  {
+                                    label: "Webhook",
+                                    icon: Webhook,
+                                    onClick: () => setWebhookTarget(agent),
+                                    tone: "text-[#2563eb]",
+                                    hoverTone: "hover:bg-[#eff6ff]",
+                                  },
+                                ] satisfies ActionMenuItem[])
+                              : []),
+                          ] satisfies ActionMenuItem[]}
+                          renderButton={({ isOpen, toggle, buttonRef }) => (
+                            <button
+                              ref={buttonRef}
+                              type="button"
+                              onClick={toggle}
+                              className={`inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[#d8e1f0] transition ${
+                                isOpen
+                                  ? "bg-[#eef2ff] text-[#4f49e2]"
+                                  : "bg-white text-[#475569] hover:bg-[#eef2ff] hover:text-[#4f49e2]"
+                              }`}
+                              aria-label={`Open actions for ${agent.name || "agent"}`}
+                              title="Actions"
+                            >
+                              <ChevronDown
+                                className={`h-4 w-4 transition-transform ${
+                                  isOpen ? "rotate-180" : ""
+                                }`}
+                              />
+                            </button>
+                          )}
+                        />
                       </div>
                     </div>
                   );
@@ -869,11 +947,18 @@ export default function AgentRegistry({
             <div className="divide-y divide-[#eef1f7] bg-white md:hidden">
               {pagedAgents.map((agent, index) => {
                 const rowKey = getAgentRowKey(agent, index);
-                const createdAt = formatDateTime(agent.created_at);
-                const updatedAt = formatDateTime(agent.updated_at);
-                const statusLabel = formatStatusLabel(agent.status);
-                const statusTone = getStatusTone(agent.status);
-                const nextStatus = isOnlineStatus(agent.status)
+                const createdAt = (() => {
+                  const value = formatDateTime(agent.created_at);
+                  return value === "-" ? EMPTY_VALUE_LABEL : value;
+                })();
+                const updatedAt = (() => {
+                  const value = formatDateTime(agent.updated_at);
+                  return value === "-" ? EMPTY_VALUE_LABEL : value;
+                })();
+                const displayStatus = getAgentDisplayStatus(agent);
+                const statusLabel = formatStatusLabel(displayStatus);
+                const statusTone = getStatusTone(displayStatus);
+                const nextStatus = isOnlineStatus(displayStatus)
                   ? "inactive"
                   : "active";
                 return (
@@ -883,8 +968,8 @@ export default function AgentRegistry({
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="truncate text-base font-semibold text-[#0f172a]">
-                          {agent.name || "-"}
+                        <p className="truncate text-base font-semibold text-[#111827]">
+                          {agent.name || EMPTY_VALUE_LABEL}
                         </p>
                         <p className="mt-1 text-xs text-[#64748b]">
                           {createdAt} updated {updatedAt}
@@ -898,28 +983,16 @@ export default function AgentRegistry({
                       </span>
                     </div>
                     <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[#64748b]">
+                      <p className="text-xs font-semibold tracking-[0.08em] text-[#64748b]">
                         Description
                       </p>
-                        <div className="mt-1 space-y-1">
-                          <p className="break-words whitespace-normal leading-snug text-[#2b3341]">
-                            {getPreviewText(agent.description, 140) || "-"}
-                          </p>
-                          {agent.description && agent.description.trim().length > 140 ? (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                openInstructionDialog(
-                                  `${agent.name} description`,
-                                  agent.description
-                                )
-                              }
-                              className="text-xs font-semibold text-[#4f49e2] transition hover:text-[#4338ca]"
-                            >
-                              See more
-                            </button>
-                          ) : null}
-                        </div>
+                      <div className="mt-1">
+                        <ExpandableMarkdownText
+                          value={agent.description}
+                          title={`${agent.name} description`}
+                          limit={140}
+                        />
+                      </div>
                     </div>
                     <div className="rounded-xl border border-[#e6ebf5] bg-[#f8fafc] px-3 py-2">
                       <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[#64748b]">
@@ -931,105 +1004,85 @@ export default function AgentRegistry({
                     </div>
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[#64748b]">
-                        Instructions
+                        Role
                       </p>
-                      <div className="mt-1 space-y-1">
-                          <p className="break-words whitespace-normal leading-snug text-[#2b3341]">
-                            {getPreviewText(agent.instruction) || "-"}
-                          </p>
-                        {agent.instruction && agent.instruction.trim().length > 180 ? (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              openInstructionDialog(
-                                `${agent.name} instructions`,
-                                agent.instruction
-                              )
-                            }
-                            className="text-xs font-semibold text-[#4f49e2] transition hover:text-[#4338ca]"
-                          >
-                            See more
-                          </button>
-                        ) : null}
+                      <div className="mt-1">
+                        <ExpandableMarkdownText
+                          value={agent.instruction}
+                          title={`${agent.name} instructions`}
+                          emptyFallback=""
+                        />
                       </div>
                     </div>
-                    <div className="relative" data-action-menu="true">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setOpenActionMenuKey((previous) =>
-                            previous === rowKey ? null : rowKey
-                          )
-                        }
-                        className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-[#dce3f1] px-3 py-2 text-xs font-semibold text-[#334155] transition hover:bg-[#eef2ff] hover:text-[#4f49e2]"
-                      >
-                        Actions
-                        <ChevronDown
-                          className={`h-3.5 w-3.5 transition ${
-                            openActionMenuKey === rowKey
-                              ? "rotate-180 text-[#4f49e2]"
-                              : ""
-                          }`}
-                        />
-                      </button>
-
-                      {openActionMenuKey === rowKey ? (
-                        <div className="absolute left-0 right-0 z-30 mt-2 overflow-hidden rounded-xl border border-[#e2e8f0] bg-white shadow-[0_12px_24px_-20px_rgba(15,23,42,0.45)]">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              handleToggleAgentEnabled(agent, rowKey, nextStatus);
-                              setOpenActionMenuKey(null);
-                            }}
-                            disabled
-                            title="Temporarily disabled"
-                            className="flex w-full cursor-not-allowed items-center gap-2 bg-[#f8fafc] px-3 py-2 text-left text-sm text-[#94a3b8]"
-                          >
-                            <Power className="h-4 w-4" />
-                            {isOnlineStatus(agent.status) ? "Disable" : "Enable"}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setDeleteTarget(agent);
-                              setDeleteError("");
-                              setOpenActionMenuKey(null);
-                            }}
-                            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[#b91c1c] hover:bg-[#fff1f2]"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                            Delete
-                          </button>
-                          {isAutomationAgent(agent) ? (
-                            <>
-                              <div className="my-1 border-t border-[#eef1f7]" />
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setJobsTarget(agent);
-                                  setOpenActionMenuKey(null);
-                                }}
-                                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[#2563eb] hover:bg-[#eff6ff]"
-                              >
-                                <BriefcaseBusiness className="h-4 w-4" />
-                                Jobs
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setWebhookTarget(agent);
-                                  setOpenActionMenuKey(null);
-                                }}
-                                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[#2563eb] hover:bg-[#eff6ff]"
-                              >
-                                <Webhook className="h-4 w-4" />
-                                Webhook
-                              </button>
-                            </>
-                          ) : null}
-                        </div>
-                      ) : null}
+                    <div className="rounded-xl border border-[#e6ebf5] bg-[#f8fafc] px-3 py-2">
+                      <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[#64748b]">
+                        Token
+                      </p>
+                      <div className="mt-2">
+                        {renderTokenUsage(agent, { mobile: true })}
+                      </div>
                     </div>
+                    <ActionMenu
+                        align="left"
+                        estimatedMenuHeight={isAutomationAgent(agent) ? 212 : 156}
+                        actions={[
+                          getToggleActionItem(agent, rowKey, nextStatus),
+                          {
+                            label: "Delete",
+                            icon: Trash2,
+                            onClick: () => {
+                              setDeleteTarget(agent);
+                            setDeleteError("");
+                          },
+                          tone: "text-[#b91c1c]",
+                          hoverTone: "hover:bg-[#fff1f2]",
+                        },
+                        {
+                          label: "Update",
+                          icon: Pencil,
+                          onClick: () => handleUpdateClick(agent),
+                          tone: "text-[#2563eb]",
+                          hoverTone: "hover:bg-[#eff6ff]",
+                        },
+                        ...(isAutomationAgent(agent)
+                          ? ([
+                              {
+                                label: "Jobs",
+                                icon: BriefcaseBusiness,
+                                onClick: () => setJobsTarget(agent),
+                                tone: "text-[#2563eb]",
+                                hoverTone: "hover:bg-[#eff6ff]",
+                              },
+                              {
+                                label: "Webhook",
+                                icon: Webhook,
+                                onClick: () => setWebhookTarget(agent),
+                                tone: "text-[#2563eb]",
+                                hoverTone: "hover:bg-[#eff6ff]",
+                              },
+                            ] satisfies ActionMenuItem[])
+                          : []),
+                      ] satisfies ActionMenuItem[]}
+                      renderButton={({ isOpen, toggle, buttonRef }) => (
+                        <button
+                          ref={buttonRef}
+                          type="button"
+                          onClick={toggle}
+                          className={`inline-flex w-full items-center justify-center gap-2 rounded-lg border border-[#dce3f1] px-3 py-2 text-xs font-semibold transition ${
+                            isOpen
+                              ? "bg-[#eef2ff] text-[#4f49e2]"
+                              : "text-[#334155] hover:bg-[#eef2ff] hover:text-[#4f49e2]"
+                          }`}
+                        >
+                          Actions
+                          <ChevronDown
+                            className={`h-3.5 w-3.5 transition-transform ${
+                              isOpen ? "rotate-180" : ""
+                            }`}
+                          />
+                        </button>
+                      )}
+                    />
                   </div>
                 );
               })}
@@ -1072,8 +1125,8 @@ export default function AgentRegistry({
       </div>
 
       {deleteTarget ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4 py-8">
-          <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-[0_18px_50px_-30px_rgba(15,23,42,0.6)]">
+        <ModalCard zIndexClassName="z-50">
+          <ModalCardPanel maxWidthClassName="max-w-md">
             <div className="flex items-center justify-between border-b border-[#fee2e2] bg-[#fff5f5] px-6 py-4">
               <div className="flex items-center gap-2 text-[#b91c1c]">
                 <Trash2 className="h-5 w-5" />
@@ -1087,7 +1140,7 @@ export default function AgentRegistry({
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <div className="px-6 py-5">
+            <ModalCardBody>
               <p className="text-sm text-[#374151]">
                 Are you sure you want to delete{" "}
                 <span className="rounded-md bg-[#fee2e2] px-2 py-0.5 font-semibold text-[#b91c1c]">
@@ -1101,8 +1154,8 @@ export default function AgentRegistry({
               {deleteError ? (
                 <p className="mt-3 text-sm text-[#dc2626]">{deleteError}</p>
               ) : null}
-            </div>
-            <div className="flex items-center justify-end gap-3 border-t border-[#eef1f7] px-6 py-4">
+            </ModalCardBody>
+            <ModalCardFooter>
               <button
                 type="button"
                 onClick={() => setDeleteTarget(null)}
@@ -1122,9 +1175,9 @@ export default function AgentRegistry({
               >
                 {isDeleting ? "Deleting..." : "Delete"}
               </button>
-            </div>
-          </div>
-        </div>
+            </ModalCardFooter>
+          </ModalCardPanel>
+        </ModalCard>
       ) : null}
 
       {isToastVisible ? (
@@ -1163,34 +1216,6 @@ export default function AgentRegistry({
           agent={webhookTarget}
           onClose={() => setWebhookTarget(null)}
         />
-      ) : null}
-
-      {instructionDialogTarget ? (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/25 px-4 py-8 backdrop-blur-md">
-          <div className="w-full max-w-3xl overflow-hidden rounded-3xl bg-white shadow-[0_24px_70px_-36px_rgba(15,23,42,0.65)]">
-            <div className="flex items-center justify-between border-b border-[#eef1f7] px-6 py-4">
-              <div>
-                <h4 className="text-lg font-semibold text-[#111827]">
-                  {instructionDialogTarget.title}
-                </h4>
-              </div>
-              <button
-                type="button"
-                onClick={() => setInstructionDialogTarget(null)}
-                className="flex h-9 w-9 items-center justify-center rounded-full border border-[#e5e7eb] text-[#475569] transition hover:bg-[#f8fafc]"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="max-h-[70vh] overflow-y-auto px-6 py-5">
-                <div>
-                  <div className="space-y-3 break-words text-sm leading-7 text-[#2b3341]">
-                    {renderMarkdownBlocks(instructionDialogTarget.content)}
-                  </div>
-                </div>
-              </div>
-            </div>
-        </div>
       ) : null}
     </section>
   );

@@ -77,7 +77,6 @@ export interface AdkSsePayload {
 
 export interface AgentSidebarProps {
   assistantDisplayName: string;
-  appName: string;
   apps: AppItem[];
   selectedApp: AppItem | null;
   onSelectApp: (app: AppItem) => void;
@@ -133,5 +132,10 @@ export interface ChatSidebarProps {
 export interface AppItem {
   agent_id: string;
   name: string;
+  status?: string | null;
+  isEnabled?: boolean | null;
   type?: string | null;
+  deployment_target?: string | null;
+  vertex_deployment_status?: string | null;
+  vertex_stream_query_url?: string | null;
 };
