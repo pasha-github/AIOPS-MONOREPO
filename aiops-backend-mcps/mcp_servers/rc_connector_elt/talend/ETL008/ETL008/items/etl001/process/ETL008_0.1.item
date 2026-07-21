@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<talendfile:ProcessType xmi:version="2.0" xmlns:xmi="http://www.omg.org/XMI" xmlns:talendfile="platform:/resource/org.talend.model/model/TalendFile.xsd" defaultContext="Default" jobType="Standard">
+  <context confirmationNeeded="false" name="Default">
+    <contextParameter comment="" name="mySQL_Database" prompt="mySQL_Database?" promptNeeded="false" repositoryContextId="_xhBPAFaGEfGNhslqaiNCZg" type="id_String" value="aiops_rc"/>
+    <contextParameter comment="" name="mySQL_Password" prompt="mySQL_Password?" promptNeeded="false" repositoryContextId="_xhBPAFaGEfGNhslqaiNCZg" type="id_Password" value="enc:system.encryption.key.v1:3iOT3FWhV456eT1hM6FKEOmCFU0dqn3x45ePnc4gc6l2IY4feCk="/>
+    <contextParameter comment="" name="mySQL_Port" prompt="mySQL_Port?" promptNeeded="false" repositoryContextId="_xhBPAFaGEfGNhslqaiNCZg" type="id_String" value="3306"/>
+    <contextParameter comment="" name="mySQL_AdditionalParams" prompt="mySQL_AdditionalParams?" promptNeeded="false" repositoryContextId="_xhBPAFaGEfGNhslqaiNCZg" type="id_String" value="noDatetimeStringSync=true"/>
+    <contextParameter comment="" name="mySQL_Server" prompt="mySQL_Server?" promptNeeded="false" repositoryContextId="_xhBPAFaGEfGNhslqaiNCZg" type="id_String" value="127.0.0.1"/>
+    <contextParameter comment="" name="mySQL_Login" prompt="mySQL_Login?" promptNeeded="false" repositoryContextId="_xhBPAFaGEfGNhslqaiNCZg" type="id_String" value="root"/>
+    <contextParameter comment="" name="postqreSQL_Port" prompt="postqreSQL_Port?" promptNeeded="false" repositoryContextId="_7FUaUFaHEfGNhslqaiNCZg" type="id_String" value="5432"/>
+    <contextParameter comment="" name="postqreSQL_Schema" prompt="postqreSQL_Schema?" promptNeeded="false" repositoryContextId="_7FUaUFaHEfGNhslqaiNCZg" type="id_String" value="public"/>
+    <contextParameter comment="" name="postqreSQL_Server" prompt="postqreSQL_Server?" promptNeeded="false" repositoryContextId="_7FUaUFaHEfGNhslqaiNCZg" type="id_String" value="127.0.0.1"/>
+    <contextParameter comment="" name="postqreSQL_Login" prompt="postqreSQL_Login?" promptNeeded="false" repositoryContextId="_7FUaUFaHEfGNhslqaiNCZg" type="id_String" value="postgres"/>
+    <contextParameter comment="" name="postqreSQL_Database" prompt="postqreSQL_Database?" promptNeeded="false" repositoryContextId="_7FUaUFaHEfGNhslqaiNCZg" type="id_String" value="aiops_rc"/>
+    <contextParameter comment="" name="postqreSQL_Password" prompt="postqreSQL_Password?" promptNeeded="false" repositoryContextId="_7FUaUFaHEfGNhslqaiNCZg" type="id_Password" value="enc:system.encryption.key.v1:VnZuWGRdIOvrQEpVCtP2s48cOpZzb1t/KkswDWlozpck3J8M2oo="/>
+    <contextParameter comment="" name="postqreSQL_AdditionalParams" prompt="postqreSQL_AdditionalParams?" promptNeeded="false" repositoryContextId="_7FUaUFaHEfGNhslqaiNCZg" type="id_String" value=""/>
+  </context>
+  <parameters>
+    <elementParameter field="TEXT" name="SCREEN_OFFSET_X" value="0" show="false"/>
+    <elementParameter field="TEXT" name="SCREEN_OFFSET_Y" value="0" show="false"/>
+    <elementParameter field="TEXT" name="REPOSITORY_CONNECTION_ID" value="" show="false"/>
+    <elementParameter field="TEXT" name="OOZIE_PROPERTY_TYPENAME" value="" show="false"/>
+    <elementParameter field="TEXT" name="OOZIE_HADOOP_DISTRIBUTION" value="" show="false"/>
+    <elementParameter field="TEXT" name="OOZIE_HADOOP_VERSION" value="" show="false"/>
+    <elementParameter field="TEXT" name="OOZIE_ENABLE_KERBEROS" value="" show="false"/>
+    <elementParameter field="TEXT" name="OOZIE_NAME_NODE_PRINCIPAL" value="" show="false"/>
+    <elementParameter field="TEXT" name="OOZIE_USERNAME" value="" show="false"/>
+    <elementParameter field="TEXT" name="OOZIE_GROUP" value="" show="false"/>
+    <elementParameter field="TEXT" name="OOZIE_USE_KEYTAB" value="" show="false"/>
+    <elementParameter field="TEXT" name="OOZIE_KT_PRINCIPAL" value="" show="false"/>
+    <elementParameter field="TEXT" name="OOZIE_KEY_TAB" value="" show="false"/>
+    <elementParameter field="TEXT" name="OOZIE_ENABLE_OO_KERBEROS" value="" show="false"/>
+    <elementParameter field="TEXT" name="OOZIE_NAME_NODE_END_POINT" value="" show="false"/>
+    <elementParameter field="TEXT" name="OOZIE_JOB_TRACKER_ENDPOINT" value="" show="false"/>
+    <elementParameter field="TEXT" name="OOZIE_END_POINT" value="" show="false"/>
+    <elementParameter field="CHECK" name="IMPLICITCONTEXT_USE_PROJECT_SETTINGS" value="true" show="false"/>
+    <elementParameter field="CHECK" name="STATANDLOG_USE_PROJECT_SETTINGS" value="true" show="false"/>
+    <elementParameter field="CHECK" name="MULTI_THREAD_EXECATION" value="false"/>
+    <elementParameter field="CHECK" name="IMPLICIT_TCONTEXTLOAD" value="false"/>
+    <elementParameter field="RADIO" name="FROM_FILE_FLAG_IMPLICIT_CONTEXT" value="false" show="false"/>
+    <elementParameter field="RADIO" name="FROM_DATABASE_FLAG_IMPLICIT_CONTEXT" value="false" show="false"/>
+    <elementParameter field="FILE" name="IMPLICIT_TCONTEXTLOAD_FILE" value="&quot;&quot;" show="false"/>
+    <elementParameter field="TEXT" name="FIELDSEPARATOR" value="&quot;&quot;" show="false"/>
+    <elementParameter field="CHECK" name="OVERRIDE_ENCODING_FLAG" value="false" show="false"/>
+    <elementParameter field="ENCODING_TYPE" name="OVERRIDE_ENCODING_IN_EXTRA" value="ISO-8859-15" show="false"/>
+    <elementParameter field="TECHNICAL" name="OVERRIDE_ENCODING_IN_EXTRA:ENCODING_TYPE" value="ISO-8859-15" show="false"/>
+    <elementParameter field="CLOSED_LIST" name="DB_TYPE_IMPLICIT_CONTEXT" value="" show="false"/>
+    <elementParameter field="CLOSED_LIST" name="DB_VERSION_IMPLICIT_CONTEXT" value="" show="false"/>
+    <elementParameter field="TEXT" name="URL_IMPLICIT_CONTEXT" value="&quot;&quot;" show="false"/>
+    <elementParameter field="TABLE" name="DRIVER_JAR_IMPLICIT_CONTEXT" show="false"/>
+    <elementParameter field="TEXT" name="DRIVER_CLASS_IMPLICIT_CONTEXT" value="&quot;&quot;" show="false"/>
+    <elementParameter field="TEXT" name="HOST_IMPLICIT_CONTEXT" value="&quot;&quot;" show="false"/>
+    <elementParameter field="TEXT" name="PORT_IMPLICIT_CONTEXT" value="&quot;&quot;" show="false"/>
+    <elementParameter field="TEXT" name="DBNAME_IMPLICIT_CONTEXT" value="&quot;&quot;" show="false"/>
+    <elementParameter field="TEXT" name="LOCAL_SERVICE_NAME_IMPLICIT_CONTEXT" value="&quot;&quot;" show="false"/>
+    <elementParameter field="TEXT" name="PROPERTIES_IMPLICIT_CONTEXT" value="&quot;&quot;" show="false"/>
+    <elementParameter field="TEXT" name="SCHEMA_DB_IMPLICIT_CONTEXT" value="&quot;&quot;" show="false"/>
+    <elementParameter field="TEXT" name="USER_IMPLICIT_CONTEXT" value="&quot;&quot;" show="false"/>
+    <elementParameter field="PASSWORD" name="PASS_IMPLICIT_CONTEXT" value="enc:system.encryption.key.v1:B46ZhEHUtMKIBIh44+sHGKUpqApUOuyg5VgLqQsH" show="false"/>
+    <elementParameter field="FILE" name="DBFILE_IMPLICIT_CONTEXT" value="&quot;&quot;" show="false"/>
+    <elementParameter field="DBTABLE" name="DBTABLE_IMPLICIT_CONTEXT" value="&quot;&quot;" show="false"/>
+    <elementParameter field="TEXT" name="QUERY_CONDITION_IMPLICIT_CONTEXT" value="&quot;&quot;" show="false"/>
+    <elementParameter field="CLOSED_LIST" name="LOAD_NEW_VARIABLE" value="Warning" show="false"/>
+    <elementParameter field="CLOSED_LIST" name="NOT_LOAD_OLD_VARIABLE" value="Warning" show="false"/>
+    <elementParameter field="CHECK" name="PRINT_OPERATIONS" value="false" show="false"/>
+    <elementParameter field="CHECK" name="DISABLE_ERROR" value="false" show="false"/>
+    <elementParameter field="CHECK" name="DISABLE_WARNINGS" value="false" show="false"/>
+    <elementParameter field="CHECK" name="DISABLE_INFO" value="false" show="false"/>
+    <elementParameter field="CHECK" name="ON_STATCATCHER_FLAG" value="false"/>
+    <elementParameter field="CHECK" name="ON_LOGCATCHER_FLAG" value="false"/>
+    <elementParameter field="CHECK" name="ON_METERCATCHER_FLAG" value="false"/>
+    <elementParameter field="CHECK" name="ON_CONSOLE_FLAG" value="false" show="false"/>
+    <elementParameter field="CHECK" name="ON_FILES_FLAG" value="false" show="false"/>
+    <elementParameter field="DIRECTORY" name="FILE_PATH" value="&quot;D:/TOS_DI-20200219_1130-V7.3.1/TOS_DI-20200219_1130-V7.3.1/workspace/.metadata&quot;" show="false"/>
+    <elementParameter field="TEXT" name="FILENAME_STATS" value="&quot;stats_file.txt&quot;" show="false"/>
+    <elementParameter field="TEXT" name="FILENAME_LOGS" value="&quot;logs_file.txt&quot;" show="false"/>
+    <elementParameter field="TEXT" name="FILENAME_METTER" value="&quot;meter_file.txt&quot;" show="false"/>
+    <elementParameter field="ENCODING_TYPE" name="ENCODING" value="ISO-8859-15" show="false"/>
+    <elementParameter field="TECHNICAL" name="ENCODING:ENCODING_TYPE" value="ISO-8859-15" show="false"/>
+    <elementParameter field="CHECK" name="ON_DATABASE_FLAG" value="false" show="false"/>
+    <elementParameter field="CLOSED_LIST" name="DB_TYPE" value="tJDBCOutput" show="false"/>
+    <elementParameter field="CLOSED_LIST" name="DB_VERSION" value="ORACLE_12" show="false"/>
+    <elementParameter field="TEXT" name="URL" value="&quot;&quot;" show="false"/>
+    <elementParameter field="TABLE" name="DRIVER_JAR" show="false"/>
+    <elementParameter field="TEXT" name="DRIVER_CLASS" value="&quot;&quot;" show="false"/>
+    <elementParameter field="TEXT" name="HOST" value="&quot;&quot;" show="false"/>
+    <elementParameter field="TEXT" name="PORT" value="&quot;&quot;" show="false"/>
+    <elementParameter field="TEXT" name="DATASOURCE" value="&quot;&quot;" show="false"/>
+    <elementParameter field="TEXT" name="DBNAME" value="&quot;&quot;" show="false"/>
+    <elementParameter field="TEXT" name="LOCAL_SERVICE_NAME" value="&quot;&quot;" show="false"/>
+    <elementParameter field="TEXT" name="PROPERTIES" value="&quot;&quot;" show="false"/>
+    <elementParameter field="TEXT" name="SCHEMA_DB" value="&quot;&quot;" show="false"/>
+    <elementParameter field="TEXT" name="USER" value="&quot;&quot;" show="false"/>
+    <elementParameter field="PASSWORD" name="PASS" value="enc:system.encryption.key.v1:hr7NlwfFpe60vhZK6gpoNVtVTYgedUrIXhblIY27" show="false"/>
+    <elementParameter field="FILE" name="DBFILE" value="&quot;&quot;" show="false"/>
+    <elementParameter field="DBTABLE" name="TABLE_STATS" value="&quot;&quot;" show="false"/>
+    <elementParameter field="DBTABLE" name="TABLE_LOGS" value="&quot;&quot;" show="false"/>
+    <elementParameter field="DBTABLE" name="TABLE_METER" value="&quot;&quot;" show="false"/>
+    <elementParameter field="CHECK" name="CATCH_RUNTIME_ERRORS" value="true" show="false"/>
+    <elementParameter field="CHECK" name="CATCH_USER_ERRORS" value="true" show="false"/>
+    <elementParameter field="CHECK" name="CATCH_USER_WARNING" value="true" show="false"/>
+    <elementParameter field="CHECK" name="CATCH_REALTIME_STATS" value="false" show="false"/>
+    <elementParameter field="TEXT" name="HEADERFOOTER_HEADERID" value="" show="false"/>
+    <elementParameter field="CHECK" name="HEADER_ENABLED" value="false" show="false"/>
+    <elementParameter field="TEXT" name="HEADER_LIBRARY" value="" show="false"/>
+    <elementParameter field="TEXT" name="HEADER_CODE" value="" show="false"/>
+    <elementParameter field="TEXT" name="HEADER_IMPORT" value="" show="false"/>
+    <elementParameter field="TEXT" name="HEADERFOOTER_FOOTERID" value="" show="false"/>
+    <elementParameter field="CHECK" name="FOOTER_ENABLED" value="false" show="false"/>
+    <elementParameter field="TEXT" name="FOOTER_LIBRARY" value="" show="false"/>
+    <elementParameter field="TEXT" name="FOOTER_CODE" value="" show="false"/>
+    <elementParameter field="TEXT" name="FOOTER_IMPORT" value="" show="false"/>
+    <routinesParameter id="_yP7cIFXFEfGEj7nDD7U9NQ" name="DataOperation"/>
+    <routinesParameter id="_yQk8YFXFEfGEj7nDD7U9NQ" name="Mathematical"/>
+    <routinesParameter id="_yQ_MEFXFEfGEj7nDD7U9NQ" name="Numeric"/>
+    <routinesParameter id="_yRXmkFXFEfGEj7nDD7U9NQ" name="Relational"/>
+    <routinesParameter id="_yRtk0FXFEfGEj7nDD7U9NQ" name="StringHandling"/>
+    <routinesParameter id="_ySIbkFXFEfGEj7nDD7U9NQ" name="TalendDataGenerator"/>
+    <routinesParameter id="_ySnjwFXFEfGEj7nDD7U9NQ" name="TalendDate"/>
+    <routinesParameter id="_yTnpUFXFEfGEj7nDD7U9NQ" name="TalendStringUtil"/>
+    <routinesParameter id="_yTJIMFXFEfGEj7nDD7U9NQ" name="TalendString"/>
+  </parameters>
+  <node componentName="tMysqlConnection" componentVersion="0.102" offsetLabelX="0" offsetLabelY="0" posX="192" posY="96">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="tDBConnection_1" show="false"/>
+    <elementParameter field="TECHNICAL" name="PROPERTY:PROPERTY_TYPE" value="REPOSITORY"/>
+    <elementParameter field="TECHNICAL" name="PROPERTY:REPOSITORY_PROPERTY_TYPE" value="_gccTsFaGEfGNhslqaiNCZg" show="false"/>
+    <elementParameter field="CLOSED_LIST" name="DB_VERSION" value="MYSQL_8"/>
+    <elementParameter field="TEXT" name="HOST" value="context.mySQL_Server"/>
+    <elementParameter field="TEXT" name="TYPE" value="MYSQL" show="false"/>
+    <elementParameter field="TEXT" name="PORT" value="context.mySQL_Port"/>
+    <elementParameter field="TEXT" name="DBNAME" value="context.mySQL_Database"/>
+    <elementParameter field="TEXT" name="PROPERTIES" value="context.mySQL_AdditionalParams"/>
+    <elementParameter field="TEXT" name="USER" value="context.mySQL_Login"/>
+    <elementParameter field="PASSWORD" name="PASS" value="enc:system.encryption.key.v1:NAgBwMjunlXZz/dsbZmgC+dDisPWxoulkvQTbfpgEclyiD42KeBJ+95BY79qm66qinw="/>
+    <elementParameter field="ENCODING_TYPE" name="ENCODING" value="&quot;ISO-8859-15&quot;" show="false"/>
+    <elementParameter field="TECHNICAL" name="ENCODING:ENCODING_TYPE" value="ISO-8859-15"/>
+    <elementParameter field="CHECK" name="USE_SHARED_CONNECTION" value="false"/>
+    <elementParameter field="TEXT" name="SHARED_CONNECTION_NAME" value="" show="false"/>
+    <elementParameter field="LABEL" name="NOTE" value="This option only applies when deploying and running in the Talend Runtime"/>
+    <elementParameter field="CHECK" name="SPECIFY_DATASOURCE_ALIAS" value="false"/>
+    <elementParameter field="TEXT" name="DATASOURCE_ALIAS" value="&quot;&quot;" show="false"/>
+    <elementParameter field="CHECK" name="AUTO_COMMIT" value="false"/>
+    <elementParameter field="TEXT" name="LABEL" value="mySQL"/>
+    <elementParameter field="TEXT" name="CONNECTION_FORMAT" value="row"/>
+  </node>
+  <node componentName="tPostgresqlConnection" componentVersion="0.102" offsetLabelX="0" offsetLabelY="0" posX="544" posY="96">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="tDBConnection_2" show="false"/>
+    <elementParameter field="TECHNICAL" name="PROPERTY:PROPERTY_TYPE" value="REPOSITORY"/>
+    <elementParameter field="TECHNICAL" name="PROPERTY:REPOSITORY_PROPERTY_TYPE" value="_wIA_QFaHEfGNhslqaiNCZg" show="false"/>
+    <elementParameter field="CLOSED_LIST" name="DB_VERSION" value="V9_X"/>
+    <elementParameter field="TEXT" name="HOST" value="context.postqreSQL_Server"/>
+    <elementParameter field="TEXT" name="TYPE" value="POSTGRESQL" show="false"/>
+    <elementParameter field="TEXT" name="PORT" value="context.postqreSQL_Port"/>
+    <elementParameter field="TEXT" name="DBNAME" value="context.postqreSQL_Database"/>
+    <elementParameter field="TEXT" name="SCHEMA_DB" value="context.postqreSQL_Schema"/>
+    <elementParameter field="TEXT" name="USER" value="context.postqreSQL_Login"/>
+    <elementParameter field="PASSWORD" name="PASS" value="enc:system.encryption.key.v1:eXnOYKzzpZxOJAOaEYohO3WipMjq5ZP9G0oaXRk27NOk3brEQgoH6X0D6IkZTavR39rz+Xzk7A=="/>
+    <elementParameter field="ENCODING_TYPE" name="ENCODING" value="&quot;ISO-8859-15&quot;" show="false"/>
+    <elementParameter field="TECHNICAL" name="ENCODING:ENCODING_TYPE" value="ISO-8859-15"/>
+    <elementParameter field="CHECK" name="USE_SHARED_CONNECTION" value="false"/>
+    <elementParameter field="TEXT" name="SHARED_CONNECTION_NAME" value="" show="false"/>
+    <elementParameter field="LABEL" name="NOTE" value="This option only applies when deploying and running in the Talend Runtime"/>
+    <elementParameter field="CHECK" name="SPECIFY_DATASOURCE_ALIAS" value="false"/>
+    <elementParameter field="TEXT" name="DATASOURCE_ALIAS" value="&quot;&quot;" show="false"/>
+    <elementParameter field="TEXT" name="PROPERTIES" value="context.postqreSQL_AdditionalParams"/>
+    <elementParameter field="CHECK" name="AUTO_COMMIT" value="false"/>
+    <elementParameter field="TEXT" name="LABEL" value="postqreSQL"/>
+    <elementParameter field="TEXT" name="CONNECTION_FORMAT" value="row"/>
+  </node>
+  <node componentName="tJava" componentVersion="0.101" offsetLabelX="0" offsetLabelY="0" posX="320" posY="256">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="tJava_1" show="false"/>
+    <elementParameter field="MEMO_JAVA" name="CODE" value="java.sql.Connection mysqlConn = (java.sql.Connection)globalMap.get(&quot;conn_tDBConnection_1&quot;);&#xA;&#xA;java.sql.Connection postgresConn = (java.sql.Connection)globalMap.get(&quot;conn_tDBConnection_2&quot;);&#xA;&#xA;java.sql.DatabaseMetaData metaData = mysqlConn.getMetaData();&#xA;// 1. Get all table names dynamically from the source database&#xA;java.sql.ResultSet tables = metaData.getTables(mysqlConn.getCatalog(), null, &quot;%&quot;, new String[] {&quot;TABLE&quot;});&#xA;&#xA;while (tables.next()) {&#xA;    String tableName = tables.getString(&quot;TABLE_NAME&quot;);&#xA;    System.out.println(&quot;Migrating table: &quot; + tableName);&#xA;    &#xA;    // 2. Fetch the schema columns and types dynamically for this specific table&#xA;    java.sql.Statement sourceStmt = mysqlConn.createStatement();&#xA;    java.sql.ResultSet rs = sourceStmt.executeQuery(&quot;SELECT * FROM `&quot; + tableName + &quot;` WHERE 1=0&quot;);&#xA;    java.sql.ResultSetMetaData rsmd = rs.getMetaData();&#xA;    int columnCount = rsmd.getColumnCount();&#xA;    &#xA;    // 3. Automatically construct a dynamic &quot;CREATE TABLE&quot; query for PostgreSQL&#xA;    StringBuilder createTableSQL = new StringBuilder(&quot;CREATE TABLE IF NOT EXISTS \&quot;public\&quot;.\&quot;&quot; + tableName + &quot;\&quot; (&quot;);&#xA;    StringBuilder insertSQL = new StringBuilder(&quot;INSERT INTO \&quot;public\&quot;.\&quot;&quot; + tableName + &quot;\&quot; (&quot;);&#xA;    StringBuilder valuesPlaceholder = new StringBuilder(&quot;VALUES (&quot;);&#xA;    &#xA;    for (int i = 1; i &lt;= columnCount; i++) {&#xA;        String columnName = rsmd.getColumnName(i);&#xA;        String mysqlType = rsmd.getColumnTypeName(i);&#xA;        &#xA;        // Dynamic Data Type Translation (Crucial for AI tools!)&#xA;        String pgType = &quot;VARCHAR(255)&quot;; // Default fallback&#xA;        if (mysqlType.equalsIgnoreCase(&quot;INT&quot;) || mysqlType.equalsIgnoreCase(&quot;INTEGER&quot;)) {&#xA;            pgType = &quot;INTEGER&quot;;&#xA;        } else if (mysqlType.equalsIgnoreCase(&quot;BIGINT&quot;)) {&#xA;            pgType = &quot;BIGINT&quot;;&#xA;        } else if (mysqlType.equalsIgnoreCase(&quot;TEXT&quot;) || mysqlType.equalsIgnoreCase(&quot;LONGTEXT&quot;)) {&#xA;            pgType = &quot;TEXT&quot;;&#xA;        } else if (mysqlType.equalsIgnoreCase(&quot;DATETIME&quot;) || mysqlType.equalsIgnoreCase(&quot;TIMESTAMP&quot;)) {&#xA;            pgType = &quot;TIMESTAMP&quot;;&#xA;        } else if (mysqlType.equalsIgnoreCase(&quot;DECIMAL&quot;) || mysqlType.equalsIgnoreCase(&quot;DOUBLE&quot;)) {&#xA;            pgType = &quot;NUMERIC&quot;;&#xA;        }&#xA;        &#xA;        createTableSQL.append(&quot;\&quot;&quot;).append(columnName).append(&quot;\&quot; &quot;).append(pgType);&#xA;        insertSQL.append(&quot;\&quot;&quot;).append(columnName).append(&quot;\&quot;&quot;);&#xA;        valuesPlaceholder.append(&quot;?&quot;);&#xA;        &#xA;        if (i &lt; columnCount) {&#xA;            createTableSQL.append(&quot;, &quot;);&#xA;            insertSQL.append(&quot;, &quot;);&#xA;            valuesPlaceholder.append(&quot;, &quot;);&#xA;        }&#xA;    }&#xA;    createTableSQL.append(&quot;)&quot;);&#xA;    insertSQL.append(&quot;) &quot;).append(valuesPlaceholder).append(&quot;)&quot;);&#xA;    &#xA;    // Execute Table Creation in PostgreSQL&#xA;    java.sql.Statement targetStmt = postgresConn.createStatement();&#xA;    targetStmt.executeUpdate(createTableSQL.toString());&#xA;    &#xA;    // 4. Stream data dynamically from Source to Destination&#xA;    java.sql.ResultSet dataRs = sourceStmt.executeQuery(&quot;SELECT * FROM `&quot; + tableName + &quot;`&quot;);&#xA;    java.sql.PreparedStatement pstmt = postgresConn.prepareStatement(insertSQL.toString());&#xA;    &#xA;    int batchSize = 0;&#xA;    while (dataRs.next()) {&#xA;        for (int i = 1; i &lt;= columnCount; i++) {&#xA;            pstmt.setObject(i, dataRs.getObject(i));&#xA;        }&#xA;        pstmt.addBatch();&#xA;        batchSize++;&#xA;        &#xA;        if (batchSize % 1000 == 0) {&#xA;            pstmt.executeBatch(); // Efficient Batch Insert&#xA;        }&#xA;    }&#xA;    pstmt.executeBatch(); // Insert remaining rows&#xA;    &#xA;    // Clean up statement resources for this table loop iteration&#xA;    pstmt.close();&#xA;    dataRs.close();&#xA;    sourceStmt.close();&#xA;    targetStmt.close();&#xA;    System.out.println(&quot;Successfully migrated table: &quot; + tableName);&#xA;}&#xA;tables.close();&#xA;&#xA;postgresConn.commit();"/>
+    <elementParameter field="MEMO_IMPORT" name="IMPORT" value="//import java.util.List;"/>
+    <elementParameter field="TEXT" name="CONNECTION_FORMAT" value="row"/>
+    <metadata connector="FLOW" name="tJava_1"/>
+  </node>
+  <connection connectorName="COMPONENT_OK" label="OnComponentOk" lineStyle="3" metaname="tDBConnection_1" offsetLabelX="0" offsetLabelY="0" source="tDBConnection_1" target="tDBConnection_2">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="OnComponentOk1" show="false"/>
+  </connection>
+  <connection connectorName="COMPONENT_OK" label="OnComponentOk" lineStyle="3" metaname="tDBConnection_2" offsetLabelX="0" offsetLabelY="0" source="tDBConnection_2" target="tJava_1">
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="OnComponentOk2" show="false"/>
+  </connection>
+  <subjob>
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="tDBConnection_1" show="false"/>
+    <elementParameter field="COLOR" name="SUBJOB_TITLE_COLOR" value="92;131;150" show="false"/>
+    <elementParameter field="COLOR" name="SUBJOB_COLOR" value="207;226;236"/>
+  </subjob>
+  <subjob>
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="tDBConnection_2" show="false"/>
+    <elementParameter field="COLOR" name="SUBJOB_TITLE_COLOR" value="92;131;150" show="false"/>
+    <elementParameter field="COLOR" name="SUBJOB_COLOR" value="207;226;236"/>
+  </subjob>
+  <subjob>
+    <elementParameter field="TEXT" name="UNIQUE_NAME" value="tJava_1" show="false"/>
+    <elementParameter field="COLOR" name="SUBJOB_TITLE_COLOR" value="92;131;150" show="false"/>
+    <elementParameter field="COLOR" name="SUBJOB_COLOR" value="207;226;236"/>
+  </subjob>
+</talendfile:ProcessType>

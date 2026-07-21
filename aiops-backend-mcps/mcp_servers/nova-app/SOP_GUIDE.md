@@ -87,5 +87,30 @@ curl -X POST http://localhost:3000/api/admin/remediate \
 
 ---
 
+## Scenario 4: Order Page Not Displaying (Batch Job Failed)
+
+### 1. How to Test / Inject the Fault
+To simulate a failure in the asynchronous order processing batch job, send the following request:
+```bash
+curl -X POST http://localhost:3000/api/admin/faults \
+  -H "Content-Type: application/json" \
+  -d '{"fault": "isBatchJobFailed", "active": true}'
+```
+**Symptoms:** 
+- The `/api/orders` endpoint returns orders, but they remain permanently stuck in the "Payment Pending" status instead of transitioning to "Order Placed".
+- Users navigating to the Orders page will see a yellow warning banner about order processing being delayed.
+- System logs will lack the typical `Batch job completed: Processed pending orders` messages.
+
+### 2. How to Remediate / Heal the Service
+If you detect the symptoms above (orders stuck in pending or batch job failure), you must manually trigger the batch job using this API call:
+```bash
+curl -X POST http://localhost:3000/api/admin/remediate \
+  -H "Content-Type: application/json" \
+  -d '{"action": "RUN_BATCH_JOB"}'
+```
+**Verification:** The Orders page will successfully load and display the list of processed orders.
+
+---
+
 ## End of SOP
 By strictly following the `Remediate / Heal` API calls defined above, any external AI Agent can successfully achieve autonomous self-healing of the platform during demonstrations.

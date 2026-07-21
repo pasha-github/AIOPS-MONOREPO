@@ -20,6 +20,21 @@ export async function POST(request: Request) {
         serverState.faults.isPaymentTimeout = false;
         addLog('infrastructure', 'Payment gateway circuit breaker reset', 'info');
         break;
+      case 'RUN_BATCH_JOB':
+        serverState.faults.isBatchJobFailed = false;
+        let processed = false;
+        serverState.orders.forEach(o => {
+          if (o.status === 'Payment Pending') {
+            o.status = 'Order Placed';
+            processed = true;
+          }
+        });
+        if (processed) {
+          addLog('order-processor', 'Batch job triggered manually: Processed backlogged orders', 'info');
+        } else {
+          addLog('infrastructure', 'Order processing batch job triggered manually', 'info');
+        }
+        break;
       default:
         addLog('aiops-agent', `Unknown remediation command: ${action}`, 'warn');
         return NextResponse.json({ error: 'Unknown remediation action' }, { status: 400 });

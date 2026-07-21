@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<talendfile:ContextType xmi:version="2.0" xmlns:xmi="http://www.omg.org/XMI" xmlns:talendfile="platform:/resource/org.talend.model/model/TalendFile.xsd" xmi:id="_7FxtUFaHEfGNhslqaiNCZg" confirmationNeeded="false" name="Default">
+  <contextParameter xmi:id="_7FxtUVaHEfGNhslqaiNCZg" comment="" name="postqreSQL_Database" prompt="postqreSQL_Database?" promptNeeded="false" type="id_String" value="aiops_rc"/>
+  <contextParameter xmi:id="_7FxtUlaHEfGNhslqaiNCZg" comment="" name="postqreSQL_Password" prompt="postqreSQL_Password?" promptNeeded="false" type="id_Password" value="enc:system.encryption.key.v1:+zW7CdzW5BMMBdKXBfXle/UhfzZ88igPTtmku6KW7FDnOIXLJ/U="/>
+  <contextParameter xmi:id="_7FxtU1aHEfGNhslqaiNCZg" comment="" name="postqreSQL_Port" prompt="postqreSQL_Port?" promptNeeded="false" type="id_String" value="5432"/>
+  <contextParameter xmi:id="_7FxtVFaHEfGNhslqaiNCZg" comment="" name="postqreSQL_Schema" prompt="postqreSQL_Schema?" promptNeeded="false" type="id_String" value="public"/>
+  <contextParameter xmi:id="_7FxtVVaHEfGNhslqaiNCZg" comment="" name="postqreSQL_AdditionalParams" prompt="postqreSQL_AdditionalParams?" promptNeeded="false" type="id_String" value=""/>
+  <contextParameter xmi:id="_7FxtVlaHEfGNhslqaiNCZg" comment="" name="postqreSQL_Server" prompt="postqreSQL_Server?" promptNeeded="false" type="id_String" value="127.0.0.1"/>
+  <contextParameter xmi:id="_7FxtV1aHEfGNhslqaiNCZg" comment="" name="postqreSQL_Login" prompt="postqreSQL_Login?" promptNeeded="false" type="id_String" value="postgres"/>
+</talendfile:ContextType>

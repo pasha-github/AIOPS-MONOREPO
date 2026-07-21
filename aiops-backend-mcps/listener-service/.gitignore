@@ -1,0 +1,5 @@
+/listener-service
+listener-service.exe
+*.db
+/data/
+.env

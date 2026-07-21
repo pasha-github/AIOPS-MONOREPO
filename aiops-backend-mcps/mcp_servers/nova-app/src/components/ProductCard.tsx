@@ -6,7 +6,8 @@
 "use client";
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { ShoppingCart, Check, AlertCircle } from 'lucide-react';
+import Link from 'next/link';
+import { ShoppingCart, Check, AlertCircle, ArrowRight } from 'lucide-react';
 import { useStore } from '@/lib/store';
 
 export default function ProductCard({ product }: { product: any }) {
@@ -56,20 +57,30 @@ export default function ProductCard({ product }: { product: any }) {
         </div>
         <div className="mt-auto flex items-center justify-between">
           <span className="text-xl font-bold text-foreground">${product.price}</span>
-          <button
-            onClick={handleAdd}
-            disabled={isAdding || added}
-            className={`flex items-center justify-center p-2 rounded-full transition-all duration-300 ${
-              error ? 'bg-red-500/10 text-red-500 hover:bg-red-500/20' :
-              added ? 'bg-green-500/10 text-green-500' :
-              'bg-brand-orange-500 text-white hover:bg-brand-orange-600 hover:shadow-md hover:shadow-brand-orange-500/20'
-            }`}
-          >
-            {error ? <AlertCircle className="h-5 w-5" /> : 
-             added ? <Check className="h-5 w-5" /> : 
-             isAdding ? <div className="h-5 w-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> :
-             <ShoppingCart className="h-5 w-5" />}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleAdd}
+              disabled={isAdding || added}
+              className={`flex items-center justify-center p-2 rounded-full transition-all duration-300 ${
+                error ? 'bg-red-500/10 text-red-500 hover:bg-red-500/20' :
+                added ? 'bg-green-500/10 text-green-500' :
+                'bg-brand-orange-500 text-white hover:bg-brand-orange-600 hover:shadow-md hover:shadow-brand-orange-500/20'
+              }`}
+              title="Add to Cart"
+            >
+              {error ? <AlertCircle className="h-5 w-5" /> : 
+               added ? <Check className="h-5 w-5" /> : 
+               isAdding ? <div className="h-5 w-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> :
+               <ShoppingCart className="h-5 w-5" />}
+            </button>
+            <Link
+              href="/cart"
+              className="flex items-center justify-center p-2 rounded-full bg-secondary text-secondary-foreground hover:bg-muted transition-all duration-300"
+              title="Go to Cart"
+            >
+              <ArrowRight className="h-5 w-5" />
+            </Link>
+          </div>
         </div>
       </div>
     </motion.div>

@@ -25,3 +25,7 @@ aroya:
     client-secret: E4BD1B603Bc44c9abf6109802F778820
     connect-timeout-seconds: 30
     read-timeout-seconds: 60
+  node-api:
+    graphql-url: https://bff-uat.aroyacruises.com/graphql
+    connect-timeout-seconds: 30
+    read-timeout-seconds: 60

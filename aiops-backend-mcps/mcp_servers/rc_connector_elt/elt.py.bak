@@ -1,0 +1,347 @@
+import subprocess
+import pymysql
+import psycopg2
+
+from fastapi import FastAPI, HTTPException, Body, Query
+from fastapi.middleware.cors import CORSMiddleware
+from typing import Dict, Any
+
+app = FastAPI(title="ETL Connector - Talend Jobs")
+
+# Enable CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Talend Linux Shell Script Path inside Docker
+TALEND_SCRIPT_PATH = "/app/talend/ETL008/ETL008_run.sh"
+
+# Session Cache
+session_cache: Dict[str, Dict[str, Any]] = {}
+
+
+# -------------------------------------------------------
+# MYSQL CONNECTION
+# -------------------------------------------------------
+def get_mysql_conn(creds: Dict[str, Any]):
+    return pymysql.connect(
+        host=creds.get("mySQL_Server"),
+        port=int(creds.get("mySQL_Port", 3306)),
+        user=creds.get("mySQL_Login"),
+        password=creds.get("mySQL_Password"),
+        database=creds.get("mySQL_Database"),
+        connect_timeout=5
+    )
+
+
+# -------------------------------------------------------
+# POSTGRES CONNECTION
+# -------------------------------------------------------
+def get_postgres_conn(creds: Dict[str, Any]):
+    return psycopg2.connect(
+        host=creds.get("postqreSQL_Server"),
+        port=int(creds.get("postqreSQL_Port", 5432)),
+        user=creds.get("postqreSQL_Login"),
+        password=creds.get("postqreSQL_Password"),
+        database=creds.get("postqreSQL_Database"),
+        connect_timeout=5
+    )
+
+
+# -------------------------------------------------------
+# DISCOVER API
+# -------------------------------------------------------
+@app.get("/api/v1/etl/discover")
+async def discover_connector():
+
+    return {
+        "connector_name": "MySQL-to-PostgreSQL Automated Pipeline Engine",
+        "version": "ETL-0.0.8",
+        "capabilities": [
+            "Handshake Testing",
+            "Dynamic Schema Discovery",
+            "Dry-Run Pre-flight Checks",
+            "Live Process Migration Pipelines"
+        ],
+        "next_step": "Submit configurations to /api/v1/etl/test-handshake"
+    }
+
+
+# -------------------------------------------------------
+# TEST HANDSHAKE
+# -------------------------------------------------------
+@app.post("/api/v1/etl/test-handshake")
+async def test_handshake(payload: Dict[str, Any] = Body(...)):
+
+    session_id = payload.get("sessionId", "default-session")
+
+    src_ok = False
+    dest_ok = False
+
+    try:
+        mysql_conn = get_mysql_conn(payload)
+        mysql_conn.close()
+        src_ok = True
+    except Exception:
+        pass
+
+    try:
+        postgres_conn = get_postgres_conn(payload)
+        postgres_conn.close()
+        dest_ok = True
+    except Exception:
+        pass
+
+    if src_ok and dest_ok:
+
+        session_cache[session_id] = {
+            "config": payload,
+            "scanned_tables": []
+        }
+
+        return {
+            "status": "CONNECTED",
+            "message": "Handshake successful.",
+            "next_step": "Invoke /api/v1/etl/inspect-source"
+        }
+
+    raise HTTPException(
+        status_code=400,
+        detail={
+            "status": "CONNECTION_FAILED",
+            "source_reachable": src_ok,
+            "destination_reachable": dest_ok
+        }
+    )
+
+
+# -------------------------------------------------------
+# INSPECT SOURCE TABLES
+# -------------------------------------------------------
+@app.get("/api/v1/etl/inspect-source")
+async def inspect_source(sessionId: str = Query(...)):
+
+    session = session_cache.get(sessionId)
+
+    if not session:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid session."
+        )
+
+    try:
+
+        conn = get_mysql_conn(session["config"])
+        cursor = conn.cursor()
+
+        cursor.execute("SHOW TABLE STATUS")
+
+        tables_meta = cursor.fetchall()
+
+        table_summary = []
+        table_names = []
+
+        for row in tables_meta:
+
+            table_summary.append({
+                "table_name": row[0],
+                "estimated_rows": row[4],
+                "data_length_kb": round(row[6] / 1024, 2)
+            })
+
+            table_names.append(row[0])
+
+        session["scanned_tables"] = table_names
+
+        conn.close()
+
+        return {
+            "session_id": sessionId,
+            "total_tables_found": len(table_summary),
+            "source_inventory": table_summary,
+            "next_step": "Invoke /api/v1/etl/preflight-check"
+        }
+
+    except Exception as e:
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed reading tables: {str(e)}"
+        )
+
+
+# -------------------------------------------------------
+# PREFLIGHT CHECK
+# -------------------------------------------------------
+@app.post("/api/v1/etl/preflight-check")
+async def preflight_check(payload: Dict[str, str] = Body(...)):
+
+    session_id = payload.get("sessionId", "")
+
+    session = session_cache.get(session_id)
+
+    if not session:
+        raise HTTPException(
+            status_code=400,
+            detail="Session not found."
+        )
+
+    try:
+
+        p_conn = get_postgres_conn(session["config"])
+        cursor = p_conn.cursor()
+
+        conflicts = []
+
+        for table in session["scanned_tables"]:
+
+            cursor.execute(f"""
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables
+                    WHERE table_schema = 'public'
+                    AND table_name = '{table.lower()}'
+                );
+            """)
+
+            if cursor.fetchone()[0]:
+                conflicts.append(table)
+
+        p_conn.close()
+
+        return {
+            "ready_for_migration": True,
+            "target_conflicts_found": len(conflicts),
+            "conflicting_tables": conflicts
+        }
+
+    except Exception as e:
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"Preflight failed: {str(e)}"
+        )
+
+
+# -------------------------------------------------------
+# EXECUTE TALEND PIPELINE
+# -------------------------------------------------------
+@app.post("/api/v1/etl/execute-pipeline")
+async def execute_pipeline(payload: Dict[str, str] = Body(...)):
+
+    session_id = payload.get("sessionId", "")
+
+    session = session_cache.get(session_id)
+
+    if not session:
+        raise HTTPException(
+            status_code=400,
+            detail="Session not found."
+        )
+
+    creds = session["config"]
+
+    try:
+
+        process = subprocess.Popen(
+            [
+                "sh",
+                TALEND_SCRIPT_PATH,
+
+                f"--context_param=mySQL_Server={creds.get('mySQL_Server')}",
+                f"--context_param=mySQL_Port={creds.get('mySQL_Port')}",
+                f"--context_param=mySQL_Database={creds.get('mySQL_Database')}",
+                f"--context_param=mySQL_Login={creds.get('mySQL_Login')}",
+                f"--context_param=mySQL_Password={creds.get('mySQL_Password')}",
+
+                f"--context_param=postqreSQL_Server={creds.get('postqreSQL_Server')}",
+                f"--context_param=postqreSQL_Port={creds.get('postqreSQL_Port')}",
+                f"--context_param=postqreSQL_Database={creds.get('postqreSQL_Database')}",
+                f"--context_param=postqreSQL_Login={creds.get('postqreSQL_Login')}",
+                f"--context_param=postqreSQL_Password={creds.get('postqreSQL_Password')}",
+                f"--context_param=postqreSQL_Schema={creds.get('postqreSQL_Schema', 'public')}"
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True
+        )
+
+        logs = []
+
+        while True:
+
+            line = process.stdout.readline()
+
+            if not line and process.poll() is not None:
+                break
+
+            if line:
+                logs.append(line)
+
+        return_code = process.poll()
+
+        full_logs = "".join(logs)
+
+        if return_code == 0:
+
+            return {
+                "execution_status": "SUCCESS",
+                "exit_code": return_code,
+                "summary": "Pipeline executed successfully.",
+                "progress_logs": full_logs
+            }
+
+        else:
+
+            return {
+                "execution_status": "FAILED",
+                "exit_code": return_code,
+                "progress_logs": full_logs
+            }
+
+    except Exception as e:
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"Pipeline execution failed: {str(e)}"
+        )
+
+
+# -------------------------------------------------------
+# PURGE SESSION
+# -------------------------------------------------------
+@app.post("/api/v1/etl/purge-session")
+async def purge_session(payload: Dict[str, str] = Body(...)):
+
+    session_id = payload.get("sessionId", "")
+
+    if session_id in session_cache:
+
+        del session_cache[session_id]
+
+        return {
+            "status": "PURGED",
+            "message": f"Session {session_id} removed."
+        }
+
+    return {
+        "status": "NO_OP",
+        "message": "Session not found."
+    }
+
+
+# -------------------------------------------------------
+# MAIN
+# -------------------------------------------------------
+if __name__ == "__main__":
+
+    import uvicorn
+
+    uvicorn.run(
+        app,
+        host="0.0.0.0",
+        port=8080
+    )

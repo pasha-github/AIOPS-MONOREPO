@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import tools.jackson.databind.JsonNode;
 
 @RestController
-@RequestMapping("/api/sc")
+@RequestMapping("/v1/api/sc")
 public class AroyaController {
 
     private final AroyaService aroyaService;
