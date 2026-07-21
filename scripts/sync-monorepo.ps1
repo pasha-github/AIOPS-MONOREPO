@@ -44,7 +44,10 @@ function Invoke-Git {
 # imports) or a --squash commit (daily syncs) - the trailer is present either way.
 function Get-SubtreeSplit {
     param([string]$Ref, [string]$Prefix)
-    $msg = & git log $Ref --grep="git-subtree-dir: $Prefix" -1 --format=%B 2>$null
+    # git log emits each line as a separate array element in PowerShell; -match
+    # on an array does an element-wise filter and never populates $matches, so
+    # join back into one string before matching against the (multi-line) body.
+    $msg = (& git log $Ref --grep="git-subtree-dir: $Prefix" -1 --format=%B 2>$null) -join "`n"
     if ($msg -match 'git-subtree-split:\s*([0-9a-f]{40})') {
         return $matches[1]
     }
@@ -197,7 +200,9 @@ if ($Skipped.Count -gt 0) {
 }
 $prBody = $prBodyLines -join "`n"
 $prBodyFile = Join-Path $LogDir "pr-body-$Today.md"
-Set-Content -Path $prBodyFile -Value $prBody -Encoding utf8NoBOM
+# Set-Content -Encoding utf8NoBOM requires PowerShell 6+; write via .NET directly
+# so this works under Windows PowerShell 5.1 too, without a BOM confusing gh.
+[System.IO.File]::WriteAllText($prBodyFile, $prBody, (New-Object System.Text.UTF8Encoding $false))
 
 Log "Switching gh CLI account to pasha-github to open the PR"
 & gh auth switch --user pasha-github --hostname github.com *>&1 | ForEach-Object { Log "  $_" }
