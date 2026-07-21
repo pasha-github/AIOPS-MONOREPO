@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xmi:XMI xmi:version="2.0" xmlns:xmi="http://www.omg.org/XMI" xmlns:TalendMetadata="http://www.talend.org/metadata/connection/2010" xmlns:orgomg.cwm.resource.relational="http:///orgomg/cwm/resource/relational.ecore">
+  <TalendMetadata:DatabaseConnection xmi:id="_x3IB4FaGEfGNhslqaiNCZg" name="mySQL" id="_gccTsFaGEfGNhslqaiNCZg" label="mySQL" dataPackage="_x6xLwFaGEfGNhslqaiNCZg" ContextMode="true" ContextId="_xhBPAFaGEfGNhslqaiNCZg" contextName="Default" DatabaseType="MySQL" DriverClass="com.mysql.cj.jdbc.Driver" URL="jdbc:mysql://127.0.0.1:3306/aiops_rc?noDatetimeStringSync=true" dbVersionString="MYSQL_8" Port="context.mySQL_Port" Username="context.mySQL_Login" Password="context.mySQL_Password" ServerName="context.mySQL_Server" DatasourceName="" FileFieldName="" SID="context.mySQL_Database" SqlSynthax="" StringQuote="" NullChar="" DbmsId="mysql_id" ProductId="MYSQL" AdditionalParams="context.mySQL_AdditionalParams" StandardSQL="true" SQLMode="false" UiSchema="">
+    <taggedValue xmi:id="_x3IB4VaGEfGNhslqaiNCZg" tag="Is Conn Need Reload" value="false"/>
+    <taggedValue xmi:id="_x3bj4FaGEfGNhslqaiNCZg" tag="package filter" value=""/>
+    <taggedValue xmi:id="_x3lU4FaGEfGNhslqaiNCZg" tag="Status" value=""/>
+    <taggedValue xmi:id="_x3lU4VaGEfGNhslqaiNCZg" tag="Version" value="0.1"/>
+    <taggedValue xmi:id="_x3lU4laGEfGNhslqaiNCZg" tag="Purpose" value=""/>
+    <taggedValue xmi:id="_x3lU41aGEfGNhslqaiNCZg" tag="Description" value=""/>
+    <taggedValue xmi:id="_x3lU5FaGEfGNhslqaiNCZg" tag="Author" value=""/>
+    <taggedValue xmi:id="_x3lU5VaGEfGNhslqaiNCZg" tag="otherParameter"/>
+    <taggedValue xmi:id="_x5up8FaGEfGNhslqaiNCZg" tag="DB ProductName" value="MySQL"/>
+    <taggedValue xmi:id="_x5up8VaGEfGNhslqaiNCZg" tag="DB ProductVersion" value="8.0.35"/>
+    <taggedValue xmi:id="_x5up8laGEfGNhslqaiNCZg" tag="DB IdentifierQuoteString" value="`"/>
+    <parameters xmi:id="_x3IB4laGEfGNhslqaiNCZg" key="CONN_PARA_KEY_USERNAME" value="context.mySQL_Login"/>
+  </TalendMetadata:DatabaseConnection>
+  <orgomg.cwm.resource.relational:Catalog xmi:id="_x6xLwFaGEfGNhslqaiNCZg" name="aiops_rc" dataManager="_x3IB4FaGEfGNhslqaiNCZg"/>
+</xmi:XMI>

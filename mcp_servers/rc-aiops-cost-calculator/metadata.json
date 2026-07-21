@@ -1,0 +1,6 @@
+{
+  "name": "RC AIOps Cost Calculator",
+  "description": "Interactive cost estimator and ROI projection dashboard for Royal Cyber's Enterprise AI Ops solution, covering GCP, AWS, Azure, on-premise infrastructure, and custom LLM volume models.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

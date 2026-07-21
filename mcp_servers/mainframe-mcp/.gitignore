@@ -1,0 +1,6 @@
+# Build artifacts
+*.exe
+mainframe-mcp
+
+# Local editor / tool settings
+.claude/settings.local.json

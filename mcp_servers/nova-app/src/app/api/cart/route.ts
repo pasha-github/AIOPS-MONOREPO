@@ -6,8 +6,6 @@
 import { NextResponse } from 'next/server';
 import { serverState, addLog } from '@/lib/server-state';
 
-// In-memory cart store simulating Redis
-const mockCartDB: Record<string, any[]> = {};
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -20,7 +18,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Cart service unavailable' }, { status: 503 });
   }
 
-  const cart = mockCartDB[userId] || [];
+  const cart = serverState.carts[userId] || [];
   return NextResponse.json(cart);
 }
 
@@ -36,20 +34,20 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { userId = 'default-user', product } = body;
     
-    if (!mockCartDB[userId]) {
-      mockCartDB[userId] = [];
+    if (!serverState.carts[userId]) {
+      serverState.carts[userId] = [];
     }
     
     // Check if exists
-    const existing = mockCartDB[userId].find(p => p.id === product.id);
+    const existing = serverState.carts[userId].find(p => p.id === product.id);
     if (existing) {
       existing.quantity += 1;
     } else {
-      mockCartDB[userId].push({ ...product, quantity: 1 });
+      serverState.carts[userId].push({ ...product, quantity: 1 });
     }
 
     addLog('cart-service', `Item ${product.id} added successfully`, 'info');
-    return NextResponse.json(mockCartDB[userId]);
+    return NextResponse.json(serverState.carts[userId]);
   } catch (error) {
     return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
   }
@@ -73,14 +71,14 @@ export async function DELETE(request: Request) {
     }
 
     if (productId === 'clear') {
-      mockCartDB[userId] = [];
+      serverState.carts[userId] = [];
       addLog('cart-service', `Cart cleared successfully`, 'info');
-    } else if (mockCartDB[userId]) {
-      mockCartDB[userId] = mockCartDB[userId].filter(p => p.id !== productId);
+    } else if (serverState.carts[userId]) {
+      serverState.carts[userId] = serverState.carts[userId].filter(p => p.id !== productId);
       addLog('cart-service', `Item ${productId} removed successfully`, 'info');
     }
 
-    return NextResponse.json(mockCartDB[userId] || []);
+    return NextResponse.json(serverState.carts[userId] || []);
   } catch (error) {
     return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
   }

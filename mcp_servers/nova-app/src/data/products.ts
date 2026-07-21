@@ -109,5 +109,55 @@ export const products: Product[] = [
     category: "Smart Home",
     rating: 4.5,
     inventory: 40
+  },
+  {
+    id: "p11",
+    name: "Nova Tablet Pro",
+    description: "12-inch high-resolution tablet for creators.",
+    price: 799.99,
+    image: "https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?q=80&w=600&auto=format&fit=crop",
+    category: "Tablets",
+    rating: 4.8,
+    inventory: 30
+  },
+  {
+    id: "p12",
+    name: "Smart Thermostat",
+    description: "Energy-saving smart thermostat with AI learning.",
+    price: 199.99,
+    image: "https://images.unsplash.com/photo-1558089687-f282ffcbc126?q=80&w=600&auto=format&fit=crop",
+    category: "Smart Home",
+    rating: 4.7,
+    inventory: 50
+  },
+  {
+    id: "p13",
+    name: "Wireless Charging Pad",
+    description: "Fast multi-device wireless charging station.",
+    price: 59.99,
+    image: "https://images.unsplash.com/photo-1583394838336-acd977736f90?q=80&w=600&auto=format&fit=crop",
+    category: "Accessories",
+    rating: 4.5,
+    inventory: 150
+  },
+  {
+    id: "p14",
+    name: "Aura On-Ear Headphones",
+    description: "Premium over-ear noise cancelling headphones.",
+    price: 249.99,
+    image: "https://images.unsplash.com/photo-1618366712010-f4ae9c647dcb?q=80&w=600&auto=format&fit=crop",
+    category: "Audio",
+    rating: 4.9,
+    inventory: 80
+  },
+  {
+    id: "p15",
+    name: "Security Cam Pro",
+    description: "4K smart home security camera with night vision.",
+    price: 129.99,
+    image: "https://images.unsplash.com/photo-1557324232-b8917d3c3dcb?q=80&w=600&auto=format&fit=crop",
+    category: "Smart Home",
+    rating: 4.6,
+    inventory: 65
   }
 ];

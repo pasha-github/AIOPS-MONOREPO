@@ -1,0 +1,439 @@
+{
+  "reservationCreate": {
+    "errors": [],
+    "result": {
+      "key": "-17279160",
+      "id": "Reservation|-17279160",
+      "guid": "5B91AF51-4FD1-4F5A-836A-045E3B51409A",
+      "initialDate": "2026-06-24T12:28:29",
+      "status": {
+        "name": "SHOPPING"
+      },
+      "invoiceTotals": {
+        "invoiceTotal": 6398,
+        "payments": 0,
+        "currentDue": {
+          "date": "2026-06-25T12:28:29",
+          "amount": 750,
+          "type": "FIRST DEPOSIT"
+        },
+        "invoiceTotalPrices": [
+          {
+            "currency": {
+              "key": "SAR",
+              "id": "Currency|SAR"
+            },
+            "total": 6398,
+            "pricePerGuest": [],
+            "discount": 0
+          }
+        ],
+        "paymentsPrices": [
+          {
+            "total": 0,
+            "discount": 0
+          }
+        ]
+      },
+      "sourceCode": "NEWINT-CON",
+      "guests": [
+        {
+          "seqN": 1,
+          "age": 36,
+          "ageCategory": {
+            "key": "SHIP,ADULT"
+          },
+          "client": {
+            "key": "42935",
+            "fullName": "AHMED AL-RASHIDI",
+            "gender": "M",
+            "email": "ahmed.rashidi@example.com",
+            "mobileNumber": "+9662501234567"
+          }
+        },
+        {
+          "seqN": 2,
+          "age": 34,
+          "ageCategory": {
+            "key": "SHIP,ADULT"
+          },
+          "client": {
+            "key": "42936",
+            "fullName": "SARA AL-RASHIDI",
+            "gender": "F",
+            "email": "sara.rashidi@example.com",
+            "mobileNumber": "+966509876543"
+          }
+        }
+      ],
+      "guestCount": 2,
+      "paymentSchedule": [
+        {
+          "dueType": "FIRST DEPOSIT",
+          "dueDate": "2026-06-25T12:28:29",
+          "expirationDate": "2026-06-25T12:28:29",
+          "amount": 750,
+          "paid": false,
+          "prices": [
+            {
+              "total": 750,
+              "discount": 0
+            }
+          ]
+        },
+        {
+          "dueType": "FINAL PAYMENT",
+          "dueDate": "2026-07-14T23:59:59",
+          "expirationDate": "2026-07-14T23:59:59",
+          "amount": 5648,
+          "paid": false,
+          "prices": [
+            {
+              "total": 5648,
+              "discount": 0
+            }
+          ]
+        }
+      ],
+      "promotions": [],
+      "addons": []
+    }
+  },
+  "selectedVoyages": [
+    {
+      "cabinSeqN": 1,
+      "packageKey": "AC01260912REPJED-8",
+      "categoryKey": "AC01,IC",
+      "availability": "OK",
+      "guests": [
+        1,
+        2
+      ],
+      "detailsAvailable": true,
+      "voyageDetails": {
+        "key": "AC01260912REPJED-8",
+        "type": {
+          "cms": {
+            "title": "8 Nights from Istanbul to Red Sea Destinations",
+            "duration": "8 nights"
+          }
+        }
+      },
+      "inventoryResult": {},
+      "cabinDetails": {
+        "detailsAvailable": true,
+        "categoryKey": "AC01,IC",
+        "selectedCategory": {
+          "cabinCategory": {
+            "cabinCapacity": 3,
+            "code": "IC",
+            "comments": "Interior Cabin",
+            "id": "CabinCategory|AC01|IC",
+            "key": "AC01,IC",
+            "keys": [
+              "AC01",
+              "IC"
+            ],
+            "rank": 210
+          }
+        }
+      },
+      "sailActivities": [
+        {
+          "dateTime": "2026-09-12T23:59:00",
+          "id": "SailActivity|103562",
+          "itineraryDescription": "Istanbul, Turkey's largest city, is a vibrant hub of culture, history, and economy, known for its rich heritage\nand diverse architecture. A popular tourist destination, it offers local food tours, park strolls, and shopping\nat the Grand Bazaar. Visitors can explore historic landmarks and enjoy stunning views of the city on a\nboat trip along the Bosphorus Strait.",
+          "itineraryTitle": "Istanbul",
+          "key": "103562",
+          "keys": [
+            "103562"
+          ],
+          "mayDisembark": false,
+          "mayEmbark": true,
+          "port": {
+            "name": "ISTANBUL",
+            "key": "TRIST"
+          },
+          "sailActivityId": 103562,
+          "recordId": "103562",
+          "sailRefId": 2773,
+          "sailRefIdent": "2773",
+          "type": {
+            "comments": "Departure",
+            "key": "DEPARTURE"
+          }
+        },
+        {
+          "dateTime": "2026-09-13T03:00:00",
+          "id": "SailActivity|103563",
+          "key": "103563",
+          "keys": [
+            "103563"
+          ],
+          "mayDisembark": false,
+          "mayEmbark": false,
+          "sailActivityId": 103563,
+          "recordId": "103563",
+          "sailRefId": 0,
+          "sailRefIdent": "0",
+          "type": {
+            "comments": "At Sea",
+            "key": "AT SEA"
+          }
+        },
+        {
+          "dateTime": "2026-09-14T08:00:00",
+          "id": "SailActivity|103564",
+          "itineraryDescription": "Marmaris is a Turkish coastal city in Muğla Province. It’s a wonderful tourist destination for visitors from all around the world, a yacht harbor, and an important starting point for sea voyages, a place where stunning nature blends with rich history.",
+          "itineraryTitle": "Marmaris",
+          "key": "103564",
+          "keys": [
+            "103564"
+          ],
+          "mayDisembark": true,
+          "mayEmbark": false,
+          "port": {
+            "name": "Marmaris",
+            "key": "TRMRM"
+          },
+          "sailActivityId": 103564,
+          "recordId": "103564",
+          "sailRefId": 2774,
+          "sailRefIdent": "2774",
+          "type": {
+            "comments": "Arrival",
+            "key": "ARRIVAL"
+          }
+        },
+        {
+          "dateTime": "2026-09-14T20:00:00",
+          "id": "SailActivity|103565",
+          "itineraryDescription": "Marmaris is a Turkish coastal city in Muğla Province. It’s a wonderful tourist destination for visitors from all around the world, a yacht harbor, and an important starting point for sea voyages, a place where stunning nature blends with rich history.",
+          "itineraryTitle": "Marmaris",
+          "key": "103565",
+          "keys": [
+            "103565"
+          ],
+          "mayDisembark": false,
+          "mayEmbark": true,
+          "port": {
+            "name": "Marmaris",
+            "key": "TRMRM"
+          },
+          "sailActivityId": 103565,
+          "recordId": "103565",
+          "sailRefId": 2775,
+          "sailRefIdent": "2775",
+          "type": {
+            "comments": "Departure",
+            "key": "DEPARTURE"
+          }
+        },
+        {
+          "dateTime": "2026-09-15T08:00:00",
+          "id": "SailActivity|103566",
+          "itineraryDescription": "Bodrum is a stunning coastal city on Turkey's west coast, famous for its mix of culture and modern\nattractions. Visitors can enjoy boat trips, sandy beaches, shopping at Midtown and Bodrum bazaar, and\nhistorical sites like Bodrum Castle and the Tomb of Mausolus. The city also features water parks and\nrestaurants offering traditional Turkish cuisine.",
+          "itineraryTitle": "Bodrum",
+          "key": "103566",
+          "keys": [
+            "103566"
+          ],
+          "mayDisembark": true,
+          "mayEmbark": false,
+          "port": {
+            "name": "Bodrum",
+            "key": "TRBXN"
+          },
+          "sailActivityId": 103566,
+          "recordId": "103566",
+          "sailRefId": 2776,
+          "sailRefIdent": "2776",
+          "type": {
+            "comments": "Arrival",
+            "key": "ARRIVAL"
+          }
+        },
+        {
+          "dateTime": "2026-09-15T20:00:00",
+          "id": "SailActivity|103567",
+          "itineraryDescription": "Bodrum is a stunning coastal city on Turkey's west coast, famous for its mix of culture and modern\nattractions. Visitors can enjoy boat trips, sandy beaches, shopping at Midtown and Bodrum bazaar, and\nhistorical sites like Bodrum Castle and the Tomb of Mausolus. The city also features water parks and\nrestaurants offering traditional Turkish cuisine.",
+          "itineraryTitle": "Bodrum",
+          "key": "103567",
+          "keys": [
+            "103567"
+          ],
+          "mayDisembark": false,
+          "mayEmbark": true,
+          "port": {
+            "name": "Bodrum",
+            "key": "TRBXN"
+          },
+          "sailActivityId": 103567,
+          "recordId": "103567",
+          "sailRefId": 2777,
+          "sailRefIdent": "2777",
+          "type": {
+            "comments": "Departure",
+            "key": "DEPARTURE"
+          }
+        },
+        {
+          "dateTime": "2026-09-16T03:00:00",
+          "id": "SailActivity|103568",
+          "key": "103568",
+          "keys": [
+            "103568"
+          ],
+          "mayDisembark": false,
+          "mayEmbark": false,
+          "sailActivityId": 103568,
+          "recordId": "103568",
+          "sailRefId": 0,
+          "sailRefIdent": "0",
+          "type": {
+            "comments": "At Sea",
+            "key": "AT SEA"
+          }
+        },
+        {
+          "dateTime": "2026-09-17T04:00:00",
+          "id": "SailActivity|103569",
+          "itineraryDescription": "Passing through Suez Canal and it’s a vital artificial waterway linking the Mediterranean Sea to the Red Sea, enabling fast travel between Europe and Asia.",
+          "itineraryTitle": "Suez Canal",
+          "key": "103569",
+          "keys": [
+            "103569"
+          ],
+          "mayDisembark": true,
+          "mayEmbark": false,
+          "port": {
+            "name": "Sues Canal",
+            "key": "EGSUZ"
+          },
+          "sailActivityId": 103569,
+          "recordId": "103569",
+          "sailRefId": 2778,
+          "sailRefIdent": "2778",
+          "type": {
+            "comments": "Arrival",
+            "key": "ARRIVAL"
+          }
+        },
+        {
+          "dateTime": "2026-09-17T15:00:00",
+          "id": "SailActivity|103570",
+          "itineraryDescription": "Passing through Suez Canal and it’s a vital artificial waterway linking the Mediterranean Sea to the Red Sea, enabling fast travel between Europe and Asia.",
+          "itineraryTitle": "Suez Canal",
+          "key": "103570",
+          "keys": [
+            "103570"
+          ],
+          "mayDisembark": false,
+          "mayEmbark": true,
+          "port": {
+            "name": "Sues Canal",
+            "key": "EGSUZ"
+          },
+          "sailActivityId": 103570,
+          "recordId": "103570",
+          "sailRefId": 2779,
+          "sailRefIdent": "2779",
+          "type": {
+            "comments": "Departure",
+            "key": "DEPARTURE"
+          }
+        },
+        {
+          "dateTime": "2026-09-18T06:00:00",
+          "id": "SailActivity|103571",
+          "itineraryDescription": "Sharm El Sheikh, a blend of authentic Egyptian and world cultures and one of the most famous coastal tourist cities located in the south of Sinai, Egypt. known for its white sandy beaches and clear blue waters, it is one of the most prominent travel destinations in the Middle East and North Africa. \nConsidered to be a prime destination for divers to explore the depths of the Red Sea, with coral reefs and rare marine creatures, Naama Bay and Ras Mohammed are well-known marine reserves and sites for diving.",
+          "itineraryTitle": "Sharm El Sheik",
+          "key": "103571",
+          "keys": [
+            "103571"
+          ],
+          "mayDisembark": true,
+          "mayEmbark": false,
+          "port": {
+            "name": "Sharm El Sheikh",
+            "key": "EGSSH"
+          },
+          "sailActivityId": 103571,
+          "recordId": "103571",
+          "sailRefId": 2780,
+          "sailRefIdent": "2780",
+          "type": {
+            "comments": "Arrival",
+            "key": "ARRIVAL"
+          }
+        },
+        {
+          "dateTime": "2026-09-18T23:59:00",
+          "id": "SailActivity|103572",
+          "itineraryDescription": "Sharm El Sheikh, a blend of authentic Egyptian and world cultures and one of the most famous coastal tourist cities located in the south of Sinai, Egypt. known for its white sandy beaches and clear blue waters, it is one of the most prominent travel destinations in the Middle East and North Africa. \nConsidered to be a prime destination for divers to explore the depths of the Red Sea, with coral reefs and rare marine creatures, Naama Bay and Ras Mohammed are well-known marine reserves and sites for diving.",
+          "itineraryTitle": "Sharm El Sheik",
+          "key": "103572",
+          "keys": [
+            "103572"
+          ],
+          "mayDisembark": false,
+          "mayEmbark": true,
+          "port": {
+            "name": "Sharm El Sheikh",
+            "key": "EGSSH"
+          },
+          "sailActivityId": 103572,
+          "recordId": "103572",
+          "sailRefId": 2781,
+          "sailRefIdent": "2781",
+          "type": {
+            "comments": "Departure",
+            "key": "DEPARTURE"
+          }
+        },
+        {
+          "dateTime": "2026-09-19T03:00:00",
+          "id": "SailActivity|103573",
+          "key": "103573",
+          "keys": [
+            "103573"
+          ],
+          "mayDisembark": false,
+          "mayEmbark": false,
+          "sailActivityId": 103573,
+          "recordId": "103573",
+          "sailRefId": 0,
+          "sailRefIdent": "0",
+          "type": {
+            "comments": "At Sea",
+            "key": "AT SEA"
+          }
+        },
+        {
+          "dateTime": "2026-09-20T06:00:00",
+          "id": "SailActivity|103574",
+          "itineraryDescription": "Jeddah, Bride of the Red Sea, Jeddah, where arts, heritage, and cultures cross, as you find spaciousness in the heart of its historical embraces, evoking warmth, and nostalgia. \nVisited by millions of tourists from around the world to explore and exchange cultures, Jeddah is considered the cradle of arts and music that dazzled the world. Additionally, it’s a global destination characterized by multiculturalism and vitality, recognized by UNESCO World Heritage, Jeddah, provides its visitors the chance to enjoy its rich culture and heritage.",
+          "itineraryTitle": "Jeddah",
+          "key": "103574",
+          "keys": [
+            "103574"
+          ],
+          "mayDisembark": true,
+          "mayEmbark": false,
+          "port": {
+            "name": "Jeddah",
+            "key": "SAJED"
+          },
+          "sailActivityId": 103574,
+          "recordId": "103574",
+          "sailRefId": 2782,
+          "sailRefIdent": "2782",
+          "type": {
+            "comments": "Arrival",
+            "key": "ARRIVAL"
+          }
+        }
+      ]
+    }
+  ]
+}

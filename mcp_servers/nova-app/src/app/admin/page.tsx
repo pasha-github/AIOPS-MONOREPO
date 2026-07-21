@@ -10,7 +10,7 @@ import { Activity, Server, Database, ServerCrash, RefreshCw, AlertTriangle, Shie
 import { motion } from "framer-motion";
 
 export default function AdminDashboard() {
-  const [faults, setFaults] = useState({ isRedisDown: false, isDbLatencyHigh: false, isPaymentTimeout: false });
+  const [faults, setFaults] = useState({ isRedisDown: false, isDbLatencyHigh: false, isPaymentTimeout: false, isBatchJobFailed: false });
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -90,11 +90,11 @@ export default function AdminDashboard() {
               </h2>
               
               <div className="relative h-64 flex items-center justify-center">
-                {/* Connections (Visual only) */}
                 <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 0 }}>
                   <line x1="20%" y1="50%" x2="40%" y2="20%" stroke={faults.isDbLatencyHigh ? "#ef4444" : "#3b82f6"} strokeWidth="2" strokeDasharray="4" className={faults.isDbLatencyHigh ? "" : "animate-pulse"} />
                   <line x1="20%" y1="50%" x2="40%" y2="80%" stroke={faults.isRedisDown ? "#ef4444" : "#3b82f6"} strokeWidth="2" strokeDasharray="4" className={faults.isRedisDown ? "" : "animate-pulse"} />
                   <line x1="20%" y1="50%" x2="70%" y2="50%" stroke={faults.isPaymentTimeout ? "#ef4444" : "#3b82f6"} strokeWidth="2" strokeDasharray="4" className={faults.isPaymentTimeout ? "" : "animate-pulse"} />
+                  <line x1="20%" y1="50%" x2="70%" y2="80%" stroke={faults.isBatchJobFailed ? "#ef4444" : "#3b82f6"} strokeWidth="2" strokeDasharray="4" className={faults.isBatchJobFailed ? "" : "animate-pulse"} />
                 </svg>
 
                 {/* Nodes */}
@@ -128,11 +128,19 @@ export default function AdminDashboard() {
                   <span className="text-xs font-bold">Payment Gateway</span>
                   {faults.isPaymentTimeout && <span className="block text-[10px] text-red-400 mt-1">Timeout</span>}
                 </div>
+
+                <div className="absolute right-[20%] bottom-[10%] z-10 text-center">
+                  <div className={`h-16 w-16 rounded-xl flex items-center justify-center mx-auto mb-2 border-2 transition-colors ${faults.isBatchJobFailed ? 'bg-red-900/50 border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.5)]' : 'bg-brand-blue-900 border-brand-cyan shadow-[0_0_15px_rgba(0,240,255,0.3)]'}`}>
+                    <RefreshCw className={`h-8 w-8 ${faults.isBatchJobFailed ? 'text-red-400' : 'text-brand-cyan'}`} />
+                  </div>
+                  <span className="text-xs font-bold">Batch Job</span>
+                  {faults.isBatchJobFailed && <span className="block text-[10px] text-red-400 mt-1">Failed</span>}
+                </div>
               </div>
             </div>
 
             {/* Fault Injection Controls */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
               <div className="bg-[#0a1128] border border-slate-800 rounded-xl p-5">
                 <div className="flex justify-between items-start mb-4">
                   <div>
@@ -172,6 +180,20 @@ export default function AdminDashboard() {
                 <div className="flex gap-2">
                   <button onClick={() => toggleFault('isPaymentTimeout', true)} disabled={faults.isPaymentTimeout} className="flex-1 bg-red-500/20 hover:bg-red-500/30 text-red-400 disabled:opacity-50 text-xs font-bold py-2 rounded">INJECT</button>
                   <button onClick={() => manualRemediate('RESET_PAYMENT_GATEWAY')} disabled={!faults.isPaymentTimeout} className="flex-1 bg-green-500/20 hover:bg-green-500/30 text-green-400 disabled:opacity-50 text-xs font-bold py-2 rounded">HEAL (RESET)</button>
+                </div>
+              </div>
+
+              <div className="bg-[#0a1128] border border-slate-800 rounded-xl p-5">
+                <div className="flex justify-between items-start mb-4">
+                  <div>
+                    <h3 className="font-semibold text-white">Order Job Fail</h3>
+                    <p className="text-xs text-slate-400 mt-1">Batch Job Stopped</p>
+                  </div>
+                  <RefreshCw className={`h-5 w-5 ${faults.isBatchJobFailed ? 'text-red-500' : 'text-slate-600'}`} />
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={() => toggleFault('isBatchJobFailed', true)} disabled={faults.isBatchJobFailed} className="flex-1 bg-red-500/20 hover:bg-red-500/30 text-red-400 disabled:opacity-50 text-xs font-bold py-2 rounded">INJECT</button>
+                  <button onClick={() => manualRemediate('RUN_BATCH_JOB')} disabled={!faults.isBatchJobFailed} className="flex-1 bg-green-500/20 hover:bg-green-500/30 text-green-400 disabled:opacity-50 text-xs font-bold py-2 rounded">HEAL (RUN)</button>
                 </div>
               </div>
             </div>
