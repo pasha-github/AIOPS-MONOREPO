@@ -33,6 +33,10 @@ def _foreign_key_names(inspector: sa.Inspector, table_name: str) -> set[str]:
     }
 
 
+def _supports_alter_foreign_keys(bind: sa.Connection) -> bool:
+    return bind.dialect.name != "sqlite"
+
+
 def upgrade() -> None:
     """Upgrade schema."""
     bind = op.get_bind()
@@ -146,39 +150,40 @@ def upgrade() -> None:
     agent_columns = _column_names(inspector, "agent")
     agent_fks = _foreign_key_names(inspector, "agent")
 
-    if (
-        "primary_model_id" in agent_columns
-        and "fk_agent_primary_model_id_model" not in agent_fks
-    ):
-        op.create_foreign_key(
-            "fk_agent_primary_model_id_model",
-            "agent",
-            "model",
-            ["primary_model_id"],
-            ["model_id"],
-        )
-    if (
-        "secondary_model_id" in agent_columns
-        and "fk_agent_secondary_model_id_model" not in agent_fks
-    ):
-        op.create_foreign_key(
-            "fk_agent_secondary_model_id_model",
-            "agent",
-            "model",
-            ["secondary_model_id"],
-            ["model_id"],
-        )
-    if (
-        "tertiary_model_id" in agent_columns
-        and "fk_agent_tertiary_model_id_model" not in agent_fks
-    ):
-        op.create_foreign_key(
-            "fk_agent_tertiary_model_id_model",
-            "agent",
-            "model",
-            ["tertiary_model_id"],
-            ["model_id"],
-        )
+    if _supports_alter_foreign_keys(bind):
+        if (
+            "primary_model_id" in agent_columns
+            and "fk_agent_primary_model_id_model" not in agent_fks
+        ):
+            op.create_foreign_key(
+                "fk_agent_primary_model_id_model",
+                "agent",
+                "model",
+                ["primary_model_id"],
+                ["model_id"],
+            )
+        if (
+            "secondary_model_id" in agent_columns
+            and "fk_agent_secondary_model_id_model" not in agent_fks
+        ):
+            op.create_foreign_key(
+                "fk_agent_secondary_model_id_model",
+                "agent",
+                "model",
+                ["secondary_model_id"],
+                ["model_id"],
+            )
+        if (
+            "tertiary_model_id" in agent_columns
+            and "fk_agent_tertiary_model_id_model" not in agent_fks
+        ):
+            op.create_foreign_key(
+                "fk_agent_tertiary_model_id_model",
+                "agent",
+                "model",
+                ["tertiary_model_id"],
+                ["model_id"],
+            )
 
     if "model_id" in agent_columns:
         # Preserve old behavior for existing agents:
@@ -211,12 +216,13 @@ def upgrade() -> None:
 
     inspector = sa.inspect(bind)
     agent_columns = _column_names(inspector, "agent")
-    if "primary_use_global" in agent_columns:
-        op.alter_column("agent", "primary_use_global", server_default=None)
-    if "secondary_use_global" in agent_columns:
-        op.alter_column("agent", "secondary_use_global", server_default=None)
-    if "tertiary_use_global" in agent_columns:
-        op.alter_column("agent", "tertiary_use_global", server_default=None)
+    if bind.dialect.name != "sqlite":
+        if "primary_use_global" in agent_columns:
+            op.alter_column("agent", "primary_use_global", server_default=None)
+        if "secondary_use_global" in agent_columns:
+            op.alter_column("agent", "secondary_use_global", server_default=None)
+        if "tertiary_use_global" in agent_columns:
+            op.alter_column("agent", "tertiary_use_global", server_default=None)
 
 
 def downgrade() -> None:

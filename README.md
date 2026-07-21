@@ -48,7 +48,8 @@ pyright . # check for type errors
 python -m pytest # run tests
 ```
 ```bash
-ruff check . && pyright && python -m pytest # run all checks
+# run all checks
+ruff format && ruff check . && pyright && python -m pytest 
 ```
 
 ## Running with Docker

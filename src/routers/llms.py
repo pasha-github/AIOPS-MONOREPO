@@ -1,12 +1,15 @@
 from datetime import datetime
 from typing import Any, cast
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import or_
 from sqlmodel import Session, select
 
-from src.agent_runtime.adk.adk_app import invalidate_cache
+from src.agent_runtime.service import (
+    enqueue_agent_runtime_reconcile,
+    mark_agent_runtime_pending,
+)
 from src.database.database import get_session
 from src.database.models import Agent, Model, ModelDefaults
 from src.utils.secrets import encrypt_secret
@@ -34,8 +37,9 @@ class ModelCreate(BaseModel):
     model_id: str
     provider: str
     name: str
-    description: str | None
+    description: str | None = None
     api_key: str
+    extra_config: dict | None = None
 
 
 class ModelRead(BaseModel):
@@ -44,6 +48,7 @@ class ModelRead(BaseModel):
     name: str
     created_at: datetime
     description: str | None
+    extra_config: dict | None = None
     # Exclude api_key
 
 
@@ -51,6 +56,7 @@ class ModelUpdate(BaseModel):
     name: str | None = None
     description: str | None = None
     api_key: str | None = None
+    extra_config: dict | None = None
 
 
 class ModelDefaultsRead(BaseModel):
@@ -76,12 +82,14 @@ def _get_or_create_model_defaults(session: Session) -> ModelDefaults:
     return defaults
 
 
-def _invalidate_global_agents(session: Session):
-    agent_ids = list(
-        session.exec(select(Agent.agent_id).where(_global_slot_condition())).all()
-    )
-    for agent_id in agent_ids:
-        invalidate_cache(agent_id)
+def _invalidate_global_agents(session: Session, background_tasks: BackgroundTasks):
+    agents = list(session.exec(select(Agent).where(_global_slot_condition())).all())
+    for agent in agents:
+        mark_agent_runtime_pending(agent)
+        session.add(agent)
+    session.commit()
+    for agent in agents:
+        enqueue_agent_runtime_reconcile(background_tasks, agent_id=agent.agent_id)
 
 
 @router.post("/", response_model=ModelRead)
@@ -111,7 +119,9 @@ def get_model_defaults(session: Session = Depends(get_session)):
 
 @router.patch("/defaults", response_model=ModelDefaultsRead)
 def update_model_defaults(
-    defaults_update: ModelDefaultsUpdate, session: Session = Depends(get_session)
+    defaults_update: ModelDefaultsUpdate,
+    background_tasks: BackgroundTasks,
+    session: Session = Depends(get_session),
 ):
     defaults = _get_or_create_model_defaults(session)
     update_data = defaults_update.model_dump(exclude_unset=True)
@@ -123,13 +133,16 @@ def update_model_defaults(
     session.add(defaults)
     session.commit()
     session.refresh(defaults)
-    _invalidate_global_agents(session)
+    _invalidate_global_agents(session, background_tasks)
     return defaults
 
 
 @router.patch("/{model_id}", response_model=ModelRead)
 def update_model(
-    model_id: str, model_update: ModelUpdate, session: Session = Depends(get_session)
+    model_id: str,
+    model_update: ModelUpdate,
+    background_tasks: BackgroundTasks,
+    session: Session = Depends(get_session),
 ):
     model = session.get(Model, model_id)
     if not model:
@@ -151,6 +164,8 @@ def update_model(
         if update_data["api_key"] is None or not update_data["api_key"].strip():
             raise HTTPException(status_code=400, detail="api_key cannot be empty")
         model.api_key = encrypt_secret(update_data["api_key"])
+    if "extra_config" in update_data:
+        model.extra_config = update_data["extra_config"]
 
     session.add(model)
     session.commit()
@@ -175,7 +190,13 @@ def update_model(
             )
         )
     for agent_id in set(agent_ids):
-        invalidate_cache(agent_id)
+        agent = session.get(Agent, agent_id)
+        if agent is not None:
+            mark_agent_runtime_pending(agent)
+            session.add(agent)
+    session.commit()
+    for agent_id in set(agent_ids):
+        enqueue_agent_runtime_reconcile(background_tasks, agent_id=agent_id)
 
     return model
 

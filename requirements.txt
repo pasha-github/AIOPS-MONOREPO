@@ -1,10 +1,13 @@
-google-adk==1.31.1
-google-adk[a2a]
+﻿google-adk[a2a,eval]==1.35.2
+google-cloud-aiplatform==1.148.1
+google-genai==1.75.0
 fastapi
 uvicorn
 sqlmodel
 litellm<=1.81.12
 cryptography
+cloudpickle==3.1.2
+PyYAML==6.0.3
 
 # For Postgres
 asyncpg
@@ -15,11 +18,25 @@ alembic
 
 # For AWS Bedrock Models
 boto3
+bedrock-agentcore
+bedrock-agentcore-starter-toolkit
 
 # For Webhooks and Jobs
 httpx
+requests
 apscheduler
 
 # For Linting
 ruff
+
+# For SSH-based connectors
 paramiko
+
+# For SharePoint Beta Connector (.docx creation, editing, and comments)
+docx-mcp-server
+
+# For scheduler condition evaluation (JSONPath support)
+jsonpath-ng
+
+# For SharePoint Beta Connector (PDF text extraction)
+pypdf

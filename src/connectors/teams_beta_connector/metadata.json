@@ -1,0 +1,53 @@
+{
+  "id": "teams_beta_connector",
+  "name": "Teams Beta",
+  "description": "Send proactive alerts through the local Teams bot APIs using non-blocking async HTTP.",
+  "version": "1.0.0",
+  "config_variables": [
+    {
+      "name": "TEAMS_BOT_BASE_URL",
+      "label": "Teams Bot Base URL",
+      "required": true,
+      "secret": false,
+      "placeholder": "http://localhost:3978"
+    },
+    {
+      "name": "ALERT_API_KEY",
+      "label": "Alert API Key",
+      "required": true,
+      "secret": true,
+      "placeholder": "Enter alert API key"
+    },
+    {
+      "name": "EMAILS",
+      "label": "Emails",
+      "required": false,
+      "secret": false,
+      "placeholder": "user@example.com,other@example.com"
+    },
+    {
+      "name": "CONVERSATION_IDS",
+      "label": "Conversation IDs",
+      "required": false,
+      "secret": false,
+      "placeholder": "19:thread@tacv2"
+    },
+    {
+      "name": "prefix",
+      "label": "Prefix",
+      "required": false,
+      "secret": false,
+      "placeholder": "Teams"
+    }
+  ],
+  "tools": [
+    {
+      "name": "send_alert_by_email",
+      "documentation": "Send a proactive Teams alert to preconfigured email target(s)."
+    },
+    {
+      "name": "send_alert_by_conversation",
+      "documentation": "Send a proactive Teams alert to preconfigured conversation target(s)."
+    }
+  ]
+}

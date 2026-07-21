@@ -1,18 +1,17 @@
+import json
 from datetime import datetime
-from pathlib import Path
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
-from src.agent_runtime.adk.adk_app import invalidate_cache
-from src.connectors.loader import (
-    get_connector_dir,
-    load_connector_info,
-    load_connector_metadata,
+from src.agent_runtime.service import (
+    enqueue_agent_runtime_reconcile,
+    mark_agent_runtime_pending,
 )
+from src.connectors.loader import CONNECTORS_DIR, get_connector_dir, load_connector_info
 from src.database.database import get_session
 from src.database.models import Agent, ConnectorConfig, Skill
 
@@ -34,21 +33,24 @@ router = APIRouter(prefix="/connectors", tags=["connectors"])
 @router.get("/", response_model=list[dict[str, str]])
 def list_connectors():
     connectors = []
-    connectors_dir = Path("src/connectors")
-    if connectors_dir.exists():
-        for path_obj in connectors_dir.iterdir():
+    if CONNECTORS_DIR.exists():
+        for path_obj in CONNECTORS_DIR.iterdir():
+            dirname = path_obj.name
             if not path_obj.is_dir():
                 continue
-            connector_id = path_obj.name
-            if connector_id in {"__pycache__", "example_connector"}:
+            if dirname in {"example_connector", "__pycache__"} or dirname.startswith(
+                "__"
+            ):
                 continue
-            metadata_path = path_obj / "metadata.json"
-            if not metadata_path.exists():
-                continue
-            metadata = load_connector_metadata(connector_id)
-            connectors.append(
-                {"id": connector_id, "name": metadata.get("name", connector_id)}
-            )
+            if dirname.endswith("_connector") and (path_obj / "connector.py").exists():
+                metadata_path = path_obj / "metadata.json"
+                if not metadata_path.exists():
+                    continue
+                with metadata_path.open(encoding="utf-8") as f:
+                    meta = json.load(f)
+                name = meta.get("name", dirname)
+                category = meta.get("category", "enterprise")
+                connectors.append({"id": dirname, "name": name, "category": category})
     return connectors
 
 
@@ -91,8 +93,8 @@ def set_connector_config(
     if connector_id in {"__init__", "base_connector"}:
         raise HTTPException(status_code=404, detail="Connector not found")
 
-    connector_dir = get_connector_dir(connector_id)
-    if not connector_dir.exists():
+    connector_file = CONNECTORS_DIR / connector_id / "connector.py"
+    if not connector_file.exists():
         raise HTTPException(status_code=404, detail="Connector not found")
 
     db = ConnectorConfig.model_validate(connector_config)
@@ -107,6 +109,7 @@ def patch_connector_config(
     connector_id: str,
     connector_config_id: UUID,
     connector_config: ConnectorConfigPatch,
+    background_tasks: BackgroundTasks,
     session: Session = Depends(get_session),
 ) -> ConnectorConfig:
     db_connector_config = session.get(ConnectorConfig, connector_config_id)
@@ -120,8 +123,8 @@ def patch_connector_config(
         for skill in session.exec(select(Skill)).all()
         if connector_config_id_str in (skill.connector_config_ids or [])
     }
-    affected_agent_ids = [
-        agent.agent_id
+    affected_agents = [
+        agent
         for agent in session.exec(select(Agent)).all()
         if connector_config_id_str in (agent.connector_config_ids or [])
         or any(skill_id in matching_skill_ids for skill_id in (agent.skill_ids or []))
@@ -136,8 +139,14 @@ def patch_connector_config(
     session.commit()
     session.refresh(db_connector_config)
 
-    for agent_id in affected_agent_ids:
-        invalidate_cache(agent_id)
+    for agent in affected_agents:
+        mark_agent_runtime_pending(agent)
+        session.add(agent)
+    session.commit()
+    session.refresh(db_connector_config)
+
+    for agent in affected_agents:
+        enqueue_agent_runtime_reconcile(background_tasks, agent_id=agent.agent_id)
 
     return db_connector_config
 
@@ -155,26 +164,25 @@ def delete_connector_config(
         raise HTTPException(status_code=404, detail="Connector config not found")
 
     connector_config_id_str = str(connector_config_id)
-    agents_using_config = session.exec(select(Agent)).all()
     agent_names = [
         agent.name
-        for agent in agents_using_config
+        for agent in session.exec(select(Agent)).all()
         if connector_config_id_str in (agent.connector_config_ids or [])
-    ]
-    skills_using_config = [
-        skill.name
-        for skill in session.exec(select(Skill)).all()
-        if connector_config_id_str in (skill.connector_config_ids or [])
     ]
     if agent_names:
         raise HTTPException(
             status_code=409,
             detail=f"Connector config is in use by agent: {', '.join(agent_names)}",
         )
-    if skills_using_config:
+    skill_names = [
+        skill.name
+        for skill in session.exec(select(Skill)).all()
+        if connector_config_id_str in (skill.connector_config_ids or [])
+    ]
+    if skill_names:
         raise HTTPException(
             status_code=409,
-            detail=f"Connector config is in use by skill: {', '.join(skills_using_config)}",
+            detail=f"Connector config is in use by skill: {', '.join(skill_names)}",
         )
 
     session.delete(db_connector_config)

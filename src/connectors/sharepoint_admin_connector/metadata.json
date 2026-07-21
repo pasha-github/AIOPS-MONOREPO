@@ -1,0 +1,61 @@
+{
+  "id": "sharepoint_admin_connector",
+  "name": "SharePoint Admin",
+  "description": "Manage SharePoint folder permissions via Microsoft Graph — grant and remove user access by email.",
+  "version": "1.1.0",
+  "config_variables": [
+    {
+      "name": "SHP_ID_APP",
+      "label": "App Client ID",
+      "required": true,
+      "secret": false,
+      "placeholder": "Enter Azure AD app client ID"
+    },
+    {
+      "name": "SHP_ID_APP_SECRET",
+      "label": "App Client Secret",
+      "required": true,
+      "secret": true,
+      "placeholder": "Enter Azure AD app client secret"
+    },
+    {
+      "name": "SHP_TENANT_ID",
+      "label": "Tenant ID",
+      "required": true,
+      "secret": false,
+      "placeholder": "Enter Microsoft tenant ID"
+    },
+    {
+      "name": "SHP_SITE_URL",
+      "label": "SharePoint Site URL",
+      "required": true,
+      "secret": false,
+      "placeholder": "https://yourtenant.sharepoint.com/sites/yoursite"
+    },
+    {
+      "name": "prefix",
+      "label": "Prefix",
+      "required": false,
+      "secret": false,
+      "placeholder": "SharePointAdmin"
+    }
+  ],
+  "tools": [
+    {
+      "name": "list_folder_permissions",
+      "documentation": "List all users and groups with their permission roles on a SharePoint folder. Shows whether each permission is directly assigned or inherited."
+    },
+    {
+      "name": "grant_folder_access",
+      "documentation": "Grant a user read or write access to a SharePoint folder by their email address."
+    },
+    {
+      "name": "remove_folder_access",
+      "documentation": "Remove a user's access from a SharePoint folder by their email address."
+    },
+    {
+      "name": "copy_folder_access",
+      "documentation": "Grant a user the same permissions on a SharePoint folder that another user already has. Reads the source user's roles and applies them to the target user."
+    }
+  ]
+}

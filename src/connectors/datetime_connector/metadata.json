@@ -1,6 +1,7 @@
 {
   "id": "datetime_connector",
   "name": "DateTime",
+  "category": "helper",
   "description": "Returns the current time for a configured timezone, with optional per-call override.",
   "version": "1.0.0",
   "config_variables": [

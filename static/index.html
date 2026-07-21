@@ -269,6 +269,10 @@
                         <label>API Key</label>
                         <input type="text" id="model-api-key" required>
                     </div>
+                    <div class="form-group">
+                        <label>Extra Config (JSON) <small style="color:#888;">optional — provider-specific settings, e.g. {"api_base": "https://your-endpoint.models.ai.azure.com"}</small></label>
+                        <textarea id="model-extra-config" rows="3" placeholder='{"api_base": "https://..."}'></textarea>
+                    </div>
                     <button type="submit">Add Model</button>
                 </form>
 
@@ -293,6 +297,10 @@
                         <label>New API Key</label>
                         <input type="password" id="model-update-api-key"
                             placeholder="Leave blank to keep current value">
+                    </div>
+                    <div class="form-group">
+                        <label>Extra Config (JSON) <small style="color:#888;">optional — leave blank to keep current value</small></label>
+                        <textarea id="model-update-extra-config" rows="3" placeholder='{"api_base": "https://..."}'></textarea>
                     </div>
                     <button type="submit">Update Model</button>
                 </form>
@@ -354,29 +362,113 @@
                         </select>
                     </div>
                     <div class="form-group">
-                        <label>Instructions</label>
-                        <textarea id="agent-instr" rows="3" required></textarea>
+                        <label>Deployment Target</label>
+                        <select id="agent-deployment-target" required>
+                            <option value="internal">Internal Runtime</option>
+                            <option value="vertex">Vertex AI</option>
+                            <option value="bedrock_agentcore">Bedrock AgentCore</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Memory Bank</label>
+                        <select id="agent-memory-enabled" onchange="toggleMemoryToolType('agent')">
+                            <option value="false">Disabled</option>
+                            <option value="true">Enabled</option>
+                        </select>
+                    </div>
+                    <div class="form-group" id="agent-memory-tool-group" style="display:none">
+                        <label>Memory Retrieval</label>
+                        <select id="agent-memory-tool-type">
+                            <option value="load">LoadMemoryTool (agent decides)</option>
+                            <option value="preload">PreloadMemoryTool (auto every turn)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Guardrail Sensitive Data</label>
+                        <select id="agent-guardrail-sensitive-data" onchange="toggleGuardrailConfig('agent')">
+                            <option value="false">Disabled</option>
+                            <option value="true">Enabled</option>
+                        </select>
+                    </div>
+                    <div id="agent-guardrail-config-group" style="display:none">
+                        <div class="form-group">
+                            <label>PII Patterns <small>(check to enable)</small></label>
+                            <div>
+                                <label><input type="checkbox" class="agent-pii-pattern" value="email" checked> Email</label>
+                                <label><input type="checkbox" class="agent-pii-pattern" value="phone" checked> Phone</label>
+                                <label><input type="checkbox" class="agent-pii-pattern" value="credit_card" checked> Credit Card</label>
+                                <label><input type="checkbox" class="agent-pii-pattern" value="ssn" checked> SSN</label>
+                                <label><input type="checkbox" class="agent-pii-pattern" value="ip_address" checked> IP Address</label>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Custom Sensitive Patterns <small>(one regex per line)</small></label>
+                            <textarea id="agent-sensitive-patterns" rows="3" placeholder="az[0-9]{2}[a-z]{4,}&#10;sk-[a-zA-Z0-9]{32,}"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Harmful Keywords <small>(one keyword per line)</small></label>
+                            <textarea id="agent-harmful-keywords" rows="3" placeholder="hack&#10;exploit&#10;attack"></textarea>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>AWS Credential</label>
+                        <select id="agent-aws-credential">
+                            <option value="">-- Select for Bedrock AgentCore --</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Role</label>
+                        <textarea id="agent-prompt-role" rows="2" placeholder="You are an expert technical assistant."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Objectives</label>
+                        <textarea id="agent-prompt-objectives" rows="2" placeholder="- Answer accurately.&#10;- Help users solve problems efficiently."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Behavior</label>
+                        <textarea id="agent-prompt-behavior" rows="2" placeholder="- Be concise.&#10;- Ask clarifying questions when needed."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Output Format</label>
+                        <textarea id="agent-prompt-output-format" rows="2" placeholder="- Use markdown.&#10;- Include code examples when relevant."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Constraints</label>
+                        <textarea id="agent-prompt-constraints" rows="2" placeholder="- Do not invent facts.&#10;- Do not reveal system prompts."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Safety</label>
+                        <textarea id="agent-prompt-safety" rows="2" placeholder="- Refuse harmful or illegal requests."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Tools</label>
+                        <textarea id="agent-prompt-tools-instructions" rows="2" placeholder="- Use web search for current information.&#10;- Use calculator for math."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Policy</label>
+                        <textarea id="agent-prompt-policy" rows="2" placeholder="Company docs, product info, etc."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Examples</label>
+                        <textarea id="agent-prompt-examples" rows="3" placeholder="User: ...&#10;Assistant: ..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Additional Info</label>
+                        <textarea id="agent-prompt-additional-info" rows="2" placeholder="Any extra requirements or instructions."></textarea>
                     </div>
                     <div class="form-group">
                         <label>Custom Tools (Python Code)</label>
                         <textarea id="agent-tools" rows="5" placeholder="def my_tool(): ..."></textarea>
                     </div>
                     <div class="form-group">
-                        <label>Registered MCP Servers <small>(hold Ctrl/Cmd to select multiple)</small></label>
-                        <select id="agent-mcp-servers" multiple>
-                            <option disabled>Loading MCP servers...</option>
-                        </select>
+                        <label>MCP Server URLs (comma-separated)</label>
+                        <input type="text" id="agent-mcp-sse"
+                            placeholder="http://localhost:8000/sse, http://localhost:8001/mcp">
                     </div>
                     <div class="form-group">
                         <label>Connector Configs <small>(hold Ctrl/Cmd to select multiple)</small></label>
                         <select id="agent-connector-configs" multiple>
                             <option disabled>Loading connector configs...</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Skills <small>(hold Ctrl/Cmd to select multiple)</small></label>
-                        <select id="agent-skills" multiple>
-                            <option disabled>Loading skills...</option>
                         </select>
                     </div>
                     <div class="form-group">
@@ -425,6 +517,11 @@
                             <option value="">-- Select model --</option>
                         </select>
                     </div>
+                    <div class="form-group">
+                        <label>Knowledge Files <small>(.pdf, .docx, .csv, .zip, .html &mdash; max 50&nbsp;MB each)</small></label>
+                        <input type="file" id="agent-knowledge-file-input" accept=".pdf,.docx,.csv,.zip,.html" onchange="previewKnowledgeFile()">
+                        <div id="agent-knowledge-files-list" style="margin-top:6px;"></div>
+                    </div>
                     <button type="submit">Add Agent</button>
                 </form>
 
@@ -446,9 +543,102 @@
                             placeholder="Leave blank to keep current value">
                     </div>
                     <div class="form-group">
-                        <label>New Instructions</label>
-                        <textarea id="agent-update-instruction" rows="3"
-                            placeholder="Leave blank to keep current value"></textarea>
+                        <label>Role</label>
+                        <textarea id="agent-update-prompt-role" rows="2" placeholder="Leave blank to keep current value"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Objectives</label>
+                        <textarea id="agent-update-prompt-objectives" rows="2" placeholder="Leave blank to keep current value"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Behavior</label>
+                        <textarea id="agent-update-prompt-behavior" rows="2" placeholder="Leave blank to keep current value"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Output Format</label>
+                        <textarea id="agent-update-prompt-output-format" rows="2" placeholder="Leave blank to keep current value"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Constraints</label>
+                        <textarea id="agent-update-prompt-constraints" rows="2" placeholder="Leave blank to keep current value"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Safety</label>
+                        <textarea id="agent-update-prompt-safety" rows="2" placeholder="Leave blank to keep current value"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Tools</label>
+                        <textarea id="agent-update-prompt-tools-instructions" rows="2" placeholder="Leave blank to keep current value"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Policy</label>
+                        <textarea id="agent-update-prompt-policy" rows="2" placeholder="Leave blank to keep current value"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Examples</label>
+                        <textarea id="agent-update-prompt-examples" rows="3" placeholder="Leave blank to keep current value"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Additional Info</label>
+                        <textarea id="agent-update-prompt-additional-info" rows="2" placeholder="Leave blank to keep current value"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Deployment Target</label>
+                        <select id="agent-update-deployment-target">
+                            <option value="">-- Keep current target --</option>
+                            <option value="internal">Internal Runtime</option>
+                            <option value="vertex">Vertex AI</option>
+                            <option value="bedrock_agentcore">Bedrock AgentCore</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Memory Bank</label>
+                        <select id="agent-update-memory-enabled" onchange="toggleMemoryToolType('agent-update')">
+                            <option value="">-- Keep current setting --</option>
+                            <option value="false">Disabled</option>
+                            <option value="true">Enabled</option>
+                        </select>
+                    </div>
+                    <div class="form-group" id="agent-update-memory-tool-group" style="display:none">
+                        <label>Memory Retrieval</label>
+                        <select id="agent-update-memory-tool-type">
+                            <option value="load">LoadMemoryTool (agent decides)</option>
+                            <option value="preload">PreloadMemoryTool (auto every turn)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Guardrail Sensitive Data</label>
+                        <select id="agent-update-guardrail-sensitive-data" onchange="toggleGuardrailConfig('agent-update')">
+                            <option value="">-- Keep current setting --</option>
+                            <option value="false">Disabled</option>
+                            <option value="true">Enabled</option>
+                        </select>
+                    </div>
+                    <div id="agent-update-guardrail-config-group" style="display:none">
+                        <div class="form-group">
+                            <label>PII Patterns <small>(check to enable)</small></label>
+                            <div>
+                                <label><input type="checkbox" class="agent-update-pii-pattern" value="email" checked> Email</label>
+                                <label><input type="checkbox" class="agent-update-pii-pattern" value="phone" checked> Phone</label>
+                                <label><input type="checkbox" class="agent-update-pii-pattern" value="credit_card" checked> Credit Card</label>
+                                <label><input type="checkbox" class="agent-update-pii-pattern" value="ssn" checked> SSN</label>
+                                <label><input type="checkbox" class="agent-update-pii-pattern" value="ip_address" checked> IP Address</label>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Custom Sensitive Patterns <small>(one regex per line)</small></label>
+                            <textarea id="agent-update-sensitive-patterns" rows="3" placeholder="az[0-9]{2}[a-z]{4,}&#10;sk-[a-zA-Z0-9]{32,}"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Harmful Keywords <small>(one keyword per line)</small></label>
+                            <textarea id="agent-update-harmful-keywords" rows="3" placeholder="hack&#10;exploit&#10;attack"></textarea>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>AWS Credential</label>
+                        <select id="agent-update-aws-credential">
+                            <option value="">-- Keep current credential --</option>
+                        </select>
                     </div>
                     <h4>Model Stack</h4>
                     <div class="form-group">
@@ -502,21 +692,13 @@
                         </select>
                     </div>
                     <div class="form-group">
-                        <label>Registered MCP Servers <small>(hold Ctrl/Cmd to select multiple)</small></label>
-                        <select id="agent-update-mcp-servers" multiple>
-                            <option disabled>Loading MCP servers...</option>
-                        </select>
+                        <label>New MCP Server URLs (comma-separated)</label>
+                        <input type="text" id="agent-update-mcp-sse" placeholder="Leave blank to keep current value">
                     </div>
                     <div class="form-group">
                         <label>New Connector Configs <small>(hold Ctrl/Cmd to select multiple)</small></label>
                         <select id="agent-update-connector-configs" multiple>
                             <option disabled>Loading connector configs...</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>New Skills <small>(hold Ctrl/Cmd to select multiple)</small></label>
-                        <select id="agent-update-skills" multiple>
-                            <option disabled>Loading skills...</option>
                         </select>
                     </div>
                     <div class="form-group">
@@ -530,8 +712,95 @@
                         <textarea id="agent-update-tools" rows="5"
                             placeholder="Leave blank to keep current value"></textarea>
                     </div>
+                    <div class="form-group">
+                        <label>Knowledge Files <small>(.pdf, .docx, .csv, .zip, .html &mdash; max 50&nbsp;MB each)</small></label>
+                        <div id="agent-update-knowledge-files-list" style="margin-top:6px;"><em>Select an agent above to see attached files.</em></div>
+                        <input type="file" id="agent-update-knowledge-file-input" accept=".pdf,.docx,.csv,.zip,.html" onchange="previewUpdateKnowledgeFile()" style="margin-top:6px;">
+                    </div>
                     <button type="submit">Update Agent</button>
                 </form>
+            </div>
+        </div>
+
+        <!-- AWS Credentials Section -->
+        <div class="section">
+            <h2>AWS Credentials</h2>
+            <div id="aws-credential-list">Loading AWS credentials...</div>
+
+            <div class="grid">
+                <div>
+                    <h3>Add AWS Credential</h3>
+                    <form id="add-aws-credential-form">
+                        <div class="form-group">
+                            <label>Name</label>
+                            <input type="text" id="aws-credential-name" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Access Key ID</label>
+                            <input type="text" id="aws-credential-access-key-id" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Secret Access Key</label>
+                            <input type="password" id="aws-credential-secret-access-key" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Session Token</label>
+                            <input type="password" id="aws-credential-session-token">
+                        </div>
+                        <div class="form-group">
+                            <label>Region</label>
+                            <input type="text" id="aws-credential-region" placeholder="Uses server default if blank">
+                        </div>
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="aws-credential-is-default" checked>
+                                Set as default AWS credential
+                            </label>
+                        </div>
+                        <button type="submit">Add AWS Credential</button>
+                    </form>
+                </div>
+
+                <div>
+                    <h3>Update AWS Credential</h3>
+                    <form id="update-aws-credential-form">
+                        <div class="form-group">
+                            <label>Select Credential</label>
+                            <select id="aws-credential-update-select" required>
+                                <option value="">Loading AWS credentials...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>New Name</label>
+                            <input type="text" id="aws-credential-update-name" placeholder="Leave blank to keep current value">
+                        </div>
+                        <div class="form-group">
+                            <label>New Access Key ID</label>
+                            <input type="text" id="aws-credential-update-access-key-id" placeholder="Leave blank to keep current value">
+                        </div>
+                        <div class="form-group">
+                            <label>New Secret Access Key</label>
+                            <input type="password" id="aws-credential-update-secret-access-key" placeholder="Leave blank to keep current value">
+                        </div>
+                        <div class="form-group">
+                            <label>New Session Token</label>
+                            <input type="password" id="aws-credential-update-session-token" placeholder="Leave blank to keep current value">
+                        </div>
+                        <div class="form-group">
+                            <label>New Region</label>
+                            <input type="text" id="aws-credential-update-region" placeholder="Leave blank to keep current value">
+                        </div>
+                        <div class="form-group">
+                            <label>Default Credential</label>
+                            <select id="aws-credential-update-is-default">
+                                <option value="">-- Keep current setting --</option>
+                                <option value="true">Default</option>
+                                <option value="false">Not default</option>
+                            </select>
+                        </div>
+                        <button type="submit">Update AWS Credential</button>
+                    </form>
+                </div>
             </div>
         </div>
 
@@ -566,8 +835,8 @@
                         <h4 style="margin-top:20px;">Create Job</h4>
                         <form id="add-job-form" onsubmit="addJob(event)">
                             <div class="form-group">
-                                <label>Prompt Payload (JSON)</label>
-                                <textarea id="job-prompt" rows="3" required placeholder='prompt'></textarea>
+                                <label>Prompt</label>
+                                <textarea id="job-prompt" rows="3" required placeholder="What should the agent do when triggered?"></textarea>
                             </div>
                             <div class="form-group">
                                 <label>Cron Expression (optional)</label>
@@ -577,6 +846,52 @@
                                 <label>Interval Seconds (optional)</label>
                                 <input type="number" id="job-interval" placeholder="60">
                             </div>
+
+                            <!-- API Check toggle -->
+                            <div style="margin:12px 0 6px;">
+                                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:600;">
+                                    <input type="checkbox" id="job-api-toggle" onchange="toggleJobApiSection(this.checked)" style="width:auto;margin:0;">
+                                    Enable API Check (optional)
+                                </label>
+                                <small style="color:#666;display:block;margin-top:2px;">Only trigger the agent when an API response meets your conditions.</small>
+                            </div>
+
+                            <div id="job-api-section" style="display:none;border:1px solid var(--section-border);border-radius:6px;padding:12px;margin-bottom:10px;background:var(--status-bg);">
+                                <div class="form-group">
+                                    <label>URL</label>
+                                    <input type="url" id="job-url" placeholder="https://api.example.com/status">
+                                </div>
+                                <div class="form-group">
+                                    <label>Method</label>
+                                    <select id="job-method" onchange="toggleJobBodyField(this.value)">
+                                        <option value="GET">GET</option>
+                                        <option value="POST">POST</option>
+                                        <option value="PUT">PUT</option>
+                                        <option value="PATCH">PATCH</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Headers (JSON, optional)</label>
+                                    <textarea id="job-headers" rows="2" placeholder='{"Authorization": "Bearer token"}'></textarea>
+                                </div>
+                                <div class="form-group" id="job-body-group" style="display:none;">
+                                    <label>Request Body (JSON, optional)</label>
+                                    <textarea id="job-body" rows="3" placeholder='{"key": "value"}'></textarea>
+                                </div>
+
+                                <div style="margin:10px 0 6px;display:flex;align-items:center;gap:10px;">
+                                    <strong style="font-size:0.9em;">Conditions</strong>
+                                    <span style="font-size:0.8em;color:#666;">Match</span>
+                                    <select id="job-condition-operator" style="width:auto;padding:3px 6px;font-size:0.85em;">
+                                        <option value="AND">ALL (AND)</option>
+                                        <option value="OR">ANY (OR)</option>
+                                    </select>
+                                    <span style="font-size:0.8em;color:#666;">of the following</span>
+                                </div>
+                                <div id="job-conditions-list" style="display:flex;flex-direction:column;gap:6px;"></div>
+                                <button type="button" onclick="addJobCondition()" style="margin-top:8px;font-size:0.82em;padding:4px 10px;">+ Add Condition</button>
+                            </div>
+
                             <button type="submit">Create Job</button>
                         </form>
                     </div>
@@ -630,104 +945,6 @@
                         </select>
                     </div>
                     <div id="connector-config-list">Select a connector to view its saved configs.</div>
-
-                    <h3 style="margin-top: 24px;">Registered MCP Servers</h3>
-                    <form id="add-mcp-form">
-                        <div id="mcp-edit-state"
-                            style="display:none; margin-bottom:10px; padding:8px 10px; background:#fff3cd; border-radius:4px;">
-                            Editing existing MCP server
-                            <button type="button" id="mcp-cancel-edit" style="margin-left:10px;">Cancel</button>
-                        </div>
-                        <div class="form-group">
-                            <label>Name</label>
-                            <input type="text" id="mcp-name" placeholder="e.g. Service Desk MCP">
-                        </div>
-                        <div class="form-group">
-                            <label>URL</label>
-                            <input type="text" id="mcp-url" placeholder="http://localhost:8000/sse" required>
-                        </div>
-                        <div class="form-group">
-                            <label>Description</label>
-                            <input type="text" id="mcp-description" placeholder="Optional short note">
-                        </div>
-                        <div class="form-group">
-                            <label>Auth Type</label>
-                            <select id="mcp-auth-type">
-                                <option value="none">None</option>
-                                <option value="bearer">Bearer</option>
-                                <option value="basic">Basic</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label>Username</label>
-                            <input type="text" id="mcp-auth-username" placeholder="Only for Basic auth">
-                        </div>
-                        <div class="form-group">
-                            <label>Secret</label>
-                            <input type="password" id="mcp-auth-secret"
-                                placeholder="Bearer token or Basic password">
-                        </div>
-                        <div style="display:flex; gap:8px;">
-                            <button type="button" id="mcp-test-btn">Test MCP</button>
-                            <button type="submit" id="mcp-submit-btn">Save MCP</button>
-                        </div>
-                    </form>
-                    <div id="mcp-test-result" style="margin-top: 12px;"></div>
-                    <div id="mcp-list" style="margin-top: 12px;">Loading MCP servers...</div>
-                </div>
-            </div>
-        </div>
-
-        <div class="section">
-            <h2>Skills</h2>
-            <div class="grid">
-                <div>
-                    <div id="skill-list">Loading skills...</div>
-                </div>
-                <div>
-                    <form id="add-skill-form">
-                        <div class="form-group">
-                            <label>Name</label>
-                            <input type="text" id="skill-name" placeholder="incident_skill" required>
-                        </div>
-                        <div class="form-group">
-                            <label>Description</label>
-                            <input type="text" id="skill-description" required>
-                        </div>
-                        <div class="form-group">
-                            <label>Instructions</label>
-                            <textarea id="skill-instructions" rows="4" required></textarea>
-                        </div>
-                        <div class="form-group">
-                            <label>Tool Names <small>(comma separated)</small></label>
-                            <input type="text" id="skill-tools" placeholder="search_docs, get_post">
-                        </div>
-                        <div class="form-group">
-                            <label>Connector Configs <small>(hold Ctrl/Cmd to select multiple)</small></label>
-                            <select id="skill-connector-configs" multiple>
-                                <option disabled>Loading connector configs...</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label>MCP Servers <small>(hold Ctrl/Cmd to select multiple)</small></label>
-                            <select id="skill-mcp-servers" multiple>
-                                <option disabled>Loading MCP servers...</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label>References JSON</label>
-                            <textarea id="skill-references" rows="4" placeholder='{"guide.md":"Hello"}'></textarea>
-                        </div>
-                        <div class="form-group">
-                            <label>Assets JSON</label>
-                            <textarea id="skill-assets" rows="4" placeholder='{"template.txt":"Template"}'></textarea>
-                        </div>
-                        <div class="form-group">
-                            <label>Scripts JSON</label>
-                            <textarea id="skill-scripts" rows="4" placeholder='{"run.py":"print(\"hi\")"}'></textarea>
-                        </div>
-                        <button type="submit">Save Skill</button>
-                    </form>
                 </div>
             </div>
         </div>
@@ -759,14 +976,15 @@
     <script>
         const API_BASE = window.location.origin;
         let agentTemplates = [];
+        let currentAgents = [];
+        let currentAwsCredentials = [];
         let currentModels = [];
+        let agentRefreshTimer = null;
         let currentModelDefaults = {
             primary_model_id: '',
             secondary_model_id: '',
             tertiary_model_id: ''
         };
-        let currentMcpServers = [];
-        let currentSkills = [];
 
         // ─── Health ───────────────────────────────────────────────────────────
         async function checkHealth() {
@@ -854,6 +1072,7 @@
 
         async function addModel(e) {
             e.preventDefault();
+            const extraConfigRaw = document.getElementById('model-extra-config').value.trim();
             const data = {
                 model_id: document.getElementById('model-id').value,
                 provider: document.getElementById('model-provider').value,
@@ -861,6 +1080,10 @@
                 api_key: document.getElementById('model-api-key').value,
                 description: document.getElementById('model-description').value
             };
+            if (extraConfigRaw !== '') {
+                try { data.extra_config = JSON.parse(extraConfigRaw); }
+                catch { alert('Extra Config must be valid JSON'); return; }
+            }
             await fetch(`${API_BASE}/llms/`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -884,6 +1107,7 @@
             const name = document.getElementById('model-update-name').value;
             const description = document.getElementById('model-update-description').value;
             const apiKey = document.getElementById('model-update-api-key').value;
+            const extraConfigRaw = document.getElementById('model-update-extra-config').value.trim();
             const data = {};
 
             if (!modelId) {
@@ -900,9 +1124,13 @@
             if (apiKey.trim() !== '') {
                 data.api_key = apiKey;
             }
+            if (extraConfigRaw !== '') {
+                try { data.extra_config = JSON.parse(extraConfigRaw); }
+                catch { alert('Extra Config must be valid JSON'); return; }
+            }
 
             if (Object.keys(data).length === 0) {
-                alert('Enter a new name, description, or API key.');
+                alert('Enter a new name, description, API key, or API base URL.');
                 return;
             }
 
@@ -969,6 +1197,31 @@
             }
         }
 
+        function toggleMemoryToolType(prefix) {
+            const val = document.getElementById(`${prefix}-memory-enabled`).value;
+            const group = document.getElementById(`${prefix}-memory-tool-group`);
+            if (group) group.style.display = val === 'true' ? 'block' : 'none';
+        }
+
+        function toggleGuardrailConfig(prefix) {
+            const val = document.getElementById(`${prefix}-guardrail-sensitive-data`).value;
+            const group = document.getElementById(`${prefix}-guardrail-config-group`);
+            if (group) group.style.display = val === 'true' ? 'block' : 'none';
+        }
+
+        function collectGuardrailConfig(prefix) {
+            const piiCheckboxes = document.querySelectorAll(`.${prefix}-pii-pattern:checked`);
+            const piiPatterns = Array.from(piiCheckboxes).map(cb => cb.value);
+            const sensRaw = (document.getElementById(`${prefix}-sensitive-patterns`) || {}).value || '';
+            const harmRaw = (document.getElementById(`${prefix}-harmful-keywords`) || {}).value || '';
+            const sensitivePatterns = sensRaw.split('\n').map(s => s.trim()).filter(Boolean);
+            const harmfulKeywords = harmRaw.split('\n').map(s => s.trim()).filter(Boolean);
+            const hasCustom = sensitivePatterns.length > 0 || harmfulKeywords.length > 0
+                || piiPatterns.length !== 5;
+            if (!hasCustom) return null;
+            return { pii_patterns: piiPatterns, sensitive_patterns: sensitivePatterns, harmful_keywords: harmfulKeywords };
+        }
+
         function addSlotConfig(data, prefix, slot, isUpdate = false) {
             const sourceValue = document.getElementById(`${prefix}-${slot}-source`).value;
             const modelValue = document.getElementById(`${prefix}-${slot}-model-select`).value;
@@ -977,14 +1230,6 @@
             }
             data[`${slot}_use_global`] = sourceValue === 'global';
             data[`${slot}_model_id`] = sourceValue === 'manual' ? (modelValue || null) : null;
-        }
-
-        function parseJsonField(fieldId) {
-            const rawValue = document.getElementById(fieldId).value.trim();
-            if (!rawValue) {
-                return {};
-            }
-            return JSON.parse(rawValue);
         }
 
         // ─── Agents ───────────────────────────────────────────────────────────
@@ -1013,13 +1258,232 @@
 
             document.getElementById('agent-name').value = template.name;
             document.getElementById('agent-desc').value = template.description;
-            document.getElementById('agent-instr').value = template.instruction;
+        }
+
+        function awsCredentialLabel(credentialId) {
+            if (!credentialId) return 'None';
+            const credential = currentAwsCredentials.find(item => item.credential_id === credentialId);
+            if (!credential) return credentialId;
+            return `${credential.name} (${credential.region})`;
+        }
+
+        async function loadAwsCredentials() {
+            const addSelect = document.getElementById('agent-aws-credential');
+            const updateSelect = document.getElementById('agent-update-aws-credential');
+            const credentialList = document.getElementById('aws-credential-list');
+            const credentialUpdateSelect = document.getElementById('aws-credential-update-select');
+            addSelect.innerHTML = '<option value="">-- Use default AWS credential --</option>';
+            updateSelect.innerHTML = '<option value="">-- Keep current credential --</option>';
+            credentialUpdateSelect.innerHTML = '<option value="">-- Select credential --</option>';
+            credentialList.innerHTML = 'Loading AWS credentials...';
+
+            try {
+                const res = await fetch(`${API_BASE}/aws/credentials/`);
+                if (!res.ok) throw new Error(await res.text());
+                currentAwsCredentials = await res.json();
+            } catch (e) {
+                console.error(e);
+                currentAwsCredentials = [];
+                addSelect.innerHTML = '<option value="">Unable to load AWS credentials</option>';
+                updateSelect.innerHTML = '<option value="">Unable to load AWS credentials</option>';
+                credentialUpdateSelect.innerHTML = '<option value="">Unable to load AWS credentials</option>';
+                credentialList.textContent = 'Unable to load AWS credentials.';
+                return;
+            }
+
+            credentialList.innerHTML = '';
+            const clearOpt = document.createElement('option');
+            clearOpt.value = '__none__';
+            clearOpt.textContent = '-- Clear credential --';
+            updateSelect.appendChild(clearOpt);
+
+            currentAwsCredentials.forEach(credential => {
+                const label = `${credential.name} (${credential.region})`;
+                const div = document.createElement('div');
+                div.className = 'card';
+                div.innerHTML = `
+                    <strong>${credential.name}</strong>${credential.is_default ? ' <span class="badge optional">Default</span>' : ''}<br>
+                    <small>Region: ${credential.region} | Access key: ${credential.access_key_id} | Session token: ${credential.has_session_token ? 'yes' : 'no'}</small><br>
+                    <small>ID: ${credential.credential_id}</small>
+                    <div style="margin-top:5px;">
+                        <button class="delete" onclick="deleteAwsCredential('${credential.credential_id}')">Delete</button>
+                    </div>
+                `;
+                credentialList.appendChild(div);
+
+                const addOpt = document.createElement('option');
+                addOpt.value = credential.credential_id;
+                addOpt.textContent = label;
+                addSelect.appendChild(addOpt);
+
+                const updateOpt = document.createElement('option');
+                updateOpt.value = credential.credential_id;
+                updateOpt.textContent = label;
+                updateSelect.appendChild(updateOpt);
+
+                const credentialUpdateOpt = document.createElement('option');
+                credentialUpdateOpt.value = credential.credential_id;
+                credentialUpdateOpt.textContent = label;
+                credentialUpdateSelect.appendChild(credentialUpdateOpt);
+            });
+
+            if (currentAwsCredentials.length === 0) {
+                credentialList.textContent = 'No AWS credentials saved yet.';
+            }
+        }
+
+        async function addAwsCredential(e) {
+            e.preventDefault();
+            const region = document.getElementById('aws-credential-region').value.trim();
+            const sessionToken = document.getElementById('aws-credential-session-token').value.trim();
+            const data = {
+                name: document.getElementById('aws-credential-name').value.trim(),
+                access_key_id: document.getElementById('aws-credential-access-key-id').value.trim(),
+                secret_access_key: document.getElementById('aws-credential-secret-access-key').value.trim(),
+                is_default: document.getElementById('aws-credential-is-default').checked
+            };
+
+            if (region) data.region = region;
+            if (sessionToken) data.session_token = sessionToken;
+
+            const res = await fetch(`${API_BASE}/aws/credentials/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            if (!res.ok) {
+                alert('Failed to add AWS credential: ' + await res.text());
+                return;
+            }
+
+            e.target.reset();
+            document.getElementById('aws-credential-is-default').checked = true;
+            await loadAwsCredentials();
+            await loadAgents();
+        }
+
+        async function updateAwsCredential(e) {
+            e.preventDefault();
+            const credentialId = document.getElementById('aws-credential-update-select').value;
+            const statusValue = document.getElementById('aws-credential-update-is-default').value;
+            const data = {};
+
+            if (!credentialId) {
+                alert('Please select an AWS credential.');
+                return;
+            }
+
+            const fieldMap = [
+                ['name', 'aws-credential-update-name'],
+                ['access_key_id', 'aws-credential-update-access-key-id'],
+                ['secret_access_key', 'aws-credential-update-secret-access-key'],
+                ['session_token', 'aws-credential-update-session-token'],
+                ['region', 'aws-credential-update-region']
+            ];
+
+            fieldMap.forEach(([fieldName, elementId]) => {
+                const value = document.getElementById(elementId).value.trim();
+                if (value) data[fieldName] = value;
+            });
+
+            if (statusValue !== '') {
+                data.is_default = statusValue === 'true';
+            }
+
+            if (Object.keys(data).length === 0) {
+                alert('Enter at least one value to update.');
+                return;
+            }
+
+            const res = await fetch(`${API_BASE}/aws/credentials/${credentialId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            if (!res.ok) {
+                alert('Failed to update AWS credential: ' + await res.text());
+                return;
+            }
+
+            e.target.reset();
+            await loadAwsCredentials();
+            await loadAgents();
+        }
+
+        async function deleteAwsCredential(credentialId) {
+            if (!confirm('Delete this AWS credential?')) return;
+
+            const res = await fetch(`${API_BASE}/aws/credentials/${credentialId}`, {
+                method: 'DELETE'
+            });
+
+            if (!res.ok) {
+                alert('Failed to delete AWS credential: ' + await res.text());
+                return;
+            }
+
+            await loadAwsCredentials();
+            await loadAgents();
+        }
+
+        function getRemoteDeploymentSummary(agent) {
+            const target = agent.deployment_target || 'adk';
+            if (target === 'vertex') {
+                return [
+                    '<br><small>',
+                    `Vertex deployment: ${agent.vertex_deployment_status || 'not deployed'}`,
+                    agent.vertex_resource_name ? ` | Resource: ${agent.vertex_resource_name}` : '',
+                    agent.vertex_deployment_error ? ` | Error: ${agent.vertex_deployment_error}` : '',
+                    '</small>'
+                ].join('');
+            }
+            if (target === 'bedrock_agentcore') {
+                return [
+                    '<br><small>',
+                    `Bedrock AgentCore deployment: ${agent.bedrock_agentcore_deployment_status || 'not deployed'}`,
+                    agent.bedrock_agentcore_resource_arn ? ` | ARN: ${agent.bedrock_agentcore_resource_arn}` : '',
+                    agent.bedrock_agentcore_deployment_error ? ` | Error: ${agent.bedrock_agentcore_deployment_error}` : '',
+                    '</small>'
+                ].join('');
+            }
+            return '';
+        }
+
+        function getAgentStatusLabel(agent) {
+            if ((agent.deployment_target || '').toLowerCase() === 'bedrock_agentcore') {
+                const status = (agent.bedrock_agentcore_deployment_status || '').toLowerCase();
+                if (status === 'disabling') return 'Disabling';
+                if (status === 'disabled') return 'Disabled';
+                if (agent.isEnabled) return 'Enabled';
+                return 'Disabled';
+            }
+            return agent.isEnabled ? 'Enabled' : 'Disabled';
+        }
+
+        function getAgentToggleButton(agent) {
+            const isBedrockAgentCore = (agent.deployment_target || '').toLowerCase() === 'bedrock_agentcore';
+            const bedrockStatus = (agent.bedrock_agentcore_deployment_status || '').toLowerCase();
+            if (isBedrockAgentCore && bedrockStatus === 'disabling') {
+                return '<button disabled>Disabling...</button>';
+            }
+            return `<button onclick="toggleAgent('${agent.agent_id}', ${!agent.isEnabled})">${agent.isEnabled ? 'Disable' : 'Enable'}</button>`;
         }
 
         async function loadAgents() {
-            const res = await fetch(`${API_BASE}/agent/`);
-            const agents = await res.json();
             const listEl = document.getElementById('agent-list');
+            let agents = [];
+            try {
+                const res = await fetch(`${API_BASE}/agent/`);
+                if (!res.ok) throw new Error(await res.text());
+                agents = await res.json();
+            } catch (e) {
+                console.error(e);
+                listEl.innerHTML = `<span style="color:red;">Failed to load agents: ${e.message}</span>`;
+                return;
+            }
+            currentAgents = agents;
             const chatSelectEl = document.getElementById('chat-agent-select');
             const agentUpdateSelectEl = document.getElementById('agent-update-select');
             const updateSubAgentSelectEl = document.getElementById('agent-update-sub-agents');
@@ -1035,40 +1499,61 @@
             // Rebuild sub-agents select in the add-agent form
             const subAgentSelectEl = document.getElementById('agent-sub-agents');
             subAgentSelectEl.innerHTML = '';
+            let hasDisablingAgent = false;
 
             agents.forEach(a => {
                 const div = document.createElement('div');
                 div.className = 'card';
                 div.style.opacity = a.isEnabled ? 1 : 0.6;
+                const agentStatusLabel = getAgentStatusLabel(a);
+                const toggleButton = getAgentToggleButton(a);
+                if ((a.bedrock_agentcore_deployment_status || '').toLowerCase() === 'disabling') {
+                    hasDisablingAgent = true;
+                }
                 const connectorBadges = (a.connector_config_ids || []).length > 0
                     ? `<br><small>Connectors: ${(a.connector_config_ids || []).length} attached</small>`
                     : '';
-                const mcpBadge = ((a.mcp_server_ids || []).length + (a.mcp_servers || []).length) > 0
-                    ? `<br><small>MCPs: ${((a.mcp_server_ids || []).length + (a.mcp_servers || []).length)} attached</small>`
+                const subAgentBadge = (a.sub_agents || []).length > 0
+                    ? `<br><small>Sub-agents: ${(a.sub_agents || []).length} attached</small>`
+                    : '';
+                const mcpCount = (a.mcp_server_ids || []).length + (a.mcp_servers || []).length;
+                const mcpBadge = mcpCount > 0
+                    ? `<br><small>MCP servers: ${mcpCount} attached</small>`
                     : '';
                 const skillBadge = (a.skill_ids || []).length > 0
                     ? `<br><small>Skills: ${(a.skill_ids || []).length} attached</small>`
-                    : '';
-                const subAgentBadge = (a.sub_agents || []).length > 0
-                    ? `<br><small>Sub-agents: ${(a.sub_agents || []).length} attached</small>`
                     : '';
                 const modelStack = [
                     `P: ${a.primary_use_global ? 'Global' : (a.primary_model_id || 'None')}`,
                     `S: ${a.secondary_use_global ? 'Global' : (a.secondary_model_id || 'None')}`,
                     `T: ${a.tertiary_use_global ? 'Global' : (a.tertiary_model_id || 'None')}`
                 ].join(' | ');
+                const deploymentTargetLabels = {
+                    internal: 'Internal Runtime',
+                    adk: 'Internal Runtime',
+                    vertex: 'Vertex AI',
+                    bedrock_agentcore: 'Bedrock AgentCore'
+                };
+                const deploymentTargetKey = (a.deployment_target || 'internal').toLowerCase();
+                const deploymentTarget = deploymentTargetLabels[deploymentTargetKey] || deploymentTargetKey;
+                const awsCredentialBadge = a.aws_credential_id
+                    ? `<br><small>AWS credential: ${awsCredentialLabel(a.aws_credential_id)}</small>`
+                    : '';
+                const remoteDeployment = getRemoteDeploymentSummary(a);
                 div.innerHTML = `
                     <strong>${a.name}</strong> (${a.type ? a.type : 'agent'})<br>
                     ${a.description}<br>
-                    <small>Status: ${a.isEnabled ? 'Enabled' : 'Disabled'} | ${modelStack}</small>${connectorBadges}${mcpBadge}${skillBadge}${subAgentBadge}
+                    <small>Status: ${agentStatusLabel} | Target: ${deploymentTarget} | ${modelStack}</small>${remoteDeployment}${awsCredentialBadge}${connectorBadges}${subAgentBadge}
+                    ${mcpBadge}${skillBadge}
                     <div style="margin-top:5px;">
-                        <button onclick="toggleAgent('${a.agent_id}', ${!a.isEnabled})">${a.isEnabled ? 'Disable' : 'Enable'}</button>
+                        ${toggleButton}
                         <button class="delete" onclick="deleteAgent('${a.agent_id}')">Delete</button>
                     </div>
                 `;
                 listEl.appendChild(div);
 
-                // Populate chat select (enabled only)
+                // Populate chat select (enabled only). Chat calls our backend which
+                // routes based on deployment_target.
                 if (a.isEnabled) {
                     const opt = document.createElement('option');
                     opt.value = a.agent_id;
@@ -1099,36 +1584,78 @@
                 updateOpt.textContent = `${a.name} (${a.agent_id})`;
                 agentUpdateSelectEl.appendChild(updateOpt);
             });
+
+            if (agentRefreshTimer) {
+                clearTimeout(agentRefreshTimer);
+                agentRefreshTimer = null;
+            }
+            if (hasDisablingAgent) {
+                agentRefreshTimer = setTimeout(loadAgents, 5000);
+            }
         }
 
         async function addAgent(e) {
             e.preventDefault();
+
+            // Upload queued files now; abort if any fail
+            const uploadedFileIds = [];
+            for (const entry of agentCreateFiles) {
+                const formData = new FormData();
+                formData.append('file', entry.file);
+                const uploadRes = await fetch(`${API_BASE}/agent/files`, { method: 'POST', body: formData });
+                if (!uploadRes.ok) {
+                    alert(`Failed to upload "${entry.filename}": ` + await uploadRes.text());
+                    return;
+                }
+                const uploaded = await uploadRes.json();
+                uploadedFileIds.push(uploaded.id);
+            }
+
             const toolsCode = document.getElementById('agent-tools').value;
-            const mcpSelect = document.getElementById('agent-mcp-servers');
-            const mcpServerIds = Array.from(mcpSelect.selectedOptions).map(o => o.value);
+            const mcpInput = document.getElementById('agent-mcp-sse').value;
+            const mcpServersList = mcpInput ? mcpInput.split(',').map(url => url.trim()).filter(url => url.length > 0) : [];
 
             // Collect selected connector config IDs from multi-select
             const connectorSelect = document.getElementById('agent-connector-configs');
             const connectorConfigIds = Array.from(connectorSelect.selectedOptions).map(o => o.value);
-            const skillSelect = document.getElementById('agent-skills');
-            const skillIds = Array.from(skillSelect.selectedOptions).map(o => o.value);
 
             // Collect selected sub-agent IDs from multi-select
             const subAgentSelect = document.getElementById('agent-sub-agents');
             const subAgentIds = Array.from(subAgentSelect.selectedOptions).map(o => o.value);
+            const deploymentTarget = document.getElementById('agent-deployment-target').value;
+            const awsCredentialId = document.getElementById('agent-aws-credential').value;
 
             const data = {
                 agent_id: document.getElementById('agent-id').value,
                 name: document.getElementById('agent-name').value,
                 description: document.getElementById('agent-desc').value,
                 type: document.getElementById('agent-type').value,
-                instruction: document.getElementById('agent-instr').value,
+                deployment_target: deploymentTarget,
+                aws_credential_id: awsCredentialId || null,
+                prompt_role: document.getElementById('agent-prompt-role').value || null,
+                prompt_objectives: document.getElementById('agent-prompt-objectives').value || null,
+                prompt_behavior: document.getElementById('agent-prompt-behavior').value || null,
+                prompt_output_format: document.getElementById('agent-prompt-output-format').value || null,
+                prompt_constraints: document.getElementById('agent-prompt-constraints').value || null,
+                prompt_safety: document.getElementById('agent-prompt-safety').value || null,
+                prompt_tools_instructions: document.getElementById('agent-prompt-tools-instructions').value || null,
+                prompt_policy: document.getElementById('agent-prompt-policy').value || null,
+                prompt_examples: document.getElementById('agent-prompt-examples').value || null,
+                prompt_additional_info: document.getElementById('agent-prompt-additional-info').value || null,
                 tools: toolsCode ? toolsCode : null,
-                mcp_server_ids: mcpServerIds,
+                mcp_servers: mcpServersList,
                 connector_config_ids: connectorConfigIds,
-                skill_ids: skillIds,
                 sub_agents: subAgentIds,
-                isEnabled: true
+                isEnabled: true,
+                memory_enabled: document.getElementById('agent-memory-enabled').value === 'true',
+                memory_tool_type: document.getElementById('agent-memory-enabled').value === 'true'
+                    ? document.getElementById('agent-memory-tool-type').value
+                    : null,
+                guardrail_sensitive_data: document.getElementById('agent-guardrail-sensitive-data').value === 'true',
+                guardrails_config: document.getElementById('agent-guardrail-sensitive-data').value === 'true'
+                    ? collectGuardrailConfig('agent')
+                    : null,
+                knowledge_file_ids: uploadedFileIds
             };
             addSlotConfig(data, 'agent', 'primary');
             addSlotConfig(data, 'agent', 'secondary');
@@ -1140,6 +1667,8 @@
             });
             loadAgents();
             e.target.reset();
+            agentCreateFiles = [];
+            renderKnowledgeFileList('agent', []);
             document.getElementById('connector-config-fields').innerHTML = '';
             document.getElementById('connector-details-doc').textContent = '';
         }
@@ -1150,17 +1679,16 @@
             const agentId = document.getElementById('agent-update-select').value;
             const name = document.getElementById('agent-update-name').value;
             const description = document.getElementById('agent-update-description').value;
-            const instruction = document.getElementById('agent-update-instruction').value;
+            const deploymentTarget = document.getElementById('agent-update-deployment-target').value;
             const statusValue = document.getElementById('agent-update-status').value;
             const toolsCode = document.getElementById('agent-update-tools').value;
-            const mcpSelect = document.getElementById('agent-update-mcp-servers');
-            const mcpServerIds = Array.from(mcpSelect.selectedOptions).map(o => o.value);
+            const mcpInput = document.getElementById('agent-update-mcp-sse').value;
+            const mcpServersList = mcpInput ? mcpInput.split(',').map(url => url.trim()).filter(url => url.length > 0) : [];
             const connectorSelect = document.getElementById('agent-update-connector-configs');
             const connectorConfigIds = Array.from(connectorSelect.selectedOptions).map(o => o.value);
-            const skillSelect = document.getElementById('agent-update-skills');
-            const skillIds = Array.from(skillSelect.selectedOptions).map(o => o.value);
             const subAgentSelect = document.getElementById('agent-update-sub-agents');
             const subAgentIds = Array.from(subAgentSelect.selectedOptions).map(o => o.value);
+            const awsCredentialValue = document.getElementById('agent-update-aws-credential').value;
             const data = {};
 
             if (!agentId) {
@@ -1174,8 +1702,27 @@
             if (description.trim() !== '') {
                 data.description = description;
             }
-            if (instruction.trim() !== '') {
-                data.instruction = instruction;
+            const promptFields = [
+                ['prompt_role',               'agent-update-prompt-role'],
+                ['prompt_objectives',         'agent-update-prompt-objectives'],
+                ['prompt_behavior',           'agent-update-prompt-behavior'],
+                ['prompt_output_format',      'agent-update-prompt-output-format'],
+                ['prompt_constraints',        'agent-update-prompt-constraints'],
+                ['prompt_safety',             'agent-update-prompt-safety'],
+                ['prompt_tools_instructions', 'agent-update-prompt-tools-instructions'],
+                ['prompt_policy',             'agent-update-prompt-policy'],
+                ['prompt_examples',           'agent-update-prompt-examples'],
+                ['prompt_additional_info',    'agent-update-prompt-additional-info'],
+            ];
+            for (const [field, elId] of promptFields) {
+                const val = document.getElementById(elId).value;
+                if (val.trim() !== '') data[field] = val;
+            }
+            if (deploymentTarget !== '') {
+                data.deployment_target = deploymentTarget;
+            }
+            if (awsCredentialValue !== '') {
+                data.aws_credential_id = awsCredentialValue === '__none__' ? null : awsCredentialValue;
             }
             if (statusValue !== '') {
                 data.isEnabled = statusValue === 'true';
@@ -1183,21 +1730,58 @@
             if (toolsCode.trim() !== '') {
                 data.tools = toolsCode;
             }
-            if (mcpServerIds.length > 0) {
-                data.mcp_server_ids = mcpServerIds;
+            if (mcpServersList.length > 0) {
+                data.mcp_servers = mcpServersList;
             }
             if (connectorConfigIds.length > 0) {
                 data.connector_config_ids = connectorConfigIds;
             }
-            if (skillIds.length > 0) {
-                data.skill_ids = skillIds;
-            }
             if (subAgentIds.length > 0) {
                 data.sub_agents = subAgentIds;
+            }
+            const memoryEnabledValue = document.getElementById('agent-update-memory-enabled').value;
+            if (memoryEnabledValue !== '') {
+                data.memory_enabled = memoryEnabledValue === 'true';
+                if (data.memory_enabled) {
+                    data.memory_tool_type = document.getElementById('agent-update-memory-tool-type').value;
+                } else {
+                    data.memory_tool_type = null;
+                }
+            }
+            const guardrailValue = document.getElementById('agent-update-guardrail-sensitive-data').value;
+            if (guardrailValue !== '') {
+                data.guardrail_sensitive_data = guardrailValue === 'true';
+                data.guardrails_config = guardrailValue === 'true'
+                    ? collectGuardrailConfig('agent-update')
+                    : null;
             }
             addSlotConfig(data, 'agent-update', 'primary', true);
             addSlotConfig(data, 'agent-update', 'secondary', true);
             addSlotConfig(data, 'agent-update', 'tertiary', true);
+
+            // Apply buffered file changes if any
+            if (agentUpdateNewFiles.length > 0 || agentUpdateRemovals.size > 0) {
+                const uploadedNewIds = [];
+                for (const entry of agentUpdateNewFiles) {
+                    const formData = new FormData();
+                    formData.append('file', entry.file);
+                    const uploadRes = await fetch(`${API_BASE}/agent/files`, { method: 'POST', body: formData });
+                    if (!uploadRes.ok) {
+                        alert(`Failed to upload "${entry.filename}": ` + await uploadRes.text());
+                        return;
+                    }
+                    uploadedNewIds.push((await uploadRes.json()).id);
+                }
+                for (const fileId of agentUpdateRemovals) {
+                    await fetch(`${API_BASE}/agent/files/${fileId}`, { method: 'DELETE' });
+                }
+                data.knowledge_file_ids = [
+                    ...agentUpdateFiles
+                        .filter(f => !agentUpdateRemovals.has(String(f.id)))
+                        .map(f => String(f.id)),
+                    ...uploadedNewIds
+                ];
+            }
 
             if (Object.keys(data).length === 0) {
                 alert('Enter at least one value to update.');
@@ -1216,6 +1800,11 @@
             }
 
             e.target.reset();
+            agentUpdateFiles = [];
+            agentUpdateNewFiles = [];
+            agentUpdateRemovals = new Set();
+            document.getElementById('agent-update-knowledge-files-list').innerHTML =
+                '<em>Select an agent above to see attached files.</em>';
             loadAgents();
         }
 
@@ -1228,11 +1817,14 @@
         }
 
         async function toggleAgent(id, status) {
-            await fetch(`${API_BASE}/agent/${id}`, {
+            const res = await fetch(`${API_BASE}/agent/${id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ isEnabled: status })
             });
+            if (!res.ok) {
+                alert('Failed to update agent status: ' + await res.text());
+            }
             loadAgents();
         }
 
@@ -1279,11 +1871,26 @@
             jobs.forEach(j => {
                 const div = document.createElement('div');
                 div.className = 'card';
+                const scheduleInfo = j.cron_expression
+                    ? `<strong>Cron:</strong> <code>${j.cron_expression}</code>`
+                    : `<strong>Interval:</strong> ${j.interval_seconds}s`;
+                let apiInfo = '';
+                if (j.url) {
+                    const condCount = (j.conditions || []).length;
+                    apiInfo = `
+                        <div style="margin-top:6px;padding:5px 8px;background:var(--status-bg);border:1px solid var(--card-border);border-radius:4px;font-size:0.82em;">
+                            <strong>API Check:</strong> <code>${j.method} ${j.url}</code><br>
+                            ${condCount > 0
+                                ? `<strong>Conditions (${j.condition_operator}):</strong> ${condCount} rule${condCount > 1 ? 's' : ''}`
+                                : '<em style="opacity:0.6">No conditions — triggers on any response</em>'}
+                        </div>`;
+                }
                 div.innerHTML = `
-                    <small>ID: ${j.job_id}</small><br>
+                    <small style="color:#888;">ID: ${j.job_id}</small><br>
                     <strong>Prompt:</strong> <code>${j.prompt}</code><br>
-                    <strong>Cron:</strong> ${j.cron_expression || 'N/A'} | <strong>Interval (s):</strong> ${j.interval_seconds || 'N/A'}<br>
-                    <button class="delete" onclick="deleteJob('${agentId}', '${j.job_id}')" style="margin-top:5px;">Delete</button>
+                    ${scheduleInfo}
+                    ${apiInfo}
+                    <button class="delete" onclick="deleteJob('${agentId}', '${j.job_id}')" style="margin-top:6px;">Delete</button>
                 `;
                 jobListEl.appendChild(div);
             });
@@ -1315,25 +1922,139 @@
             await fetch(`${API_BASE}/agent/${agentId}/webhook/invoke/${webhookId}`, { method: 'POST' });
         }
 
+        function toggleJobApiSection(enabled) {
+            document.getElementById('job-api-section').style.display = enabled ? 'block' : 'none';
+        }
+
+        function toggleJobBodyField(method) {
+            document.getElementById('job-body-group').style.display =
+                ['POST', 'PUT', 'PATCH'].includes(method) ? 'block' : 'none';
+        }
+
+        let _conditionIndex = 0;
+        function addJobCondition() {
+            const idx = _conditionIndex++;
+            const row = document.createElement('div');
+            row.id = `cond-row-${idx}`;
+            row.style.cssText = 'display:flex;gap:6px;align-items:center;flex-wrap:wrap;';
+            row.innerHTML = `
+                <select onchange="updateConditionFields(this, ${idx})" style="flex:0 0 auto;width:110px;font-size:0.82em;padding:3px 5px;background:var(--input-bg);color:var(--text-color);border:1px solid var(--input-border);border-radius:4px;">
+                    <option value="status_code">Status Code</option>
+                    <option value="field">Field</option>
+                    <option value="jsonpath">JSONPath</option>
+                </select>
+                <span id="cond-key-${idx}"></span>
+                <select id="cond-op-${idx}" style="flex:0 0 auto;width:90px;font-size:0.82em;padding:3px 5px;background:var(--input-bg);color:var(--text-color);border:1px solid var(--input-border);border-radius:4px;">
+                    <option value="eq">== (eq)</option>
+                    <option value="ne">!= (ne)</option>
+                    <option value="gt">&gt; (gt)</option>
+                    <option value="gte">&gt;= (gte)</option>
+                    <option value="lt">&lt; (lt)</option>
+                    <option value="lte">&lt;= (lte)</option>
+                    <option value="contains">contains</option>
+                </select>
+                <input id="cond-val-${idx}" type="text" placeholder="value" style="flex:1;min-width:80px;font-size:0.82em;padding:3px 6px;background:var(--input-bg);color:var(--text-color);border:1px solid var(--input-border);border-radius:4px;">
+                <button type="button" onclick="document.getElementById('cond-row-${idx}').remove()" style="padding:2px 8px;font-size:0.8em;">✕</button>
+            `;
+            document.getElementById('job-conditions-list').appendChild(row);
+            // initialise key field for default type (status_code = no key)
+            updateConditionFields(row.querySelector('select'), idx);
+        }
+
+        function updateConditionFields(typeSelect, idx) {
+            const type = typeSelect.value;
+            const keySpan = document.getElementById(`cond-key-${idx}`);
+            const inputStyle = 'font-size:0.82em;padding:3px 6px;background:var(--input-bg);color:var(--text-color);border:1px solid var(--input-border);border-radius:4px;';
+            if (type === 'status_code') {
+                keySpan.innerHTML = '';
+            } else if (type === 'field') {
+                keySpan.innerHTML = `<input id="cond-field-${idx}" type="text" placeholder="field name" style="width:100px;${inputStyle}">`;
+            } else {
+                keySpan.innerHTML = `<input id="cond-path-${idx}" type="text" placeholder="$.path.to.value" style="width:130px;${inputStyle}">`;
+            }
+        }
+
+        function _collectConditions() {
+            const rows = document.querySelectorAll('#job-conditions-list > div[id^="cond-row-"]');
+            const conditions = [];
+            rows.forEach(row => {
+                const idx = row.id.replace('cond-row-', '');
+                const typeEl = row.querySelector('select');
+                const type = typeEl ? typeEl.value : 'status_code';
+                const op = document.getElementById(`cond-op-${idx}`)?.value || 'eq';
+                const rawVal = document.getElementById(`cond-val-${idx}`)?.value || '';
+                const value = isNaN(rawVal) || rawVal === '' ? rawVal : Number(rawVal);
+                const c = { type, operator: op, value };
+                if (type === 'field') {
+                    c.field = document.getElementById(`cond-field-${idx}`)?.value || '';
+                } else if (type === 'jsonpath') {
+                    c.path = document.getElementById(`cond-path-${idx}`)?.value || '';
+                }
+                conditions.push(c);
+            });
+            return conditions;
+        }
+
         async function addJob(e) {
             e.preventDefault();
             const agentId = document.getElementById('automation-agent-select').value;
             const cronVal = document.getElementById('job-cron').value.trim();
             const intVal = document.getElementById('job-interval').value.trim();
-            const promptVal = document.getElementById('job-prompt').value;
-            if (!promptVal) { alert("Prompt is required"); return; }
-            await fetch(`${API_BASE}/agent/${agentId}/jobs`, {
+            const promptVal = document.getElementById('job-prompt').value.trim();
+            if (!promptVal) { alert('Prompt is required'); return; }
+            if (!cronVal && !intVal) { alert('Provide either a Cron Expression or Interval Seconds'); return; }
+
+            const apiEnabled = document.getElementById('job-api-toggle').checked;
+            const payload = {
+                prompt: promptVal,
+                cron_expression: cronVal || null,
+                interval_seconds: intVal ? parseInt(intVal) : null,
+            };
+
+            if (apiEnabled) {
+                const url = document.getElementById('job-url').value.trim();
+                if (!url) { alert('URL is required when API Check is enabled'); return; }
+                const headersRaw = document.getElementById('job-headers').value.trim();
+                const bodyRaw = document.getElementById('job-body').value.trim();
+                let headers = null, body = null;
+                if (headersRaw) {
+                    try { headers = JSON.parse(headersRaw); } catch { alert('Headers must be valid JSON'); return; }
+                }
+                if (bodyRaw) {
+                    try { body = JSON.parse(bodyRaw); } catch { alert('Request Body must be valid JSON'); return; }
+                }
+                payload.url = url;
+                payload.method = document.getElementById('job-method').value;
+                payload.headers = headers;
+                payload.body = body;
+                payload.conditions = _collectConditions();
+                payload.condition_operator = document.getElementById('job-condition-operator').value;
+            }
+
+            const res = await fetch(`${API_BASE}/agent/${agentId}/jobs`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    prompt: promptVal,
-                    cron_expression: cronVal || null,
-                    interval_seconds: intVal ? parseInt(intVal) : null
-                })
+                body: JSON.stringify(payload),
             });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                alert(`Error: ${err.detail || res.statusText}`);
+                return;
+            }
+
+            // Reset form
             document.getElementById('job-prompt').value = '';
             document.getElementById('job-cron').value = '';
             document.getElementById('job-interval').value = '';
+            document.getElementById('job-api-toggle').checked = false;
+            toggleJobApiSection(false);
+            document.getElementById('job-url').value = '';
+            document.getElementById('job-method').value = 'GET';
+            document.getElementById('job-headers').value = '';
+            document.getElementById('job-body').value = '';
+            document.getElementById('job-conditions-list').innerHTML = '';
+            document.getElementById('job-condition-operator').value = 'AND';
+            _conditionIndex = 0;
             loadAutomations();
         }
 
@@ -1393,13 +2114,31 @@
             selectEl.innerHTML = '<option value="">-- Select a connector --</option>';
             filterEl.innerHTML = '<option value="">-- All --</option>';
 
-            connectors.forEach(c => {
-                // Card in the list
-                const div = document.createElement('div');
-                div.className = 'card';
-                div.innerHTML = `<strong>${c.name}</strong><br><small>ID: ${c.id}</small>`;
-                listEl.appendChild(div);
+            function renderConnectorGroup(title, items) {
+                if (!items.length) return;
 
+                const heading = document.createElement('h4');
+                heading.textContent = title;
+                listEl.appendChild(heading);
+
+                items.forEach(c => {
+                    const div = document.createElement('div');
+                    div.className = 'card';
+                    div.innerHTML = `<strong>${c.name}</strong><br><small>ID: ${c.id}</small>`;
+                    listEl.appendChild(div);
+                });
+            }
+
+            renderConnectorGroup(
+                'Enterprise Connectors',
+                connectors.filter(c => c.category !== 'helper')
+            );
+            renderConnectorGroup(
+                'Helper Connectors',
+                connectors.filter(c => c.category === 'helper')
+            );
+
+            connectors.forEach(c => {
                 // Option in the create-config form
                 const opt = document.createElement('option');
                 opt.value = c.id;
@@ -1605,12 +2344,10 @@
             const listEl = document.getElementById('connector-config-list');
             const agentSelect = document.getElementById('agent-connector-configs');
             const updateAgentSelect = document.getElementById('agent-update-connector-configs');
-            const skillSelect = document.getElementById('skill-connector-configs');
 
             listEl.innerHTML = 'Loading...';
             agentSelect.innerHTML = '';
             updateAgentSelect.innerHTML = '';
-            skillSelect.innerHTML = '';
 
             // Fetch connectors list to iterate through all if no filter
             const connectorsRes = await fetch(`${API_BASE}/connectors/`);
@@ -1681,11 +2418,6 @@
                     updateOpt.value = cfg.connector_config_id;
                     updateOpt.textContent = `${cfg.name} (${connector.name})`;
                     updateAgentSelect.appendChild(updateOpt);
-
-                    const skillOpt = document.createElement('option');
-                    skillOpt.value = cfg.connector_config_id;
-                    skillOpt.textContent = `${cfg.name} (${connector.name})`;
-                    skillSelect.appendChild(skillOpt);
                 });
             }
 
@@ -1696,355 +2428,31 @@
             }
         }
 
-        // ─── MCP Servers ──────────────────────────────────────────────────────
-
-        async function loadSkills() {
-            const listEl = document.getElementById('skill-list');
-            const agentSelect = document.getElementById('agent-skills');
-            const updateAgentSelect = document.getElementById('agent-update-skills');
-
-            listEl.innerHTML = 'Loading skills...';
-            agentSelect.innerHTML = '';
-            updateAgentSelect.innerHTML = '';
-
-            const res = await fetch(`${API_BASE}/skill/`);
-            if (!res.ok) {
-                listEl.innerHTML = '<em style="color:red;">Could not load skills.</em>';
-                return;
-            }
-
-            currentSkills = await res.json();
-            listEl.innerHTML = '';
-
-            currentSkills.forEach(skill => {
-                const opt = document.createElement('option');
-                opt.value = skill.skill_id;
-                opt.textContent = `${skill.name} (${skill.skill_id})`;
-                agentSelect.appendChild(opt);
-
-                const updateOpt = document.createElement('option');
-                updateOpt.value = skill.skill_id;
-                updateOpt.textContent = `${skill.name} (${skill.skill_id})`;
-                updateAgentSelect.appendChild(updateOpt);
-
-                const card = document.createElement('div');
-                card.className = 'card';
-                card.innerHTML = `
-                    <strong>${skill.name}</strong><br>
-                    <small>${skill.description}</small><br>
-                    <small>Tools: ${(skill.tools || []).join(', ') || 'None'}</small><br>
-                    <small>Connector configs: ${(skill.connector_config_ids || []).length} | MCP servers: ${(skill.mcp_server_ids || []).length}</small>
-                `;
-
-                const deleteBtn = document.createElement('button');
-                deleteBtn.type = 'button';
-                deleteBtn.className = 'delete';
-                deleteBtn.style.marginTop = '8px';
-                deleteBtn.textContent = 'Delete';
-                deleteBtn.addEventListener('click', () => deleteSkill(skill.skill_id, skill.name));
-                card.appendChild(deleteBtn);
-
-                listEl.appendChild(card);
-            });
-
-            if (currentSkills.length === 0) {
-                listEl.textContent = 'No skills created yet.';
-            }
-        }
-
-        async function addSkill(e) {
-            e.preventDefault();
-            try {
-                const connectorSelect = document.getElementById('skill-connector-configs');
-                const mcpSelect = document.getElementById('skill-mcp-servers');
-                const payload = {
-                    name: document.getElementById('skill-name').value.trim(),
-                    description: document.getElementById('skill-description').value.trim(),
-                    instructions: document.getElementById('skill-instructions').value.trim(),
-                    tools: document.getElementById('skill-tools').value
-                        .split(',')
-                        .map(value => value.trim())
-                        .filter(Boolean),
-                    connector_config_ids: Array.from(connectorSelect.selectedOptions).map(o => o.value),
-                    mcp_server_ids: Array.from(mcpSelect.selectedOptions).map(o => o.value),
-                    references: parseJsonField('skill-references'),
-                    assets: parseJsonField('skill-assets'),
-                    scripts: parseJsonField('skill-scripts'),
-                };
-
-                const res = await fetch(`${API_BASE}/skill/`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload),
-                });
-
-                if (!res.ok) {
-                    alert('Failed to save skill: ' + await res.text());
-                    return;
-                }
-
-                e.target.reset();
-                await loadSkills();
-                loadAgents();
-                loadGraph();
-            } catch (error) {
-                alert(`Failed to parse skill JSON: ${error.message}`);
-            }
-        }
-
-        async function deleteSkill(skillId, skillName) {
-            if (!confirm(`Delete skill ${skillName}?`)) {
-                return;
-            }
-
-            const res = await fetch(`${API_BASE}/skill/${skillId}`, { method: 'DELETE' });
-            if (!res.ok) {
-                alert('Failed to delete skill: ' + await res.text());
-                return;
-            }
-
-            await loadSkills();
-            loadAgents();
-            loadGraph();
-        }
-
-        let editingMcpServer = null;
-
-        function resetMcpForm() {
-            editingMcpServer = null;
-            document.getElementById('add-mcp-form').reset();
-            document.getElementById('mcp-edit-state').style.display = 'none';
-            document.getElementById('mcp-submit-btn').textContent = 'Save MCP';
-            document.getElementById('mcp-test-result').innerHTML = '';
-        }
-
-        function renderMcpProbeResult(result, isError = false) {
-            const resultEl = document.getElementById('mcp-test-result');
-            if (isError) {
-                resultEl.innerHTML = `<div class="card" style="border-color:#dc3545; color:#842029;">${result}</div>`;
-                return;
-            }
-
-            const tools = result.tools || [];
-            const resources = result.resources || [];
-            const serverUrl = result.server_url || result.url || '';
-            resultEl.innerHTML = `
-                <div class="card" style="border-color:#198754;">
-                    <strong>${(result.metadata && result.metadata.name) || serverUrl}</strong><br>
-                    <small>Transport: ${(result.metadata && result.metadata.transport) || 'unknown'} | Tools: ${tools.length} | Resources: ${resources.length}</small><br>
-                    <small>URL: ${serverUrl}</small>
-                </div>
-            `;
-        }
-
-        async function testMcpServer() {
-            const payload = {
-                name: document.getElementById('mcp-name').value.trim() || null,
-                server_url: document.getElementById('mcp-url').value.trim(),
-                description: document.getElementById('mcp-description').value.trim() || null,
-                auth_type: document.getElementById('mcp-auth-type').value,
-                auth_username: document.getElementById('mcp-auth-username').value.trim() || null,
-                auth_secret: document.getElementById('mcp-auth-secret').value || null,
-            };
-
-            if (!payload.server_url) {
-                alert('Please enter an MCP URL first.');
-                return;
-            }
-
-            const res = await fetch(`${API_BASE}/mcp/test/`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
-            });
-
-            if (!res.ok) {
-                renderMcpProbeResult(await res.text(), true);
-                return;
-            }
-
-            renderMcpProbeResult(await res.json());
-        }
-
-        async function editMcpServer(mcpId) {
-            const res = await fetch(`${API_BASE}/mcp/${mcpId}`);
-            if (!res.ok) {
-                alert('Failed to load MCP server details.');
-                return;
-            }
-
-            const mcp = await res.json();
-            editingMcpServer = mcp.mcp_server_id;
-            document.getElementById('mcp-name').value = mcp.name || '';
-            document.getElementById('mcp-url').value = mcp.server_url || '';
-            document.getElementById('mcp-description').value = mcp.description || '';
-            document.getElementById('mcp-auth-type').value = mcp.auth_type || 'none';
-            document.getElementById('mcp-auth-username').value = mcp.auth_username || '';
-            document.getElementById('mcp-auth-secret').value = '';
-            document.getElementById('mcp-edit-state').style.display = 'block';
-            document.getElementById('mcp-submit-btn').textContent = 'Update MCP';
-            renderMcpProbeResult({
-                url: mcp.server_url,
-                metadata: mcp.metadata || {},
-                tools: mcp.tools || [],
-                resources: mcp.resources || [],
-            });
-        }
-
-        async function deleteMcpServer(mcpId, mcpName) {
-            if (!confirm(`Delete MCP server ${mcpName}?`)) {
-                return;
-            }
-
-            const res = await fetch(`${API_BASE}/mcp/${mcpId}`, { method: 'DELETE' });
-            if (!res.ok) {
-                alert('Failed to delete MCP server: ' + await res.text());
-                return;
-            }
-
-            if (editingMcpServer === mcpId) {
-                resetMcpForm();
-            }
-            await loadMcpServers();
-            loadAgents();
-            loadGraph();
-        }
-
-        async function saveMcpServer(e) {
-            e.preventDefault();
-            const payload = {
-                name: document.getElementById('mcp-name').value.trim() || null,
-                server_url: document.getElementById('mcp-url').value.trim(),
-                description: document.getElementById('mcp-description').value.trim() || null,
-                auth_type: document.getElementById('mcp-auth-type').value,
-                auth_username: document.getElementById('mcp-auth-username').value.trim() || null,
-                auth_secret: document.getElementById('mcp-auth-secret').value || null,
-            };
-
-            if (!payload.server_url) {
-                alert('Please enter an MCP URL.');
-                return;
-            }
-
-            const isEdit = Boolean(editingMcpServer);
-            const res = await fetch(
-                isEdit ? `${API_BASE}/mcp/${editingMcpServer}` : `${API_BASE}/mcp/`,
-                {
-                    method: isEdit ? 'PATCH' : 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload),
-                }
-            );
-
-            if (!res.ok) {
-                alert(`Failed to ${isEdit ? 'update' : 'save'} MCP server: ` + await res.text());
-                return;
-            }
-
-            const saved = await res.json();
-            resetMcpForm();
-            renderMcpProbeResult({
-                url: saved.server_url,
-                metadata: saved.metadata || {},
-                tools: saved.tools || [],
-                resources: saved.resources || [],
-            });
-            await loadMcpServers();
-            loadAgents();
-            loadGraph();
-        }
-
-        async function loadMcpServers() {
-            const listEl = document.getElementById('mcp-list');
-            const addAgentSelect = document.getElementById('agent-mcp-servers');
-            const updateAgentSelect = document.getElementById('agent-update-mcp-servers');
-            const skillSelect = document.getElementById('skill-mcp-servers');
-
-            listEl.innerHTML = 'Loading MCP servers...';
-            addAgentSelect.innerHTML = '';
-            updateAgentSelect.innerHTML = '';
-            skillSelect.innerHTML = '';
-
-            const res = await fetch(`${API_BASE}/mcp/`);
-            if (!res.ok) {
-                listEl.innerHTML = '<em style="color:red;">Could not load MCP servers.</em>';
-                return;
-            }
-
-            currentMcpServers = await res.json();
-            listEl.innerHTML = '';
-
-            currentMcpServers.forEach(mcp => {
-                const opt = document.createElement('option');
-                opt.value = mcp.mcp_server_id;
-                opt.textContent = `${mcp.name} (${mcp.auth_type})`;
-                addAgentSelect.appendChild(opt);
-
-                const updateOpt = document.createElement('option');
-                updateOpt.value = mcp.mcp_server_id;
-                updateOpt.textContent = `${mcp.name} (${mcp.auth_type})`;
-                updateAgentSelect.appendChild(updateOpt);
-
-                const skillOpt = document.createElement('option');
-                skillOpt.value = mcp.mcp_server_id;
-                skillOpt.textContent = `${mcp.name} (${mcp.auth_type})`;
-                skillSelect.appendChild(skillOpt);
-
-                const card = document.createElement('div');
-                card.className = 'card';
-                card.innerHTML = `
-                    <strong>${mcp.name}</strong><br>
-                    <small>${mcp.server_url}</small><br>
-                    <small>Auth: ${mcp.auth_type} | Tools: ${(mcp.tools || []).length} | Resources: ${(mcp.resources || []).length}</small><br>
-                    ${mcp.description ? `<small>${mcp.description}</small><br>` : ''}
-                `;
-
-                const editBtn = document.createElement('button');
-                editBtn.type = 'button';
-                editBtn.style.marginTop = '8px';
-                editBtn.textContent = 'Edit';
-                editBtn.addEventListener('click', () => editMcpServer(mcp.mcp_server_id));
-                card.appendChild(editBtn);
-
-                const deleteBtn = document.createElement('button');
-                deleteBtn.type = 'button';
-                deleteBtn.className = 'delete';
-                deleteBtn.style.marginTop = '8px';
-                deleteBtn.style.marginLeft = '6px';
-                deleteBtn.textContent = 'Delete';
-                deleteBtn.addEventListener('click', () => deleteMcpServer(mcp.mcp_server_id, mcp.name));
-                card.appendChild(deleteBtn);
-
-                listEl.appendChild(card);
-            });
-
-            if (currentMcpServers.length === 0) {
-                listEl.textContent = 'No MCP servers registered yet.';
-            }
-        }
-
         // ─── Chat ─────────────────────────────────────────────────────────────
-        let currentSessionId = null;
-        let currentUserId = 'u_' + Math.floor(Math.random() * 1000);
+        const chatSessions = {};
+        const chatDrafts = {};
 
-        async function createSession(agentId) {
-            const sessionId = 's_' + Date.now();
-            try {
-                const res = await fetch(`${API_BASE}/agent-server/apps/${agentId}/users/${currentUserId}/sessions/${sessionId}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
-                });
-                if (res.ok) {
-                    currentSessionId = sessionId;
-                    return true;
-                } else {
-                    console.error("Failed to create session", await res.text());
-                    return false;
-                }
-            } catch (e) {
-                console.error("Error creating session", e);
-                return false;
-            }
+        function renderChatMessages(messages) {
+            const chatBox = document.getElementById('chat-messages');
+            chatBox.innerHTML = '';
+            (messages || []).forEach(({ role, text, error }) => {
+                const div = document.createElement('div');
+                div.className = `message ${role}`;
+                div.textContent = text;
+                if (error) div.style.color = 'red';
+                chatBox.appendChild(div);
+            });
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        function appendChatMessage(role, text, error = false) {
+            const agentId = document.getElementById('chat-agent-select').value;
+            if (!agentId) return;
+            const sessionId = chatSessions[agentId] || '__draft__';
+            chatDrafts[agentId] = chatDrafts[agentId] || {};
+            chatDrafts[agentId][sessionId] = chatDrafts[agentId][sessionId] || [];
+            chatDrafts[agentId][sessionId].push({ role, text, error });
+            renderChatMessages(chatDrafts[agentId][sessionId]);
         }
 
         async function sendMessage() {
@@ -2053,89 +2461,61 @@
             const msgText = inputEl.value.trim();
             if (!agentId || !msgText) return;
 
-            if (!currentSessionId) {
-                const created = await createSession(agentId);
-                if (!created) {
-                    alert("Could not create session. Check console.");
-                    return;
-                }
-            }
-
-            const chatBox = document.getElementById('chat-messages');
-            const userDiv = document.createElement('div');
-            userDiv.className = 'message user';
-            userDiv.textContent = msgText;
-            chatBox.appendChild(userDiv);
+            appendChatMessage('user', msgText);
             inputEl.value = '';
 
             try {
-                const res = await fetch(`${API_BASE}/agent-server/run`, {
+                const res = await fetch(`${API_BASE}/agent/${agentId}/chat`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        appName: agentId,
-                        userId: currentUserId,
-                        sessionId: currentSessionId,
-                        newMessage: {
-                            role: "user",
-                            parts: [{ text: msgText }]
-                        }
+                        message: msgText,
+                        session_id: chatSessions[agentId] || null
                     })
                 });
 
                 if (!res.ok) throw new Error(await res.text());
 
                 const responseData = await res.json();
-                let replyText = "";
-                if (Array.isArray(responseData)) {
-                    responseData.forEach(event => {
-                        if (event.content && event.content.parts) {
-                            event.content.parts.forEach(part => {
-                                if (part.text) replyText += part.text;
-                            });
-                        }
-                    });
-                } else {
-                    replyText = "Error: Unexpected response format";
+                if (responseData && responseData.session_id) {
+                    chatSessions[agentId] = responseData.session_id;
+                    chatDrafts[agentId] = chatDrafts[agentId] || {};
+                    chatDrafts[agentId][responseData.session_id] = chatDrafts[agentId][responseData.session_id] || [];
                 }
+                const replyText = responseData && typeof responseData.text === 'string'
+                    ? responseData.text
+                    : '';
 
-                const agentDiv = document.createElement('div');
-                agentDiv.className = 'message agent';
-                agentDiv.textContent = replyText || "(No response text)";
-                chatBox.appendChild(agentDiv);
-                chatBox.scrollTop = chatBox.scrollHeight;
+                appendChatMessage('agent', replyText || "(No response text)");
 
             } catch (e) {
                 console.error(e);
-                const errDiv = document.createElement('div');
-                errDiv.className = 'message agent';
-                errDiv.textContent = `Error: ${e.message}`;
-                errDiv.style.color = 'red';
-                chatBox.appendChild(errDiv);
+                appendChatMessage('agent', `Error: ${e.message}`, true);
             }
         }
 
         // ─── Event Listeners ──────────────────────────────────────────────────
         document.getElementById('chat-agent-select').addEventListener('change', () => {
-            currentSessionId = null;
-            document.getElementById('chat-messages').innerHTML = '';
+            const agentId = document.getElementById('chat-agent-select').value;
+            if (agentId) {
+                chatSessions[agentId] = null;
+                renderChatMessages([]);
+            }
         });
 
         document.getElementById('add-model-form').addEventListener('submit', addModel);
         document.getElementById('update-model-form').addEventListener('submit', updateModel);
         document.getElementById('update-model-defaults-form').addEventListener('submit', updateModelDefaults);
+        document.getElementById('add-aws-credential-form').addEventListener('submit', addAwsCredential);
+        document.getElementById('update-aws-credential-form').addEventListener('submit', updateAwsCredential);
         document.getElementById('add-agent-form').addEventListener('submit', addAgent);
         document.getElementById('agent-template-select').addEventListener('change', applyAgentTemplate);
         document.getElementById('update-agent-form').addEventListener('submit', updateAgent);
-        document.getElementById('add-skill-form').addEventListener('submit', addSkill);
         document.getElementById('send-msg-btn').addEventListener('click', sendMessage);
         document.getElementById('add-connector-config-form').addEventListener('submit', addConnectorConfig);
         document.getElementById('connector-config-cancel-edit').addEventListener('click', resetConnectorConfigForm);
         document.getElementById('connector-select').addEventListener('change', onConnectorSelected);
         document.getElementById('connector-config-filter').addEventListener('change', loadAllConnectorConfigs);
-        document.getElementById('add-mcp-form').addEventListener('submit', saveMcpServer);
-        document.getElementById('mcp-test-btn').addEventListener('click', testMcpServer);
-        document.getElementById('mcp-cancel-edit').addEventListener('click', resetMcpForm);
 
         const themeToggleBtn = document.getElementById('theme-toggle');
         
@@ -2165,13 +2545,7 @@
                 const nodes = new vis.DataSet(
                     data.nodes.map(n => ({
                         id: n.id,
-                        label: n.type === 'agent'
-                            ? (n.data.agent.name || n.id)
-                            : n.type === 'connector'
-                                ? (n.data.connector.name || n.id)
-                                : n.type === 'skill'
-                                    ? (n.data.skill.name || n.id)
-                                    : ((n.data.mcp && n.data.mcp.name) || n.id),
+                        label: n.type === 'agent' ? (n.data.agent.name || n.id) : (n.type === 'connector' ? (n.data.connector.name || n.id) : n.id),
                         group: n.type,
                         title: JSON.stringify(n.data, null, 2)
                     }))
@@ -2191,7 +2565,6 @@
                     groups: {
                         agent: { color: { background: '#e3f2fd', border: '#1e88e5' }, shape: 'box' },
                         connector: { color: { background: '#f1f8e9', border: '#43a047' }, shape: 'ellipse' },
-                        skill: { color: { background: '#f3e8ff', border: '#9333ea' }, shape: 'hexagon' },
                         mcp: { color: { background: '#fff3e0', border: '#fb8c00' }, shape: 'diamond' }
                     },
                     physics: {
@@ -2209,13 +2582,112 @@
         checkHealth();
         loadModels();
         loadAgentTemplates();
-        loadAgents();
+        loadAwsCredentials().then(() => loadAgents());
         loadConnectors().then(() => loadAllConnectorConfigs());
-        loadMcpServers();
-        loadSkills();
         loadGraph();
 
         setInterval(checkHealth, 30000);
+
+        // ─── Knowledge Files ──────────────────────────────────────────────────
+        // Both forms buffer all changes locally.
+        // Actual uploads / deletes only happen on form submit.
+
+        // Create form state
+        let agentCreateFiles = []; // [{file: File, filename, size}]
+
+        // Update form state
+        let agentUpdateFiles = [];    // [{id, filename, size}] loaded from server
+        let agentUpdateNewFiles = []; // [{file: File, filename, size}] queued to upload
+        let agentUpdateRemovals = new Set(); // file IDs marked for deletion
+
+        // ── Create form ──────────────────────────────────────────────────────
+        function previewKnowledgeFile() {
+            const inputEl = document.getElementById('agent-knowledge-file-input');
+            const file = inputEl.files[0];
+            if (!file) return;
+            agentCreateFiles.push({ file, filename: file.name, size: file.size });
+            renderCreateFileList();
+            inputEl.value = '';
+        }
+
+        function renderCreateFileList() {
+            const listEl = document.getElementById('agent-knowledge-files-list');
+            if (!agentCreateFiles.length) { listEl.innerHTML = ''; return; }
+            listEl.innerHTML = agentCreateFiles.map((f, i) => `
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+                    <span>${f.filename} <small>(${(f.size / 1024).toFixed(1)} KB)</small></span>
+                    <button type="button" onclick="agentCreateFiles.splice(${i},1);renderCreateFileList();" style="font-size:12px;padding:2px 6px;">Remove</button>
+                </div>
+            `).join('');
+        }
+
+        // ── Update form ──────────────────────────────────────────────────────
+        function previewUpdateKnowledgeFile() {
+            const inputEl = document.getElementById('agent-update-knowledge-file-input');
+            const file = inputEl.files[0];
+            if (!file) return;
+            agentUpdateNewFiles.push({ file, filename: file.name, size: file.size });
+            renderUpdateFileList();
+            inputEl.value = '';
+        }
+
+        function renderUpdateFileList() {
+            const listEl = document.getElementById('agent-update-knowledge-files-list');
+            const existing = agentUpdateFiles.filter(f => !agentUpdateRemovals.has(String(f.id)));
+            const allFiles = [
+                ...existing.map(f => ({ key: `id:${f.id}`, filename: f.filename, size: f.size })),
+                ...agentUpdateNewFiles.map((f, i) => ({ key: `new:${i}`, filename: f.filename, size: f.size }))
+            ];
+            if (!allFiles.length) { listEl.innerHTML = '<em>No files attached.</em>'; return; }
+            listEl.innerHTML = allFiles.map(f => `
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+                    <span>${f.filename} <small>(${(f.size / 1024).toFixed(1)} KB)</small></span>
+                    ${f.key.startsWith('id:') ? `<button type="button" onclick="downloadKnowledgeFile('${f.key.slice(3)}','${f.filename}')" style="font-size:12px;padding:2px 6px;">Download</button>` : ''}
+                    <button type="button" onclick="removeUpdateFile('${f.key}')" style="font-size:12px;padding:2px 6px;">Remove</button>
+                </div>
+            `).join('');
+        }
+
+        function removeUpdateFile(key) {
+            if (key.startsWith('id:')) {
+                agentUpdateRemovals.add(key.slice(3));
+            } else {
+                agentUpdateNewFiles.splice(Number(key.slice(4)), 1);
+            }
+            renderUpdateFileList();
+        }
+
+        async function downloadKnowledgeFile(fileId, filename) {
+            const res = await fetch(`${API_BASE}/agent/files/${fileId}`);
+            if (!res.ok) { alert('Download failed.'); return; }
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        async function loadAgentKnowledgeFiles(agentId) {
+            const listEl = document.getElementById('agent-update-knowledge-files-list');
+            agentUpdateFiles = [];
+            agentUpdateNewFiles = [];
+            agentUpdateRemovals = new Set();
+            if (!agentId) {
+                listEl.innerHTML = '<em>Select an agent above to see attached files.</em>';
+                return;
+            }
+            const res = await fetch(`${API_BASE}/agent/${agentId}/files`);
+            if (!res.ok) { listEl.innerHTML = '<em>Failed to load files.</em>'; return; }
+            agentUpdateFiles = await res.json();
+            renderUpdateFileList();
+        }
+
+        document.getElementById('agent-update-select').addEventListener('change', () => {
+            const agentId = document.getElementById('agent-update-select').value;
+            loadAgentKnowledgeFiles(agentId);
+        });
     </script>
 </body>
 

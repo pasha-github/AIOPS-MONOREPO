@@ -74,12 +74,13 @@ jobs:
             --region=${{ env.REGION }} \
             --project=${{ env.PROJECT_ID }} \
             --min-instances=0 \
-            --max-instances=1 \
+            --max-instances=50 \
             --set-env-vars="\
               MAIN_SERVER_DATABASE_URL=${{ secrets.MAIN_SERVER_DATABASE_URL }},\
               AGENT_SERVER_DATABASE_URL=${{ secrets.AGENT_SERVER_DATABASE_URL }},\
               ENV=${{ secrets.ENV }},\
               A2A=${{ secrets.A2A }},\
+              POSTGRES_AGENT_SERVER_DATABASE_URL=${{ secrets.POSTGRES_AGENT_SERVER_DATABASE_URL }},\
               ENCRYPTION_KEY=${{ secrets.ENCRYPTION_KEY }}" \
             --quiet
 

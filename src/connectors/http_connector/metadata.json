@@ -1,0 +1,22 @@
+{
+  "id": "http_connector",
+  "name": "HTTP",
+  "category": "helper",
+  "description": "Generic HTTP connector with one universal request tool.",
+  "version": "1.0.0",
+  "config_variables": [
+    {
+      "name": "BASE_URL",
+      "label": "Base URL",
+      "required": true,
+      "secret": false,
+      "placeholder": "https://api.example.com"
+    }
+  ],
+  "tools": [
+    {
+      "name": "http_request",
+      "documentation": "Makes an HTTP request with method GET, POST, PUT, PATCH, or DELETE to a relative path under BASE_URL."
+    }
+  ]
+}

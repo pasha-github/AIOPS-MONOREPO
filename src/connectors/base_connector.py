@@ -7,9 +7,15 @@ Each connector extends BaseConnector and exposes its tools to an LlmAgent.
 
 import base64
 import inspect
+import logging
+from functools import wraps
+from typing import Any
+from urllib.parse import urlsplit
 
 import requests
 from google.adk.tools.function_tool import FunctionTool
+
+logger = logging.getLogger(__name__)
 
 
 def connector_tool(func):
@@ -40,7 +46,15 @@ class BaseConnector:
 
     def _make_tool(self, func, name: str | None = None) -> FunctionTool:
         _tool_name = name or f"{self.prefix}{func.__name__}"
-        return FunctionTool(func=func)
+        if _tool_name == func.__name__:
+            return FunctionTool(func=func)
+
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            return func(*args, **kwargs)
+
+        wrapper.__name__ = _tool_name
+        return FunctionTool(func=wrapper)
 
     def get_tools(self) -> list[FunctionTool]:
         return self._tools
@@ -58,7 +72,7 @@ class BaseConnector:
         method: str = "GET",
         headers: dict[str, str] | None = None,
         data: dict[str, str] | None = None,
-        json: dict[str, str] | None = None,
+        json: dict[str, Any] | None = None,
         params: dict[str, str] | None = None,
         basic_auth: tuple[str, str] | None = None,
         bearer_token: str | None = None,
@@ -105,6 +119,28 @@ class BaseConnector:
                 headers = {}
             headers["Authorization"] = f"Bearer {bearer_token}"
 
-        return requests.request(
-            method, url, headers=headers, data=data, params=params, json=json
+        safe_url = urlsplit(url)
+        logger.info(
+            "Connector HTTP request: connector=%s method=%s host=%s path=%s",
+            self.__class__.__name__,
+            method,
+            safe_url.netloc,
+            safe_url.path,
         )
+        response = requests.request(
+            method,
+            url,
+            headers=headers,
+            data=data,
+            params=params,
+            json=json,
+        )
+        logger.info(
+            "Connector HTTP response: connector=%s method=%s host=%s path=%s status=%s",
+            self.__class__.__name__,
+            method,
+            safe_url.netloc,
+            safe_url.path,
+            response.status_code,
+        )
+        return response

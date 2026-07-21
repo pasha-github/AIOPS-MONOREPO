@@ -172,6 +172,11 @@ def _patch_common_runtime(monkeypatch: pytest.MonkeyPatch):
             self.model = model
             self.kwargs = kwargs
 
+    class _FakeGemini:
+        def __init__(self, model, **kwargs):
+            self.model = model
+            self.kwargs = kwargs
+
     class _FakeLlmAgent:
         def __init__(self, **kwargs):
             self.kwargs = kwargs
@@ -182,6 +187,7 @@ def _patch_common_runtime(monkeypatch: pytest.MonkeyPatch):
             self.kwargs = kwargs
 
     monkeypatch.setattr(agent_loader_module, "LiteLlm", _FakeLiteLlm)
+    monkeypatch.setattr(agent_loader_module, "Gemini", _FakeGemini)
     monkeypatch.setattr(agent_loader_module, "LlmAgent", _FakeLlmAgent)
     monkeypatch.setattr(agent_loader_module, "SkillToolset", _FakeSkillToolset)
     monkeypatch.setattr(
@@ -295,7 +301,26 @@ def test_agent_loader_google_model_path(monkeypatch: pytest.MonkeyPatch):
     assert agent.kwargs["model"].kwargs["fallbacks"] == []
 
 
-def test_agent_loader_does_not_attach_session_summary_callback(
+def test_agent_loader_bedrock_agentcore_google_uses_native_gemini(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    _patch_common_runtime(monkeypatch)
+    cfg = _agent_cfg(deployment_target="bedrock_agentcore")
+    model = _model_cfg(provider="google", name="gemini-2.5-flash")
+    monkeypatch.setattr(agent_loader_module, "cache", _FakeCache())
+    monkeypatch.setattr(
+        agent_loader_module,
+        "Session",
+        lambda _engine: _FakeSession(agent_config=cfg, model_config=model),
+    )
+
+    loader = DatabaseAgentLoader()
+    agent = loader.load_agent("main", allow_non_adk=True)
+    assert type(agent.kwargs["model"]).__name__ == "_FakeGemini"
+    assert agent.kwargs["model"].model == "gemini-2.5-flash"
+
+
+def test_agent_loader_attaches_session_summary_callback(
     monkeypatch: pytest.MonkeyPatch,
 ):
     _patch_common_runtime(monkeypatch)
@@ -310,7 +335,9 @@ def test_agent_loader_does_not_attach_session_summary_callback(
 
     loader = DatabaseAgentLoader()
     agent = loader.load_agent("main")
-    assert "before_model_callback" not in agent.kwargs
+    assert "before_model_callback" in agent.kwargs
+    assert "before_agent_callback" in agent.kwargs
+    assert "after_agent_callback" in agent.kwargs
 
 
 def test_agent_loader_non_google_model_path(monkeypatch: pytest.MonkeyPatch):
@@ -456,9 +483,9 @@ def test_agent_loader_duplicate_sub_agents_skipped(monkeypatch: pytest.MonkeyPat
 
     original_load_agent = DatabaseAgentLoader.load_agent
 
-    def _wrapped(self, name):
+    def _wrapped(self, name, **kwargs):
         if name == "main":
-            return original_load_agent(self, name)
+            return original_load_agent(self, name, **kwargs)
         return object()
 
     monkeypatch.setattr(DatabaseAgentLoader, "load_agent", _wrapped)
