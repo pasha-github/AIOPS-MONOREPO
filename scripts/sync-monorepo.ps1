@@ -21,8 +21,12 @@ $Today = Get-Date -Format "yyyy-MM-dd"
 $LogFile = Join-Path $LogDir "sync-$Today.log"
 
 function Log($msg) {
+    # Write-Host, not Write-Output: this is called from inside Invoke-Git, and
+    # Write-Output would leak into that function's return value (which callers
+    # compare against 0 as an exit code), silently turning every call into a
+    # false failure.
     $line = "[{0}] {1}" -f (Get-Date -Format "yyyy-MM-dd HH:mm:ss"), $msg
-    Write-Output $line
+    Write-Host $line
     Add-Content -Path $LogFile -Value $line
 }
 
