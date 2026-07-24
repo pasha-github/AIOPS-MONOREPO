@@ -1,8 +1,11 @@
-FROM mcr.microsoft.com/playwright:v1.55.0-jammy
+FROM mcr.microsoft.com/playwright:v1.61.1-noble
+
 WORKDIR /app
 
-RUN npm init -y && npm install @playwright/mcp@latest
-RUN npx playwright install chromium   # fetches the revision THIS playwright expects into /ms-playwright
+RUN npm init -y \
+ && npm install @playwright/mcp@0.0.78
+
+RUN npx playwright install --with-deps chromium
 
 ENV PORT=8080
 
