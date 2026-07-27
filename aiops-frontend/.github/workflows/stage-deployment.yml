@@ -1,0 +1,94 @@
+name: Build & Deploy to Cloud Run (Dev)
+
+on:
+  push:
+    branches:
+      - stage
+  workflow_dispatch: # Allow manual triggers from GitHub UI
+
+env:
+  PROJECT_ID: rc-ai-ops-internal
+  REGION: us-central1
+  REGISTRY: us-central1-docker.pkg.dev
+  REPOSITORY: aiops-registry
+  SERVICE_NAME: aiops-frontend-stage
+  IMAGE: aiops-frontend-stage
+
+jobs:
+  build-and-deploy:
+    name: Build, Push & Deploy
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write # Required for Workload Identity Federation (recommended)
+
+    steps:
+      # ── 1. Checkout code ──────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── 2. Authenticate to Google Cloud ───────────────────────────────────
+      # Option A (recommended): Workload Identity Federation — no long-lived keys
+      # Requires one-time setup: https://github.com/google-github-actions/auth#setup
+      # - name: Authenticate to Google Cloud
+      #   uses: google-github-actions/auth@v2
+      #   with:
+      #     workload_identity_provider: ${{ secrets.WIF_PROVIDER }}   # e.g. projects/123/locations/global/workloadIdentityPools/my-pool/providers/my-provider
+      #     service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}       # e.g. my-sa@rc-ai-ops-internal.iam.gserviceaccount.com
+
+      # Option B: Service Account JSON key (simpler but less secure)
+      # Uncomment below and comment out Option A if you prefer key-based auth.
+      - name: Authenticate to Google Cloud (SA Key)
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      # ── 3. Set up gcloud CLI ──────────────────────────────────────────────
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      # ── 4. Configure Docker for Artifact Registry ─────────────────────────
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGISTRY }} --quiet
+
+      # ── 5. Build Docker image ─────────────────────────────────────────────
+      - name: Build Docker image
+        run: |
+          docker build \
+            --tag ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE }}:${{ github.sha }} \
+            --tag ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE }}:latest \
+            .
+      # ── 6. Push to Artifact Registry ──────────────────────────────────────
+      - name: Push image to Artifact Registry
+        run: |
+          docker push ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE }}:${{ github.sha }}
+          docker push ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE }}:latest
+      # ── 7. Deploy to Cloud Run ────────────────────────────────────────────
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy ${{ env.SERVICE_NAME }} \
+            --image=${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE }}:${{ github.sha }} \
+            --region=${{ env.REGION }} \
+            --project=${{ env.PROJECT_ID }} \
+            --min-instances=0 \
+            --max-instances=1 \
+            --set-env-vars="\
+              NEXT_PUBLIC_LLM_MANAGER_API_BASE_URL=${{ secrets.NEXT_PUBLIC_LLM_MANAGER_API_BASE_URL_STAGE }},\
+              NEXT_PUBLIC_AGENT_ADK_BASE_URL=${{ secrets.NEXT_PUBLIC_AGENT_ADK_BASE_URL_STAGE }}" \
+            --quiet
+      # ── 8. Route all traffic to the new revision ──────────────────────────
+      - name: Update traffic to latest revision
+        run: |
+          gcloud run services update-traffic ${{ env.SERVICE_NAME }} \
+            --to-latest \
+            --region=${{ env.REGION }} \
+            --project=${{ env.PROJECT_ID }}
+      # ── 9. Print the deployed service URL ────────────────────────────────
+      - name: Get Service URL
+        run: |
+          URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} \
+            --region=${{ env.REGION }} \
+            --project=${{ env.PROJECT_ID }} \
+            --format='value(status.url)')
+          echo "✅ Deployed to: $URL"
