@@ -37,6 +37,13 @@ const getStringArray = (value: unknown) => {
     .filter(Boolean);
 };
 
+const getSubAgentDelegationType = (
+  value: unknown
+): AgentRecord["sub_agent_delegation_type"] => {
+  const normalized = getStringOrNull(value)?.toLowerCase();
+  return normalized === "full" || normalized === "task" ? normalized : null;
+};
+
 const getMcpServerEndpoints = (value: unknown): string[] => {
   if (Array.isArray(value)) {
     return value.flatMap((item) => getMcpServerEndpoints(item));
@@ -323,6 +330,9 @@ export default function AgentManagementPage() {
             mcp_servers: getMcpServerEndpoints(record.mcp_servers),
             connector_config_ids: getStringArray(record.connector_config_ids),
             sub_agents: getStringArray(record.sub_agents),
+            sub_agent_delegation_type: getSubAgentDelegationType(
+              record.sub_agent_delegation_type
+            ),
             knowledge_file_ids: getStringArray(record.knowledge_file_ids),
             isEnabled: isEnabledFromApi,
             guardrail_sensitive_data:
