@@ -76,7 +76,7 @@ def ensure_connector_import_paths() -> None:
             sys.path.insert(0, path_str)
 
 
-def resolve_connector_tools(connector_config: ConnectorConfig):
+def resolve_connector_instance(connector_config: ConnectorConfig):
     """Dynamically imports a connector by connector_id and instantiates it with config values.
 
     Args:
@@ -85,7 +85,7 @@ def resolve_connector_tools(connector_config: ConnectorConfig):
             - config: list of {"name": str, "value": str} dicts used as constructor kwargs
 
     Returns:
-        An instantiated connector object (subclass of BaseConnector) with its tools ready.
+        An instantiated connector object (subclass of BaseConnector).
 
     Raises:
         FileNotFoundError: If no matching .py file exists in the connectors/ folder.
@@ -94,7 +94,7 @@ def resolve_connector_tools(connector_config: ConnectorConfig):
     connector_id = connector_config.connector_id
     config = connector_config.config
     logger.info(
-        "Resolving connector tools: connector_id=%s config_id=%s config_keys=%s",
+        "Resolving connector instance: connector_id=%s config_id=%s config_keys=%s",
         connector_id,
         connector_config.connector_config_id,
         _config_names(config),
@@ -166,12 +166,30 @@ def resolve_connector_tools(connector_config: ConnectorConfig):
         sorted(kwargs.keys()),
         omitted_blank_keys,
     )
-    connector = connector_class(**kwargs)
+    return connector_class(**kwargs)
+
+
+def resolve_connector_tools(connector_config: ConnectorConfig):
+    """Dynamically imports a connector by connector_id and returns its tools.
+
+    Args:
+        connector_config: A ConnectorConfig instance containing:
+            - connector_id: maps to a .py file in the connectors/ folder (e.g. "example_connector")
+            - config: list of {"name": str, "value": str} dicts used as constructor kwargs
+
+    Returns:
+        The instantiated connector's tools, ready for an agent.
+
+    Raises:
+        FileNotFoundError: If no matching .py file exists in the connectors/ folder.
+        ValueError: If the module contains no BaseConnector subclass.
+    """
+    connector = resolve_connector_instance(connector_config)
     tools = connector.get_tools()
     logger.info(
         "Connector tools resolved: connector_id=%s class=%s tool_names=%s",
-        connector_id,
-        connector_class.__name__,
+        connector_config.connector_id,
+        connector.__class__.__name__,
         [getattr(tool, "name", repr(tool)) for tool in tools],
     )
 

@@ -1,4 +1,9 @@
 ﻿google-adk[a2a,eval]==1.35.2
+# google-adk requires opentelemetry-resourcedetector-gcp>=1.9.0a0. Its only
+# non-prerelease (1.13.0) was yanked ("breaks imports"), so the requirement
+# can only be met by a prerelease. Pin one explicitly so uv resolves it
+# without enabling prereleases globally (--prerelease=allow).
+opentelemetry-resourcedetector-gcp==1.12.0a0
 google-cloud-aiplatform==1.148.1
 google-genai==1.75.0
 fastapi
@@ -12,6 +17,8 @@ PyYAML==6.0.3
 # For Postgres
 asyncpg
 psycopg2-binary
+# pgvector: real vector(dim) column + HNSW ANN index on Postgres (SOP embeddings)
+pgvector
 
 # for db migrations
 alembic
@@ -31,6 +38,8 @@ ruff
 
 # For SSH-based connectors
 paramiko
+
+pytest
 
 # For SharePoint Beta Connector (.docx creation, editing, and comments)
 docx-mcp-server
