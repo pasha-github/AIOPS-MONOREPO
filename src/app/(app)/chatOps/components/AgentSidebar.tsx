@@ -1,4 +1,4 @@
-import { Bot, Settings } from "lucide-react";
+import { Bot } from "lucide-react";
 import { isSelectableStatus } from "../agentStatus";
 import { AgentSidebarProps, AppItem } from "../types";
 
@@ -21,13 +21,9 @@ export default function AgentSidebar({
             <div className="p-2 bg-blue-100 text-blue-600 rounded-xl">
               <Bot className="h-5 w-5" />
             </div>
-            <h3 className="text-lg font-semibold text-gray-900">Agent</h3>
+            <h3 className="text-m font-semibold text-gray-900">{assistantDisplayName}</h3>
           </div>
-          <Settings className="h-5 w-5 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer" />
         </div>
-        <p className="text-sm text-gray-600 line-clamp-2 pl-1">
-          {assistantDisplayName}
-        </p>
       </div>
 
       {/* Body */}

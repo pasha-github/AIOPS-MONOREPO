@@ -344,40 +344,40 @@ export default function LLMOverviewSection({
         </div>
 
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(320px,0.8fr)]">
-          <div className="flex h-full min-h-[190px] min-w-[220px] flex-col rounded-2xl bg-white p-5 shadow-[0_12px_30px_-28px_rgba(16,24,40,0.45)] ring-1 ring-[#eef1f7]">
+          <div className="flex h-full min-h-[135px] min-w-[220px] flex-col rounded-2xl bg-white p-5 shadow-[0_12px_30px_-28px_rgba(16,24,40,0.45)] ring-1 ring-[#eef1f7]">
             <div className="flex items-center justify-between">
               <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-[#18c964] to-[#00b56c] text-white shadow-[0_10px_20px_-12px_rgba(0,0,0,0.45)]">
                 <Network className="h-5 w-5" />
               </div>
           
             </div>
-            <p className="mt-5 text-sm font-semibold text-[#5a6476]">
-              Providers
-            </p>
-            <div className="mt-auto flex flex-col gap-5 pt-6 lg:flex-row lg:items-end lg:justify-between">
-              <p className="flex items-center gap-2 text-3xl font-semibold text-[#0f1115]">
-                {isLoading || isRefreshing ? (
-                  <Loader2 className="h-6 w-6 animate-spin text-[#5b4cf0]" />
-                ) : (
-                  `${activeProviderCount}/${totalProviderCount}`
-                )}
-              </p>
-              <div className="grid flex-1 grid-cols-5 gap-3 lg:max-w-[540px]">
+            <div className="mt-4 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div className="shrink-0">
+                <p className="text-sm font-semibold text-[#5a6476]">
+                  Providers
+                </p>
+                <p className="mt-2 flex items-center gap-2 text-3xl font-semibold text-[#0f1115]">
+                  {isLoading || isRefreshing ? (
+                    <Loader2 className="h-6 w-6 animate-spin text-[#5b4cf0]" />
+                  ) : (
+                    `${activeProviderCount}/${totalProviderCount}`
+                  )}
+                </p>
+              </div>
+              <div className="grid flex-1 grid-cols-6 gap-2 lg:max-w-[560px]">
                 {providerBreakdown.map((provider) => (
                   <div
                     key={provider.key}
-                    className="flex flex-col items-center justify-end gap-2 rounded-xl px-2 py-3 ring-[#eef1f7]"
+                    className="flex flex-col items-center justify-start gap-1 rounded-xl px-2 py-1 ring-[#eef1f7]"
                   >
                     <Image
                       src={provider.iconSrc}
                       alt={`${provider.label} logo`}
                       width={26}
                       height={26}
-                      className={`h-12 w-12 object-contain`}
+                      className="h-9 w-9 object-contain"
                     />
-                    <span
-                      className={`text-sm font-semibold`}
-                    >
+                    <span className="text-sm font-semibold">
                       {provider.count}
                     </span>
                   </div>
@@ -386,16 +386,16 @@ export default function LLMOverviewSection({
             </div>
           </div>
 
-          <div className="flex h-full min-h-[190px] min-w-[220px] flex-col rounded-2xl bg-white p-5 shadow-[0_12px_30px_-28px_rgba(16,24,40,0.45)] ring-1 ring-[#eef1f7]">
+          <div className="flex h-full min-h-[135px] min-w-[220px] flex-col rounded-2xl bg-white p-5 shadow-[0_12px_30px_-28px_rgba(16,24,40,0.45)] ring-1 ring-[#eef1f7]">
             <div className="flex items-center justify-between">
               <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-[#b45cff] to-[#ff5ac8] text-white shadow-[0_10px_20px_-12px_rgba(0,0,0,0.45)]">
                 <Brain className="h-5 w-5" />
               </div>
             </div>
-            <p className="mt-5 text-sm font-semibold text-[#5a6476]">
+            <p className="mt-4 text-sm font-semibold text-[#5a6476]">
               Total LLMs Configured
             </p>
-            <p className="mt-auto pt-6 flex items-center gap-2 text-3xl font-semibold text-[#0f1115]">
+            <p className="mt-2 flex items-center gap-2 text-3xl font-semibold text-[#0f1115]">
               {isLoading || isRefreshing ? (
                 <Loader2 className="h-6 w-6 animate-spin text-[#5b4cf0]" />
               ) : (
