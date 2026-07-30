@@ -3,10 +3,7 @@ package com.rc.aroyacruise.mcp;
 
 import com.rc.aroyacruise.dto.request.*;
 import com.rc.aroyacruise.dto.response.AroyaLoginResponse;
-import com.rc.aroyacruise.service.AroyaService;
-import com.rc.aroyacruise.service.NodeAroyaGuestService;
-import com.rc.aroyacruise.service.NodeAroyaReservationService;
-import com.rc.aroyacruise.service.NodeAroyaVoyageService;
+import com.rc.aroyacruise.service.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.mcp.annotation.McpTool;
 import org.springframework.ai.mcp.annotation.McpToolParam;
@@ -23,6 +20,8 @@ public class AroyaMcpTools {
     private final NodeAroyaVoyageService voyageService;
     private final NodeAroyaGuestService nodeAroyaGuestService;
     private final NodeAroyaReservationService nodeAroyaReservationService;
+    private final NodeAroyaHomePageVoyageService homePageVoyageService;
+    private final NodeAroyaAddonService nodeAroyaAddonService;
 
 
     /*@McpTool(
@@ -160,5 +159,59 @@ public class AroyaMcpTools {
         );
     }
 
+    @McpTool(
+            name = "aroya_get_voyages_recommendations",
+            description = """
+                Get recommendation voyages grouped by destination.
+                It returns only the first 3 voyages for every destination to keep the response small and useful.
+                """
+    )
+    public JsonNode getHomePageVoyages(
+    ) {
+        return homePageVoyageService.getHomePageVoyages(
+        );
+    }
+
+    @McpTool(
+            name = "aroya_get_available_addons",
+            description = """
+                Get available addons for an existing Aroya reservation.
+
+                This tool calls availableAddons using reservationId.
+
+                The response is returned in Markdown format, not JSON.
+
+                Response includes only:
+                - addon name
+                - addon key
+                - classification
+                - component reference
+                """
+    )
+    public String getAvailableAddons(
+            @McpToolParam(
+                    description = """
+                        Reservation ID returned from create reservation.
+
+                        Can be provided with or without Reservation| prefix.
+
+                        Examples:
+                        - "-21085278"
+                        - "Reservation|-21085278"
+                        """,
+                    required = true
+            )
+            String reservationId
+
+    ) {
+        return nodeAroyaAddonService.getAvailableAddons(
+                new NodeAvailableAddonsRequest(
+                        reservationId,
+                        false,
+                        false
+                ),
+                null
+        );
+    }
 
 }
