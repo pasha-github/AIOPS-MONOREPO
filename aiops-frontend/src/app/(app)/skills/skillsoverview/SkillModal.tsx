@@ -21,11 +21,13 @@ import {
   Loader2,
   Pencil,
   Plus,
+  Sparkles,
   Trash2,
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import PromptAgent from "../../agent-management/agentform/promptAgent";
 import { normalizeMcpServer } from "../../mcp/mcpHelpers";
 import {
   buildSkillPatchPayload,
@@ -105,6 +107,13 @@ const sectionByTabIndex: EditingSection[] = [
   "dependencies",
   "tools",
   "references",
+];
+
+const SKILL_DRAFT_GENERATION_STEPS = [
+  "Understanding skill purpose",
+  "Drafting frontmatter fields",
+  "Preparing skill instructions",
+  "Mapping tools and integrations",
 ];
 
 const toUniqueValues = (values: string[]) => {
@@ -199,6 +208,60 @@ const buildReferenceRecord = (rows: ReferenceRow[]) =>
     result[key] = row.text;
     return result;
   }, {});
+
+const getDraftText = (record: Record<string, unknown>, key: string) => {
+  const value = record[key];
+  return typeof value === "string" ? value.trim() : undefined;
+};
+
+const getDraftStringArray = (record: Record<string, unknown>, key: string) => {
+  const value = record[key];
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+
+  return value
+    .map((item) => (typeof item === "string" ? item.trim() : ""))
+    .filter(Boolean);
+};
+
+const normalizeDraftIdRows = (values: string[] | undefined, current: string[]) => {
+  if (values === undefined) {
+    return current;
+  }
+
+  return values.length ? values : [""];
+};
+
+const buildSkillDraftConfig = (detail: SkillDetail) => ({
+  name: detail.name.trim(),
+  description: detail.description.trim(),
+  instructions: detail.instructions.trim(),
+  tools: toUniqueValues(detail.tools),
+  connector_config_ids: toUniqueValues(detail.connectorConfigIds),
+  mcp_server_ids: toUniqueValues(detail.mcpServerIds),
+});
+
+const mergeSkillDraftResponse = (
+  current: SkillDetail,
+  payload: Record<string, unknown>
+): SkillDetail => {
+  const nextConnectorConfigIds = getDraftStringArray(payload, "connector_config_ids");
+  const nextMcpServerIds = getDraftStringArray(payload, "mcp_server_ids");
+
+  return {
+    ...current,
+    name: getDraftText(payload, "name") ?? current.name,
+    description: getDraftText(payload, "description") ?? current.description,
+    instructions: getDraftText(payload, "instructions") ?? current.instructions,
+    tools: getDraftStringArray(payload, "tools") ?? current.tools,
+    connectorConfigIds: normalizeDraftIdRows(
+      nextConnectorConfigIds,
+      current.connectorConfigIds
+    ),
+    mcpServerIds: normalizeDraftIdRows(nextMcpServerIds, current.mcpServerIds),
+  };
+};
 
 const getModalTitle = (mode: SkillModalMode) => {
   if (mode === "view") {
@@ -400,6 +463,7 @@ export default function SkillModal({
   const [editingSection, setEditingSection] = useState<EditingSection | null>(null);
   const [activeAvailableTool, setActiveAvailableTool] = useState("");
   const [activeSelectedTool, setActiveSelectedTool] = useState("");
+  const [isPromptSkillOpen, setIsPromptSkillOpen] = useState(false);
 
   useEffect(() => {
     if (!isOpen) {
@@ -412,6 +476,7 @@ export default function SkillModal({
     setLoadError("");
     setActiveAvailableTool("");
     setActiveSelectedTool("");
+    setIsPromptSkillOpen(false);
 
     if (mode === "create") {
       const initial = emptySkillDetail();
@@ -663,6 +728,38 @@ export default function SkillModal({
     );
   };
 
+  const handleGenerateSkillDraft = async (prompt: string) => {
+    const requestBody =
+      mode === "update"
+        ? {
+            prompt,
+            current_config: buildSkillDraftConfig(draft),
+          }
+        : { prompt };
+
+    const response = await fetch(`${apiBase}/skill/orchestrate`, {
+      method: mode === "update" ? "PATCH" : "POST",
+      headers: {
+        accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(requestBody),
+    });
+    const payload = await response.json().catch(() => null);
+
+    if (!response.ok || !payload || typeof payload !== "object" || Array.isArray(payload)) {
+      throw new Error(getSkillErrorMessage(payload, "Unable to generate skill draft."));
+    }
+
+    const record = payload as Record<string, unknown>;
+    setDraft((current) => mergeSkillDraftResponse(current, record));
+    setActiveTab(0);
+    if (mode === "update") {
+      setEditingSection("frontmatter");
+    }
+    setIsPromptSkillOpen(false);
+  };
+
   const startEditing = () => {
     if (!isUpdateMode) {
       return;
@@ -816,12 +913,30 @@ export default function SkillModal({
   const headerName = detail.name || draft.name || skillId || "Skill";
 
   return (
-    <ModalCard zIndexClassName="z-[100]" onBackdropClick={onClose}>
-      <ModalCardPanel maxWidthClassName="max-w-5xl" className="max-h-[92vh]">
+    <ModalCard
+      zIndexClassName="z-[100]"
+      onBackdropClick={isPromptSkillOpen ? () => setIsPromptSkillOpen(false) : onClose}
+    >
+      <ModalCardPanel
+        maxWidthClassName="max-w-5xl"
+        className={isPromptSkillOpen ? "hidden" : "max-h-[92vh]"}
+      >
         <ModalCardHeader
           title={getModalTitle(mode)}
           subtitle={headerName}
           icon={mode === "view" ? <Eye className="h-4 w-4" /> : <ListTree className="h-4 w-4" />}
+          actions={
+            mode === "create" || mode === "update" ? (
+              <button
+                type="button"
+                onClick={() => setIsPromptSkillOpen(true)}
+                className="inline-flex h-8 items-center gap-2 rounded-lg border border-white/25 bg-white/10 px-3 text-xs font-semibold text-white transition hover:bg-white/15"
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                Draft with AI
+              </button>
+            ) : null
+          }
           onClose={onClose}
         />
 
@@ -834,7 +949,7 @@ export default function SkillModal({
           />
         </div>
 
-        <ModalCardBody className="soft-scrollbar flex-1 overflow-y-auto bg-[#f8faff]">
+        <ModalCardBody className="soft-scrollbar flex-1 overflow-y-auto bg-white">
           {isLoading ? (
             <div className="space-y-4">
               {Array.from({ length: 4 }).map((_, index) => (
@@ -1304,6 +1419,21 @@ export default function SkillModal({
           )}
         </ModalCardFooter>
       </ModalCardPanel>
+      {isPromptSkillOpen ? (
+        <PromptAgent
+          title="Draft Skill with AI"
+          subtitle="Configure skill from prompt"
+          description="Describe the Skill you want to configure."
+          buttonLabel="Generate Skill Draft"
+          loadingLabel="Generating Skill Draft..."
+          helperText="You can review and edit generated skill fields before configuring the skill."
+          promptLabel="Skill prompt"
+          placeholder="Create a reusable incident resolution skill that explains troubleshooting steps, required tools, references, and expected response format."
+          generationSteps={SKILL_DRAFT_GENERATION_STEPS}
+          onClose={() => setIsPromptSkillOpen(false)}
+          onGenerate={handleGenerateSkillDraft}
+        />
+      ) : null}
     </ModalCard>
   );
 }
