@@ -1,8 +1,8 @@
 "use client";
 
-import { buildSpinnerLabel } from "@/Spinnerverb";
 import { trimTrailingSlash } from "@/config/agent";
 import { useRuntimeConfig } from "@/config/runtime-config";
+import { buildSpinnerLabel } from "@/Spinnerverb";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
     DEFAULT_USER_ID,
@@ -29,20 +29,20 @@ import type {
     StreamStep,
 } from "./types";
 
+import { isSelectableStatus } from "./agentStatus";
+import { awsAgentChat } from "./AWSAgent/AWSAgentChat";
+import { createSessionAWSAgent } from "./AWSAgent/CreateSessionAWSAgent";
+import { deleteSessionAWSAgent } from "./AWSAgent/DeleteSessionAWSAgent";
+import { listSessionsAWSAgent } from "./AWSAgent/ListSessionAWSAgent";
+import { restoreChatForSessionAWSAgent } from "./AWSAgent/RestoreChatForSession";
 import AgentSidebar from "./components/AgentSidebar";
 import ChatHeader from "./components/ChatHeader";
 import ChatInput from "./components/ChatInput";
 import ChatMessages from "./components/ChatMessages";
 import ChatSidebar from "./components/ChatSidebar";
 import Fallbackpage from "./Fallbackpage";
-import { isSelectableStatus } from "./agentStatus";
-import { awsAgentChat } from "./AWSAgent/AWSAgentChat";
-import { createSessionAWSAgent } from "./AWSAgent/CreateSessionAWSAgent";
 import { createSessionVertexAgent } from "./VertexAgent/CreateSessionVertexAgent";
-import { deleteSessionAWSAgent } from "./AWSAgent/DeleteSessionAWSAgent";
 import { deleteSessionVertexAgent } from "./VertexAgent/DeleteSessionVertexAgent";
-import { listSessionsAWSAgent } from "./AWSAgent/ListSessionAWSAgent";
-import { restoreChatForSessionAWSAgent } from "./AWSAgent/RestoreChatForSession";
 import { listSessionsVertexAgent } from "./VertexAgent/ListSessionsVertexAgent";
 import { restoreChatForSession as restoreVertexChatForSession } from "./VertexAgent/RestoreChatForSession";
 import { vertexAgentChat } from "./VertexAgent/VertexAgentChat";
@@ -109,7 +109,7 @@ export default function ChatOps({
     // ============ COMPUTED VALUES ============
 
     const safeAgent = agent || { agentId: "", name: "" };
-    const appName = selectedApp?.agent_id || safeAgent.agentId || "supervisor";
+    const appName = selectedApp?.agent_id || safeAgent.agentId || "Loading...";
     const assistantDisplayName =
         selectedApp?.name ||
         (safeAgent.name ?? "").trim() ||
@@ -305,7 +305,9 @@ export default function ChatOps({
                 }
 
                 const payload = (await response.json()) as AdkSession;
-                const mapped = mapEventsToMessages(payload.events);
+                const mapped = mapEventsToMessages(payload.events, {
+                    collapseMilestones: true,
+                });
 
                 const applied = applyRestoredMessages(mapped, { silent });
 

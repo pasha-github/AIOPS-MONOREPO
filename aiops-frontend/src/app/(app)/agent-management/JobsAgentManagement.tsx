@@ -249,7 +249,7 @@ export default function JobsAgentManagement({
   return (
     <>
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 px-4 py-8 backdrop-blur-md">
-        <div className="w-full max-w-[1480px] overflow-hidden rounded-[28px] bg-white shadow-[0_24px_70px_-36px_rgba(15,23,42,0.65)]">
+        <div className="flex h-[720px] max-h-[calc(100vh-48px)] w-full max-w-[1480px] flex-col overflow-hidden rounded-[28px] bg-white shadow-[0_24px_70px_-36px_rgba(15,23,42,0.65)]">
           <div className="flex items-start justify-between bg-[#4f49e2] px-6 py-4 text-white">
             <div className="space-y-1">
               <div className="flex items-center gap-3">
@@ -272,7 +272,7 @@ export default function JobsAgentManagement({
             </button>
           </div>
 
-          <div className="max-h-[70vh] overflow-y-auto px-6 py-5">
+          <div className="min-h-0 flex-1 overflow-hidden px-6 py-5">
             <AgentAutomationJobsPage
               jobs={jobs}
               isJobsLoading={isJobsLoading}
