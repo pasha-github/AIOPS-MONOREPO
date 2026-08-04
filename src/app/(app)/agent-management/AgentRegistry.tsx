@@ -15,6 +15,7 @@ import {
   Bot,
   BriefcaseBusiness,
   ChevronDown,
+  Eye,
   Pencil,
   Power,
   Trash2,
@@ -24,14 +25,15 @@ import {
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { formatDateTime, getProviderIconSrc } from "../llm-management/llmHelpers";
+import InspectAgent from "./Inspect Agent";
 import JobsAgentManagement from "./JobsAgentManagement";
 import {
   fetchAgentTokenUsageMap,
   type AgentTokenUsage,
 } from "./Observability";
 import WebhookAgentManagement from "./WebhookAgentManagement";
-import type { AgentRecord } from "./types";
 import DropdownAgentType, { type AgentDropdownType } from "./dropdownagenttype";
+import type { AgentRecord } from "./types";
 import UpdateAgent from "./updateagent";
 type AgentRegistryProps = {
   agents: AgentRecord[];
@@ -52,7 +54,7 @@ export default function AgentRegistry({
   onStatusUpdateSuccess,
 }: AgentRegistryProps) {
   const { llmManagerApiBaseUrl } = useRuntimeConfig();
-  const [agentTypeFilter, setAgentTypeFilter] = useState<AgentDropdownType>("agent");
+  const [agentTypeFilter, setAgentTypeFilter] = useState<AgentDropdownType>("all");
   const [filter, setFilter] = useState<"all" | "online" | "offline">("all");
   const [sortKey, setSortKey] = useState<SortKey>("updated_at");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
@@ -69,6 +71,7 @@ export default function AgentRegistry({
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedAgent, setSelectedAgent] = useState<AgentRecord | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [inspectTarget, setInspectTarget] = useState<AgentRecord | null>(null);
   const [jobsTarget, setJobsTarget] = useState<AgentRecord | null>(null);
   const [webhookTarget, setWebhookTarget] = useState<AgentRecord | null>(null);
   const [tokenUsageByAgentId, setTokenUsageByAgentId] = useState<
@@ -196,7 +199,7 @@ export default function AgentRegistry({
         agent.secondary_model_id,
         agent.tertiary_model_id,
         agent.deployment_target,
-        agent.instruction,
+        agent.prompt_role,
         agent.status,
         agent.type,
         getAgentDisplayStatus(agent),
@@ -829,8 +832,8 @@ export default function AgentRegistry({
                       </div>
                       <div className="flex h-full items-start px-3">
                         <ExpandableMarkdownText
-                          value={agent.instruction}
-                          title={`${agent.name} instructions`}
+                          value={agent.prompt_role}
+                          title={`${agent.name} role`}
                           emptyFallback=""
                         />
                       </div>
@@ -877,7 +880,7 @@ export default function AgentRegistry({
                       <div className="flex h-full items-center justify-center px-3">
                         <ActionMenu
                           align="right"
-                            estimatedMenuHeight={isAutomationAgent(agent) ? 212 : 156}
+                            estimatedMenuHeight={isAutomationAgent(agent) ? 258 : 202}
                             actions={[
                               getToggleActionItem(agent, rowKey, nextStatus),
                               {
@@ -889,6 +892,13 @@ export default function AgentRegistry({
                               },
                               tone: "text-[#b91c1c]",
                               hoverTone: "hover:bg-[#fff1f2]",
+                            },
+                            {
+                              label: "View Agent",
+                              icon: Bot,
+                              onClick: () => setInspectTarget(agent),
+                              tone: "text-[#2563eb]",
+                              hoverTone: "hover:bg-[#eff6ff]",
                             },
                             {
                               label: "Update",
@@ -1008,8 +1018,8 @@ export default function AgentRegistry({
                       </p>
                       <div className="mt-1">
                         <ExpandableMarkdownText
-                          value={agent.instruction}
-                          title={`${agent.name} instructions`}
+                          value={agent.prompt_role}
+                          title={`${agent.name} role`}
                           emptyFallback=""
                         />
                       </div>
@@ -1024,7 +1034,7 @@ export default function AgentRegistry({
                     </div>
                     <ActionMenu
                         align="left"
-                        estimatedMenuHeight={isAutomationAgent(agent) ? 212 : 156}
+                        estimatedMenuHeight={isAutomationAgent(agent) ? 258 : 202}
                         actions={[
                           getToggleActionItem(agent, rowKey, nextStatus),
                           {
@@ -1036,6 +1046,13 @@ export default function AgentRegistry({
                           },
                           tone: "text-[#b91c1c]",
                           hoverTone: "hover:bg-[#fff1f2]",
+                        },
+                        {
+                          label: "View Agent",
+                          icon: Eye,
+                          onClick: () => setInspectTarget(agent),
+                          tone: "text-[#2563eb]",
+                          hoverTone: "hover:bg-[#eff6ff]",
                         },
                         {
                           label: "Update",
@@ -1203,6 +1220,14 @@ export default function AgentRegistry({
           onUpdateSuccess={onStatusUpdateSuccess}
         />
       )}
+
+      {inspectTarget ? (
+        <InspectAgent
+          agent={inspectTarget}
+          isOpen={Boolean(inspectTarget)}
+          onClose={() => setInspectTarget(null)}
+        />
+      ) : null}
 
       {jobsTarget ? (
         <JobsAgentManagement
