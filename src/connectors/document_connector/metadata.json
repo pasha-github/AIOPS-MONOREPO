@@ -1,0 +1,33 @@
+{
+  "id": "document_connector",
+  "name": "Documents (SOP)",
+  "description": "Agent-facing SOP retrieval: semantic search, fetch whole sections, list a document's sections, and trigger re-ingestion. Id-only access; reads the ingested SOP corpus.",
+  "version": "1.0.0",
+  "config_variables": [
+    {
+      "name": "prefix",
+      "label": "Tool Prefix",
+      "required": false,
+      "secret": false,
+      "placeholder": "sop_"
+    }
+  ],
+  "tools": [
+    {
+      "name": "search_sop",
+      "documentation": "Search SOPs for sections matching an error/trigger pattern; returns candidate section ids + metadata (no raw text)."
+    },
+    {
+      "name": "get_sop_section",
+      "documentation": "Fetch one SOP section in full (rendered markdown + ordered elements) by id."
+    },
+    {
+      "name": "list_sop_sections",
+      "documentation": "List a document's sections by id (titles + element refs, no text)."
+    },
+    {
+      "name": "ingest_sop",
+      "documentation": "Trigger a background SOP re-ingestion when the agent detects content drift."
+    }
+  ]
+}
