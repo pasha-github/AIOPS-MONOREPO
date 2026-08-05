@@ -21,20 +21,25 @@ from typing import Any, Dict, Optional
 from google.adk.tools.tool_context import ToolContext
 from base_connector import BaseConnector, connector_tool
 
+
 class ExampleConnector(BaseConnector):
     """
     Module level documentation explaining what the connector does.
     This documentation is extracted by the UI/Platform.
     """
 
-    def __init__(self, API_KEY: str, BASE_URL: str = "https://api.example.com", prefix: str = ""):
+    def __init__(
+        self, API_KEY: str, BASE_URL: str = "https://api.example.com", prefix: str = ""
+    ):
         # SUPER INIT MUST BE CALLED
         super().__init__(prefix=prefix)
         self.api_key = API_KEY
-        self.base_url = BASE_URL.rstrip('/')
+        self.base_url = BASE_URL.rstrip("/")
 
     @connector_tool
-    def example_tool(self, item_id: str, tool_context: Optional[ToolContext] = None) -> Dict[str, Any]:
+    def example_tool(
+        self, item_id: str, tool_context: Optional[ToolContext] = None
+    ) -> Dict[str, Any]:
         """Description of the tool goes here for the LLM to understand.
 
         Args:
@@ -43,7 +48,7 @@ class ExampleConnector(BaseConnector):
         response = self.call_api(
             url=f"{self.base_url}/items/{item_id}",
             method="GET",
-            headers={"Authorization": f"Bearer {self.api_key}"}
+            headers={"Authorization": f"Bearer {self.api_key}"},
         )
         return {"status": "success", "data": response.json()}
 ```
@@ -76,9 +81,9 @@ self.call_api(
     method="GET",  # or POST, PUT, PATCH, DELETE
     headers={"Accept": "application/json"},
     data={"key": "value"},  # For JSON payloads
-    params={"limit": 10},   # For URL Query Parameters
+    params={"limit": 10},  # For URL Query Parameters
     basic_auth=("username", "password"),
-    bearer_token="eyJhbGc..."
+    bearer_token="eyJhbGc...",
 )
 ```
 
@@ -89,37 +94,54 @@ For most APIs, it is highly recommended to create an internal helper method (e.g
 ### Example Wrapper
 
 ```python
-    def _make_request(self, endpoint: str, method: str = "GET", params: Optional[Dict[str, Any]] = None, data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """Helper method to make API requests and handle common authentication/status errors."""
-        url = f"{self.base_url}{endpoint}"
-        
-        headers = {
-            "Accept": "application/json",
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {self.api_key}" # centralized auth
+def _make_request(
+    self,
+    endpoint: str,
+    method: str = "GET",
+    params: Optional[Dict[str, Any]] = None,
+    data: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Helper method to make API requests and handle common authentication/status errors."""
+    url = f"{self.base_url}{endpoint}"
+
+    headers = {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {self.api_key}",  # centralized auth
+    }
+
+    # Call the BaseConnector API function
+    response = self.call_api(
+        url=url,
+        method=method,
+        headers=headers,
+        params=params,  # Optional URL Params
+        data=data,  # Optional Body
+    )
+
+    # Centralized Error Handling
+    if response.status_code == 401:
+        return {
+            "status": "error",
+            "code": 401,
+            "message": "Authentication failed. Token may be invalid or expired.",
         }
-        
-        # Call the BaseConnector API function
-        response = self.call_api(
-            url=url,
-            method=method,
-            headers=headers,
-            params=params, # Optional URL Params
-            data=data      # Optional Body
-        )
-        
-        # Centralized Error Handling 
-        if response.status_code == 401:
-            return {"status": "error", "code": 401, "message": "Authentication failed. Token may be invalid or expired."}
-            
-        elif response.status_code >= 400:
-             return {"status": "error", "code": response.status_code, "message": response.text}
-             
-        try:
-             # Strip standard boilerplate from response
-            return {"status": "success", "data": response.json().get('result', response.json())}
-        except ValueError:
-            return {"status": "success", "data": response.text}
+
+    elif response.status_code >= 400:
+        return {
+            "status": "error",
+            "code": response.status_code,
+            "message": response.text,
+        }
+
+    try:
+        # Strip standard boilerplate from response
+        return {
+            "status": "success",
+            "data": response.json().get("result", response.json()),
+        }
+    except ValueError:
+        return {"status": "success", "data": response.text}
 ```
 
 **Note:** Always handle your REST status codes explicitly! The Agent uses your return dict (e.g., `{"status": "error", "code": 401}`) to determine if its Action succeeded and if it needs to attempt a retry. By centralizing this in a `_make_request` method, you ensure resilient behaviors for all LLM interactions.

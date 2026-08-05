@@ -29,7 +29,7 @@ def build_mcp_auth_headers(
     if normalized == "none":
         return {}
     if normalized == "bearer":
-        if not bearer_token:
+        if not bearer_token or not bearer_token.strip():
             raise ValueError("bearer auth requires a token")
         return {"Authorization": f"Bearer {bearer_token}"}
     if not username or password is None:
