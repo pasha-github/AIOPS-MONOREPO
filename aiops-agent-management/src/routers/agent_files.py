@@ -2,12 +2,12 @@ import logging
 from datetime import datetime
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, UploadFile
 from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
-from src.database.database import engine
+from src.database.database import get_session
 from src.database.models import Agent, AgentFile
 
 router = APIRouter(prefix="/agent", tags=["agent-files"])
@@ -36,7 +36,9 @@ class AgentFileResponse(BaseModel):
 
 
 @router.post("/files", response_model=AgentFileResponse)
-async def upload_file(file: UploadFile) -> AgentFileResponse:
+async def upload_file(
+    file: UploadFile, session: Session = Depends(get_session)
+) -> AgentFileResponse:
     filename = file.filename or ""
     ext = "." + filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
     if ext not in ALLOWED_EXTENSIONS:
@@ -60,10 +62,9 @@ async def upload_file(file: UploadFile) -> AgentFileResponse:
         content=content,
     )
 
-    with Session(engine) as session:
-        session.add(agent_file)
-        session.commit()
-        session.refresh(agent_file)
+    session.add(agent_file)
+    session.commit()
+    session.refresh(agent_file)
 
     logger.info(
         "File uploaded: id=%s filename=%s size=%s",
@@ -82,20 +83,21 @@ async def upload_file(file: UploadFile) -> AgentFileResponse:
 
 
 @router.get("/{agent_id}/files", response_model=list[AgentFileResponse])
-def list_files(agent_id: str) -> list[AgentFileResponse]:
-    with Session(engine) as session:
-        agent = session.get(Agent, agent_id)
-        if not agent:
-            raise HTTPException(status_code=404, detail="Agent not found.")
+def list_files(
+    agent_id: str, session: Session = Depends(get_session)
+) -> list[AgentFileResponse]:
+    agent = session.get(Agent, agent_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found.")
 
-        file_ids = agent.knowledge_file_ids or []
-        if not file_ids:
-            return []
+    file_ids = agent.knowledge_file_ids or []
+    if not file_ids:
+        return []
 
-        uuid_ids = [UUID(fid) for fid in file_ids]
-        files = session.exec(
-            select(AgentFile).where(AgentFile.id.in_(uuid_ids))  # type: ignore[attr-defined]
-        ).all()
+    uuid_ids = [UUID(fid) for fid in file_ids]
+    files = session.exec(
+        select(AgentFile).where(AgentFile.id.in_(uuid_ids))  # type: ignore[attr-defined]
+    ).all()
 
     return [
         AgentFileResponse(
@@ -110,11 +112,10 @@ def list_files(agent_id: str) -> list[AgentFileResponse]:
 
 
 @router.get("/files/{file_id}")
-def download_file(file_id: UUID) -> Response:
-    with Session(engine) as session:
-        agent_file = session.get(AgentFile, file_id)
-        if not agent_file:
-            raise HTTPException(status_code=404, detail="File not found.")
+def download_file(file_id: UUID, session: Session = Depends(get_session)) -> Response:
+    agent_file = session.get(AgentFile, file_id)
+    if not agent_file:
+        raise HTTPException(status_code=404, detail="File not found.")
 
     return Response(
         content=agent_file.content,
@@ -126,23 +127,20 @@ def download_file(file_id: UUID) -> Response:
 
 
 @router.delete("/files/{file_id}", status_code=204)
-def delete_file(file_id: UUID) -> None:
-    with Session(engine) as session:
-        agent_file = session.get(AgentFile, file_id)
-        if not agent_file:
-            raise HTTPException(status_code=404, detail="File not found.")
+def delete_file(file_id: UUID, session: Session = Depends(get_session)) -> None:
+    agent_file = session.get(AgentFile, file_id)
+    if not agent_file:
+        raise HTTPException(status_code=404, detail="File not found.")
 
-        # Remove file ID from any agent that references it
-        agents = session.exec(select(Agent)).all()
-        for agent in agents:
-            file_ids = agent.knowledge_file_ids or []
-            if str(file_id) in file_ids:
-                agent.knowledge_file_ids = [
-                    fid for fid in file_ids if fid != str(file_id)
-                ]
-                session.add(agent)
+    # Remove file ID from any agent that references it
+    agents = session.exec(select(Agent)).all()
+    for agent in agents:
+        file_ids = agent.knowledge_file_ids or []
+        if str(file_id) in file_ids:
+            agent.knowledge_file_ids = [fid for fid in file_ids if fid != str(file_id)]
+            session.add(agent)
 
-        session.delete(agent_file)
-        session.commit()
+    session.delete(agent_file)
+    session.commit()
 
     logger.info("File deleted: id=%s", file_id)

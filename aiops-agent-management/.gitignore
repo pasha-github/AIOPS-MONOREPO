@@ -50,6 +50,9 @@ coverage.xml
 .hypothesis/
 .tmp/
 
+# Logs
+logs/
+
 # Environments
 .env
 .venv
@@ -67,6 +70,13 @@ dmypy.json
 # IDEs
 .idea/
 .vscode/
+.vs/
+
+# Claude Code local working dir (memory + local settings)
+.claude/
+
+# Dev-only Docling analysis scratch — not part of the app (see its README)
+docling_analysis/
 
 *.db
 agent_management.db
@@ -77,3 +87,21 @@ agent_management.db
 #exclude bedrock packages
 .bedrock_agentcore
 .bedrock_agentcore.yaml
+
+# Exclude generated documentation, API specs, and saved Docling result dumps.
+# The parser test that loads docling_test_results.json skips when it is absent
+# (see tests/test_ingestion_pipeline.py), so CI stays green without it.
+src/ingestion/docling_test_result.md
+src/ingestion/docling_test_results.json
+src/ingestion/docling_openapi_docs.json
+docs/claude-docling-api.md
+docs/claude-ingestion.md
+docs/claude-retrieval.md
+CLAUDE.md
+cloud_sql_proxy
+cloud_sql_proxy.exe
+
+confluence_35258369.html
+confluence_37519361.html
+docling_response_37519361.json
+wrapped_37519361.html
