@@ -229,6 +229,50 @@
             background: var(--card-border);
             color: var(--text-color);
         }
+
+        /* ── Tabs ─────────────────────────────────────────────────────── */
+        .tab-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 2px;
+            border-bottom: 2px solid var(--section-border);
+            margin-bottom: 24px;
+        }
+
+        .tab-btn {
+            padding: 9px 18px;
+            background: none;
+            color: var(--text-color);
+            border: 1px solid transparent;
+            border-bottom: none;
+            cursor: pointer;
+            border-radius: 6px 6px 0 0;
+            font-size: 0.9em;
+            font-weight: 500;
+            transition: background-color 0.2s, color 0.2s;
+            margin-bottom: -2px;
+        }
+
+        .tab-btn:hover {
+            background: var(--status-bg);
+            color: var(--heading-color);
+        }
+
+        .tab-btn.active {
+            background: var(--bg-color);
+            border-color: var(--section-border);
+            border-bottom: 2px solid var(--bg-color);
+            font-weight: bold;
+            color: #007bff;
+        }
+
+        .tab-panel {
+            display: none;
+        }
+
+        .tab-panel.active {
+            display: block;
+        }
     </style>
     <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
 </head>
@@ -241,9 +285,21 @@
         </div>
         <div id="health-status" class="status">Checking connection...</div>
 
-        <div class="grid">
-            <!-- LLM Models Section -->
-            <div class="section">
+        <!-- Tab bar -->
+        <div class="tab-bar">
+            <button class="tab-btn active" data-tab="tab-llms" onclick="switchTab('tab-llms')">LLM Models</button>
+            <button class="tab-btn" data-tab="tab-agents" onclick="switchTab('tab-agents')">Agents</button>
+            <button class="tab-btn" data-tab="tab-aws" onclick="switchTab('tab-aws')">AWS Credentials</button>
+            <button class="tab-btn" data-tab="tab-webhooks" onclick="switchTab('tab-webhooks')">Webhooks &amp; Jobs</button>
+            <button class="tab-btn" data-tab="tab-connectors" onclick="switchTab('tab-connectors')">Connectors</button>
+            <button class="tab-btn" data-tab="tab-skills" onclick="switchTab('tab-skills')">Skills</button>
+            <button class="tab-btn" data-tab="tab-visualizer" onclick="switchTab('tab-visualizer')">Visualizer</button>
+            <button class="tab-btn" data-tab="tab-chat" onclick="switchTab('tab-chat')">Chat</button>
+        </div>
+
+        <!-- LLM Models Tab -->
+        <div class="tab-panel active" id="tab-llms">
+        <div class="section">
                 <h2>LLM Models</h2>
                 <div id="model-list">Loading models...</div>
 
@@ -329,8 +385,12 @@
                 </form>
             </div>
 
-            <!-- Agents Section -->
-            <div class="section">
+        </div><!-- /section -->
+        </div><!-- /tab-llms -->
+
+        <!-- Agents Tab -->
+        <div class="tab-panel" id="tab-agents">
+        <div class="section">
                 <h2>Agents</h2>
                 <div id="agent-list">Loading agents...</div>
 
@@ -341,6 +401,15 @@
                         <select id="agent-template-select">
                             <option value="">-- Select a template --</option>
                         </select>
+                    </div>
+                    <div class="form-group" style="background:#f0f4ff;border:1px solid #c7d4f7;border-radius:8px;padding:12px;">
+                        <label style="font-weight:600;">✨ AI Generate</label>
+                        <p style="margin:4px 0 8px;font-size:13px;color:#555;">Describe the agent you want and AI will fill in the prompt fields and recommend connectors.</p>
+                        <div style="display:flex;gap:8px;">
+                            <input type="text" id="orchestrate-create-prompt" placeholder="e.g. Create an agent that monitors SharePoint and sends Teams alerts" style="flex:1;">
+                            <button type="button" id="orchestrate-create-btn" onclick="orchestrateCreate()">Generate</button>
+                        </div>
+                        <div id="orchestrate-create-status" style="margin-top:6px;font-size:12px;color:#666;display:none;"></div>
                     </div>
                     <div class="form-group">
                         <label>Agent ID (Unique)</label>
@@ -477,6 +546,19 @@
                             <option disabled>Loading agents...</option>
                         </select>
                     </div>
+                    <div class="form-group">
+                        <label>Sub Agent Delegation Type</label>
+                        <select id="agent-sub-agent-delegation-type">
+                            <option value="task">Task Delegation (Agent as Tool)</option>
+                            <option value="full">Full Delegation (Sub-Agent)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Skills <small>(hold Ctrl/Cmd to select multiple)</small></label>
+                        <select id="agent-skills" multiple>
+                            <option disabled>Loading skills...</option>
+                        </select>
+                    </div>
                     <h4>Model Stack</h4>
                     <div class="form-group">
                         <label>Primary Source</label>
@@ -532,6 +614,15 @@
                         <select id="agent-update-select" required>
                             <option value="">Loading agents...</option>
                         </select>
+                    </div>
+                    <div class="form-group" style="background:#f0f4ff;border:1px solid #c7d4f7;border-radius:8px;padding:12px;">
+                        <label style="font-weight:600;">✨ AI Update</label>
+                        <p style="margin:4px 0 8px;font-size:13px;color:#555;">Describe what you want to change and AI will update the prompt fields based on the current config.</p>
+                        <div style="display:flex;gap:8px;">
+                            <input type="text" id="orchestrate-update-prompt" placeholder="e.g. Make this agent focus on kubernetes health checks and alert via Teams" style="flex:1;">
+                            <button type="button" id="orchestrate-update-btn" onclick="orchestrateUpdate()">Update with AI</button>
+                        </div>
+                        <div id="orchestrate-update-status" style="margin-top:6px;font-size:12px;color:#666;display:none;"></div>
                     </div>
                     <div class="form-group">
                         <label>New Name</label>
@@ -708,6 +799,20 @@
                         </select>
                     </div>
                     <div class="form-group">
+                        <label>Sub Agent Delegation Type</label>
+                        <select id="agent-update-sub-agent-delegation-type">
+                            <option value="">-- Keep current setting --</option>
+                            <option value="task">Task Delegation (Agent as Tool)</option>
+                            <option value="full">Full Delegation (Sub-Agent)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Skills <small>(hold Ctrl/Cmd to select multiple)</small></label>
+                        <select id="agent-update-skills" multiple>
+                            <option disabled>Loading skills...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
                         <label>New Custom Tools (Python Code)</label>
                         <textarea id="agent-update-tools" rows="5"
                             placeholder="Leave blank to keep current value"></textarea>
@@ -719,10 +824,11 @@
                     </div>
                     <button type="submit">Update Agent</button>
                 </form>
-            </div>
-        </div>
+        </div><!-- /section -->
+        </div><!-- /tab-agents -->
 
-        <!-- AWS Credentials Section -->
+        <!-- AWS Credentials Tab -->
+        <div class="tab-panel" id="tab-aws">
         <div class="section">
             <h2>AWS Credentials</h2>
             <div id="aws-credential-list">Loading AWS credentials...</div>
@@ -804,7 +910,11 @@
             </div>
         </div>
 
-        <!-- Webhooks & Jobs Section -->
+        </div><!-- /section -->
+        </div><!-- /tab-aws -->
+
+        <!-- Webhooks & Jobs Tab -->
+        <div class="tab-panel" id="tab-webhooks">
         <div class="section" id="automation-section">
             <h2>Webhooks & Jobs (Automation Agents)</h2>
             <div class="form-group">
@@ -899,7 +1009,11 @@
             </div>
         </div>
 
-        <!-- Connectors Section -->
+        </div><!-- /section -->
+        </div><!-- /tab-webhooks -->
+
+        <!-- Connectors Tab -->
+        <div class="tab-panel" id="tab-connectors">
         <div class="section">
             <h2>Connectors</h2>
             <div class="grid">
@@ -949,14 +1063,120 @@
             </div>
         </div>
 
-        <!-- Visualizer Section -->
+        </div><!-- /section -->
+        </div><!-- /tab-connectors -->
+
+        <!-- Skills Tab -->
+        <div class="tab-panel" id="tab-skills">
+        <div class="section">
+            <h2>Skills</h2>
+            <div class="grid">
+                <div>
+                    <h3>Existing Skills</h3>
+                    <div id="skill-list">Loading skills...</div>
+
+                    <h3 style="margin-top: 24px;">Create Skill</h3>
+                    <div class="form-group" style="background:#f0f4ff;border:1px solid #c7d4f7;border-radius:8px;padding:12px;margin-bottom:12px;">
+                        <label style="font-weight:600;">✨ AI Generate</label>
+                        <p style="margin:4px 0 8px;font-size:13px;color:#555;">Describe the skill you want and AI will fill in the name, description, instructions, and recommended tools.</p>
+                        <div style="display:flex;gap:8px;">
+                            <input type="text" id="orchestrate-skill-prompt" placeholder="e.g. A skill that reads SharePoint documents and summarizes them" style="flex:1;">
+                            <button type="button" id="orchestrate-skill-btn" onclick="orchestrateSkillCreate()">Generate</button>
+                        </div>
+                        <div id="orchestrate-skill-status" style="margin-top:6px;font-size:12px;color:#666;display:none;"></div>
+                    </div>
+                    <form id="add-skill-form">
+                        <div class="form-group">
+                            <label>Name <small>(kebab-case or snake_case)</small></label>
+                            <input type="text" id="skill-name" required placeholder="my-skill-name">
+                        </div>
+                        <div class="form-group">
+                            <label>Description</label>
+                            <input type="text" id="skill-description" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Instructions</label>
+                            <textarea id="skill-instructions" rows="6" required placeholder="Describe what this skill does and how to use it..."></textarea>
+                        </div>
+                        <button type="submit">Create Skill</button>
+                    </form>
+                </div>
+
+                <div>
+                    <h3>Upload Skill (ZIP)</h3>
+                    <p style="font-size:0.9em; color:#555;">
+                        Upload a <code>.zip</code> containing <code>skill.md</code> (with YAML frontmatter) and optional
+                        <code>references/</code>, <code>assets/</code>, <code>scripts/</code> subdirectories.
+                    </p>
+                    <form id="upload-skill-form">
+                        <div class="form-group">
+                            <label>ZIP File</label>
+                            <input type="file" id="skill-zip-file" accept=".zip" required>
+                        </div>
+                        <div id="upload-skill-status" style="margin-bottom:8px; font-size:0.9em;"></div>
+                        <button type="submit">Upload Skill</button>
+                    </form>
+
+                    <h3 style="margin-top: 24px;">skill.md Example</h3>
+                    <pre style="background:var(--status-bg);padding:10px;border-radius:4px;font-size:0.8em;overflow-x:auto;">---
+name: my-skill-name
+description: Short blurb
+tools:
+  - some_tool
+---
+Instructions go here…</pre>
+
+                    <div id="edit-skill-section" style="display:none;margin-top:24px;">
+                        <h3>Edit Skill</h3>
+                        <div class="form-group" style="background:#f0f4ff;border:1px solid #c7d4f7;border-radius:8px;padding:12px;margin-bottom:12px;">
+                            <label style="font-weight:600;">✨ AI Update</label>
+                            <p style="margin:4px 0 8px;font-size:13px;color:#555;">Describe what you want to change and AI will update the fields.</p>
+                            <div style="display:flex;gap:8px;">
+                                <input type="text" id="orchestrate-skill-update-prompt" placeholder="e.g. Also handle Excel files" style="flex:1;">
+                                <button type="button" id="orchestrate-skill-update-btn" onclick="orchestrateSkillUpdate()">Update with AI</button>
+                            </div>
+                            <div id="orchestrate-skill-update-status" style="margin-top:6px;font-size:12px;color:#666;display:none;"></div>
+                        </div>
+                        <form id="edit-skill-form">
+                            <input type="hidden" id="edit-skill-id">
+                            <div class="form-group">
+                                <label>Name <small>(kebab-case or snake_case)</small></label>
+                                <input type="text" id="edit-skill-name" required placeholder="my-skill-name">
+                            </div>
+                            <div class="form-group">
+                                <label>Description</label>
+                                <input type="text" id="edit-skill-description" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Instructions</label>
+                                <textarea id="edit-skill-instructions" rows="6" required></textarea>
+                            </div>
+                            <div style="display:flex;gap:8px;">
+                                <button type="submit">Save Changes</button>
+                                <button type="button" onclick="cancelEditSkill()" style="background:#aaa;">Cancel</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        </div><!-- /section -->
+        </div><!-- /tab-skills -->
+
+        <!-- Visualizer Tab -->
+        <div class="tab-panel" id="tab-visualizer">
         <div class="section">
             <h2>Architecture Visualizer</h2>
             <button onclick="loadGraph()">Refresh Graph</button>
             <div id="graph-container" style="width: 100%; height: 600px; border: 1px solid var(--input-border); margin-top: 10px; background: var(--graph-bg); border-radius: 4px;"></div>
         </div>
 
-        <!-- Chat Section -->
+        </div><!-- /section -->
+        </div><!-- /tab-visualizer -->
+
+        <!-- Chat Tab -->
+        <div class="tab-panel" id="tab-chat">
         <div class="section">
             <h2>Chat with Agent</h2>
             <div class="form-group">
@@ -970,8 +1190,10 @@
                 <input type="text" id="chat-input" placeholder="Type your message here...">
                 <button id="send-msg-btn">Send</button>
             </div>
-        </div>
-    </div>
+        </div><!-- /section -->
+        </div><!-- /tab-chat -->
+
+    </div><!-- /container -->
 
     <script>
         const API_BASE = window.location.origin;
@@ -1594,6 +1816,280 @@
             }
         }
 
+        function openEditSkill(s) {
+            document.getElementById('edit-skill-id').value = s.skill_id;
+            document.getElementById('edit-skill-name').value = s.name;
+            document.getElementById('edit-skill-description').value = s.description;
+            document.getElementById('edit-skill-instructions').value = s.instructions || '';
+            document.getElementById('edit-skill-section').style.display = 'block';
+            document.getElementById('edit-skill-section').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function cancelEditSkill() {
+            document.getElementById('edit-skill-section').style.display = 'none';
+            document.getElementById('edit-skill-form').reset();
+        }
+
+        async function saveEditSkill(e) {
+            e.preventDefault();
+            const id = document.getElementById('edit-skill-id').value;
+            const data = {
+                name: document.getElementById('edit-skill-name').value.trim(),
+                description: document.getElementById('edit-skill-description').value.trim(),
+                instructions: document.getElementById('edit-skill-instructions').value.trim(),
+            };
+            const res = await fetch(`${API_BASE}/skill/${id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            if (!res.ok) {
+                alert('Failed to update skill: ' + await res.text());
+                return;
+            }
+            cancelEditSkill();
+            loadSkills();
+        }
+
+        async function orchestrateSkillUpdate() {
+            const prompt = document.getElementById('orchestrate-skill-update-prompt').value.trim();
+            if (!prompt) { alert('Please describe what you want to change.'); return; }
+
+            const btn = document.getElementById('orchestrate-skill-update-btn');
+            const status = document.getElementById('orchestrate-skill-update-status');
+            btn.disabled = true;
+            btn.textContent = 'Updating...';
+            status.style.display = 'block';
+            status.textContent = 'Calling AI orchestrator...';
+
+            const current_config = {
+                name: document.getElementById('edit-skill-name').value.trim(),
+                description: document.getElementById('edit-skill-description').value.trim(),
+                instructions: document.getElementById('edit-skill-instructions').value.trim(),
+            };
+
+            try {
+                const res = await fetch(`${API_BASE}/skill/orchestrate`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt, current_config })
+                });
+                if (!res.ok) {
+                    const err = await res.text();
+                    status.textContent = 'Error: ' + err;
+                    return;
+                }
+                const data = await res.json();
+
+                if (data.name != null) document.getElementById('edit-skill-name').value = data.name;
+                if (data.description != null) document.getElementById('edit-skill-description').value = data.description;
+                if (data.instructions != null) document.getElementById('edit-skill-instructions').value = data.instructions;
+
+                status.textContent = '✓ Fields updated. Review and save.';
+            } catch (err) {
+                status.textContent = 'Error: ' + err.message;
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Update with AI';
+            }
+        }
+
+        async function orchestrateSkillCreate() {
+            const prompt = document.getElementById('orchestrate-skill-prompt').value.trim();
+            if (!prompt) { alert('Please enter a description for the skill.'); return; }
+
+            const btn = document.getElementById('orchestrate-skill-btn');
+            const status = document.getElementById('orchestrate-skill-status');
+            btn.disabled = true;
+            btn.textContent = 'Generating...';
+            status.style.display = 'block';
+            status.textContent = 'Calling AI orchestrator...';
+
+            try {
+                const res = await fetch(`${API_BASE}/skill/orchestrate`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt })
+                });
+                if (!res.ok) {
+                    const err = await res.text();
+                    status.textContent = 'Error: ' + err;
+                    return;
+                }
+                const data = await res.json();
+
+                if (data.name) document.getElementById('skill-name').value = data.name;
+                if (data.description) document.getElementById('skill-description').value = data.description;
+                if (data.instructions) document.getElementById('skill-instructions').value = data.instructions;
+
+                status.textContent = '✓ Fields populated. Review and submit.';
+            } catch (err) {
+                status.textContent = 'Error: ' + err.message;
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Generate';
+            }
+        }
+
+        async function orchestrateCreate() {
+            const prompt = document.getElementById('orchestrate-create-prompt').value.trim();
+            if (!prompt) { alert('Please enter a description for the agent.'); return; }
+
+            const btn = document.getElementById('orchestrate-create-btn');
+            const status = document.getElementById('orchestrate-create-status');
+            btn.disabled = true;
+            btn.textContent = 'Generating...';
+            status.style.display = 'block';
+            status.textContent = 'Calling AI orchestrator...';
+
+            try {
+                const res = await fetch(`${API_BASE}/agent/orchestrate`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt })
+                });
+                if (!res.ok) {
+                    const err = await res.text();
+                    status.textContent = 'Error: ' + err;
+                    return;
+                }
+                const data = await res.json();
+
+                // Populate basic fields
+                if (data.name) document.getElementById('agent-name').value = data.name;
+                if (data.description) document.getElementById('agent-desc').value = data.description;
+
+                // Populate prompt fields
+                const fieldMap = {
+                    prompt_role: 'agent-prompt-role',
+                    prompt_objectives: 'agent-prompt-objectives',
+                    prompt_behavior: 'agent-prompt-behavior',
+                    prompt_output_format: 'agent-prompt-output-format',
+                    prompt_constraints: 'agent-prompt-constraints',
+                    prompt_safety: 'agent-prompt-safety',
+                    prompt_tools_instructions: 'agent-prompt-tools-instructions',
+                    prompt_policy: 'agent-prompt-policy',
+                    prompt_examples: 'agent-prompt-examples',
+                    prompt_additional_info: 'agent-prompt-additional-info',
+                };
+                for (const [key, elId] of Object.entries(fieldMap)) {
+                    if (data[key]) document.getElementById(elId).value = data[key];
+                }
+
+                // Select recommended connector configs
+                if (data.connector_config_ids && data.connector_config_ids.length > 0) {
+                    const sel = document.getElementById('agent-connector-configs');
+                    for (const opt of sel.options) {
+                        opt.selected = data.connector_config_ids.includes(opt.value);
+                    }
+                }
+
+                // Populate recommended MCP server IDs
+                if (data.mcp_server_ids && data.mcp_server_ids.length > 0) {
+                    const sel = document.getElementById('agent-mcp-server-ids');
+                    if (sel) {
+                        for (const opt of sel.options) {
+                            opt.selected = data.mcp_server_ids.includes(opt.value);
+                        }
+                    }
+                }
+
+                status.textContent = '✓ Fields populated. Review and submit.';
+            } catch (err) {
+                status.textContent = 'Error: ' + err.message;
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Generate';
+            }
+        }
+
+        async function orchestrateUpdate() {
+            const agentId = document.getElementById('agent-update-select').value;
+            if (!agentId) { alert('Please select an agent first.'); return; }
+
+            const prompt = document.getElementById('orchestrate-update-prompt').value.trim();
+            if (!prompt) { alert('Please describe what you want to change.'); return; }
+
+            const btn = document.getElementById('orchestrate-update-btn');
+            const status = document.getElementById('orchestrate-update-status');
+            btn.disabled = true;
+            btn.textContent = 'Updating...';
+            status.style.display = 'block';
+            status.textContent = 'Calling AI orchestrator...';
+
+            try {
+                // Collect current config from the update form fields
+                const current_config = {
+                    prompt_role: document.getElementById('agent-update-prompt-role').value || null,
+                    prompt_objectives: document.getElementById('agent-update-prompt-objectives').value || null,
+                    prompt_behavior: document.getElementById('agent-update-prompt-behavior').value || null,
+                    prompt_output_format: document.getElementById('agent-update-prompt-output-format').value || null,
+                    prompt_constraints: document.getElementById('agent-update-prompt-constraints').value || null,
+                    prompt_safety: document.getElementById('agent-update-prompt-safety').value || null,
+                    prompt_tools_instructions: document.getElementById('agent-update-prompt-tools-instructions').value || null,
+                    prompt_policy: document.getElementById('agent-update-prompt-policy').value || null,
+                    prompt_examples: document.getElementById('agent-update-prompt-examples').value || null,
+                    prompt_additional_info: document.getElementById('agent-update-prompt-additional-info').value || null,
+                    connector_config_ids: Array.from(document.getElementById('agent-update-connector-configs').selectedOptions).map(o => o.value),
+                    mcp_server_ids: (() => { const s = document.getElementById('agent-update-mcp-server-ids'); return s ? Array.from(s.selectedOptions).map(o => o.value) : []; })(),
+                };
+
+                const res = await fetch(`${API_BASE}/agent/orchestrate`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt, current_config })
+                });
+                if (!res.ok) {
+                    const err = await res.text();
+                    status.textContent = 'Error: ' + err;
+                    return;
+                }
+                const data = await res.json();
+
+                // Merge: only overwrite fields that the AI returned non-null values for
+                const fieldMap = {
+                    prompt_role: 'agent-update-prompt-role',
+                    prompt_objectives: 'agent-update-prompt-objectives',
+                    prompt_behavior: 'agent-update-prompt-behavior',
+                    prompt_output_format: 'agent-update-prompt-output-format',
+                    prompt_constraints: 'agent-update-prompt-constraints',
+                    prompt_safety: 'agent-update-prompt-safety',
+                    prompt_tools_instructions: 'agent-update-prompt-tools-instructions',
+                    prompt_policy: 'agent-update-prompt-policy',
+                    prompt_examples: 'agent-update-prompt-examples',
+                    prompt_additional_info: 'agent-update-prompt-additional-info',
+                };
+                for (const [key, elId] of Object.entries(fieldMap)) {
+                    if (data[key] != null) document.getElementById(elId).value = data[key];
+                }
+
+                // Merge connector_config_ids: use AI result if non-empty, else keep current
+                if (data.connector_config_ids && data.connector_config_ids.length > 0) {
+                    const sel = document.getElementById('agent-update-connector-configs');
+                    for (const opt of sel.options) {
+                        opt.selected = data.connector_config_ids.includes(opt.value);
+                    }
+                }
+
+                // Merge mcp_server_ids: use AI result if non-empty, else keep current
+                if (data.mcp_server_ids && data.mcp_server_ids.length > 0) {
+                    const mcpSel = document.getElementById('agent-update-mcp-server-ids');
+                    if (mcpSel) {
+                        for (const opt of mcpSel.options) {
+                            opt.selected = data.mcp_server_ids.includes(opt.value);
+                        }
+                    }
+                }
+
+                status.textContent = '✓ Fields updated. Review and submit.';
+            } catch (err) {
+                status.textContent = 'Error: ' + err.message;
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Update with AI';
+            }
+        }
+
         async function addAgent(e) {
             e.preventDefault();
 
@@ -1622,6 +2118,11 @@
             // Collect selected sub-agent IDs from multi-select
             const subAgentSelect = document.getElementById('agent-sub-agents');
             const subAgentIds = Array.from(subAgentSelect.selectedOptions).map(o => o.value);
+
+            // Collect selected skill IDs from multi-select
+            const skillSelect = document.getElementById('agent-skills');
+            const skillIds = Array.from(skillSelect.selectedOptions).map(o => o.value);
+
             const deploymentTarget = document.getElementById('agent-deployment-target').value;
             const awsCredentialId = document.getElementById('agent-aws-credential').value;
 
@@ -1646,6 +2147,8 @@
                 mcp_servers: mcpServersList,
                 connector_config_ids: connectorConfigIds,
                 sub_agents: subAgentIds,
+                sub_agent_delegation_type: document.getElementById('agent-sub-agent-delegation-type').value,
+                skill_ids: skillIds,
                 isEnabled: true,
                 memory_enabled: document.getElementById('agent-memory-enabled').value === 'true',
                 memory_tool_type: document.getElementById('agent-memory-enabled').value === 'true'
@@ -1688,6 +2191,8 @@
             const connectorConfigIds = Array.from(connectorSelect.selectedOptions).map(o => o.value);
             const subAgentSelect = document.getElementById('agent-update-sub-agents');
             const subAgentIds = Array.from(subAgentSelect.selectedOptions).map(o => o.value);
+            const updateSkillSelect = document.getElementById('agent-update-skills');
+            const updateSkillIds = Array.from(updateSkillSelect.selectedOptions).map(o => o.value);
             const awsCredentialValue = document.getElementById('agent-update-aws-credential').value;
             const data = {};
 
@@ -1738,6 +2243,13 @@
             }
             if (subAgentIds.length > 0) {
                 data.sub_agents = subAgentIds;
+            }
+            if (updateSkillIds.length > 0) {
+                data.skill_ids = updateSkillIds;
+            }
+            const delegationTypeValue = document.getElementById('agent-update-sub-agent-delegation-type').value;
+            if (delegationTypeValue !== '') {
+                data.sub_agent_delegation_type = delegationTypeValue;
             }
             const memoryEnabledValue = document.getElementById('agent-update-memory-enabled').value;
             if (memoryEnabledValue !== '') {
@@ -2063,6 +2575,113 @@
                 await fetch(`${API_BASE}/agent/${agentId}/jobs/${jobId}`, { method: 'DELETE' });
                 loadAutomations();
             }
+        }
+
+        // ─── Skills ───────────────────────────────────────────────────────────
+
+        let currentSkills = [];
+
+        async function loadSkills() {
+            const listEl = document.getElementById('skill-list');
+            try {
+                const res = await fetch(`${API_BASE}/skill/`);
+                if (!res.ok) throw new Error(await res.text());
+                currentSkills = await res.json();
+            } catch (e) {
+                listEl.innerHTML = `<span style="color:red;">Failed to load skills: ${e.message}</span>`;
+                return;
+            }
+
+            listEl.innerHTML = '';
+            const skillSelectIds = ['agent-skills', 'agent-update-skills'];
+            skillSelectIds.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.innerHTML = '';
+            });
+
+            if (currentSkills.length === 0) {
+                listEl.innerHTML = '<em>No skills created yet.</em>';
+            }
+
+            currentSkills.forEach(s => {
+                const div = document.createElement('div');
+                div.className = 'card';
+                div.innerHTML = `
+                    <strong>${s.name}</strong><br>
+                    ${s.description}<br>
+                    <small>ID: ${s.skill_id}</small>
+                    ${s.tools && s.tools.length ? `<br><small>Tools: ${s.tools.join(', ')}</small>` : ''}
+                    <div style="margin-top:5px;">
+                        <button class="edit-skill-btn" data-skill-id="${s.skill_id}">Edit</button>
+                        <button class="delete" onclick="deleteSkill('${s.skill_id}')">Delete</button>
+                    </div>
+                `;
+                listEl.appendChild(div);
+
+                skillSelectIds.forEach(id => {
+                    const el = document.getElementById(id);
+                    if (!el) return;
+                    const opt = document.createElement('option');
+                    opt.value = s.skill_id;
+                    opt.textContent = `${s.name} — ${s.description}`;
+                    el.appendChild(opt);
+                });
+            });
+        }
+
+        async function addSkill(e) {
+            e.preventDefault();
+            const data = {
+                name: document.getElementById('skill-name').value.trim(),
+                description: document.getElementById('skill-description').value.trim(),
+                instructions: document.getElementById('skill-instructions').value.trim(),
+            };
+            const res = await fetch(`${API_BASE}/skill/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            if (!res.ok) {
+                alert('Failed to create skill: ' + await res.text());
+                return;
+            }
+            e.target.reset();
+            loadSkills();
+        }
+
+        async function uploadSkill(e) {
+            e.preventDefault();
+            const fileInput = document.getElementById('skill-zip-file');
+            const statusEl = document.getElementById('upload-skill-status');
+            const file = fileInput.files[0];
+            if (!file) { alert('Select a ZIP file first.'); return; }
+
+            statusEl.textContent = 'Uploading…';
+            statusEl.style.color = '';
+
+            const formData = new FormData();
+            formData.append('file', file);
+            const res = await fetch(`${API_BASE}/skill/upload`, { method: 'POST', body: formData });
+            if (!res.ok) {
+                const err = await res.text();
+                statusEl.textContent = 'Upload failed: ' + err;
+                statusEl.style.color = 'red';
+                return;
+            }
+            statusEl.textContent = 'Skill uploaded successfully.';
+            statusEl.style.color = 'green';
+            fileInput.value = '';
+            loadSkills();
+        }
+
+        async function deleteSkill(id) {
+            if (!confirm('Delete this skill?')) return;
+            const res = await fetch(`${API_BASE}/skill/${id}`, { method: 'DELETE' });
+            if (!res.ok) {
+                alert('Failed to delete skill: ' + await res.text());
+                return;
+            }
+            loadSkills();
         }
 
         // ─── Connectors ───────────────────────────────────────────────────────
@@ -2516,6 +3135,16 @@
         document.getElementById('connector-config-cancel-edit').addEventListener('click', resetConnectorConfigForm);
         document.getElementById('connector-select').addEventListener('change', onConnectorSelected);
         document.getElementById('connector-config-filter').addEventListener('change', loadAllConnectorConfigs);
+        document.getElementById('add-skill-form').addEventListener('submit', addSkill);
+        document.getElementById('upload-skill-form').addEventListener('submit', uploadSkill);
+        document.getElementById('edit-skill-form').addEventListener('submit', saveEditSkill);
+        document.getElementById('skill-list').addEventListener('click', e => {
+            const btn = e.target.closest('.edit-skill-btn');
+            if (!btn) return;
+            const id = btn.dataset.skillId;
+            const s = currentSkills.find(sk => sk.skill_id === id);
+            if (s) openEditSkill(s);
+        });
 
         const themeToggleBtn = document.getElementById('theme-toggle');
         
@@ -2578,13 +3207,28 @@
             }
         }
 
+        // ─── Tabs ─────────────────────────────────────────────────────────────
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            const panel = document.getElementById(tabId);
+            if (panel) panel.classList.add('active');
+            const btn = document.querySelector(`.tab-btn[data-tab="${tabId}"]`);
+            if (btn) btn.classList.add('active');
+            localStorage.setItem('activeTab', tabId);
+        }
+
         // ─── Init ─────────────────────────────────────────────────────────────
         checkHealth();
         loadModels();
         loadAgentTemplates();
         loadAwsCredentials().then(() => loadAgents());
         loadConnectors().then(() => loadAllConnectorConfigs());
+        loadSkills();
         loadGraph();
+
+        // Restore last active tab (default: LLM Models)
+        switchTab(localStorage.getItem('activeTab') || 'tab-llms');
 
         setInterval(checkHealth, 30000);
 
@@ -2687,6 +3331,44 @@
         document.getElementById('agent-update-select').addEventListener('change', () => {
             const agentId = document.getElementById('agent-update-select').value;
             loadAgentKnowledgeFiles(agentId);
+
+            // Populate prompt fields from the selected agent so orchestrateUpdate
+            // can send the real current_config instead of all-nulls.
+            const agent = currentAgents.find(a => a.agent_id === agentId);
+            if (!agent) return;
+
+            const promptFieldMap = [
+                ['prompt_role',               'agent-update-prompt-role'],
+                ['prompt_objectives',         'agent-update-prompt-objectives'],
+                ['prompt_behavior',           'agent-update-prompt-behavior'],
+                ['prompt_output_format',      'agent-update-prompt-output-format'],
+                ['prompt_constraints',        'agent-update-prompt-constraints'],
+                ['prompt_safety',             'agent-update-prompt-safety'],
+                ['prompt_tools_instructions', 'agent-update-prompt-tools-instructions'],
+                ['prompt_policy',             'agent-update-prompt-policy'],
+                ['prompt_examples',           'agent-update-prompt-examples'],
+                ['prompt_additional_info',    'agent-update-prompt-additional-info'],
+            ];
+            for (const [field, elId] of promptFieldMap) {
+                const el = document.getElementById(elId);
+                if (el) el.value = agent[field] || '';
+            }
+
+            // Pre-select connector configs
+            const connectorSel = document.getElementById('agent-update-connector-configs');
+            if (connectorSel && agent.connector_config_ids) {
+                for (const opt of connectorSel.options) {
+                    opt.selected = agent.connector_config_ids.includes(opt.value);
+                }
+            }
+
+            // Pre-select MCP server IDs
+            const mcpSel = document.getElementById('agent-update-mcp-server-ids');
+            if (mcpSel && agent.mcp_server_ids) {
+                for (const opt of mcpSel.options) {
+                    opt.selected = agent.mcp_server_ids.includes(opt.value);
+                }
+            }
         });
     </script>
 </body>
