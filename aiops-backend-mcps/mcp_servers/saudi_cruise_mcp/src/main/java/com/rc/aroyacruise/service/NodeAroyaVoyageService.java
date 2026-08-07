@@ -13,6 +13,9 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.ArrayNode;
+import tools.jackson.databind.node.JsonNodeFactory;
+import tools.jackson.databind.node.ObjectNode;
 
 import java.util.Map;
 
@@ -20,6 +23,8 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class NodeAroyaVoyageService {
 
+    private static final JsonNodeFactory JSON = JsonNodeFactory.instance;
+    private static final int MAX_AVAILABLE_VOYAGES = 3;
     private final RestClient restClient;
     private final AroyaNodeApiProperties properties;
     private final NodeVoyageResponseHelper responseHelper;
@@ -46,9 +51,11 @@ public class NodeAroyaVoyageService {
                 .body(JsonNode.class);
 
         if (response == null) {
-            return responseHelper.mockAvailableVoyagesResponse(
-                    request,
-                    "Aroya availableVoyages response is null"
+            return limitFirstThreeAvailableVoyages(
+                    responseHelper.mockAvailableVoyagesResponse(
+                            request,
+                            "AvailableVoyages response is null"
+                    )
             );
         }
 
@@ -62,22 +69,27 @@ public class NodeAroyaVoyageService {
         JsonNode data = response.get("data");
 
         if (data == null || data.isNull()) {
-            return responseHelper.mockAvailableVoyagesResponse(
-                    request,
-                    "Aroya availableVoyages response data is missing"
+            return limitFirstThreeAvailableVoyages(
+                    responseHelper.mockAvailableVoyagesResponse(
+                            request,
+                            "Aroya availableVoyages response data is missing"
+                    )
             );
         }
 
         if (!responseHelper.hasAvailableVoyagesCmsData(data)) {
-            return responseHelper.mockAvailableVoyagesResponse(
-                    request,
-                    "Aroya availableVoyages CMS data is missing"
+            return limitFirstThreeAvailableVoyages(
+                    responseHelper.mockAvailableVoyagesResponse(
+                            request,
+                            "Aroya availableVoyages CMS data is missing"
+                    )
             );
         }
 
-        return Utility.removeNulls(data);
+        return Utility.removeNulls(
+                limitFirstThreeAvailableVoyages(data)
+        );
     }
-
     public JsonNode getAvailableVoyageByPackageKey(
             String packageKey
     ) {
@@ -144,4 +156,41 @@ public class NodeAroyaVoyageService {
 
         return Utility.removeNulls(data);
     }
+
+private JsonNode limitFirstThreeAvailableVoyages(JsonNode data) {
+    if (!(data.deepCopy() instanceof ObjectNode dataObject)) {
+        return data;
+    }
+
+    JsonNode availableVoyagesNode =
+            dataObject.path("availableVoyages");
+
+    if (!(availableVoyagesNode instanceof ObjectNode availableVoyagesObject)) {
+        return dataObject;
+    }
+
+    JsonNode resultsNode =
+            availableVoyagesObject.path("results");
+
+    if (!resultsNode.isArray()) {
+        return dataObject;
+    }
+
+    ArrayNode limitedResults = JSON.arrayNode();
+
+    int count = 0;
+
+    for (JsonNode result : resultsNode) {
+        if (count >= MAX_AVAILABLE_VOYAGES) {
+            break;
+        }
+
+        limitedResults.add(result.deepCopy());
+        count++;
+    }
+
+    availableVoyagesObject.set("results", limitedResults);
+
+    return dataObject;
+}
 }

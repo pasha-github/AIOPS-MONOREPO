@@ -7,7 +7,7 @@ import {
 } from "@/components/modalcards";
 import { trimTrailingSlash } from "@/config/agent";
 import { useRuntimeConfig } from "@/config/runtime-config";
-import { Bot, ChevronDown, LayoutTemplate, Plus, Workflow } from "lucide-react";
+import { Bot, ChevronDown, LayoutTemplate, Plus, Sparkles, Workflow } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { getProviderIconSrc } from "../llm-management/llmHelpers";
 import { uploadKnowledgeFile } from "./agentform/addknowledge/file-upload";
@@ -16,8 +16,10 @@ import Capabilities from "./agentform/Capabilities";
 import Deployment from "./agentform/Deployment";
 import Guardrails from "./agentform/Guardrails";
 import Identity from "./agentform/Identity";
+import ImportAgent, { type ImportedAgentPayload } from "./agentform/ImportAgent";
 import KnowledgeSources from "./agentform/KnowledgeSources";
 import Models, { type LlmFieldConfig } from "./agentform/Models";
+import PromptAgent from "./agentform/promptAgent";
 import PromptInstructions from "./agentform/PromptInstructions";
 import SubAgents from "./agentform/SubAgents";
 import {
@@ -32,6 +34,7 @@ import {
   DEPLOYMENT_TARGET_OPTIONS,
   MEMORY_BANK_OPTIONS,
   PROMPT_FIELD_DEFINITIONS,
+  type SubAgentDelegationType,
   type AgentLookupOption,
   type ModelTemplate,
   type PromptFieldKey,
@@ -43,10 +46,69 @@ type LlmDefaults = {
   tertiary_model_id: string | null;
 };
 
+type AgentDraftPayload = Record<string, unknown>;
+
 const toSnakeCase = (value: string) =>
   value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
 
 const normalizeString = (value: string) => value.trim();
+
+const getDraftString = (payload: AgentDraftPayload, key: string) => {
+  const value = payload[key];
+  return typeof value === "string" ? value.trim() : "";
+};
+
+const getDraftStringArray = (payload: AgentDraftPayload, key: string) => {
+  const value = payload[key];
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((item) => (typeof item === "string" ? item.trim() : ""))
+    .filter(Boolean);
+};
+
+const parsePossibleJson = (value: unknown): unknown => {
+  if (typeof value !== "string") {
+    return value;
+  }
+
+  const cleaned = value
+    .trim()
+    .replace(/^```(?:json)?/i, "")
+    .replace(/```$/i, "")
+    .trim();
+
+  if (!cleaned) {
+    return value;
+  }
+
+  try {
+    return JSON.parse(cleaned);
+  } catch {
+    return value;
+  }
+};
+
+const extractAgentDraftPayload = (value: unknown): AgentDraftPayload | null => {
+  const parsed = parsePossibleJson(value);
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return null;
+  }
+
+  const record = parsed as AgentDraftPayload;
+  const nestedKeys = ["agent", "draft", "data", "result", "response", "output"];
+
+  for (const key of nestedKeys) {
+    const nestedPayload = extractAgentDraftPayload(record[key]);
+    if (nestedPayload) {
+      return nestedPayload;
+    }
+  }
+
+  return record;
+};
 
 const getErrorMessage = (payload: unknown, fallback: string) => {
   if (
@@ -86,7 +148,9 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
   const base = trimTrailingSlash(llmManagerApiBaseUrl);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isPromptAgentOpen, setIsPromptAgentOpen] = useState(false);
   const [activeAgentFormTab, setActiveAgentFormTab] = useState(0);
+  const [highlightDraftFields, setHighlightDraftFields] = useState(false);
   const [agentName, setAgentName] = useState("");
   const [description, setDescription] = useState("");
   const [promptFields, setPromptFields] = useState<Record<PromptFieldKey, string>>({
@@ -145,6 +209,8 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
   const [skillOptions, setSkillOptions] = useState<{ value: string; label: string }[]>([]);
   const [isSkillsLoading, setIsSkillsLoading] = useState(false);
   const [subAgentIds, setSubAgentIds] = useState<string[]>([]);
+  const [subAgentDelegationType, setSubAgentDelegationType] =
+    useState<SubAgentDelegationType>("task");
   const [agentOptions, setAgentOptions] = useState<AgentLookupOption[]>([]);
   const [isAgentOptionsLoading, setIsAgentOptionsLoading] = useState(false);
   const [guardrailsEnabled, setGuardrailsEnabled] = useState(false);
@@ -171,6 +237,36 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
     },
     []
   );
+
+  const handleImportAgent = useCallback((payload: ImportedAgentPayload) => {
+    if (typeof payload.name === "string") {
+      setAgentName(payload.name);
+    }
+    if (typeof payload.description === "string") {
+      setDescription(payload.description);
+    }
+
+    setPromptFields((current) => ({
+      ...current,
+      prompt_role: payload.prompt_role ?? current.prompt_role,
+      prompt_objectives: payload.prompt_objectives ?? current.prompt_objectives,
+      prompt_behavior: payload.prompt_behavior ?? current.prompt_behavior,
+      prompt_output_format:
+        payload.prompt_output_format ?? current.prompt_output_format,
+      prompt_constraints: payload.prompt_constraints ?? current.prompt_constraints,
+      prompt_safety: payload.prompt_safety ?? current.prompt_safety,
+      prompt_tools_instructions:
+        payload.prompt_tools_instructions ?? current.prompt_tools_instructions,
+      prompt_policy: payload.prompt_policy ?? current.prompt_policy,
+      prompt_examples: payload.prompt_examples ?? current.prompt_examples,
+      prompt_additional_info:
+        payload.prompt_additional_info ?? current.prompt_additional_info,
+    }));
+    setActiveAgentFormTab(0);
+    setHighlightDraftFields(true);
+    setToastMessage("Agent import loaded successfully.");
+    setIsToastVisible(true);
+  }, []);
 
   // Fetch connectors
   useEffect(() => {
@@ -436,6 +532,12 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
     return () => clearTimeout(t);
   }, [isToastVisible]);
 
+  useEffect(() => {
+    if (!highlightDraftFields) return;
+    const t = setTimeout(() => setHighlightDraftFields(false), 1800);
+    return () => clearTimeout(t);
+  }, [highlightDraftFields]);
+
   // Fetch Models
   useEffect(() => {
     if (!isModalOpen) return;
@@ -655,6 +757,7 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
     setConnectorConfigIds([[]]);
     setSkillIds([""]);
     setSubAgentIds([]);
+    setSubAgentDelegationType("task");
     setGuardrailsEnabled(false);
     setGuardrailPiiPatterns(DEFAULT_GUARDRAIL_PII_PATTERNS);
     setGuardrailSensitivePatternsText("");
@@ -666,13 +769,144 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
     setSubmitError("");
     setSuccess("");
     setSelectedTemplateId("");
+    setHighlightDraftFields(false);
     setAwsCredentialId("");
     setAwsCredentialOptions([]);
     setAwsCredentialsLoadError("");
   };
 
-  const openModal = () => { resetForm(); setIsModalOpen(true); };
+  const openModal = () => {
+    resetForm();
+    setIsPromptAgentOpen(false);
+    setIsModalOpen(true);
+  };
   const closeModal = () => { if (!isCreating) setIsModalOpen(false); };
+
+  const updateSubAgents = (ids: string[]) => {
+    setSubAgentIds(ids);
+  };
+
+  const applyAgentDraft = (draft: AgentDraftPayload) => {
+    const nextName = getDraftString(draft, "name");
+    const nextDescription = getDraftString(draft, "description");
+    const nextAgentType = getDraftString(draft, "type");
+    const nextPrimaryModelId = getDraftString(draft, "primary_model_id");
+    const nextSecondaryModelId = getDraftString(draft, "secondary_model_id");
+    const nextTertiaryModelId = getDraftString(draft, "tertiary_model_id");
+    const nextMcpServerIds = getDraftStringArray(draft, "mcp_server_ids");
+    const nextManualMcpServers = getDraftStringArray(draft, "mcp_servers");
+    const nextConnectorConfigIds = getDraftStringArray(draft, "connector_config_ids");
+    const nextSkillIds = getDraftStringArray(draft, "skill_ids");
+    const nextSubAgentIds = getDraftStringArray(draft, "sub_agents");
+
+    if (nextName) {
+      setAgentName(nextName);
+    }
+
+    if (nextDescription) {
+      setDescription(nextDescription);
+    }
+
+    setPromptFields((current) => ({
+      prompt_role:
+        getDraftString(draft, "prompt_role") ||
+        getDraftString(draft, "instruction") ||
+        current.prompt_role,
+      prompt_objectives:
+        getDraftString(draft, "prompt_objectives") || current.prompt_objectives,
+      prompt_behavior:
+        getDraftString(draft, "prompt_behavior") || current.prompt_behavior,
+      prompt_output_format:
+        getDraftString(draft, "prompt_output_format") || current.prompt_output_format,
+      prompt_constraints:
+        getDraftString(draft, "prompt_constraints") || current.prompt_constraints,
+      prompt_safety: getDraftString(draft, "prompt_safety") || current.prompt_safety,
+      prompt_tools_instructions:
+        getDraftString(draft, "prompt_tools_instructions") ||
+        current.prompt_tools_instructions,
+      prompt_policy: getDraftString(draft, "prompt_policy") || current.prompt_policy,
+      prompt_examples:
+        getDraftString(draft, "prompt_examples") || current.prompt_examples,
+      prompt_additional_info:
+        getDraftString(draft, "prompt_additional_info") ||
+        current.prompt_additional_info,
+    }));
+
+    if (
+      nextAgentType &&
+      AGENT_TYPE_OPTIONS.some((option) => option.value === nextAgentType)
+    ) {
+      setAgentType(nextAgentType);
+    }
+
+    if (nextPrimaryModelId) {
+      setPrimaryUseCustom(true);
+      setPrimaryModelId(nextPrimaryModelId);
+    }
+
+    if (nextSecondaryModelId) {
+      setSecondaryUseCustom(true);
+      setSecondaryModelId(nextSecondaryModelId);
+    }
+
+    if (nextTertiaryModelId) {
+      setTertiaryUseCustom(true);
+      setTertiaryModelId(nextTertiaryModelId);
+    }
+
+    if (nextMcpServerIds.length > 0 || nextManualMcpServers.length > 0) {
+      const selectedMcpServerLabels = nextMcpServerIds.map((id) => {
+        const option = mcpOptions.find((item) => item.id === id);
+        return option?.name || option?.serverUrl || id;
+      });
+      setMcpServers([...selectedMcpServerLabels, ...nextManualMcpServers]);
+      setMcpServerIds([
+        ...nextMcpServerIds,
+        ...nextManualMcpServers.map(() => ""),
+      ]);
+    }
+
+    if (nextConnectorConfigIds.length > 0) {
+      setConnectorConfigIds(nextConnectorConfigIds.map((id) => [id]));
+    }
+
+    if (nextSkillIds.length > 0) {
+      setSkillIds(nextSkillIds);
+    }
+
+    if (nextSubAgentIds.length > 0) {
+      setSubAgentIds(nextSubAgentIds);
+    }
+  };
+
+  const handleGenerateAgentDraft = async (prompt: string) => {
+    const res = await fetch(`${base}/agent/orchestrate`, {
+      method: "POST",
+      headers: {
+        accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ prompt }),
+    });
+    const rawText = await res.text();
+    const parsedPayload = parsePossibleJson(rawText);
+
+    if (!res.ok) {
+      throw new Error(
+        getErrorMessage(parsedPayload, "Unable to generate agent draft.")
+      );
+    }
+
+    const draftPayload = extractAgentDraftPayload(parsedPayload);
+    if (!draftPayload) {
+      throw new Error("Draft response did not include agent fields.");
+    }
+
+    applyAgentDraft(draftPayload);
+    setActiveAgentFormTab(0);
+    setHighlightDraftFields(true);
+    setIsPromptAgentOpen(false);
+  };
 
   // For connectorConfigIds (string[][])
   const updateList = (i: number, val: string[]) => {
@@ -795,6 +1029,7 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
                 : null,
             isEnabled: true,
             sub_agents: subAgentIds,
+            sub_agent_delegation_type: subAgentDelegationType,
             type: agentType || "agent",
             guardrail_sensitive_data: guardrailsEnabled,
             guardrails_config: getGuardrailsConfig(),
@@ -889,43 +1124,57 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
       {/* Modal */}
       {isModalOpen && (
         <ModalCard zIndexClassName="z-[75]" onBackdropClick={closeModal}>
-          <ModalCardPanel maxWidthClassName="max-w-5xl" className="max-h-[92vh]">
+          <ModalCardPanel
+            maxWidthClassName="max-w-5xl"
+            className={isPromptAgentOpen ? "hidden" : "max-h-[92vh]"}
+          >
             <ModalCardHeader
               title="Create New Agent"
               subtitle="Fill the details below"
               icon={<Bot className="h-4 w-4" />}
               actions={
-                <div className="relative flex items-center">
-                  <LayoutTemplate size={14} className="pointer-events-none absolute left-2.5 text-white/70" />
-                  <select
-                    value={selectedTemplateId}
-                    onChange={(e) => setSelectedTemplateId(e.target.value)}
-                    disabled={isTemplatesLoading || modelTemplates.length === 0}
-                    title={templatesLoadError || undefined}
-                    className={`appearance-none rounded-lg pl-8 pr-7 py-1.5 text-xs font-medium outline-none transition focus:ring-2 focus:ring-white/20 ${
-                      templatesLoadError
-                        ? "cursor-not-allowed border border-red-200/60 bg-white/10 text-white/70"
-                        : isTemplatesLoading || modelTemplates.length === 0
-                          ? "cursor-not-allowed border border-white/15 bg-white/10 text-white/45"
-                          : "border border-white/20 bg-white/10 text-white hover:border-white/35"
-                    }`}
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsPromptAgentOpen(true)}
+                    className="inline-flex items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-medium text-white transition hover:border-white/35 hover:bg-white/15"
                   >
-                    <option value="" className="text-slate-900">
-                      {isTemplatesLoading
-                        ? "Loading templates..."
-                        : templatesLoadError
-                          ? "Templates unavailable"
-                          : modelTemplates.length === 0
-                            ? "No templates available"
-                            : "Use a template"}
-                    </option>
-                    {modelTemplates.map((t) => (
-                      <option key={t.template_id} value={t.template_id} className="text-slate-900">
-                        {t.name}
+                    <Sparkles size={14} className="text-white/80" />
+                    Draft with Agent
+                  </button>
+
+                  <div className="relative flex items-center">
+                    <LayoutTemplate size={14} className="pointer-events-none absolute left-2.5 text-white/70" />
+                    <select
+                      value={selectedTemplateId}
+                      onChange={(e) => setSelectedTemplateId(e.target.value)}
+                      disabled={isTemplatesLoading || modelTemplates.length === 0}
+                      title={templatesLoadError || undefined}
+                      className={`appearance-none rounded-lg pl-8 pr-7 py-1.5 text-xs font-medium outline-none transition focus:ring-2 focus:ring-white/20 ${
+                        templatesLoadError
+                          ? "cursor-not-allowed border border-red-200/60 bg-white/10 text-white/70"
+                          : isTemplatesLoading || modelTemplates.length === 0
+                            ? "cursor-not-allowed border border-white/15 bg-white/10 text-white/45"
+                            : "border border-white/20 bg-white/10 text-white hover:border-white/35"
+                      }`}
+                    >
+                      <option value="" className="text-slate-900">
+                        {isTemplatesLoading
+                          ? "Loading templates..."
+                          : templatesLoadError
+                            ? "Templates unavailable"
+                            : modelTemplates.length === 0
+                              ? "No templates available"
+                              : "Use a template"}
                       </option>
-                    ))}
-                  </select>
-                  <ChevronDown size={12} className="pointer-events-none absolute right-2 text-white/70" />
+                      {modelTemplates.map((t) => (
+                        <option key={t.template_id} value={t.template_id} className="text-slate-900">
+                          {t.name}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown size={12} className="pointer-events-none absolute right-2 text-white/70" />
+                  </div>
                 </div>
               }
               onClose={closeModal}
@@ -933,7 +1182,6 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
 
             {/* Form Content */}
             <ModalCardBody className="flex-1 overflow-y-auto flex flex-col gap-4">
-
               <AgentFormPages
                 activeTab={activeAgentFormTab}
                 onTabChange={setActiveAgentFormTab}
@@ -943,6 +1191,7 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
                     description={description}
                     onAgentNameChange={setAgentName}
                     onDescriptionChange={setDescription}
+                    highlight={highlightDraftFields}
                   />
                 )}
                 deployment={(
@@ -1037,9 +1286,11 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
                   <SubAgents
                     agentId={agentId}
                     subAgentIds={subAgentIds}
+                    subAgentDelegationType={subAgentDelegationType}
                     agentOptions={agentOptions}
                     isAgentOptionsLoading={isAgentOptionsLoading}
-                    onChange={setSubAgentIds}
+                    onChange={updateSubAgents}
+                    onDelegationTypeChange={setSubAgentDelegationType}
                   />
                 )}
                 guardrails={(
@@ -1090,11 +1341,14 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
 
             {/* Footer */}
             <ModalCardFooter className="justify-between bg-slate-50">
-              <p className="text-xs text-gray-400">
-                {!isFormValid && !success
-                  ? <>Fields marked <span className="text-red-400">*</span> are required</>
-                  : null}
-              </p>
+              <div className="flex items-center gap-3">
+                <ImportAgent onImport={handleImportAgent} />
+                <p className="text-xs text-gray-400">
+                  {!isFormValid && !success
+                    ? <>Fields marked <span className="text-red-400">*</span> are required</>
+                    : null}
+                </p>
+              </div>
 
               <div className="flex gap-2.5">
                 <button
@@ -1134,6 +1388,15 @@ export default function CreateNewAgent({ onCreateSuccess }: CreateNewAgentProps)
           </ModalCardPanel>
         </ModalCard>
       )}
+
+      {isModalOpen && isPromptAgentOpen ? (
+        <div className="fixed inset-0 z-[95] flex items-center justify-center px-4 py-8">
+          <PromptAgent
+            onClose={() => setIsPromptAgentOpen(false)}
+            onGenerate={handleGenerateAgentDraft}
+          />
+        </div>
+      ) : null}
 
       {/* Toast */}
       {isToastVisible && (
