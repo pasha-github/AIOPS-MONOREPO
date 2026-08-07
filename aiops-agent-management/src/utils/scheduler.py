@@ -87,6 +87,18 @@ async def execute_job(agent_id: str, prompt: str, job_id: str):
         logger.error("[SCHEDULER] Job %s failed: %s", job_id, e)
 
 
+async def execute_ingestion_job():
+    # Import locally to avoid importing the ingestion package at module load.
+    from src.ingestion.trigger import ingestion_trigger
+    from src.ingestion.types import TriggerSource
+
+    try:
+        # blocking=True so the run is serialized by the trigger's lock.
+        await ingestion_trigger.fire(TriggerSource.SCHEDULED, blocking=True)
+    except Exception as e:
+        logger.error(f"Failed to execute scheduled ingestion job: {e}")
+
+
 async def reload_jobs():
     """Clear existing jobs and reload from database"""
     if not scheduler.running:
@@ -100,13 +112,21 @@ async def reload_jobs():
             job_id_str = str(job.job_id)
             trigger = build_job_trigger(job)
 
-            scheduler.add_job(
-                execute_job,
-                trigger=trigger,
-                args=[job.agent_id, job.prompt, job_id_str],
-                id=job_id_str,
-                replace_existing=True,
-            )
+            if job.job_type == "ingestion":
+                scheduler.add_job(
+                    execute_ingestion_job,
+                    trigger=trigger,
+                    id=job_id_str,
+                    replace_existing=True,
+                )
+            else:
+                scheduler.add_job(
+                    execute_job,
+                    trigger=trigger,
+                    args=[job.agent_id, job.prompt, job_id_str],
+                    id=job_id_str,
+                    replace_existing=True,
+                )
 
     total = len(scheduler.get_jobs())
     logger.info("[SCHEDULER] Reloaded — %d job(s) active", total)
