@@ -34,6 +34,13 @@ import { listSessionsVertexAgent } from "../chatOps/VertexAgent/ListSessionsVert
 import { restoreChatForSession as restoreVertexChatForSession } from "../chatOps/VertexAgent/RestoreChatForSession";
 import { vertexAgentChat } from "../chatOps/VertexAgent/VertexAgentChat";
 
+const resizeComposerTextarea = (element: HTMLTextAreaElement, maxHeight: number) => {
+  element.style.height = "auto";
+  const nextHeight = Math.min(element.scrollHeight, maxHeight);
+  element.style.height = `${nextHeight}px`;
+  element.style.overflowY = element.scrollHeight > maxHeight ? "auto" : "hidden";
+};
+
 type ChatAgent = {
   agentId: string;
   name: string;
@@ -129,6 +136,7 @@ type StreamStep = {
   label: string;
   status: "running" | "done";
   details?: string;
+  children?: StreamStep[];
 };
 
 const formatMilestoneDetails = (value: unknown) => {
@@ -175,8 +183,8 @@ const renderMilestones = (
             <button
               type="button"
               onClick={() => onToggle(step.id)}
-              disabled={!step.details}
-              className={`flex w-full items-center justify-between gap-2 text-left ${step.details ? "cursor-pointer" : "cursor-default"
+              disabled={!step.details && !step.children?.length}
+              className={`flex w-full items-center justify-between gap-2 text-left ${step.details || step.children?.length ? "cursor-pointer" : "cursor-default"
                 }`}
             >
               <span
@@ -185,7 +193,7 @@ const renderMilestones = (
               >
                 {step.label}
               </span>
-              {step.details ? (
+              {step.details || step.children?.length ? (
                 expandedState[step.id] ? (
                   <ChevronDown className="h-3.5 w-3.5 shrink-0 text-[#64748b]" />
                 ) : (
@@ -193,6 +201,11 @@ const renderMilestones = (
                 )
               ) : null}
             </button>
+            {step.children?.length && expandedState[step.id] ? (
+              <div className="mt-2">
+                {renderMilestones(step.children, expandedState, onToggle)}
+              </div>
+            ) : null}
             {step.details && expandedState[step.id] ? (
               <pre className="mt-2 max-h-56 overflow-auto rounded-lg border border-[#dbe2f0] bg-white/80 p-2 text-[11px] leading-5 text-[#334155]">
                 {step.details}
@@ -204,6 +217,47 @@ const renderMilestones = (
     </div>
   </div>
 );
+
+const renderStreamingMilestone = (steps: StreamStep[]) => {
+  const currentStep = steps[steps.length - 1];
+  if (!currentStep) {
+    return null;
+  }
+
+  return (
+    <div className="mb-3 rounded-xl border border-[#d4dcf6] bg-white/60 px-3 py-2">
+      <style>
+        {`
+          @keyframes streaming-tool-weight {
+            0%, 100% { font-weight: 500; opacity: 0.72; }
+            50% { font-weight: 700; opacity: 1; }
+          }
+        `}
+      </style>
+      <div className="flex items-center gap-2">
+        <span
+          className={`inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full ${
+            currentStep.status === "done"
+              ? "bg-[#dcfce7] text-[#16a34a]"
+              : "bg-[#e0e7ff] text-[#4f49e2]"
+          }`}
+        >
+          {currentStep.status === "done" ? (
+            <Check className="h-2.5 w-2.5" />
+          ) : (
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" />
+          )}
+        </span>
+        <span
+          className="min-w-0 truncate text-xs text-[#1f2937]"
+          style={{ animation: "streaming-tool-weight 1.4s ease-in-out infinite" }}
+        >
+          {currentStep.label}
+        </span>
+      </div>
+    </div>
+  );
+};
 
 const mergeStreamingText = (currentText: string, incomingText: string): string => {
   if (!incomingText) {
@@ -279,6 +333,22 @@ const formatTime = (timestamp?: number | null) => {
   return new Date(value).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 };
 
+const toTimestampMs = (timestamp?: number | null) => {
+  if (!timestamp || Number.isNaN(timestamp)) {
+    return null;
+  }
+
+  return timestamp > 9999999999 ? timestamp : timestamp * 1000;
+};
+
+const formatDurationSeconds = (startMs: number | null, endMs: number | null) => {
+  if (startMs === null || endMs === null || endMs < startMs) {
+    return null;
+  }
+
+  return Math.max(1, Math.round((endMs - startMs) / 1000));
+};
+
 const normalizeRole = (event: AdkEvent): ChatMessage["role"] | null => {
   const contentRole = String(event.content?.role ?? "").toLowerCase();
   if (contentRole === "user") {
@@ -297,14 +367,25 @@ const normalizeRole = (event: AdkEvent): ChatMessage["role"] | null => {
   return null;
 };
 
-const mapEventsToMessages = (events: AdkEvent[] | null | undefined) => {
+type HistoryStreamStep = StreamStep & {
+  timestampMs?: number | null;
+};
+
+const mapEventsToMessages = (
+  events: AdkEvent[] | null | undefined,
+  options?: { collapseMilestones?: boolean }
+) => {
   const source = Array.isArray(events) ? events : [];
   const messages: ChatMessage[] = [];
   const milestonesByMessageId: Record<string, StreamStep[]> = {};
-  let pendingMilestones: StreamStep[] = [];
+  let pendingMilestones: HistoryStreamStep[] = [];
   let stepCounter = 0;
 
-  const addPendingMilestone = (label: string, details?: unknown) => {
+  const addPendingMilestone = (
+    label: string,
+    details: unknown,
+    timestamp?: number | null
+  ) => {
     const cleanLabel = label.trim();
     if (!cleanLabel) {
       return;
@@ -315,7 +396,42 @@ const mapEventsToMessages = (events: AdkEvent[] | null | undefined) => {
       label: cleanLabel,
       status: "done",
       details: formatMilestoneDetails(details),
+      timestampMs: toTimestampMs(timestamp),
     });
+  };
+
+  const buildMessageMilestones = (
+    messageId: string,
+    messageTimestamp?: number | null
+  ): StreamStep[] => {
+    const childSteps = pendingMilestones.map((step) => ({
+      ...step,
+      id: `${messageId}-${step.id}`,
+    }));
+
+    if (!options?.collapseMilestones || childSteps.length === 0) {
+      return childSteps;
+    }
+
+    const firstToolTimestamp =
+      pendingMilestones.find((step) => step.timestampMs !== null)?.timestampMs ?? null;
+    const durationSeconds = formatDurationSeconds(
+      firstToolTimestamp,
+      toTimestampMs(messageTimestamp)
+    );
+    const label =
+      durationSeconds !== null
+        ? `Worked for ${durationSeconds} seconds`
+        : "Worked with tools";
+
+    return [
+      {
+        id: `${messageId}-history-work-summary`,
+        label,
+        status: "done",
+        children: childSteps,
+      },
+    ];
   };
 
   source.forEach((event, index) => {
@@ -333,7 +449,8 @@ const mapEventsToMessages = (events: AdkEvent[] | null | undefined) => {
         {
           tool: toolName,
           args: toolCall.args ?? {},
-        }
+        },
+        event.timestamp
       );
     });
     functionResponses.forEach((toolResponse) => {
@@ -348,7 +465,8 @@ const mapEventsToMessages = (events: AdkEvent[] | null | undefined) => {
         {
           tool: toolName,
           response: toolResponse.response ?? {},
-        }
+        },
+        event.timestamp
       );
     });
 
@@ -367,10 +485,10 @@ const mapEventsToMessages = (events: AdkEvent[] | null | undefined) => {
     });
 
     if (role === "agent" && pendingMilestones.length > 0) {
-      milestonesByMessageId[messageId] = pendingMilestones.map((step) => ({
-        ...step,
-        id: `${messageId}-${step.id}`,
-      }));
+      milestonesByMessageId[messageId] = buildMessageMilestones(
+        messageId,
+        event.timestamp
+      );
       pendingMilestones = [];
     }
   });
@@ -866,7 +984,9 @@ export default function AgentChatWorkspace({
           setMessagesError("Unable to load session messages.");
           return [] as ChatMessage[];
         }
-        const mapped = mapEventsToMessages(payload.events);
+        const mapped = mapEventsToMessages(payload.events, {
+          collapseMilestones: true,
+        });
         const applied = applyRestoredMessages(mapped, { silent });
         return applied ? mapped.messages : messagesRef.current;
       } catch {
@@ -1939,21 +2059,24 @@ export default function AgentChatWorkspace({
                     What&apos;s on the agenda today?
                   </h3>
                   <div className="rounded-[2rem] border border-[#dbe2f0] bg-white p-5 shadow-[0_24px_60px_-42px_rgba(16,24,40,0.35)]">
-                    <input
-                      type="text"
+                    <textarea
+                      rows={1}
                       value={draft}
-                      onChange={(event) => setDraft(event.target.value)}
+                      onChange={(event) => {
+                        setDraft(event.target.value);
+                        resizeComposerTextarea(event.currentTarget, 160);
+                      }}
                       onKeyDown={(event) => {
                         if ((event.nativeEvent as KeyboardEvent).isComposing) {
                           return;
                         }
-                        if (event.key === "Enter") {
+                        if (event.key === "Enter" && !event.shiftKey) {
                           event.preventDefault();
                           void sendMessage();
                         }
                       }}
                       placeholder="Ask anything"
-                      className="w-full bg-transparent text-3xl text-[#111827] outline-none placeholder:text-[#9ca3af]"
+                      className="max-h-40 min-h-[40px] w-full resize-none bg-transparent text-3xl leading-tight text-[#111827] outline-none placeholder:text-[#9ca3af]"
                     />
                     <div className="mt-5 flex items-center justify-between">
                       <div className="flex items-center gap-2">
@@ -2090,11 +2213,7 @@ export default function AgentChatWorkspace({
                       </div>
 
                       {streamSteps.length > 0
-                        ? renderMilestones(
-                          streamSteps,
-                          expandedMilestones,
-                          toggleMilestoneExpansion
-                        )
+                        ? renderStreamingMilestone(streamSteps)
                         : null}
 
                       <div className="space-y-3 break-words">
@@ -2121,21 +2240,24 @@ export default function AgentChatWorkspace({
               ) : null}
 
               <div className="flex items-center gap-3 rounded-2xl border border-[#e5e7eb] bg-[#f7f8fc] px-4 py-3">
-                <input
-                  type="text"
+                <textarea
+                  rows={1}
                   value={draft}
-                  onChange={(event) => setDraft(event.target.value)}
+                  onChange={(event) => {
+                    setDraft(event.target.value);
+                    resizeComposerTextarea(event.currentTarget, 128);
+                  }}
                   onKeyDown={(event) => {
                     if ((event.nativeEvent as KeyboardEvent).isComposing) {
                       return;
                     }
-                    if (event.key === "Enter") {
+                    if (event.key === "Enter" && !event.shiftKey) {
                       event.preventDefault();
                       void sendMessage();
                     }
                   }}
                   placeholder="Ask Anything"
-                  className="flex-1 bg-transparent text-sm text-[#111827] outline-none placeholder:text-[#9ca3af]"
+                  className="max-h-32 min-h-[24px] flex-1 resize-none bg-transparent py-1 text-sm leading-5 text-[#111827] outline-none placeholder:text-[#9ca3af]"
                 />
                 <button
                   type="button"
