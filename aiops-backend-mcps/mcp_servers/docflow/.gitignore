@@ -1,0 +1,16 @@
+.claude/settings.local.json
+
+# Real credentials — the agent stack's .env holds a live OpenRouter API key.
+# Commit .env.example instead.
+.env
+**/.env
+
+# Runtime state: the shared document register, uploaded attachment blobs, and
+# SQLite's WAL sidecars. Seeded from data.js on first run — never committed.
+server/data/
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
+
+__pycache__/
+*.pyc
