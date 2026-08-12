@@ -37,6 +37,12 @@ type FileUploadKnowledgeProps = {
   existingFiles?: KnowledgeFileRecord[];
   onDownloadExistingFile?: (file: KnowledgeFileRecord) => void;
   onRemoveExistingFile?: (file: KnowledgeFileRecord) => void;
+  accept?: string;
+  allowedExtensions?: string[];
+  allowedFileTypesLabel?: string;
+  emptyMessage?: string;
+  uploadTitle?: string;
+  multiple?: boolean;
 };
 
 export type KnowledgeFileRecord = {
@@ -79,26 +85,40 @@ export default function FileUploadKnowledge({
   existingFiles = [],
   onDownloadExistingFile,
   onRemoveExistingFile,
+  accept = KNOWLEDGE_FILE_ACCEPT,
+  allowedExtensions = Array.from(ALLOWED_KNOWLEDGE_FILE_EXTENSIONS),
+  allowedFileTypesLabel = "PDF, Word, CSV, ZIP, or HTML",
+  emptyMessage = "No knowledge files attached.",
+  uploadTitle = "Upload or drag and drop files",
+  multiple = true,
 }: FileUploadKnowledgeProps) {
   const [fileError, setFileError] = useState("");
   const [isDragActive, setIsDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const allowedExtensionSet = new Set(
+    allowedExtensions.map((extension) => extension.trim().toLowerCase())
+  );
 
   const addFiles = (fileList: FileList | null) => {
     if (!fileList?.length) return;
 
     const incomingFiles = Array.from(fileList);
     const validFiles = incomingFiles.filter((file) =>
-      ALLOWED_KNOWLEDGE_FILE_EXTENSIONS.has(getFileExtension(file.name))
+      allowedExtensionSet.has(getFileExtension(file.name))
     );
 
     if (validFiles.length !== incomingFiles.length) {
-      setFileError("Only PDF, Word, CSV, ZIP, and HTML files are allowed.");
+      setFileError(`Only ${allowedFileTypesLabel} files are allowed.`);
     } else {
       setFileError("");
     }
 
     if (validFiles.length === 0) return;
+
+    if (!multiple) {
+      onFilesChange([validFiles[0]]);
+      return;
+    }
 
     const existingKeys = new Set(
       files.map((file) => `${file.name}-${file.size}-${file.lastModified}`)
@@ -120,8 +140,8 @@ export default function FileUploadKnowledge({
       <input
         ref={fileInputRef}
         type="file"
-        multiple
-        accept={KNOWLEDGE_FILE_ACCEPT}
+        multiple={multiple}
+        accept={accept}
         onChange={(event) => {
           addFiles(event.target.files);
           event.target.value = "";
@@ -163,10 +183,10 @@ export default function FileUploadKnowledge({
             <Plus size={24} />
           </span>
           <span className="mt-3 text-sm font-semibold text-gray-800">
-            Upload or drag and drop files
+            {uploadTitle}
           </span>
           <span className="mt-1 text-xs text-gray-400">
-            PDF, Word, CSV, ZIP, or HTML
+            {allowedFileTypesLabel}
           </span>
           <span className="mt-3 inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-indigo-700">
             <Paperclip size={14} />
@@ -249,7 +269,7 @@ export default function FileUploadKnowledge({
             ))}
           </div>
         ) : (
-          <p className="mt-3 text-xs text-gray-400">No knowledge files attached.</p>
+          <p className="mt-3 text-xs text-gray-400">{emptyMessage}</p>
         )}
       </div>
     </>

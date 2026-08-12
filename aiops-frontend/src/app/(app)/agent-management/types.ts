@@ -54,6 +54,7 @@ export type AgentRecord = {
   mcp_servers: string[];
   connector_config_ids: string[];
   sub_agents: string[];
+  sub_agent_delegation_type?: SubAgentDelegationType | null;
   knowledge_file_ids?: string[];
   isEnabled: boolean | null;
   guardrail_sensitive_data?: boolean | null;
@@ -102,6 +103,19 @@ export type AgentLookupOption = {
   name: string;
   description?: string;
 };
+
+export type SubAgentDelegationType = "task" | "full";
+
+export const SUB_AGENT_DELEGATION_OPTIONS: KeyValueOption[] = [
+  {
+    key: "Task",
+    value: "task",
+  },
+  {
+    key: "Full",
+    value: "full",
+  },
+];
 
 export const DEPLOYMENT_TARGET_OPTIONS: KeyValueOption[] = [
   {

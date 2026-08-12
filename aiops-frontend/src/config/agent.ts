@@ -24,6 +24,7 @@ export const LLM_PROVIDER_MODELS = {
     "gemini-3.1-flash-lite-preview",
     "gemini-2.5-flash",
     "gemini-2.5-pro",
+    "gemini-3.5-flash"
   ],
   openai: [
     "gpt-5.4",
@@ -31,12 +32,18 @@ export const LLM_PROVIDER_MODELS = {
     "gpt-5.2",
     "gpt-5.1",
     "gpt-5-mini",
-    "gpt-5-nano"
+    "gpt-5-nano",
+    "gpt-5.5",
+    "gpt-5.5-pro"
   ],
   anthropic: [
     "claude-haiku-4-5",
     "claude-sonnet-4-6",
     "claude-opus-4-6",
+    "claude-sonnet-5",
+    "claude-opus-4-7",
+    "claude-opus-4-8",
+    "claude-fable-5"
   ],
   groq: [
     "openai/gpt-oss-120b",
@@ -47,6 +54,11 @@ export const LLM_PROVIDER_MODELS = {
     "global.anthropic.claude-haiku-4-5-v1:0",
     "global.anthropic.claude-sonnet-4-6",
     "global.amazon.nova-2-lite-v1:0",
+    "global.anthropic.claude-opus-4-8",
+    "global.anthropic.claude-opus-4-7",
+    "global.anthropic.claude-sonnet-5",
+    "global.anthropic.claude-fable-5",
+    "us.meta.llama3-2-90b-instruct-v1:0"
   ],
   azure_ai: [
     "claude-sonnet-4-6",
