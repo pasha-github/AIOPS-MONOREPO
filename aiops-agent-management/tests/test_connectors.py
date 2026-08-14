@@ -12,6 +12,67 @@ from src.connectors.outlook_connector import OutlookConnector
 from src.connectors.teams_connector import TeamsConnector
 from src.database.models import ConnectorConfig
 
+# ---------------------------------------------------------------------------
+# list_connectors — corrupted metadata.json resilience
+# ---------------------------------------------------------------------------
+
+
+def test_list_connectors_skips_connector_with_malformed_metadata_json(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    """
+    Regression: json.load() in list_connectors() has no error handling.
+    A single corrupted metadata.json crashes the entire endpoint with 500,
+    taking down the connector listing for ALL connectors.
+
+    This test verifies the endpoint returns 200 and includes valid connectors
+    even when one connector's metadata.json is malformed.
+    """
+    import src.routers.connectors as connectors_module
+
+    # Build a fake CONNECTORS_DIR with two connectors:
+    # - good_connector: valid metadata.json
+    # - bad_connector:  corrupted metadata.json (invalid JSON)
+    good_dir = tmp_path / "good_connector"
+    good_dir.mkdir()
+    (good_dir / "connector.py").write_text("", encoding="utf-8")
+    (good_dir / "metadata.json").write_text(
+        '{"name": "Good Connector", "category": "test"}', encoding="utf-8"
+    )
+
+    bad_dir = tmp_path / "bad_connector"
+    bad_dir.mkdir()
+    (bad_dir / "connector.py").write_text("", encoding="utf-8")
+    (bad_dir / "metadata.json").write_text(
+        "{this is not valid json!!!}", encoding="utf-8"
+    )
+
+    monkeypatch.setattr(connectors_module, "CONNECTORS_DIR", tmp_path)
+
+    response = client.get("/connectors/")
+
+    # Endpoint returns 200, includes good connector, skips bad one
+    assert response.status_code == 200
+    ids = {item["id"] for item in response.json()}
+    assert "good_connector" in ids
+    assert "bad_connector" not in ids
+
+
+def test_list_connectors_skips_connector_with_malformed_metadata_json_structural():
+    """
+    Structural: list_connectors() must wrap json.load() in a try/except.
+    Without this, any corrupted metadata.json crashes the entire endpoint.
+    """
+    import inspect
+
+    import src.routers.connectors as connectors_module
+
+    source = inspect.getsource(connectors_module.list_connectors)
+    assert "except" in source, (
+        "list_connectors must wrap json.load() in a try/except — "
+        "a single corrupted metadata.json currently crashes the entire endpoint with 500"
+    )
+
 
 def test_list_connectors_success(client: TestClient):
     response = client.get("/connectors/")
