@@ -1,0 +1,12 @@
+# Keep the build context to the app itself — everything below is docs,
+# fixtures, or a separate service that has its own compose stack.
+docflow-agent-mvp-v2/
+Test Files/
+design/
+.claude/
+server/data/
+**/__pycache__/
+**/*.pyc
+*.md
+.git/
+.gitignore
