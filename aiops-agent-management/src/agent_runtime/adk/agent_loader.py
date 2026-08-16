@@ -326,11 +326,24 @@ class DatabaseAgentLoader(BaseAgentLoader):
             results = session.exec(statement).all()
             return list(results)
 
-    def load_agent(self, agent_name: str, allow_non_adk: bool = False) -> Any | None:
-        """Loads an agent configuration from the database, initializes it, and returns it."""
+    def load_agent(
+        self,
+        agent_name: str,
+        allow_non_adk: bool = False,
+        for_sub_agent: bool = False,
+    ) -> Any | None:
+        """Loads an agent configuration from the database, initializes it, and returns it.
 
-        # Reuse the already-built runtime agent when possible.
-        cached_agent = cache.get_agent(agent_name)
+        ``for_sub_agent=True`` builds a fresh, uncached instance for embedding as a
+        *full-delegation* sub-agent. ADK binds each sub-agent to exactly one parent,
+        so a cached (already-parented) instance cannot be re-attached when the parent
+        is rebuilt — it raises "already has a parent agent". Such instances are
+        therefore neither served from nor written to the shared cache.
+        """
+
+        # Reuse the already-built runtime agent when possible (never for
+        # full-delegation sub-agents — see the docstring).
+        cached_agent = None if for_sub_agent else cache.get_agent(agent_name)
         if cached_agent:
             with Session(engine) as session:
                 agent_config = session.exec(
@@ -543,32 +556,42 @@ class DatabaseAgentLoader(BaseAgentLoader):
                         )
                     )
 
-            # Wrap sub-agents as tools so the main agent can call them.
-            sub_agents = []
-            loaded_sub_agent_ids = set()
+            # Load sub-agents; delegation type controls how they are attached:
+            # "task"  -> wrapped as AgentTool and added to tools_list
+            # "full"  -> passed directly as sub_agents in LlmAgent
+            delegation_type = (
+                getattr(agent_config, "sub_agent_delegation_type", None) or "task"
+            ).lower()
+            task_delegation_tools: list[Any] = []
+            full_delegation_sub_agents: list[Any] = []
+            loaded_sub_agent_ids: set[str] = set()
             if agent_config.sub_agents:
                 for sub_agent_id in agent_config.sub_agents:
-                    # Skip self-references and duplicates
                     if (
                         sub_agent_id == agent_name
                         or sub_agent_id in loaded_sub_agent_ids
                     ):
                         continue
                     try:
-                        # Recursive loading is the current way sub-agents are built.
                         sub_agent = self.load_agent(
                             sub_agent_id,
                             allow_non_adk=allow_non_adk,
+                            # Full-delegation sub-agents get a parent, so each
+                            # must be a fresh, uncached instance.
+                            for_sub_agent=(delegation_type == "full"),
                         )
                         if sub_agent:
-                            sub_agents.append(AgentTool(agent=sub_agent))
+                            if delegation_type == "full":
+                                full_delegation_sub_agents.append(sub_agent)
+                            else:
+                                task_delegation_tools.append(AgentTool(agent=sub_agent))
                             loaded_sub_agent_ids.add(sub_agent_id)
                     except Exception as e:
                         logger.error(
                             f"Error loading sub agent config '{sub_agent_id}' for agent {agent_name}: {e}"
                         )
 
-            tools_list.extend(sub_agents)
+            tools_list.extend(task_delegation_tools)
 
             memory_enabled = getattr(agent_config, "memory_enabled", False)
             memory_tool_type = getattr(agent_config, "memory_tool_type", None) or "load"
@@ -644,7 +667,7 @@ class DatabaseAgentLoader(BaseAgentLoader):
                     description=agent_config.description,
                     instruction=compile_instruction(agent_config),
                     tools=[exit_loop, *tools_list],
-                    sub_agents=[],
+                    sub_agents=full_delegation_sub_agents,
                     before_agent_callback=before_agent_cb,
                     before_model_callback=before_model_cb,
                     after_model_callback=after_model_cb,
@@ -664,13 +687,16 @@ class DatabaseAgentLoader(BaseAgentLoader):
                     description=agent_config.description,
                     instruction=compile_instruction(agent_config),
                     tools=tools_list,
-                    sub_agents=[],
+                    sub_agents=full_delegation_sub_agents,
                     before_agent_callback=before_agent_cb,
                     before_model_callback=before_model_cb,
                     after_model_callback=after_model_cb,
                     after_agent_callback=after_cb,
                 )
             # Cache the built runtime object so later requests can reuse it.
-            cache.set_agent(agent_name, agent)
+            # A full-delegation sub-agent is bound to its parent and must not be
+            # shared with a later parent rebuild, so it is never cached.
+            if not for_sub_agent:
+                cache.set_agent(agent_name, agent)
 
             return agent
