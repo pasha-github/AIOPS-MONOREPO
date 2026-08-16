@@ -1,3 +1,5 @@
+import asyncio
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -7,12 +9,16 @@ from fastapi.staticfiles import StaticFiles
 
 from src.agent_runtime.adk.adk_app import ADK_APP
 from src.database.database import create_db_and_tables
+from src.ingestion.bootstrap import bootstrap_ingestion_sources_from_env
+from src.ingestion.trigger import ingestion_trigger
+from src.ingestion.types import TriggerSource
 from src.routers import (
     agent_files,
     agents,
     auth,
     aws_credentials,
     connectors,
+    documents,
     llms,
     mcp,
     observability,
@@ -20,14 +26,27 @@ from src.routers import (
     vertex_config,
     visualizer,
 )
-from src.utils.constants import WEB
+from src.utils.constants import INGEST_ON_STARTUP, WEB
+from src.utils.logging_config import configure_logging
 from src.utils.scheduler import start_scheduler
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    log_file = configure_logging()
+    _dest = f"terminal + {log_file}" if log_file else "terminal"
+    logging.getLogger(__name__).info(
+        "Logging configured → %s (set LOG_LEVEL=DEBUG for step detail + file)", _dest
+    )
     create_db_and_tables()
+    # Temporary: seed an IngestionSource from env until the management UI lands.
+    bootstrap_ingestion_sources_from_env()
     start_scheduler()
+    # Bind the running loop so synchronous callers (e.g. the agent tool) can
+    # reach the trigger, then optionally kick off a background startup ingestion.
+    ingestion_trigger.bind_loop(asyncio.get_running_loop())
+    if INGEST_ON_STARTUP:
+        await ingestion_trigger.fire(TriggerSource.STARTUP, blocking=False)
     yield
 
 
@@ -56,6 +75,7 @@ app.include_router(aws_credentials.router)
 app.include_router(auth.router)
 app.include_router(llms.router)
 app.include_router(connectors.router)
+app.include_router(documents.router)
 app.include_router(mcp.router)
 app.include_router(skills.router)
 app.include_router(visualizer.router)
