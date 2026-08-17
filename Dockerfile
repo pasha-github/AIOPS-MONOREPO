@@ -20,11 +20,8 @@ RUN uv pip install --system --no-cache -r requirements.txt
 # Copy the rest of the application code
 COPY . .
 
-# Run script
-RUN chmod +x start.sh
-
 # Expose the application port
 EXPOSE 8000
 
 # default command to run the server
-CMD ["./start.sh"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
