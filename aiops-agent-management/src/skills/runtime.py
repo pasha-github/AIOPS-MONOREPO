@@ -162,7 +162,14 @@ def build_skill_model(skill: Skill) -> skill_models.Skill:
             references=cast(Any, references),
             assets=cast(Any, assets),
             scripts={
-                script_name: skill_models.Script(src=script_src)
+                # Use model_construct to store src as UTF-8 bytes instead of str.
+                # ADK writes text files with open(path, 'w') which on Windows
+                # defaults to cp1252, causing UnicodeDecodeError when runpy reads
+                # the file back as UTF-8. Bytes cause ADK to use 'wb' mode,
+                # preserving the exact UTF-8 bytes on all platforms.
+                script_name: skill_models.Script.model_construct(
+                    src=script_src.encode("utf-8")
+                )
                 for script_name, script_src in (skill.scripts or {}).items()
             },
         ),

@@ -1,0 +1,1146 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/ai-playbook-design-system-2f74f718-f698-414c-a969-70703725ddd6/colors_and_type.css">
+<link rel="stylesheet" href="_ds/ai-playbook-design-system-2f74f718-f698-414c-a969-70703725ddd6/styles.css">
+<script src="_ds/ai-playbook-design-system-2f74f718-f698-414c-a969-70703725ddd6/_ds_bundle.js"></script>
+<script src="data.js"></script>
+<script src="dms.js"></script>
+<script src="chat.js"></script>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{font-family:var(--font-sans);color:var(--ink);background:var(--surface-1);-webkit-font-smoothing:antialiased}
+#dc-root,.df-app{height:100%}
+::selection{background:var(--orange-tint-2)}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:var(--border-strong);border-radius:6px;border:2px solid transparent;background-clip:padding-box}
+::-webkit-scrollbar-track{background:transparent}
+a{color:var(--orange-deep);text-decoration:none}
+a:hover{text-decoration:underline;text-underline-offset:2px}
+@keyframes df-fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@keyframes df-slide{from{transform:translateX(24px);opacity:.4}to{transform:none;opacity:1}}
+@keyframes df-blink{0%,100%{opacity:1}50%{opacity:.35}}
+
+.df-in{width:100%;font-family:var(--font-sans);font-size:14px;color:var(--ink);background:var(--bg);border:1px solid var(--border-strong);border-radius:var(--r-sm);padding:9px 11px;transition:border-color var(--dur),box-shadow var(--dur)}
+.df-in::placeholder{color:var(--fg-3)}
+.df-in:focus{outline:none;border-color:var(--orange);box-shadow:var(--ring-orange)}
+select.df-in{cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238A8178' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:32px}
+
+.navitem{display:flex;align-items:center;gap:10px;width:100%;text-align:left;font-family:var(--font-sans);font-size:13.5px;font-weight:500;color:var(--fg-2);background:none;border:0;border-radius:var(--r-sm);padding:8px 10px;cursor:pointer;transition:background var(--dur),color var(--dur)}
+.navitem svg{width:17px;height:17px;flex:none;color:var(--fg-3);transition:color var(--dur)}
+.navitem:hover{background:var(--surface-2);color:var(--ink)}
+.navitem.on{background:var(--orange-tint);color:var(--orange-deep);font-weight:600}
+.navitem.on svg{color:var(--orange)}
+.navitem .nc{margin-left:auto;font-family:var(--font-mono);font-size:11.5px;font-weight:700;color:var(--fg-3);background:var(--surface-2);border-radius:var(--r-pill);padding:1px 8px;min-width:24px;text-align:center}
+.navitem.on .nc{color:var(--orange-deep);background:var(--bg)}
+.navitem.alert .nc{color:var(--danger);background:var(--danger-bg)}
+
+.tile{flex:1;min-width:120px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r-md);padding:12px 14px;cursor:pointer;transition:box-shadow var(--dur),transform var(--dur),border-color var(--dur);text-align:left}
+.tile:hover{box-shadow:var(--shadow-md);transform:translateY(-1px);border-color:var(--border-strong)}
+.tile .tn{font-family:var(--font-display);font-size:26px;font-weight:700;color:var(--ink);line-height:1}
+.tile .tl{font-size:12px;color:var(--fg-2);margin-top:5px;display:block}
+.tile.alert{background:var(--danger-bg);border-color:#f2c9c9}
+.tile.alert .tn{color:var(--danger)}
+.tile.alert .tl{color:var(--danger)}
+
+.panel{background:var(--bg);border:1px solid var(--border);border-radius:var(--r-md);box-shadow:var(--shadow-sm)}
+
+.tbl-wrap{overflow:auto}
+table.doc-table{border-collapse:separate;border-spacing:0;width:100%;font-size:13px}
+.doc-table thead th{position:sticky;top:0;z-index:2;background:var(--surface-2);color:var(--fg-2);font-weight:600;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;text-align:left;padding:10px 12px;border-bottom:1px solid var(--border-strong);white-space:nowrap}
+.doc-table tbody td{padding:11px 12px;border-bottom:1px solid var(--border);vertical-align:top;color:var(--fg-2);line-height:1.45}
+.doc-table tbody tr{transition:background var(--dur)}
+.doc-table tbody tr.click{cursor:pointer}
+.doc-table tbody tr.click:hover{background:var(--orange-tint)}
+.doc-table tbody tr.od td{background:#fdf4f3}
+.doc-table tbody tr.od.click:hover td{background:#fbe9e7}
+.doc-table tbody tr:last-child td{border-bottom:0}
+.mono{font-family:var(--font-mono)}
+.docno{font-family:var(--font-mono);font-weight:700;color:var(--ink);font-size:12px;white-space:nowrap}
+.dtitle{color:var(--ink);font-weight:500;max-width:340px}
+.c-sum{color:var(--fg-3);font-size:11.5px;margin-top:2px;max-width:210px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+.tag{display:inline-flex;align-items:center;gap:6px;font-family:var(--font-sans);font-weight:600;font-size:11px;letter-spacing:.01em;padding:3px 9px;border-radius:var(--r-pill);white-space:nowrap;border:1px solid transparent;line-height:1.5}
+.tag::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;flex:none}
+.tag.approved{color:var(--success);background:var(--success-bg);border-color:#bfe3cd}
+.tag.pending{color:var(--warning);background:var(--warning-bg);border-color:#efdcb0}
+.tag.review{color:var(--info);background:var(--info-bg);border-color:#c7dbf7}
+.tag.revise{color:var(--orange-deep);background:var(--orange-tint);border-color:var(--orange-tint-3)}
+.tag.rejected{color:var(--danger);background:var(--danger-bg);border-color:#f2c9c9}
+.tag.closed{color:var(--fg-3);background:var(--surface-2);border-color:var(--border)}
+.od-flag{display:inline-flex;align-items:center;gap:4px;font-family:var(--font-sans);font-weight:700;font-size:10px;letter-spacing:.04em;text-transform:uppercase;color:#fff;background:var(--danger);border-radius:var(--r-pill);padding:2px 7px;margin-left:6px;white-space:nowrap}
+
+.iconbtn{position:relative;display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:var(--r-sm);border:1px solid var(--border-on-dark);background:rgba(255,255,255,.06);color:var(--fg-on-dark);cursor:pointer;transition:background var(--dur)}
+.iconbtn:hover{background:rgba(255,255,255,.14)}
+.iconbtn svg{width:18px;height:18px}
+.iconbtn .badge-dot{position:absolute;top:-5px;right:-5px;min-width:17px;height:17px;padding:0 4px;border-radius:var(--r-pill);background:var(--danger);color:#fff;font-family:var(--font-mono);font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;border:2px solid var(--ink-bg)}
+
+.ai-dot{width:9px;height:9px;border-radius:50%;background:var(--success);box-shadow:0 0 0 3px var(--success-bg);flex:none}
+.msg{max-width:94%;padding:9px 12px;border-radius:var(--r-md);line-height:1.5;font-size:13px;overflow-wrap:break-word;animation:df-fade var(--dur) var(--ease-out)}
+.msg.user{align-self:flex-end;background:var(--orange);color:#fff;border-bottom-right-radius:4px}
+.msg.ai{align-self:flex-start;background:var(--surface-2);color:var(--ink);border-bottom-left-radius:4px}
+.msg.ai p{margin:0 0 6px}.msg.ai p:last-child{margin:0}
+.msg.ai code{font-family:var(--font-mono);font-size:11.5px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r-xs);padding:1px 5px;color:var(--orange-deep)}
+.msg.ai .tbl-wrap{margin:8px 0;border:1px solid var(--border);border-radius:var(--r-sm);max-height:300px;background:var(--bg)}
+.msg.ai .doc-table{font-size:11.5px}
+.msg.ai .doc-table thead th{font-size:9.5px;padding:7px 8px}
+.msg.ai .doc-table tbody td{padding:7px 8px}
+.msg.ai .hint{color:var(--fg-3);font-size:11.5px;margin-top:4px}
+.msg.ai .warn{color:var(--danger);font-weight:600}
+.msg.ai .kv{display:grid;grid-template-columns:1fr 1fr;gap:7px 12px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r-sm);padding:10px;margin:8px 0;font-size:12px}
+.msg.ai .kv span{display:block;color:var(--fg-3);font-size:9.5px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:1px}
+.msg.ai .sect{font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--fg-2);margin:12px 0 6px}
+.msg.ai .comment{background:var(--bg);border:1px solid var(--border);border-left:3px solid var(--orange);border-radius:var(--r-xs);padding:8px 10px;margin-bottom:6px}
+.msg.ai .c-head{font-size:11px;color:var(--fg-3);margin-bottom:3px}
+.msg.ai .c-text{font-size:12.5px;color:var(--ink)}
+.msg.ai .attach{font-size:12.5px;padding:3px 0}
+.msg.ai .meta{color:var(--fg-3)}
+.msg.ai .detail-head{margin-bottom:6px}
+.msg.ai .next{margin-top:8px}
+.dl-btn{margin-left:8px;padding:3px 10px;font-size:11px;font-family:var(--font-sans);font-weight:600;border:1px solid var(--orange);color:var(--orange-deep);background:var(--bg);border-radius:var(--r-xs);cursor:pointer}
+.dl-btn:hover{background:var(--orange-tint)}
+
+.dtab{background:none;border:0;border-bottom:2px solid transparent;padding:10px 14px;font-family:var(--font-sans);font-size:13px;font-weight:500;color:var(--fg-2);cursor:pointer;white-space:nowrap;transition:color var(--dur)}
+.dtab:hover{color:var(--ink)}
+.dtab.on{color:var(--orange-deep);border-bottom-color:var(--orange);font-weight:600}
+.kvbox{display:grid;grid-template-columns:1fr 1fr;gap:14px 20px}
+.kvbox .k{display:block;color:var(--fg-3);font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px}
+.kvbox .v{color:var(--ink);font-size:13.5px}
+.dsect{font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--fg-2);margin:0 0 10px}
+.dcomment{background:var(--surface-1);border:1px solid var(--border);border-radius:var(--r-sm);padding:11px 13px}
+.step{display:flex;gap:12px}
+.step .rail{display:flex;flex-direction:column;align-items:center}
+.step .dot{width:13px;height:13px;border-radius:50%;background:var(--border-strong);border:2px solid var(--bg);box-shadow:0 0 0 1px var(--border-strong);flex:none;margin-top:2px}
+.step.done .dot{background:var(--success);box-shadow:0 0 0 1px var(--success)}
+.step.pend .dot{background:var(--warning);box-shadow:0 0 0 1px var(--warning)}
+.step .line{flex:1;width:2px;background:var(--border);margin:3px 0}
+.step:last-child .line{display:none}
+
+.modal-back{position:fixed;inset:0;background:rgba(26,23,20,.55);z-index:60;display:flex;align-items:center;justify-content:center;padding:24px;animation:df-fade var(--dur) var(--ease-out)}
+.modal-card{background:var(--bg);border-radius:var(--r-lg);box-shadow:var(--shadow-lg);width:100%;max-width:560px;max-height:82vh;display:flex;flex-direction:column;overflow:hidden}
+.audit-card{max-width:860px}
+
+@media (max-width:1180px){
+  .df-assistant.open{position:fixed !important;top:0;right:0;bottom:0;z-index:45;box-shadow:var(--shadow-lg)}
+}
+@media (max-width:900px){
+  .df-shell{flex-direction:column !important;height:auto !important;overflow:visible !important}
+  .df-sidebar{width:auto !important;flex-direction:row !important;overflow-x:auto;border-right:0 !important;border-bottom:1px solid var(--border)}
+  .df-sidebar .side-group{display:none !important}
+  .df-content{overflow:visible !important}
+  .df-drawer{width:100vw !important;max-width:100vw !important}
+}
+</style>
+</helmet>
+
+<sc-if value="{{ isLogin }}" hint-placeholder-val="{{ true }}">
+<div style="min-height:100vh;display:flex;align-items:stretch;background:var(--ink-bg);font-family:var(--font-sans)">
+  <div style="flex:1.1;display:flex;flex-direction:column;justify-content:space-between;padding:48px 52px;color:var(--fg-on-dark);background:linear-gradient(180deg,#1f1b18,#1a1714)">
+    <div style="display:flex;align-items:center;gap:12px">
+      <div style="width:40px;height:40px;border-radius:10px;background:var(--orange);display:flex;align-items:center;justify-content:center;flex:none">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px"><path d="M4 4h10l6 6v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z"/><path d="M14 4v6h6"/><path d="M8 13h8M8 17h5"/></svg>
+      </div>
+      <div style="font-family:var(--font-display);font-weight:700;font-size:20px;letter-spacing:-.02em;color:#fff">DocFlow AI</div>
+    </div>
+    <div style="max-width:420px">
+      <div style="font-family:var(--font-sans);font-weight:700;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--orange)">Enterprise document control</div>
+      <h1 style="font-family:var(--font-display);font-weight:700;font-size:38px;line-height:1.1;letter-spacing:-.02em;color:#fff;margin:14px 0 16px">Every drawing, RFI and approval â€” traceable and audit-ready.</h1>
+      <p style="font-size:15px;line-height:1.6;color:var(--fg-2-on-dark);margin:0">A lite DMS for EPC and construction teams: review codes 1â€“4, revision control, role-based access and a full audit trail on every action.</p>
+    </div>
+    <div style="display:flex;gap:22px;color:var(--fg-2-on-dark);font-size:12px">
+      <span style="display:flex;align-items:center;gap:7px"><svg viewBox="0 0 24 24" fill="none" stroke="var(--orange)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> Role-based access</span>
+      <span style="display:flex;align-items:center;gap:7px"><svg viewBox="0 0 24 24" fill="none" stroke="var(--orange)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px"><path d="M12 8v4l3 2"/><circle cx="12" cy="12" r="9"/></svg> Full audit trail</span>
+      <span style="display:flex;align-items:center;gap:7px"><svg viewBox="0 0 24 24" fill="none" stroke="var(--orange)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px"><path d="M20 6 9 17l-5-5"/></svg> WCAG AA</span>
+    </div>
+  </div>
+
+  <div style="flex:1;display:flex;align-items:center;justify-content:center;background:var(--surface-1);padding:32px">
+    <div style="width:100%;max-width:400px">
+      <h2 style="font-family:var(--font-display);font-weight:700;font-size:26px;letter-spacing:-.02em;color:var(--ink);margin:0 0 4px">Sign in</h2>
+      <p style="font-size:13.5px;color:var(--fg-2);margin:0 0 22px">Access is scoped to your role, project and discipline.</p>
+
+      <sc-if value="{{ loginError }}" hint-placeholder-val="">
+        <div style="display:flex;align-items:center;gap:8px;background:var(--danger-bg);color:var(--danger);border:1px solid #f2c9c9;border-radius:var(--r-sm);padding:9px 11px;font-size:13px;margin-bottom:14px">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;flex:none"><circle cx="12" cy="12" r="10"/><path d="M12 8v5M12 16h.01"/></svg>
+          <span>{{ loginError }}</span>
+        </div>
+      </sc-if>
+
+      <label style="display:block;font-size:12px;font-weight:600;color:var(--fg-2);margin-bottom:6px">Username or email</label>
+      <input class="df-in" type="text" placeholder="e.g. rajesh" value="{{ loginUser }}" onInput="{{ setLoginUser }}" onKeyDown="{{ onLoginKey }}" style="margin-bottom:14px">
+
+      <label style="display:block;font-size:12px;font-weight:600;color:var(--fg-2);margin-bottom:6px">Password</label>
+      <input class="df-in" type="password" placeholder="demo123" value="{{ loginPass }}" onInput="{{ setLoginPass }}" onKeyDown="{{ onLoginKey }}" style="margin-bottom:14px">
+
+      <label style="display:block;font-size:12px;font-weight:600;color:var(--fg-2);margin-bottom:6px">Project / organization</label>
+      <select class="df-in" value="{{ loginProject }}" onChange="{{ setLoginProject }}" style="margin-bottom:20px">
+        <option value="SPCL">SPCL â€” Shapoorji Tower Project (EPC)</option>
+        <option value="LTRM">LTRM â€” Metro Depot (EPC)</option>
+      </select>
+
+      <x-import component-from-global-scope="AIPlaybookDesignSystem_2f74f7.Button" variant="primary" size="lg" block="{{ true }}" onClick="{{ doLogin }}" hint-size="100%,46px">Sign in</x-import>
+
+      <div style="margin-top:22px;border-top:1px solid var(--border);padding-top:16px">
+        <div style="font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--fg-3);margin-bottom:10px">Demo users Â· password demo123</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px 12px">
+          <sc-for list="{{ demoUsers }}" as="u" hint-placeholder-count="6">
+            <button onClick="{{ u.fill }}" style="display:flex;flex-direction:column;align-items:flex-start;gap:1px;text-align:left;background:var(--bg);border:1px solid var(--border);border-radius:var(--r-sm);padding:7px 9px;cursor:pointer;transition:border-color .2s,background .2s" onmouseover="this.style.borderColor='var(--orange)';this.style.background='var(--orange-tint)'" onmouseout="this.style.borderColor='var(--border)';this.style.background='var(--bg)'">
+              <span style="font-family:var(--font-mono);font-size:12px;font-weight:700;color:var(--ink)">{{ u.username }}</span>
+              <span style="font-size:11px;color:var(--fg-3)">{{ u.role }}</span>
+            </button>
+          </sc-for>
+        </div>
+        <div style="font-size:11.5px;color:var(--fg-3);margin-top:10px">Tap a user to fill the form, then Sign in.</div>
+      </div>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isApp }}" hint-placeholder-val="">
+<div class="df-app" style="display:flex;flex-direction:column;height:100vh;overflow:hidden;background:var(--surface-1)">
+
+  <header style="display:flex;align-items:center;gap:16px;padding:0 16px;height:56px;flex:none;background:var(--ink-bg);color:var(--fg-on-dark);z-index:30">
+    <div style="display:flex;align-items:center;gap:10px">
+      <div style="width:30px;height:30px;border-radius:8px;background:var(--orange);display:flex;align-items:center;justify-content:center;flex:none">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:17px;height:17px"><path d="M4 4h10l6 6v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z"/><path d="M14 4v6h6"/><path d="M8 13h8M8 17h5"/></svg>
+      </div>
+      <span style="font-family:var(--font-display);font-weight:700;font-size:16px;letter-spacing:-.01em;color:#fff">DocFlow AI</span>
+    </div>
+    <div style="width:1px;height:22px;background:var(--border-on-dark)"></div>
+    <nav style="display:flex;align-items:center;gap:7px;font-size:13px;color:var(--fg-2-on-dark);min-width:0">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;flex:none"><path d="M3 9.5 12 3l9 6.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>
+      <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ crumb }}</span>
+    </nav>
+    <div style="flex:1"></div>
+
+    <button class="iconbtn" onClick="{{ toggleBell }}" title="Notifications" aria-label="Notifications">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+      <sc-if value="{{ hasNotifs }}" hint-placeholder-val=""><span class="badge-dot">{{ notifCount }}</span></sc-if>
+    </button>
+
+    <sc-if value="{{ isAdmin }}" hint-placeholder-val="">
+      <button class="iconbtn" onClick="{{ toggleAudit }}" title="Audit trail" aria-label="Audit trail">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+      </button>
+    </sc-if>
+
+    <div style="display:flex;align-items:center;gap:9px;padding:4px 6px 4px 10px;border-radius:var(--r-pill);background:rgba(255,255,255,.06)">
+      <div style="width:28px;height:28px;border-radius:50%;background:var(--orange);color:#fff;display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:700;font-size:12px;flex:none">{{ userInitials }}</div>
+      <div style="line-height:1.2;max-width:170px">
+        <div style="font-size:12.5px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ userName }}</div>
+        <div style="font-size:10.5px;color:var(--fg-2-on-dark);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ userRole }}</div>
+      </div>
+      <button onClick="{{ doLogout }}" title="Sign out" aria-label="Sign out" style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:var(--r-sm);border:0;background:none;color:var(--fg-2-on-dark);cursor:pointer" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='var(--fg-2-on-dark)'">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:17px;height:17px"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <div class="df-shell" style="display:flex;flex:1;min-height:0;overflow:hidden">
+
+    <aside class="df-sidebar" style="width:224px;flex:none;background:var(--bg);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:14px 12px;gap:4px;overflow-y:auto">
+      <div class="side-group" style="font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--fg-3);padding:6px 10px 4px">Views</div>
+      <button class="navitem {{ viewAllOn }}" onClick="{{ setViewAll }}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h10l6 6v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z"/><path d="M14 4v6h6"/></svg>
+        <span>All my documents</span><span class="nc">{{ countAll }}</span>
+      </button>
+      <button class="navitem {{ viewPendingOn }}" onClick="{{ setViewPending }}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+        <span>Awaiting my review</span><span class="nc">{{ countPending }}</span>
+      </button>
+      <button class="navitem alert {{ viewOverdueOn }}" onClick="{{ setViewOverdue }}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>
+        <span>Overdue</span><span class="nc">{{ countOverdue }}</span>
+      </button>
+      <button class="navitem {{ viewMineOn }}" onClick="{{ setViewMine }}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+        <span>Submitted by me</span><span class="nc">{{ countMine }}</span>
+      </button>
+
+      <div class="side-group" style="font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--fg-3);padding:16px 10px 4px">Disciplines</div>
+      <button class="navitem {{ discAllOn }}" onClick="{{ setDiscAll }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><span>All disciplines</span></button>
+      <sc-for list="{{ disciplines }}" as="d" hint-placeholder-count="4">
+        <button class="navitem {{ d.cls }}" onClick="{{ d.onClick }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h10"/></svg><span>{{ d.name }}</span><span class="nc">{{ d.count }}</span></button>
+      </sc-for>
+
+      <div style="flex:1"></div>
+      <div style="border-top:1px solid var(--border);padding:12px 10px 4px;display:flex;align-items:center;gap:8px">
+        <span class="ai-dot"></span>
+        <span style="font-size:11.5px;color:var(--fg-3)">All actions audit-logged</span>
+      </div>
+    </aside>
+
+    <main class="df-content" style="flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden">
+      <div style="padding:18px 22px 12px;flex:none">
+        <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:14px">
+          <div>
+            <h1 style="font-family:var(--font-display);font-weight:700;font-size:24px;letter-spacing:-.02em;color:var(--ink);margin:0">{{ viewTitle }}</h1>
+            <div style="font-size:13px;color:var(--fg-2);margin-top:3px">{{ resultLine }}</div>
+          </div>
+          <div style="position:relative;width:280px;max-width:100%">
+            <svg viewBox="0 0 24 24" fill="none" stroke="var(--fg-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;position:absolute;left:11px;top:50%;transform:translateY(-50%);pointer-events:none"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+            <input class="df-in" type="search" placeholder="Filter by keyword or doc no." value="{{ q }}" onInput="{{ setQ }}" style="padding-left:34px">
+          </div>
+        </div>
+
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="tile" onClick="{{ setViewAll }}"><span class="tn">{{ tileTotal }}</span><span class="tl">In my scope</span></button>
+          <button class="tile" onClick="{{ setViewPending }}"><span class="tn">{{ tileAwaiting }}</span><span class="tl">Awaiting my action</span></button>
+          <button class="tile" onClick="{{ setViewMine }}"><span class="tn">{{ tileMine }}</span><span class="tl">Submitted by me</span></button>
+          <button class="tile {{ overdueTileCls }}" onClick="{{ setViewOverdue }}"><span class="tn">{{ tileOverdue }}</span><span class="tl">Overdue</span></button>
+        </div>
+      </div>
+
+      <div style="flex:1;min-height:0;padding:0 22px 22px;overflow:hidden">
+        <div class="panel" style="height:100%;display:flex;flex-direction:column;overflow:hidden">
+          <sc-if value="{{ hasRows }}" hint-placeholder-val="{{ true }}">
+            <div class="tbl-wrap" style="flex:1">
+              <table class="doc-table">
+                <thead><tr>
+                  <th>Doc No.</th><th>Document name</th><th>Type</th><th>Disc.</th><th>Rev</th><th>Status</th><th>Assigned to</th><th>Due date</th><th>Last updated</th><th>Comments</th>
+                </tr></thead>
+                <tbody>
+                  <sc-for list="{{ rows }}" as="r" hint-placeholder-count="8">
+                    <tr class="click {{ r.odCls }}" onClick="{{ r.onOpen }}">
+                      <td><span class="docno">{{ r.docNumber }}</span></td>
+                      <td><span class="dtitle">{{ r.title }}</span></td>
+                      <td style="white-space:nowrap">{{ r.type }}</td>
+                      <td>{{ r.discipline }}</td>
+                      <td class="mono">{{ r.revision }}</td>
+                      <td style="white-space:nowrap"><span class="tag {{ r.statusClass }}">{{ r.statusLabel }}</span><sc-if value="{{ r.overdue }}" hint-placeholder-val=""><span class="od-flag">Overdue</span></sc-if></td>
+                      <td style="white-space:nowrap">{{ r.assignee }}</td>
+                      <td class="mono" style="white-space:nowrap">{{ r.due }}</td>
+                      <td class="mono" style="white-space:nowrap">{{ r.updated }}</td>
+                      <td><span style="font-weight:700;color:var(--ink)">{{ r.commentCount }}</span><sc-if value="{{ r.commentSnippet }}" hint-placeholder-val=""><div class="c-sum">{{ r.commentSnippet }}</div></sc-if></td>
+                    </tr>
+                  </sc-for>
+                </tbody>
+              </table>
+            </div>
+          </sc-if>
+          <sc-if value="{{ noRows }}" hint-placeholder-val="">
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px;color:var(--fg-3)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="var(--border-strong)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="width:52px;height:52px;margin-bottom:14px"><path d="M4 4h10l6 6v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z"/><path d="M14 4v6h6"/><path d="m9 15 2 2 4-4"/></svg>
+              <div style="font-size:15px;font-weight:600;color:var(--fg-2);margin-bottom:4px">No documents match this view</div>
+              <div style="font-size:13px;max-width:320px">Try clearing the keyword filter or switching to â€œAll my documentsâ€ in the sidebar.</div>
+            </div>
+          </sc-if>
+        </div>
+      </div>
+    </main>
+
+    <sc-if value="{{ chatOpen }}" hint-placeholder-val="{{ true }}">
+    <aside class="df-assistant open" style="width:384px;flex:none;background:var(--bg);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden">
+      <div style="display:flex;align-items:center;gap:9px;padding:14px 16px;border-bottom:1px solid var(--border);flex:none">
+        <span class="ai-dot"></span>
+        <div style="line-height:1.2">
+          <div style="font-family:var(--font-display);font-weight:700;font-size:14px;color:var(--ink)">DocFlow assistant</div>
+          <div style="font-size:10.5px;color:var(--fg-3)">tool-backed Â· audit-logged</div>
+        </div>
+        <div style="flex:1"></div>
+        <button onClick="{{ toggleChat }}" title="Collapse assistant" aria-label="Collapse assistant" style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:var(--r-sm);border:1px solid var(--border);background:var(--bg);color:var(--fg-2);cursor:pointer" onmouseover="this.style.background='var(--surface-2)'" onmouseout="this.style.background='var(--bg)'">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px"><path d="m9 18 6-6-6-6"/></svg>
+        </button>
+      </div>
+      <div ref="{{ chatLogRef }}" style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px">
+        {{ chatBody }}
+      </div>
+      <div style="padding:12px;border-top:1px solid var(--border);flex:none">
+        <div style="display:flex;gap:8px">
+          <input class="df-in" type="text" placeholder='Try: "show my documents"' value="{{ chatInput }}" onInput="{{ setChatInput }}" onKeyDown="{{ onChatKey }}" style="flex:1">
+          <x-import component-from-global-scope="AIPlaybookDesignSystem_2f74f7.Button" variant="primary" size="md" onClick="{{ sendChat }}" hint-size="auto,40px">Send</x-import>
+        </div>
+      </div>
+    </aside>
+    </sc-if>
+
+    <sc-if value="{{ chatClosed }}" hint-placeholder-val="">
+    <aside style="width:52px;flex:none;background:var(--bg);border-left:1px solid var(--border);display:flex;flex-direction:column;align-items:center;padding:14px 0;gap:14px">
+      <button onClick="{{ toggleChat }}" title="Open assistant" aria-label="Open assistant" style="position:relative;display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:var(--r-sm);border:1px solid var(--border);background:var(--bg);color:var(--orange-deep);cursor:pointer" onmouseover="this.style.background='var(--orange-tint)'" onmouseout="this.style.background='var(--bg)'">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <sc-if value="{{ chatUnread }}" hint-placeholder-val=""><span style="position:absolute;top:-3px;right:-3px;width:9px;height:9px;border-radius:50%;background:var(--danger);border:2px solid var(--bg)"></span></sc-if>
+      </button>
+      <div style="writing-mode:vertical-rl;transform:rotate(180deg);font-size:11px;font-weight:600;letter-spacing:.06em;color:var(--fg-3);white-space:nowrap">Assistant</div>
+    </aside>
+    </sc-if>
+  </div>
+
+  <sc-if value="{{ bellOpen }}" hint-placeholder-val="">
+    <div onClick="{{ closeBell }}" style="position:fixed;inset:0;z-index:40"></div>
+    <div style="position:fixed;top:60px;right:16px;z-index:41;width:360px;max-height:60vh;overflow-y:auto;background:var(--bg);border:1px solid var(--border);border-radius:var(--r-md);box-shadow:var(--shadow-lg);animation:df-fade var(--dur) var(--ease-out)">
+      <div style="padding:12px 14px;border-bottom:1px solid var(--border);font-family:var(--font-display);font-weight:700;font-size:14px;color:var(--ink);display:flex;align-items:center;justify-content:space-between">Notifications<sc-if value="{{ hasNotifs }}" hint-placeholder-val=""><span class="tag pending" style="border:0;background:var(--orange-tint);color:var(--orange-deep)">{{ notifCount }} open</span></sc-if></div>
+      <sc-for list="{{ notifs }}" as="n" hint-placeholder-count="3">
+        <button onClick="{{ n.onOpen }}" style="display:flex;gap:10px;align-items:flex-start;width:100%;text-align:left;padding:11px 14px;border:0;border-bottom:1px solid var(--border);background:var(--bg);cursor:pointer;font-size:13px;color:var(--fg-2)" onmouseover="this.style.background='var(--surface-1)'" onmouseout="this.style.background='var(--bg)'">
+          <span style="margin-top:1px;color:{{ n.color }}">{{ n.icon }}</span>
+          <span><span class="docno" style="font-size:11.5px">{{ n.docNumber }}</span><br>{{ n.text }}</span>
+        </button>
+      </sc-for>
+      <sc-if value="{{ noNotifs }}" hint-placeholder-val="">
+        <div style="padding:22px 14px;text-align:center;color:var(--fg-3);font-size:13px">You're all caught up â€” no pending items.</div>
+      </sc-if>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ drawerOpen }}" hint-placeholder-val="">
+    <div onClick="{{ closeDrawer }}" style="position:fixed;inset:0;background:rgba(26,23,20,.5);z-index:50;animation:df-fade var(--dur) var(--ease-out)"></div>
+    <div class="df-drawer" style="position:fixed;top:0;right:0;bottom:0;width:640px;max-width:94vw;z-index:51;background:var(--bg);box-shadow:var(--shadow-lg);display:flex;flex-direction:column;animation:df-slide var(--dur) var(--ease-out)">
+      <div style="padding:18px 22px 12px;border-bottom:1px solid var(--border);flex:none">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
+          <div style="min-width:0">
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+              <span class="docno" style="font-size:13px">{{ dDocNo }}</span>
+              <span class="tag {{ dStatusClass }}">{{ dStatusLabel }}</span>
+              <sc-if value="{{ dOverdue }}" hint-placeholder-val=""><span class="od-flag">Overdue</span></sc-if>
+            </div>
+            <h2 style="font-family:var(--font-display);font-weight:600;font-size:19px;letter-spacing:-.01em;color:var(--ink);margin:8px 0 0;line-height:1.25">{{ dTitle }}</h2>
+          </div>
+          <button onClick="{{ closeDrawer }}" aria-label="Close" style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:var(--r-sm);border:1px solid var(--border);background:var(--bg);color:var(--fg-2);cursor:pointer;flex:none" onmouseover="this.style.background='var(--surface-2)'" onmouseout="this.style.background='var(--bg)'">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px"><path d="M18 6 6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+      </div>
+      <div style="display:flex;gap:2px;padding:0 16px;border-bottom:1px solid var(--border);flex:none;overflow-x:auto">
+        <button class="dtab {{ tabOverviewOn }}" onClick="{{ setTabOverview }}">Overview</button>
+        <button class="dtab {{ tabCommentsOn }}" onClick="{{ setTabComments }}">Comments ({{ commentCount }})</button>
+        <button class="dtab {{ tabRevisionsOn }}" onClick="{{ setTabRevisions }}">Revision history</button>
+        <button class="dtab {{ tabWorkflowOn }}" onClick="{{ setTabWorkflow }}">Workflow trail</button>
+        <button class="dtab {{ tabAttachmentsOn }}" onClick="{{ setTabAttachments }}">Attachments</button>
+      </div>
+
+      <div style="flex:1;overflow-y:auto;padding:20px 22px">
+        <sc-if value="{{ tabOverview }}" hint-placeholder-val="{{ true }}">
+          <div class="kvbox">
+            <sc-for list="{{ ovRows }}" as="o" hint-placeholder-count="8">
+              <div><span class="k">{{ o.k }}</span><span class="v">{{ o.v }}</span></div>
+            </sc-for>
+          </div>
+          <sc-if value="{{ hasDistribution }}" hint-placeholder-val="">
+            <div style="margin-top:22px"><div class="dsect">Distribution list</div><div style="font-size:13.5px;color:var(--ink);line-height:1.7">{{ distribution }}</div></div>
+          </sc-if>
+        </sc-if>
+
+        <sc-if value="{{ tabComments }}" hint-placeholder-val="">
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <sc-for list="{{ comments }}" as="c" hint-placeholder-count="3">
+              <div class="dcomment">
+                <div style="display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--fg-3);margin-bottom:5px"><span style="font-weight:700;color:var(--ink)">{{ c.author }}</span><span style="background:var(--surface-2);border-radius:var(--r-pill);padding:1px 8px">{{ c.role }}</span><span style="margin-left:auto" class="mono">{{ c.timestamp }}</span></div>
+                <div style="font-size:13.5px;color:var(--ink);line-height:1.55">{{ c.text }}</div>
+              </div>
+            </sc-for>
+            <sc-if value="{{ noComments }}" hint-placeholder-val=""><div style="font-size:13px;color:var(--fg-3);padding:8px 0">No comments on record.</div></sc-if>
+          </div>
+          <sc-if value="{{ canComment }}" hint-placeholder-val="">
+            <div style="margin-top:18px">
+              <div class="dsect">Add comment</div>
+              <textarea class="df-in" rows="3" placeholder="Add a remark â€” logged with your name, role and timestamp." value="{{ commentDraft }}" onInput="{{ setCommentDraft }}" style="resize:vertical;font-family:var(--font-sans)"></textarea>
+              <div style="margin-top:10px">
+                <x-import component-from-global-scope="AIPlaybookDesignSystem_2f74f7.Button" variant="secondary" size="sm" onClick="{{ postComment }}" hint-size="auto,34px">Post comment</x-import>
+              </div>
+            </div>
+          </sc-if>
+        </sc-if>
+
+        <sc-if value="{{ tabRevisions }}" hint-placeholder-val="">
+          <div class="tbl-wrap" style="border:1px solid var(--border);border-radius:var(--r-sm)">
+            <table class="doc-table">
+              <thead><tr><th>Rev</th><th>Date</th><th>Change summary</th><th>Uploaded by</th></tr></thead>
+              <tbody>
+                <sc-for list="{{ revisions }}" as="rv" hint-placeholder-count="3">
+                  <tr><td class="mono" style="font-weight:700;color:var(--ink)">{{ rv.revision }}</td><td class="mono" style="white-space:nowrap">{{ rv.date }}</td><td style="color:var(--ink)">{{ rv.summary }}</td><td style="white-space:nowrap">{{ rv.by }}</td></tr>
+                </sc-for>
+              </tbody>
+            </table>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ tabWorkflow }}" hint-placeholder-val="">
+          <div style="display:flex;flex-direction:column">
+            <sc-for list="{{ steps }}" as="s" hint-placeholder-count="3">
+              <div class="step {{ s.cls }}">
+                <div class="rail"><div class="dot"></div><div class="line"></div></div>
+                <div style="padding-bottom:18px">
+                  <div style="font-weight:600;font-size:14px;color:var(--ink)">{{ s.step }}</div>
+                  <div style="font-size:12.5px;color:var(--fg-2);margin-top:2px">{{ s.actor }} Â· {{ s.decision }}<sc-if value="{{ s.date }}" hint-placeholder-val=""> Â· <span class="mono">{{ s.date }}</span></sc-if></div>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ tabAttachments }}" hint-placeholder-val="">
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <sc-for list="{{ attachments }}" as="a" hint-placeholder-count="2">
+              <div style="display:flex;align-items:center;gap:12px;padding:11px 13px;background:var(--surface-1);border:1px solid var(--border);border-radius:var(--r-sm)">
+                <div style="width:34px;height:34px;border-radius:var(--r-sm);background:var(--orange-tint);color:var(--orange-deep);display:flex;align-items:center;justify-content:center;flex:none;font-family:var(--font-mono);font-size:9.5px;font-weight:700">{{ a.type }}</div>
+                <div style="min-width:0;flex:1"><div style="font-size:13.5px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ a.file }}</div><div style="font-size:11.5px;color:var(--fg-3)">{{ a.meta }}</div></div>
+                <button onClick="{{ a.onDownload }}" style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;font-size:12.5px;font-weight:600;font-family:var(--font-sans);border:1px solid var(--border-strong);border-radius:var(--r-sm);background:var(--bg);color:var(--ink);cursor:pointer;flex:none" onmouseover="this.style.borderColor='var(--orange)';this.style.color='var(--orange-deep)'" onmouseout="this.style.borderColor='var(--border-strong)';this.style.color='var(--ink)'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>Download</button>
+              </div>
+            </sc-for>
+            <sc-if value="{{ noAttachments }}" hint-placeholder-val=""><div style="font-size:13px;color:var(--fg-3);padding:8px 0">No attachments on this document.</div></sc-if>
+          </div>
+        </sc-if>
+      </div>
+
+      <div style="padding:12px 22px;border-top:1px solid var(--border);flex:none;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <sc-for list="{{ actions }}" as="act" hint-placeholder-count="2">
+          <x-import component-from-global-scope="AIPlaybookDesignSystem_2f74f7.Button" variant="{{ act.variant }}" size="sm" onClick="{{ act.onClick }}" hint-size="auto,34px">{{ act.label }}</x-import>
+        </sc-for>
+        <sc-if value="{{ actionNote }}" hint-placeholder-val=""><span style="font-size:12.5px;color:var(--fg-3)">{{ actionNote }}</span></sc-if>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ auditOpen }}" hint-placeholder-val="">
+    <div class="modal-back" onClick="{{ closeAudit }}">
+      <div class="modal-card audit-card" onClick="{{ stop }}">
+        <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex:none">
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--orange)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+          <div><div style="font-family:var(--font-display);font-weight:700;font-size:16px;color:var(--ink)">Session audit trail</div><div style="font-size:12px;color:var(--fg-3)">Every login, view, search and write â€” user + timestamp. Admin only.</div></div>
+          <div style="flex:1"></div>
+          <button onClick="{{ closeAudit }}" aria-label="Close" style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:var(--r-sm);border:1px solid var(--border);background:var(--bg);color:var(--fg-2);cursor:pointer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:17px;height:17px"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+        </div>
+        <div class="tbl-wrap" style="flex:1;overflow:auto">
+          <table class="doc-table">
+            <thead><tr><th>Timestamp</th><th>User</th><th>Action</th><th>Detail</th></tr></thead>
+            <tbody>
+              <sc-for list="{{ auditRows }}" as="e" hint-placeholder-count="6">
+                <tr><td class="mono" style="white-space:nowrap">{{ e.timestamp }}</td><td style="white-space:nowrap">{{ e.user }}</td><td><span class="tag closed" style="font-size:10px">{{ e.action }}</span></td><td style="color:var(--ink)">{{ e.detail }}</td></tr>
+              </sc-for>
+            </tbody>
+          </table>
+          <sc-if value="{{ noAudit }}" hint-placeholder-val=""><div style="padding:26px;text-align:center;color:var(--fg-3);font-size:13px">No audit entries recorded yet this session.</div></sc-if>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ confirmOpen }}" hint-placeholder-val="">
+    <div class="modal-back" onClick="{{ confirmNo }}">
+      <div class="modal-card" style="max-width:440px" onClick="{{ stop }}">
+        <div style="padding:22px 22px 8px"><div style="font-family:var(--font-display);font-weight:700;font-size:17px;color:var(--ink);margin-bottom:8px">{{ confirmTitle }}</div><div style="font-size:13.5px;color:var(--fg-2);line-height:1.55">{{ confirmMsg }}</div></div>
+        <div style="padding:16px 22px 20px;display:flex;gap:10px;justify-content:flex-end">
+          <x-import component-from-global-scope="AIPlaybookDesignSystem_2f74f7.Button" variant="ghost" size="md" onClick="{{ confirmNo }}" hint-size="auto,40px">Cancel</x-import>
+          <x-import component-from-global-scope="AIPlaybookDesignSystem_2f74f7.Button" variant="primary" size="md" onClick="{{ confirmYes }}" hint-size="auto,40px">{{ confirmCta }}</x-import>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+</div>
+</sc-if>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = {
+    screen: 'login',
+    loginUser: '', loginPass: '', loginProject: 'SPCL', loginError: '',
+    user: null,
+    view: 'all', disc: '', q: '',
+    drawerOpen: false, drawerDoc: null, drawerPerms: null, activeTab: 'overview', commentDraft: '',
+    bellOpen: false,
+    chatOpen: true, chatInput: '', chatLog: [], chatUnread: false,
+    auditOpen: false,
+    confirm: null,
+    tick: 0,
+  };
+
+  chatLogRef = React.createRef();
+  _lastDoc = null;
+
+  componentDidMount() {
+    const self = this;
+    try {
+      Object.defineProperty(window, 'DFBridge', {
+        configurable: true,
+        value: {
+          refresh: () => self.refresh(),
+          onLogout: () => self.doLogout(),
+          openDetail: (dn) => self.openDetail(dn),
+          get lastOpenedDoc() { return self._lastDoc || self.state.drawerDoc || null; },
+          set lastOpenedDoc(v) { self._lastDoc = v; },
+        },
+      });
+    } catch (e) {}
+    this.forceUpdate();
+  }
+
+  componentDidUpdate(prevProps, prevState) {
+    if (this.chatLogRef.current && this.state.chatLog !== prevState.chatLog) {
+      this.chatLogRef.current.scrollTop = this.chatLogRef.current.scrollHeight;
+    }
+  }
+
+  refresh() {
+    this.setState((s) => {
+      const ns = { tick: s.tick + 1 };
+      if (s.drawerDoc) {
+        const det = DMS.get_document_details(s.drawerDoc.doc_id);
+        if (det.ok) { ns.drawerDoc = det.data; ns.drawerPerms = det.permissions; this._lastDoc = det.data; }
+      }
+      return ns;
+    });
+  }
+
+  pushAI(html) {
+    this.setState((s) => ({ chatLog: [...s.chatLog, { who: 'ai', html }], chatUnread: s.chatOpen ? false : true }));
+  }
+  pushUser(text) {
+    this.setState((s) => ({ chatLog: [...s.chatLog, { who: 'user', html: text }] }));
+  }
+
+  // ---- login ----
+  setLoginUser = (e) => this.setState({ loginUser: e.target.value });
+  setLoginPass = (e) => this.setState({ loginPass: e.target.value });
+  setLoginProject = (e) => this.setState({ loginProject: e.target.value });
+  onLoginKey = (e) => { if (e.key === 'Enter') this.doLogin(); };
+
+  doLogin = () => {
+    const res = DMS.authenticate_user(this.state.loginUser, this.state.loginPass);
+    if (!res.ok) { this.setState({ loginError: res.error, loginPass: '' }); return; }
+    this.enterApp(res.data);
+  };
+
+  enterApp(user) {
+    const g = Chat.greeting(user);
+    this.setState({
+      screen: 'app', user, loginError: '', loginPass: '',
+      chatLog: [{ who: 'ai', html: g.html }], chatOpen: true, chatUnread: false,
+      drawerOpen: false, bellOpen: false, auditOpen: false, view: 'all', disc: '', q: '',
+    });
+  }
+
+  doLogout = () => {
+    DMS.logout();
+    this._lastDoc = null;
+    this.setState({
+      screen: 'login', user: null, loginUser: '', loginPass: '', loginError: '',
+      drawerOpen: false, drawerDoc: null, drawerPerms: null, bellOpen: false, auditOpen: false,
+      chatLog: [], chatInput: '', view: 'all', disc: '', q: '',
+    });
+  };
+
+  // ---- filters / nav ----
+  setQ = (e) => this.setState({ q: e.target.value });
+  setViewAll = () => this.setState({ view: 'all', bellOpen: false });
+  setViewPending = () => this.setState({ view: 'pending', bellOpen: false });
+  setViewOverdue = () => this.setState({ view: 'overdue', bellOpen: false });
+  setViewMine = () => this.setState({ view: 'mine', bellOpen: false });
+  setDiscAll = () => this.setState({ disc: '' });
+
+  // ---- bell / audit ----
+  toggleBell = () => this.setState((s) => ({ bellOpen: !s.bellOpen }));
+  closeBell = () => this.setState({ bellOpen: false });
+  toggleAudit = () => this.setState((s) => ({ auditOpen: !s.auditOpen, bellOpen: false }));
+  closeAudit = () => this.setState({ auditOpen: false });
+  stop = (e) => { if (e && e.stopPropagation) e.stopPropagation(); };
+
+  // ---- chat ----
+  toggleChat = () => this.setState((s) => ({ chatOpen: !s.chatOpen, chatUnread: false }));
+  setChatInput = (e) => this.setState({ chatInput: e.target.value });
+  onChatKey = (e) => { if (e.key === 'Enter') { e.preventDefault(); this.sendChat(); } };
+
+  sendChat = () => {
+    const text = (this.state.chatInput || '').trim();
+    if (!text) return;
+    const loginMatch = text.match(/^login\s+(\S+)\s+(\S+)/i);
+    if (!DMS.session && loginMatch) {
+      this.pushUser(`login ${loginMatch[1]} â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢`);
+      this.setState({ chatInput: '' });
+      const res = DMS.authenticate_user(loginMatch[1], loginMatch[2]);
+      if (res.ok) this.enterApp(res.data);
+      else this.pushAI(`<p>${res.error} Please try again, or use the login panel.</p>`);
+      return;
+    }
+    this.pushUser(text);
+    this.setState({ chatInput: '' });
+    const out = Chat.handle(text);
+    this.pushAI(out.html);
+  };
+
+  // ---- drawer ----
+  openDetail = (docNumber) => {
+    const det = DMS.get_document_details(docNumber);
+    if (!det.ok) return;
+    this._lastDoc = det.data;
+    this.setState({ drawerDoc: det.data, drawerPerms: det.permissions, drawerOpen: true, activeTab: 'overview', commentDraft: '', bellOpen: false });
+  };
+  closeDrawer = () => this.setState({ drawerOpen: false, drawerDoc: null, drawerPerms: null });
+  setTabOverview = () => this.setState({ activeTab: 'overview' });
+  setTabComments = () => this.setState({ activeTab: 'comments' });
+  setTabRevisions = () => this.setState({ activeTab: 'revisions' });
+  setTabWorkflow = () => this.setState({ activeTab: 'workflow' });
+  setTabAttachments = () => this.setState({ activeTab: 'attachments' });
+  setCommentDraft = (e) => this.setState({ commentDraft: e.target.value });
+
+  postComment = () => {
+    const d = this.state.drawerDoc;
+    const text = (this.state.commentDraft || '').trim();
+    if (!d || !text) return;
+    const res = DMS.add_comment(d.doc_id, text);
+    if (res.ok) {
+      this.setState({ commentDraft: '' });
+      this.refresh();
+      this.pushAI(`<p>âœ… Comment added to <strong>${d.doc_number}</strong> via the detail view. Action logged for audit.</p>`);
+    } else {
+      this.pushAI(`<p>${res.error}</p>`);
+    }
+  };
+
+  askConfirm(title, msg, cta, onYes) {
+    this.setState({ confirm: { title, msg, cta, onYes } });
+  }
+  confirmYes = () => { const c = this.state.confirm; this.setState({ confirm: null }); if (c && c.onYes) c.onYes(); };
+  confirmNo = () => this.setState({ confirm: null });
+
+  applyCode(code) {
+    const d = this.state.drawerDoc;
+    const label = DMS.REVIEW_CODES[code].label;
+    this.askConfirm('Apply review decision', `Apply ${label} to ${d.doc_number} â€” â€œ${d.title}â€? This is recorded in the workflow trail and audit log.`, label.split(' â€” ')[0], () => {
+      const res = DMS.update_status(d.doc_id, code);
+      if (res.ok) {
+        this.refresh();
+        this.pushAI(`<p>âœ… <strong>${label}</strong> applied to <strong>${d.doc_number}</strong> by ${DMS.session.user.display_name}. Action logged for audit.</p>`);
+      } else this.pushAI(`<p>${res.error}</p>`);
+    });
+  }
+  uploadRev() {
+    const d = this.state.drawerDoc;
+    const next = /^\d+$/.test(d.revision) ? String(Number(d.revision) + 1) : String.fromCharCode(d.revision.charCodeAt(0) + 1);
+    this.askConfirm('Upload new revision', `Upload Rev ${next} to ${d.doc_number}? Current Rev ${d.revision} will be superseded (retained in history) and status reset to Pending review.`, 'Upload Rev ' + next, () => {
+      const file = d.doc_number.replace(/-[A-Z0-9]+$/, '') + '-' + next + '.pdf';
+      const res = DMS.upload_revision(d.doc_id, file, next);
+      if (res.ok) {
+        this.refresh();
+        this.pushAI(`<p>âœ… Rev <strong>${next}</strong> uploaded to <strong>${res.data.doc_number}</strong>. Status reset to Pending review. Action logged for audit.</p>`);
+      } else this.pushAI(`<p>${res.error}</p>`);
+    });
+  }
+
+  // ---- attachment download (client-side placeholder generation) ----
+  _pdfEscape(s) { return String(s).replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)').replace(/[^\x20-\x7E]/g, '?'); }
+  _makePdf(lines) {
+    const content = 'BT /F1 11 Tf 50 790 Td 15 TL ' + lines.map((l) => `(${this._pdfEscape(l)}) Tj T*`).join(' ') + ' ET';
+    const objs = [
+      '<< /Type /Catalog /Pages 2 0 R >>',
+      '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+      '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>',
+      `<< /Length ${content.length} >>\nstream\n${content}\nendstream`,
+      '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+    ];
+    let pdf = '%PDF-1.4\n'; const offsets = [];
+    objs.forEach((o, i) => { offsets.push(pdf.length); pdf += `${i + 1} 0 obj\n${o}\nendobj\n`; });
+    const xref = pdf.length;
+    pdf += `xref\n0 ${objs.length + 1}\n0000000000 65535 f \n` + offsets.map((o) => String(o).padStart(10, '0') + ' 00000 n \n').join('');
+    pdf += `trailer\n<< /Size ${objs.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
+    return new Blob([pdf], { type: 'application/pdf' });
+  }
+
+  _canvasJpeg(canvas) {
+    const bin = atob(canvas.toDataURL('image/jpeg', 0.9).split(',')[1]);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return bytes;
+  }
+  _makeImagePdf(bytes, iw, ih) {
+    const enc = new TextEncoder();
+    const PW = 842, PH = 595; // A4 landscape (pt)
+    const scale = Math.min(PW / iw, PH / ih);
+    const w = iw * scale, h = ih * scale, ox = (PW - w) / 2, oy = (PH - h) / 2;
+    const content = `q ${w.toFixed(2)} 0 0 ${h.toFixed(2)} ${ox.toFixed(2)} ${oy.toFixed(2)} cm /Im0 Do Q`;
+    const chunks = []; let pos = 0; const off = [];
+    const S = (s) => { const b = enc.encode(s); chunks.push(b); pos += b.length; };
+    const B = (b) => { chunks.push(b); pos += b.length; };
+    S('%PDF-1.4\n');
+    off[0] = pos; S('1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n');
+    off[1] = pos; S('2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n');
+    off[2] = pos; S(`3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${PW} ${PH}] /Resources << /XObject << /Im0 5 0 R >> >> /Contents 4 0 R >>\nendobj\n`);
+    off[3] = pos; S(`4 0 obj\n<< /Length ${content.length} >>\nstream\n${content}\nendstream\nendobj\n`);
+    off[4] = pos; S(`5 0 obj\n<< /Type /XObject /Subtype /Image /Width ${iw} /Height ${ih} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${bytes.length} >>\nstream\n`);
+    B(bytes); S('\nendstream\nendobj\n');
+    const xref = pos;
+    let x = 'xref\n0 6\n0000000000 65535 f \n';
+    for (let i = 0; i < 5; i++) x += String(off[i]).padStart(10, '0') + ' 00000 n \n';
+    S(x); S(`trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`);
+    return new Blob(chunks, { type: 'application/pdf' });
+  }
+  _wrapText(g, text, x, y, maxW, lh, maxLines) {
+    const words = String(text).split(/\s+/); let line = '', ln = 0;
+    for (let i = 0; i < words.length; i++) {
+      const t = line ? line + ' ' + words[i] : words[i];
+      if (g.measureText(t).width > maxW && line) {
+        g.fillText(line, x, y); y += lh; ln++; line = words[i];
+        if (ln >= maxLines - 1) { let rest = line; while (i + 1 < words.length) { i++; rest += ' ' + words[i]; } if (g.measureText(rest + 'â€¦').width > maxW) { while (rest.length && g.measureText(rest + 'â€¦').width > maxW) rest = rest.slice(0, -1); rest += 'â€¦'; } g.fillText(rest, x, y); return y + lh; }
+      } else line = t;
+    }
+    if (line) { g.fillText(line, x, y); y += lh; }
+    return y;
+  }
+  _cloud(g, cx, cy, rx, ry) {
+    g.beginPath();
+    const bumps = 14, step = (Math.PI * 2) / bumps, r = Math.min(rx, ry) * 0.34;
+    for (let i = 0; i < bumps; i++) {
+      const a = i * step, px = cx + Math.cos(a) * rx, py = cy + Math.sin(a) * ry;
+      g.moveTo(px + r, py); g.arc(px, py, r, 0, Math.PI * 2);
+    }
+    g.stroke();
+  }
+  _makeDrawingCanvas(doc) {
+    const W = 1414, H = 1000, c = document.createElement('canvas'); c.width = W; c.height = H;
+    const g = c.getContext('2d');
+    g.lineJoin = 'round'; g.lineCap = 'round';
+    g.fillStyle = '#fdfdfb'; g.fillRect(0, 0, W, H);
+    g.strokeStyle = '#1A1714'; g.lineWidth = 3; g.strokeRect(16, 16, W - 32, H - 32);
+    g.lineWidth = 1; g.strokeRect(26, 26, W - 52, H - 52);
+    const A = { x: 62, y: 66, w: W - 124, h: H - 66 - 208 };
+
+    // grid + bubbles
+    const cols = 6, rows = 4;
+    g.strokeStyle = '#ded7ca'; g.lineWidth = 1;
+    for (let i = 0; i <= cols; i++) { const x = A.x + (A.w / cols) * i; g.beginPath(); g.moveTo(x, A.y); g.lineTo(x, A.y + A.h); g.stroke(); }
+    for (let j = 0; j <= rows; j++) { const y = A.y + (A.h / rows) * j; g.beginPath(); g.moveTo(A.x, y); g.lineTo(A.x + A.w, y); g.stroke(); }
+    g.font = '15px "Space Mono", monospace'; g.fillStyle = '#8A8178'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    for (let i = 0; i < cols; i++) { const x = A.x + (A.w / cols) * (i + 0.5); g.strokeStyle = '#b8b0a2'; g.beginPath(); g.arc(x, A.y - 22, 13, 0, 7); g.stroke(); g.fillText(String(i + 1), x, A.y - 22); }
+    for (let j = 0; j < rows; j++) { const y = A.y + (A.h / rows) * (j + 0.5); g.beginPath(); g.arc(A.x - 26, y, 13, 0, 7); g.stroke(); g.fillText(String.fromCharCode(65 + j), A.x - 26, y); }
+
+    // north arrow + scale bar
+    g.strokeStyle = '#57514A'; g.fillStyle = '#57514A'; g.lineWidth = 2;
+    const nx = A.x + A.w - 40, ny = A.y + 44;
+    g.beginPath(); g.moveTo(nx, ny - 24); g.lineTo(nx - 9, ny + 8); g.lineTo(nx, ny); g.lineTo(nx + 9, ny + 8); g.closePath(); g.fill();
+    g.font = 'bold 13px "Space Grotesk", sans-serif'; g.textAlign = 'center'; g.fillText('N', nx, ny + 22);
+    const sbx = A.x + 20, sby = A.y + A.h - 26;
+    for (let i = 0; i < 4; i++) { g.fillStyle = i % 2 ? '#fdfdfb' : '#57514A'; g.fillRect(sbx + i * 26, sby, 26, 8); g.strokeRect(sbx + i * 26, sby, 26, 8); }
+    g.fillStyle = '#8A8178'; g.font = '12px "Space Mono", monospace'; g.textAlign = 'left'; g.fillText('0        5m', sbx, sby + 20);
+
+    // discipline motif
+    const disc = doc.discipline; const cx = A.x + A.w / 2, cy = A.y + A.h / 2;
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    if (disc === 'ELE') {
+      g.strokeStyle = '#2A3F5F'; g.lineWidth = 4; const busY = A.y + 90;
+      g.beginPath(); g.moveTo(A.x + 120, busY); g.lineTo(A.x + A.w - 160, busY); g.stroke();
+      g.fillStyle = '#2A3F5F'; g.font = '13px "Space Grotesk", sans-serif';
+      for (let i = 0; i < 5; i++) { const x = A.x + 200 + i * 170; g.lineWidth = 3; g.beginPath(); g.moveTo(x, busY); g.lineTo(x, busY + 120); g.stroke(); g.strokeRect(x - 16, busY + 120, 32, 46); g.fillText('MCCB', x, busY + 143); g.beginPath(); g.moveTo(x, busY + 166); g.lineTo(x, busY + 230); g.stroke(); g.fillText('AHU-' + (i + 1), x, busY + 248); }
+      g.lineWidth = 3; g.beginPath(); g.arc(A.x + 120, busY + 80, 22, 0, 7); g.arc(A.x + 120, busY + 118, 22, 0, 7); g.stroke(); g.fillText('TX', A.x + 120, busY + 99);
+    } else if (disc === 'CIV' || disc === 'STR') {
+      const sx = A.x + 120, sw = A.w - 260, sy = cy - 40, sh = 90;
+      g.fillStyle = '#eceae2'; g.fillRect(sx, sy, sw, sh); g.strokeStyle = '#2A3F5F'; g.lineWidth = 3; g.strokeRect(sx, sy, sw, sh);
+      g.fillStyle = '#2A3F5F'; for (let i = 0; i < 22; i++) { g.beginPath(); g.arc(sx + 30 + i * ((sw - 60) / 21), sy + 20, 5, 0, 7); g.fill(); }
+      g.strokeStyle = '#57514A'; g.lineWidth = 1.5;
+      for (let i = 0; i < 22; i++) { const x = sx + 30 + i * ((sw - 60) / 21); g.beginPath(); g.moveTo(x, sy + sh); g.lineTo(x, sy + sh + 16); g.stroke(); }
+      g.beginPath(); g.moveTo(sx, sy + sh + 40); g.lineTo(sx + sw, sy + sh + 40); g.stroke();
+      g.fillStyle = '#8A8178'; g.font = '13px "Space Mono", monospace'; g.fillText('T20 @ 150 c/c  â€”  span ' + sw + ' (NTS)', cx, sy + sh + 60);
+      g.strokeStyle = '#2A3F5F'; g.lineWidth = 2; for (let i = 0; i < 40; i++) { g.beginPath(); g.moveTo(sx + i * (sw / 40), sy + sh); g.lineTo(sx + i * (sw / 40) + 14, sy + sh + 14); g.stroke(); }
+    } else {
+      // MEP / services piping plan
+      g.strokeStyle = '#2A3F5F'; g.lineWidth = 5;
+      const y1 = A.y + 120, y2 = A.y + A.h - 150;
+      g.beginPath(); g.moveTo(A.x + 90, y1); g.lineTo(A.x + A.w - 220, y1); g.stroke();
+      g.beginPath(); g.moveTo(A.x + 90, y1 + 28); g.lineTo(A.x + A.w - 260, y1 + 28); g.stroke();
+      g.beginPath(); g.moveTo(A.x + 160, y1); g.lineTo(A.x + 160, y2); g.moveTo(A.x + 420, y1 + 28); g.lineTo(A.x + 420, y2); g.stroke();
+      g.strokeRect(A.x + A.w - 300, y1 - 30, 150, 96); g.fillStyle = '#2A3F5F'; g.font = 'bold 15px "Space Grotesk", sans-serif'; g.fillText('CHILLER', A.x + A.w - 225, y1 + 18);
+      const valve = (x, y) => { g.lineWidth = 3; g.beginPath(); g.moveTo(x - 13, y - 11); g.lineTo(x + 13, y + 11); g.lineTo(x - 13, y + 11); g.lineTo(x + 13, y - 11); g.closePath(); g.stroke(); };
+      valve(A.x + 160, y2); valve(A.x + 420, y2); valve(A.x + A.w - 380, y1);
+      g.font = '13px "Space Mono", monospace'; g.fillStyle = '#8A8178'; g.textAlign = 'left';
+      g.fillText('CHW SUPPLY Ã˜150', A.x + 96, y1 - 14); g.fillText('CHW RETURN Ã˜150', A.x + 96, y1 + 52);
+    }
+
+    // review-comment markups (inline clouds + numbered badges)
+    const comments = (doc.comments || []).slice(0, 4);
+    const anchors = [[0.30, 0.32], [0.63, 0.5], [0.44, 0.72], [0.78, 0.30]];
+    comments.forEach((cm, i) => {
+      const ax = A.x + A.w * anchors[i][0], ay = A.y + A.h * anchors[i][1];
+      g.strokeStyle = '#D93838'; g.lineWidth = 2; this._cloud(g, ax, ay, 46, 30);
+      g.fillStyle = '#D93838'; g.beginPath(); g.arc(ax + 44, ay - 26, 15, 0, 7); g.fill();
+      g.fillStyle = '#fff'; g.font = 'bold 16px "Space Grotesk", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(String(i + 1), ax + 44, ay - 26);
+    });
+
+    // review comments legend panel
+    if (comments.length) {
+      const lw = 400, lx = A.x + A.w - lw - 14, ly = A.y + 14;
+      let lh = 46; comments.forEach((cm) => { lh += 20 + Math.min(3, Math.ceil(cm.text.length / 46)) * 17 + 8; });
+      g.fillStyle = 'rgba(255,255,255,0.94)'; g.strokeStyle = '#D93838'; g.lineWidth = 1.5;
+      g.fillRect(lx, ly, lw, lh); g.strokeRect(lx, ly, lw, lh);
+      g.fillStyle = '#D93838'; g.fillRect(lx, ly, lw, 30);
+      g.fillStyle = '#fff'; g.font = 'bold 14px "Space Grotesk", sans-serif'; g.textAlign = 'left'; g.textBaseline = 'middle'; g.fillText('REVIEW COMMENTS â€” REVISION ' + doc.revision, lx + 12, ly + 15);
+      let yy = ly + 44;
+      comments.forEach((cm, i) => {
+        g.fillStyle = '#D93838'; g.beginPath(); g.arc(lx + 22, yy, 11, 0, 7); g.fill();
+        g.fillStyle = '#fff'; g.font = 'bold 13px "Space Grotesk", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(String(i + 1), lx + 22, yy);
+        g.fillStyle = '#1A1714'; g.textAlign = 'left'; g.font = 'bold 12px "Geist", sans-serif';
+        g.fillText(DMS.nameOf(cm.author) + ' Â· ' + cm.timestamp, lx + 40, yy - 1);
+        g.fillStyle = '#57514A'; g.font = '12px "Geist", sans-serif';
+        yy = this._wrapText(g, cm.text, lx + 40, yy + 17, lw - 54, 17, 3) + 10;
+      });
+    }
+
+    // title block
+    const tb = { x: 40, y: H - 196, w: W - 80, h: 156 };
+    g.strokeStyle = '#1A1714'; g.lineWidth = 2; g.strokeRect(tb.x, tb.y, tb.w, tb.h);
+    const c1 = tb.x + 360, c2 = tb.x + tb.w - 420;
+    g.lineWidth = 1; g.beginPath(); g.moveTo(c1, tb.y); g.lineTo(c1, tb.y + tb.h); g.moveTo(c2, tb.y); g.lineTo(c2, tb.y + tb.h); g.stroke();
+    // left: logo + contractor
+    g.fillStyle = '#FF6600'; g.fillRect(tb.x + 18, tb.y + 20, 34, 34);
+    g.fillStyle = '#fff'; g.font = 'bold 15px "Space Grotesk", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('DF', tb.x + 35, tb.y + 37);
+    g.fillStyle = '#1A1714'; g.textAlign = 'left'; g.font = 'bold 18px "Space Grotesk", sans-serif'; g.fillText('DocFlow AI', tb.x + 62, tb.y + 30);
+    g.fillStyle = '#57514A'; g.font = '12px "Geist", sans-serif'; g.fillText('Document Management System', tb.x + 62, tb.y + 48);
+    g.fillStyle = '#8A8178'; g.font = '10px "Geist", sans-serif'; g.fillText('CONTRACTOR / ORIGINATOR', tb.x + 18, tb.y + 82);
+    g.fillStyle = '#1A1714'; g.font = '13px "Geist", sans-serif'; this._wrapText(g, doc.originator_org || 'â€”', tb.x + 18, tb.y + 100, 320, 16, 2);
+    g.fillStyle = '#8A8178'; g.font = '10px "Geist", sans-serif'; g.fillText('PROJECT', tb.x + 18, tb.y + 138);
+    g.fillStyle = '#1A1714'; g.font = 'bold 13px "Geist", sans-serif'; g.fillText('Project ' + doc.project_id, tb.x + 90, tb.y + 138);
+    // middle: title
+    g.fillStyle = '#8A8178'; g.font = '10px "Geist", sans-serif'; g.fillText('DRAWING TITLE', c1 + 18, tb.y + 22);
+    g.fillStyle = '#1A1714'; g.font = 'bold 20px "Space Grotesk", sans-serif'; this._wrapText(g, doc.title, c1 + 18, tb.y + 50, c2 - c1 - 36, 26, 3);
+    g.fillStyle = '#57514A'; g.font = '12px "Space Mono", monospace'; g.fillText(doc.type + '  Â·  ' + disc + '  Â·  ' + doc.confidentiality, c1 + 18, tb.y + tb.h - 20);
+    // right: fields
+    const rows2 = [['DRAWING NO.', doc.doc_number], ['REVISION', doc.revision], ['STATUS', DMS.effectiveStatus(doc)], ['SCALE', 'NTS  Â·  A1'], ['DATE', doc.revision_history && doc.revision_history.length ? doc.revision_history[doc.revision_history.length - 1].date : (doc.submitted_date || 'â€”')]];
+    const rh = tb.h / rows2.length;
+    rows2.forEach((r, i) => {
+      const yy = tb.y + rh * i; if (i) { g.strokeStyle = '#ded7ca'; g.lineWidth = 1; g.beginPath(); g.moveTo(c2, yy); g.lineTo(tb.x + tb.w, yy); g.stroke(); }
+      g.fillStyle = '#8A8178'; g.font = '10px "Geist", sans-serif'; g.textAlign = 'left'; g.textBaseline = 'middle'; g.fillText(r[0], c2 + 14, yy + rh / 2 - 8);
+      g.fillStyle = r[0] === 'DRAWING NO.' ? '#B84A00' : '#1A1714'; g.font = (r[0] === 'DRAWING NO.' ? 'bold 14px "Space Mono", monospace' : 'bold 13px "Geist", sans-serif');
+      g.fillText(String(r[1]), c2 + 14, yy + rh / 2 + 9);
+    });
+    return { canvas: c, iw: W, ih: H };
+  }
+
+  downloadAttachment(docNo, fileName) {
+    const res = DMS.download_attachment(docNo, fileName);
+    if (!res.ok) { this.pushAI(`<p>Download failed: ${res.error}</p>`); return; }
+    const { doc, attachment } = res.data;
+    const meta = [
+      'DocFlow AI â€” placeholder attachment (POC)', '',
+      'File:        ' + attachment.file_name,
+      'Document:    ' + doc.doc_number,
+      'Title:       ' + doc.title,
+      'Type:        ' + doc.type + '  |  Discipline: ' + doc.discipline + '  |  Rev ' + doc.revision,
+      'Status:      ' + DMS.effectiveStatus(doc),
+      'Uploaded by: ' + DMS.nameOf(attachment.uploaded_by) + ' on ' + attachment.date,
+      'Size on record: ' + attachment.size, '',
+      'The original file content is not stored in this demo;',
+      'this placeholder was generated at download time.',
+    ];
+    const ext = (attachment.file_name.split('.').pop() || '').toLowerCase();
+    const isDrawing = ['Drawing', 'RFI', 'NCR', 'Inspection Request'].includes(doc.type) || doc.discipline === 'ARC' || doc.discipline === 'STR' || doc.discipline === 'CIV' || doc.discipline === 'ELE' || doc.discipline === 'MEP';
+    let blob;
+    if (ext === 'pdf' && isDrawing) { const { canvas, iw, ih } = this._makeDrawingCanvas(doc); blob = this._makeImagePdf(this._canvasJpeg(canvas), iw, ih); }
+    else if (ext === 'jpg' || ext === 'jpeg') { const { canvas } = this._makeDrawingCanvas(doc); blob = new Blob([this._canvasJpeg(canvas)], { type: 'image/jpeg' }); }
+    else if (ext === 'pdf') blob = this._makePdf(meta);
+    else blob = new Blob([meta.join('\r\n')], { type: 'text/plain' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = attachment.file_name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    this.pushAI(`<p>â¬‡ï¸ Downloaded <code>${attachment.file_name}</code> from <strong>${doc.doc_number}</strong>. Download logged for audit.</p>`);
+  }
+
+  // ---- helpers ----
+  statusMeta(d) {
+    const raw = d.status;
+    let cls = 'pending';
+    if (/^APPROVED/.test(raw)) cls = 'approved';
+    else if (raw === 'UNDER REVIEW') cls = 'review';
+    else if (raw === 'PENDING REVIEW') cls = 'pending';
+    else if (raw === 'REVISE & RESUBMIT') cls = 'revise';
+    else if (raw === 'REJECTED') cls = 'rejected';
+    else if (raw === 'CLOSED' || raw === 'SUPERSEDED') cls = 'closed';
+    const label = raw.replace('W/ COMMENTS', 'w/ comments');
+    return { cls, label: label.charAt(0) + label.slice(1).toLowerCase() };
+  }
+  titleCase(s) { return String(s).replace(/\w\S*/g, (t) => t.charAt(0).toUpperCase() + t.slice(1).toLowerCase()); }
+
+  myDocs() { const r = DMS.list_assigned_documents(); return r.ok ? r.data : []; }
+
+  filtered() {
+    let docs = this.myDocs();
+    const me = DMS.session.user.user_id;
+    const { view, disc, q } = this.state;
+    if (view === 'pending') docs = docs.filter((d) => d.current_assignee === me && (DMS.effectiveStatus(d).includes('PENDING') || DMS.effectiveStatus(d).includes('UNDER REVIEW')));
+    if (view === 'overdue') docs = docs.filter((d) => DMS.isOverdue(d));
+    if (view === 'mine') docs = docs.filter((d) => d.originator === me);
+    if (disc) docs = docs.filter((d) => d.discipline === disc);
+    if (q) { const k = q.trim().toLowerCase(); docs = docs.filter((d) => d.doc_number.toLowerCase().includes(k) || d.title.toLowerCase().includes(k) || d.type.toLowerCase().includes(k)); }
+    return docs;
+  }
+
+  renderVals() {
+    const s = this.state;
+    if (s.screen !== 'app' || typeof DMS === 'undefined' || !DMS.session) {
+      const demoUsers = (typeof USERS !== 'undefined' ? USERS : []).map((u) => ({
+        username: u.username, role: u.role,
+        fill: () => this.setState({ loginUser: u.username, loginPass: 'demo123', loginError: '' }),
+      }));
+      return {
+        isLogin: true, isApp: false,
+        loginUser: s.loginUser, loginPass: s.loginPass, loginProject: s.loginProject, loginError: s.loginError,
+        setLoginUser: this.setLoginUser, setLoginPass: this.setLoginPass, setLoginProject: this.setLoginProject,
+        onLoginKey: this.onLoginKey, doLogin: this.doLogin, demoUsers,
+      };
+    }
+
+    const me = DMS.session.user.user_id;
+    const all = this.myDocs();
+    const rowsD = this.filtered();
+    const overdueN = all.filter((d) => DMS.isOverdue(d)).length;
+    const awaitingN = all.filter((d) => d.current_assignee === me).length;
+    const mineN = all.filter((d) => d.originator === me).length;
+
+    const discCounts = {};
+    all.forEach((d) => { discCounts[d.discipline] = (discCounts[d.discipline] || 0) + 1; });
+    const disciplines = Object.keys(discCounts).sort().map((name) => ({
+      name, count: discCounts[name], cls: s.disc === name ? 'on' : '',
+      onClick: () => this.setState({ disc: name }),
+    }));
+
+    const rows = rowsD.map((d) => {
+      const m = this.statusMeta(d);
+      const od = DMS.isOverdue(d);
+      const last = d.comments[d.comments.length - 1];
+      let snip = '';
+      if (last) { const t = last.text.length > 60 ? last.text.slice(0, 60) + 'â€¦' : last.text; snip = DMS.nameOf(last.author).split(' ')[0] + ': ' + t; }
+      return {
+        docNumber: d.doc_number, title: d.title, type: d.type, discipline: d.discipline, revision: d.revision,
+        statusClass: m.cls, statusLabel: m.label, overdue: od, odCls: od ? 'od' : '',
+        assignee: DMS.nameOf(d.current_assignee), due: d.due_date || 'â€”',
+        updated: d.closed_date || d.submitted_date || 'â€”',
+        commentCount: d.comments.length, commentSnippet: snip,
+        onOpen: () => this.openDetail(d.doc_number),
+      };
+    });
+
+    const viewTitles = { all: 'All my documents', pending: 'Awaiting my review', overdue: 'Overdue', mine: 'Submitted by me' };
+    let viewTitle = viewTitles[s.view] || 'My documents';
+    if (s.disc) viewTitle += ' Â· ' + s.disc;
+
+    // notifications
+    const notifs = [];
+    all.forEach((d) => {
+      if (DMS.isOverdue(d)) notifs.push({ docNumber: d.doc_number, text: `Past its due date (${d.due_date}).`, icon: 'â°', color: 'var(--danger)', onOpen: () => this.openDetail(d.doc_number) });
+      else if (d.current_assignee === me) notifs.push({ docNumber: d.doc_number, text: `Awaiting your action${d.due_date ? ' â€” due ' + d.due_date : ''}.`, icon: 'ðŸ“‹', color: 'var(--warning)', onOpen: () => this.openDetail(d.doc_number) });
+    });
+
+    // chat body element
+    const chatBody = React.createElement(
+      'div', { style: { display: 'flex', flexDirection: 'column', gap: '10px' } },
+      s.chatLog.map((mm, i) => mm.who === 'user'
+        ? React.createElement('div', { key: i, className: 'msg user' }, mm.html)
+        : React.createElement('div', { key: i, className: 'msg ai', dangerouslySetInnerHTML: { __html: mm.html } })
+      )
+    );
+
+    const u = s.user;
+    const initials = (u.display_name || '?').split(' ').map((x) => x[0]).slice(0, 2).join('').toUpperCase();
+    const isAdmin = u.role === (typeof ROLES !== 'undefined' ? ROLES.ADMIN : 'Admin/Auditor');
+    const crumb = s.drawerOpen && s.drawerDoc
+      ? `Project ${s.drawerDoc.project_id} â€º ${s.drawerDoc.discipline} â€º ${s.drawerDoc.doc_number}`
+      : `Project ${u.projects[0]} â€º ${s.disc || 'All disciplines'}`;
+
+    const base = {
+      isLogin: false, isApp: true,
+      userName: u.display_name, userRole: u.role, userInitials: initials, isAdmin, crumb,
+      doLogout: this.doLogout,
+      setTabOverview: this.setTabOverview, setTabComments: this.setTabComments,
+      setTabRevisions: this.setTabRevisions, setTabWorkflow: this.setTabWorkflow, setTabAttachments: this.setTabAttachments,
+      // nav
+      countAll: all.length, countPending: awaitingN, countOverdue: overdueN, countMine: mineN,
+      viewAllOn: s.view === 'all' ? 'on' : '', viewPendingOn: s.view === 'pending' ? 'on' : '',
+      viewOverdueOn: s.view === 'overdue' ? 'on' : '', viewMineOn: s.view === 'mine' ? 'on' : '',
+      setViewAll: this.setViewAll, setViewPending: this.setViewPending, setViewOverdue: this.setViewOverdue, setViewMine: this.setViewMine,
+      disciplines, discAllOn: s.disc === '' ? 'on' : '', setDiscAll: this.setDiscAll,
+      // header
+      q: s.q, setQ: this.setQ, viewTitle,
+      resultLine: `${rows.length} document${rows.length === 1 ? '' : 's'}${s.q ? ' matching â€œ' + s.q + 'â€' : ''}`,
+      tileTotal: all.length, tileAwaiting: awaitingN, tileMine: mineN, tileOverdue: overdueN,
+      overdueTileCls: overdueN ? 'alert' : '',
+      rows, hasRows: rows.length > 0, noRows: rows.length === 0,
+      // assistant
+      chatOpen: s.chatOpen, chatClosed: !s.chatOpen, chatUnread: s.chatUnread,
+      toggleChat: this.toggleChat, chatBody, chatInput: s.chatInput, setChatInput: this.setChatInput,
+      onChatKey: this.onChatKey, sendChat: this.sendChat, chatLogRef: this.chatLogRef,
+      // bell
+      bellOpen: s.bellOpen, toggleBell: this.toggleBell, closeBell: this.closeBell,
+      notifs, notifCount: notifs.length, hasNotifs: notifs.length > 0, noNotifs: notifs.length === 0,
+      // audit
+      auditOpen: s.auditOpen, toggleAudit: this.toggleAudit, closeAudit: this.closeAudit, stop: this.stop,
+      // confirm
+      confirmOpen: !!s.confirm, confirmTitle: s.confirm ? s.confirm.title : '', confirmMsg: s.confirm ? s.confirm.msg : '',
+      confirmCta: s.confirm ? s.confirm.cta : 'Confirm', confirmYes: this.confirmYes, confirmNo: this.confirmNo,
+      // drawer defaults
+      drawerOpen: s.drawerOpen, closeDrawer: this.closeDrawer,
+    };
+
+    if (isAdmin && s.auditOpen) {
+      const r = DMS.get_audit_trail();
+      const entries = r.ok ? r.data.slice(-60).reverse() : [];
+      base.auditRows = entries.map((e) => ({ timestamp: e.timestamp, user: DMS.nameOf(e.user), action: e.action, detail: e.detail }));
+      base.noAudit = entries.length === 0;
+    } else { base.auditRows = []; base.noAudit = false; }
+
+    if (s.drawerOpen && s.drawerDoc) {
+      const d = s.drawerDoc; const p = s.drawerPerms || {};
+      const m = this.statusMeta(d);
+      base.dDocNo = d.doc_number; base.dTitle = d.title; base.dStatusClass = m.cls; base.dStatusLabel = m.label; base.dOverdue = DMS.isOverdue(d);
+      base.commentCount = d.comments.length;
+      base.tabOverview = s.activeTab === 'overview'; base.tabComments = s.activeTab === 'comments';
+      base.tabRevisions = s.activeTab === 'revisions'; base.tabWorkflow = s.activeTab === 'workflow'; base.tabAttachments = s.activeTab === 'attachments';
+      base.tabOverviewOn = base.tabOverview ? 'on' : ''; base.tabCommentsOn = base.tabComments ? 'on' : '';
+      base.tabRevisionsOn = base.tabRevisions ? 'on' : ''; base.tabWorkflowOn = base.tabWorkflow ? 'on' : ''; base.tabAttachmentsOn = base.tabAttachments ? 'on' : '';
+
+      const ov = [
+        { k: 'Type', v: d.type }, { k: 'Discipline', v: d.discipline },
+        { k: 'Revision', v: d.revision }, { k: 'Confidentiality', v: d.confidentiality },
+        { k: 'Originator', v: DMS.nameOf(d.originator) }, { k: 'Originator org', v: d.originator_org || 'â€”' },
+        { k: 'Project', v: d.project_id }, { k: 'Current holder', v: DMS.nameOf(d.current_assignee) },
+        { k: 'Submitted', v: d.submitted_date || 'â€”' }, { k: 'Due date', v: d.due_date || 'â€”' }, { k: 'Closed', v: d.closed_date || 'â€”' },
+      ];
+      if (d.commercial_value) ov.push({ k: 'Commercial value', v: d.commercial_value });
+      base.ovRows = ov;
+      base.hasDistribution = !!d.distribution_list;
+      base.distribution = d.distribution_list ? d.distribution_list.map((x) => DMS.nameOf(x)).join(', ') : '';
+
+      base.comments = d.comments.map((c) => ({ author: DMS.nameOf(c.author), role: c.role, timestamp: c.timestamp, text: c.text }));
+      base.noComments = d.comments.length === 0;
+      base.canComment = !!p.comment; base.commentDraft = s.commentDraft; base.setCommentDraft = this.setCommentDraft; base.postComment = this.postComment;
+
+      base.revisions = d.revision_history.map((r) => ({ revision: r.revision, date: r.date, summary: r.change_summary, by: DMS.nameOf(r.uploaded_by) }));
+
+      base.steps = d.workflow_trail.map((w) => {
+        const done = w.decision && !['Pending', 'Not started'].includes(w.decision);
+        const cls = done ? 'done' : (w.decision === 'Pending' ? 'pend' : '');
+        return { step: w.step, actor: DMS.nameOf(w.actor), decision: w.decision, date: w.date || '', cls };
+      });
+
+      base.attachments = (d.attachments || []).map((a) => ({
+        file: a.file_name, type: (a.type || 'FILE'), meta: `${a.type} Â· ${a.size} Â· ${DMS.nameOf(a.uploaded_by)} Â· ${a.date}`,
+        onDownload: () => this.downloadAttachment(d.doc_number, a.file_name),
+      }));
+      base.noAttachments = !d.attachments || d.attachments.length === 0;
+
+      const acts = [];
+      if (p.approve) {
+        acts.push({ label: 'Code 1 Â· Approve', variant: 'primary', onClick: () => this.applyCode('1') });
+        acts.push({ label: 'Code 2 Â· Approve w/ comments', variant: 'secondary', onClick: () => this.applyCode('2') });
+        acts.push({ label: 'Code 3 Â· Revise & resubmit', variant: 'secondary', onClick: () => this.applyCode('3') });
+        acts.push({ label: 'Code 4 Â· Reject', variant: 'ghost', onClick: () => this.applyCode('4') });
+      }
+      if (p.upload) acts.push({ label: 'Upload new revision', variant: 'secondary', onClick: () => this.uploadRev() });
+      base.actions = acts;
+      base.actionNote = acts.length ? '' : `Your role (${DMS.session.user.role}) has view${p.comment ? ' and comment' : ''}-only access to this document.`;
+    } else {
+      base.actions = []; base.actionNote = ''; base.ovRows = []; base.comments = []; base.revisions = []; base.steps = []; base.attachments = [];
+      base.tabOverview = true;
+    }
+
+    return base;
+  }
+}
+</script>
+</body>
+</html>

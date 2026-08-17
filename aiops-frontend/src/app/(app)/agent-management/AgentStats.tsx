@@ -19,7 +19,6 @@ export default function AgentStats({
     {
       title: "Agents Online",
       value: onlineCount,
-      note: "All healthy",
       icon: Globe,
       tone: "from-[#18c964] to-[#00b56c]",
       noteColor: "text-[#16a34a]",
@@ -27,7 +26,6 @@ export default function AgentStats({
     {
       title: "Agents Offline",
       value: offlineCount,
-      note: "Review connectivity",
       icon: GlobeX,
       tone: "from-[#2f80ff] to-[#1aa7ff]",
       noteColor: "text-[#3b82f6]",
@@ -35,7 +33,6 @@ export default function AgentStats({
     {
       title: "Total Agents",
       value: totalCount,
-      note: "+2 new this week",
       icon: Bot,
       tone: "from-[#b45cff] to-[#ff5ac8]",
       noteColor: "text-[#e11d8d]",
@@ -57,9 +54,6 @@ export default function AgentStats({
               >
                 <Icon className="h-5 w-5" />
               </div>
-              <span className={`text-xs font-semibold ${card.noteColor}`}>
-                {card.note}
-              </span>
             </div>
             <p className="mt-5 text-sm font-semibold text-[#5a6476]">
               {card.title}
