@@ -38,7 +38,7 @@ func LoadConfig() (*Config, error) {
 	cfg := &Config{
 		BaseURL:  os.Getenv("MAINFRAME_BASE_URL"),
 		User:     getenv("MAINFRAME_USER", "ADCDMST"),
-		Password: getenv("MAINFRAME_PASSWORD", "RC2026"),
+		Password: getenv("MAINFRAME_PASSWORD", "RC2027"),
 		System:   getenv("MAINFRAME_SYSTEM", "S0W1"),
 		Owner:    getenv("MAINFRAME_OWNER", "ADCDMST"),
 
