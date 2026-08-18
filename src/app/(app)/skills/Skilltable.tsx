@@ -110,7 +110,7 @@ export default function Skilltable({
                 <span className="px-4">Instructions</span>
                 <span className="px-4">Created At</span>
                 <span className="px-4">Updated At</span>
-                <span className="px-3 text-right">Action</span>
+                <span className="px-4">Action</span>
               </div>
 
               <div className="divide-y divide-[#eef1f7] bg-white">
@@ -158,12 +158,12 @@ export default function Skilltable({
           ) : (
             <div className="min-w-[1200px]">
               <div className="grid grid-cols-[1.2fr_1.7fr_2fr_1.2fr_1.2fr_120px] items-center divide-x divide-[#d7e0ee] bg-[#f3f6fb] px-4 py-3 text-xs font-semibold uppercase tracking-[0.08em] text-[#111827]">
-                <span className="flex h-full items-center capitalize px-3 text-left leading-tight whitespace-normal break-words">Name</span>
-                <span className="flex h-full items-center capitalize px-3 text-left leading-tight whitespace-normal break-words">Description</span>
-                <span className="flex h-full items-center capitalize px-3 text-left leading-tight whitespace-normal break-words">Instructions</span>
-                <span className="flex h-full items-center capitalize px-3 text-left leading-tight whitespace-normal break-words">Created At</span>
-                <span className="flex h-full items-center capitalize px-3 text-left leading-tight whitespace-normal break-words">Updated At</span>
-                <span className="flex h-full items-center justify-end px-3 text-right">Action</span>
+                <span className="flex h-full items-center capitalize px-3 leading-tight whitespace-normal break-words">Name</span>
+                <span className="flex h-full items-center capitalize px-3 leading-tight whitespace-normal break-words">Description</span>
+                <span className="flex h-full items-center capitalize px-3 leading-tight whitespace-normal break-words">Instructions</span>
+                <span className="flex h-full items-center capitalize px-3 leading-tight whitespace-normal break-words">Created At</span>
+                <span className="flex h-full items-center capitalize px-3 leading-tight whitespace-normal break-words">Updated At</span>
+                <span className="flex h-full items-center capitalize px-3 leading-tight whitespace-normal break-words">Action</span>
               </div>
 
               <div className="divide-y divide-[#eef1f7] bg-white">
