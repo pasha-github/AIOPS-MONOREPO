@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowLeft, ArrowRight } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 
 type DualListPickerItem = {
   id: string;
@@ -18,6 +18,8 @@ type DualListPickerProps = {
   emptyAvailableMessage: string;
   emptySelectedMessage: string;
   onChange: (selectedIds: string[]) => void;
+  renderAvailableItem?: (item: DualListPickerItem) => ReactNode;
+  renderSelectedItem?: (item: DualListPickerItem) => ReactNode;
 };
 
 export default function DualListPicker({
@@ -29,6 +31,8 @@ export default function DualListPicker({
   emptyAvailableMessage,
   emptySelectedMessage,
   onChange,
+  renderAvailableItem,
+  renderSelectedItem,
 }: DualListPickerProps) {
   const [activeAvailableId, setActiveAvailableId] = useState("");
   const [activeSelectedId, setActiveSelectedId] = useState("");
@@ -77,10 +81,16 @@ export default function DualListPicker({
                       : "text-[#44506a] hover:bg-[#f4f7ff]"
                   } ${disabled ? "cursor-default" : ""}`}
                 >
-                  <div className="min-w-0">
-                    <div className="break-words font-medium">{item.name}</div>
-                    <div className="mt-1 text-xs text-[#7a8498]">{item.secondary ?? item.id}</div>
-                  </div>
+                  {renderAvailableItem ? (
+                    renderAvailableItem(item)
+                  ) : (
+                    <div className="min-w-0">
+                      <div className="break-words font-medium">{item.name}</div>
+                      {item.secondary ? (
+                        <div className="mt-1 text-xs text-[#7a8498]">{item.secondary}</div>
+                      ) : null}
+                    </div>
+                  )}
                 </button>
               ))
             )}
@@ -134,9 +144,8 @@ export default function DualListPicker({
               <p className="px-2 py-2 text-sm text-[#8a94a6]">{emptySelectedMessage}</p>
             ) : (
               selectedItems.map((item) => (
-                <button
+                <div
                   key={item.id}
-                  type="button"
                   onClick={() => {
                     if (disabled) {
                       return;
@@ -149,11 +158,17 @@ export default function DualListPicker({
                       : "text-[#44506a] hover:bg-[#f4f7ff]"
                   } ${disabled ? "cursor-default" : ""}`}
                 >
-                  <div className="min-w-0">
-                    <div className="break-words font-medium">{item.name}</div>
-                    <div className="mt-1 text-xs text-[#7a8498]">{item.secondary ?? item.id}</div>
-                  </div>
-                </button>
+                  {renderSelectedItem ? (
+                    renderSelectedItem(item)
+                  ) : (
+                    <div className="min-w-0">
+                      <div className="break-words font-medium">{item.name}</div>
+                      {item.secondary ? (
+                        <div className="mt-1 text-xs text-[#7a8498]">{item.secondary}</div>
+                      ) : null}
+                    </div>
+                  )}
+                </div>
               ))
             )}
           </div>

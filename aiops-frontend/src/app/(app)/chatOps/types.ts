@@ -19,6 +19,7 @@ export interface StreamStep {
     label: string;
     status: "running" | "done";
     details?: string;
+    children?: StreamStep[];
 };
 
 export interface AdkFunctionResponse {
