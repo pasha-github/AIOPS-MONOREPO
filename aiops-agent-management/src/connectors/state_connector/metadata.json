@@ -1,0 +1,46 @@
+{
+  "id": "state_connector",
+  "name": "State",
+  "category": "helper",
+  "description": "Generic persistent key-value state for agents (session / user / app scope), namespaced per configuration. Use-case-agnostic primitives for memory, dedup, counters, and caching.",
+  "version": "1.0.0",
+  "config_variables": [
+    {
+      "name": "NAMESPACE",
+      "label": "Namespace",
+      "required": false,
+      "secret": false,
+      "placeholder": "default"
+    }
+  ],
+  "tools": [
+    {
+      "name": "state_get",
+      "documentation": "Reads one or more stored values by scope and key (accepts a single key or a list of keys to batch in one call)."
+    },
+    {
+      "name": "state_set",
+      "documentation": "REPLACES one or more values outright, discarding the previous ones; accepts a single key/value or matching lists of keys/values to batch in one call. Use 'user' or 'app' scope to persist across runs. Do not use for 'add'/'also remember' requests — use state_append."
+    },
+    {
+      "name": "state_append",
+      "documentation": "ADDS one or more values to a list at a key without discarding what's already stored, creating the list if unset; accepts a single value or a list of values to append all at once. Use for 'add'/'also remember'/'append' requests."
+    },
+    {
+      "name": "state_update",
+      "documentation": "REPLACES one specific item within a list with a new value, in place, leaving the rest untouched; no-op if the old value isn't found. Use for 'update/change/correct X to Y in the list' requests. Do not use state_set for this — it discards the whole list."
+    },
+    {
+      "name": "state_remove",
+      "documentation": "REMOVES one or more specific values from a list at a key, keeping the rest of the list; accepts a single value or a list of values to remove all at once. Use for 'remove X from the list' requests. Do not use state_delete for this — it erases the whole key."
+    },
+    {
+      "name": "state_delete",
+      "documentation": "Permanently removes one or more keys and their values entirely within the namespace (accepts a single key or a list of keys to batch in one call). Erases the whole key/list — use state_remove instead to take out just one item."
+    },
+    {
+      "name": "state_keys",
+      "documentation": "Lists all keys stored under the namespace for a given scope."
+    }
+  ]
+}
