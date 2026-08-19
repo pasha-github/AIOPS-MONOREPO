@@ -1,6 +1,5 @@
 "use client";
 
-import DualListPicker from "@/components/DualListPicker";
 import {
     ModalCard,
     ModalCardBody,
@@ -11,8 +10,7 @@ import {
 } from "@/components/modalcards";
 import { trimTrailingSlash } from "@/config/agent";
 import { useRuntimeConfig } from "@/config/runtime-config";
-import { Bot, ChevronDown, Link2, LucideIcon, Plus, Sparkles, Trash2, Workflow } from "lucide-react";
-import Image from "next/image";
+import { Bot, LucideIcon, Sparkles, Workflow } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { getProviderIconSrc } from "../llm-management/llmHelpers";
 import AddKnowledge from "./agentform/addknowledge";
@@ -20,27 +18,30 @@ import {
     uploadKnowledgeFile,
     type KnowledgeFileRecord,
 } from "./agentform/addknowledge/file-upload";
-import GuardrailInput, {
+import AgentFormPages from "./agentform/AgentFormPages";
+import Capabilities from "./agentform/Capabilities";
+import Deployment from "./agentform/Deployment";
+import {
     DEFAULT_GUARDRAIL_PII_PATTERNS,
     type GuardrailPiiPattern,
 } from "./agentform/guardrail-input";
-import AwsCredentialDropdown from "./AwsCredentialDropdown";
+import Guardrails from "./agentform/Guardrails";
+import Identity from "./agentform/Identity";
+import Models from "./agentform/Models";
+import PromptAgent from "./agentform/promptAgent";
+import PromptInstructions from "./agentform/PromptInstructions";
+import SubAgents from "./agentform/SubAgents";
 import { fetchAwsCredentialOptions, type AwsCredentialOption } from "./awsCredentials";
-import {
-    DynamicDropdownField,
-    inputClass,
-    SimpleDropdownField,
-    ThemedSingleDropdown,
-} from "./DynamicConnector";
+import ExportAgent, { type ExportAgentPayload } from "./ExportAgent";
 import {
     AGENT_TYPE_OPTIONS,
     DEPLOYMENT_TARGET_OPTIONS,
     MEMORY_BANK_OPTIONS,
-    MEMORY_RETRIEVAL_OPTIONS,
     PROMPT_FIELD_DEFINITIONS,
     type AgentLookupOption,
     type AgentRecord,
     type PromptFieldKey,
+    type SubAgentDelegationType,
 } from "./types";
 
 type UpdateAgentProps = {
@@ -88,7 +89,70 @@ type UpdateAgentForm = {
     isEnabled: boolean;
 };
 
+type AgentDraftPayload = Record<string, unknown>;
+
 const normalizeString = (value: string) => value.trim();
+
+const parsePossibleJson = (value: unknown): unknown => {
+    if (typeof value !== "string") {
+        return value;
+    }
+
+    const cleaned = value
+        .trim()
+        .replace(/^```(?:json)?/i, "")
+        .replace(/```$/i, "")
+        .trim();
+
+    if (!cleaned) {
+        return value;
+    }
+
+    try {
+        return JSON.parse(cleaned);
+    } catch {
+        return value;
+    }
+};
+
+const extractAgentDraftPayload = (value: unknown): AgentDraftPayload | null => {
+    const parsed = parsePossibleJson(value);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        return null;
+    }
+
+    const record = parsed as AgentDraftPayload;
+    const nestedKeys = ["agent", "draft", "data", "result", "response", "output"];
+
+    for (const key of nestedKeys) {
+        const nestedPayload = extractAgentDraftPayload(record[key]);
+        if (nestedPayload) {
+            return nestedPayload;
+        }
+    }
+
+    return record;
+};
+
+const getDraftStringValue = (payload: AgentDraftPayload, key: string) => {
+    if (!(key in payload) || payload[key] === null) {
+        return undefined;
+    }
+    return typeof payload[key] === "string" ? payload[key].trim() : undefined;
+};
+
+const getDraftStringArrayValue = (payload: AgentDraftPayload, key: string) => {
+    if (!(key in payload) || payload[key] === null) {
+        return undefined;
+    }
+    if (!Array.isArray(payload[key])) {
+        return undefined;
+    }
+
+    return (payload[key] as unknown[])
+        .map((item) => (typeof item === "string" ? item.trim() : ""))
+        .filter(Boolean);
+};
 
 const getErrorMessage = (payload: unknown, fallback: string) => {
     if (
@@ -265,161 +329,6 @@ const getInitialMcpSelections = (agent: AgentRecord) => {
     };
 };
 
-function SectionLabel({ children }: { children: React.ReactNode }) {
-    return (
-        <p className="mt-1 text-[10px] font-semibold uppercase tracking-widest text-gray-400">
-            {children}
-        </p>
-    );
-}
-
-function Field({
-    label,
-    hint,
-    required,
-    children,
-}: {
-    label: React.ReactNode;
-    hint?: string;
-    required?: boolean;
-    children: React.ReactNode;
-}) {
-    return (
-        <div className="flex flex-col gap-1.5">
-            <label className="flex items-center gap-1 text-sm font-medium text-gray-700">
-                {label}
-                {required && <span className="text-red-500">*</span>}
-            </label>
-            {hint && (
-                <p className="text-xs leading-snug text-gray-400">{hint}</p>
-            )}
-            {children}
-        </div>
-    );
-}
-
-function ModelSelect({
-    value,
-    options,
-    placeholder,
-    disabled,
-    loading,
-    onChange,
-}: {
-    value: string;
-    options: ModelOption[];
-    placeholder: string;
-    disabled?: boolean;
-    loading?: boolean;
-    onChange: (value: string) => void;
-}) {
-    const [isOpen, setIsOpen] = useState(false);
-    const ref = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-        if (!isOpen) return;
-        const handler = (event: MouseEvent) => {
-            if (ref.current && !ref.current.contains(event.target as Node)) {
-                setIsOpen(false);
-            }
-        };
-        document.addEventListener("mousedown", handler);
-        return () => document.removeEventListener("mousedown", handler);
-    }, [isOpen]);
-
-    const selected = options.find((option) => option.value === value) ?? null;
-
-    return (
-        <div ref={ref} className="relative">
-            <button
-                type="button"
-                onClick={() => {
-                    if (!disabled && !loading) {
-                        setIsOpen((previous) => !previous);
-                    }
-                }}
-                className={`flex w-full items-center justify-between rounded-lg border px-3 py-2.5 text-sm transition ${disabled || loading
-                    ? "cursor-not-allowed border-dashed border-gray-200 bg-gray-100 text-gray-400"
-                    : "border-gray-200 bg-gray-50 text-gray-900 hover:border-gray-300 hover:bg-white focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/10"
-                    }`}
-            >
-                <span className="flex min-w-0 items-center gap-2">
-                    {selected?.iconSrc ? (
-                        <Image
-                            src={selected.iconSrc}
-                            alt=""
-                            width={18}
-                            height={18}
-                            className="shrink-0 rounded-sm object-contain"
-                        />
-                    ) : null}
-                    {loading ? (
-                        <span className="text-gray-400">Loading models...</span>
-                    ) : selected ? (
-                        <span className="min-w-0">
-                            <span className="block truncate">{selected.label}</span>
-                            <span className="block truncate text-xs text-gray-400">
-                                {selected.secondary}
-                            </span>
-                        </span>
-                    ) : (
-                        <span className="text-gray-400">{placeholder}</span>
-                    )}
-                </span>
-                <ChevronDown
-                    size={15}
-                    className={`shrink-0 text-gray-400 transition-transform ${isOpen ? "rotate-180" : ""}`}
-                />
-            </button>
-
-            {isOpen && !disabled && !loading ? (
-                <div className="absolute z-30 mt-1.5 max-h-64 w-full overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-lg">
-                    <button
-                        type="button"
-                        onClick={() => {
-                            onChange("");
-                            setIsOpen(false);
-                        }}
-                        className="w-full px-3 py-2.5 text-left text-sm text-gray-400 hover:bg-gray-50"
-                    >
-                        {placeholder}
-                    </button>
-                    {options.map((option) => (
-                        <button
-                            key={option.value}
-                            type="button"
-                            onClick={() => {
-                                onChange(option.value);
-                                setIsOpen(false);
-                            }}
-                            className={`flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm transition ${option.value === value
-                                ? "bg-indigo-50 font-medium text-indigo-700"
-                                : "text-gray-700 hover:bg-gray-50"
-                                }`}
-                        >
-                            {option.iconSrc ? (
-                                <Image
-                                    src={option.iconSrc}
-                                    alt=""
-                                    width={18}
-                                    height={18}
-                                    className="shrink-0 rounded-sm object-contain"
-                                />
-                            ) : null}
-                            <span className="min-w-0">
-                                <span className="block truncate">{option.label}</span>
-                                <span className="block truncate text-xs text-gray-400">
-                                    {option.secondary}
-                                </span>
-                            </span>
-                        </button>
-                    ))}
-                </div>
-            ) : null}
-        </div>
-    );
-}
-
 export default function UpdateAgent({
     agent,
     isOpen,
@@ -429,6 +338,9 @@ export default function UpdateAgent({
     const { llmManagerApiBaseUrl } = useRuntimeConfig();
     const base = trimTrailingSlash(llmManagerApiBaseUrl);
 
+    const [activeAgentFormTab, setActiveAgentFormTab] = useState(0);
+    const [isPromptAgentOpen, setIsPromptAgentOpen] = useState(false);
+    const [highlightDraftFields, setHighlightDraftFields] = useState(false);
     const [form, setForm] = useState<UpdateAgentForm>({
         agentName: "",
         description: "",
@@ -469,6 +381,8 @@ export default function UpdateAgent({
     const [skillOptions, setSkillOptions] = useState<{ value: string; label: string }[]>([]);
     const [isSkillsLoading, setIsSkillsLoading] = useState(false);
     const [subAgentIds, setSubAgentIds] = useState<string[]>([]);
+    const [subAgentDelegationType, setSubAgentDelegationType] =
+        useState<SubAgentDelegationType>("task");
     const [agentOptions, setAgentOptions] = useState<AgentLookupOption[]>([]);
     const [isAgentOptionsLoading, setIsAgentOptionsLoading] = useState(false);
     const [guardrailsEnabled, setGuardrailsEnabled] = useState(false);
@@ -521,6 +435,12 @@ export default function UpdateAgent({
         const timer = setTimeout(() => setIsToastVisible(false), 3000);
         return () => clearTimeout(timer);
     }, [isToastVisible]);
+
+    useEffect(() => {
+        if (!highlightDraftFields) return;
+        const timer = setTimeout(() => setHighlightDraftFields(false), 1800);
+        return () => clearTimeout(timer);
+    }, [highlightDraftFields]);
 
     const resolveModelOption = (modelId: string | null) => {
         if (!modelId) {
@@ -686,9 +606,35 @@ export default function UpdateAgent({
         setPrimaryModelId(initialPrimaryModelId);
         setSecondaryModelId(normalizeModelId(agent.secondary_model_id) ?? "");
         setTertiaryModelId(normalizeModelId(agent.tertiary_model_id) ?? "");
-        setCustomMcpServers(initialMcpSelections.customServers);
-        setMcpServers(initialMcpSelections.registeredServers);
-        setMcpServerIds(initialMcpSelections.registeredServerIds);
+        setIsPromptAgentOpen(false);
+        setHighlightDraftFields(false);
+        setActiveAgentFormTab(0);
+        setSubAgentDelegationType(
+            agent.sub_agent_delegation_type === "full" ? "full" : "task"
+        );
+        setCustomMcpServers([]);
+        setMcpServers(
+            [
+                ...initialMcpSelections.registeredServers,
+                ...initialMcpSelections.customServers,
+            ].length
+                ? [
+                    ...initialMcpSelections.registeredServers,
+                    ...initialMcpSelections.customServers,
+                ]
+                : [""]
+        );
+        setMcpServerIds(
+            [
+                ...initialMcpSelections.registeredServerIds,
+                ...initialMcpSelections.customServers.map(() => ""),
+            ].length
+                ? [
+                    ...initialMcpSelections.registeredServerIds,
+                    ...initialMcpSelections.customServers.map(() => ""),
+                ]
+                : [""]
+        );
         setConnectorConfigIds(
             agent.connector_config_ids?.length
                 ? agent.connector_config_ids.map((value: string) => [value])
@@ -920,19 +866,6 @@ export default function UpdateAgent({
     }, [base, isOpen]);
 
     useEffect(() => {
-        const onClickOutside = (event: MouseEvent) => {
-            if (openMcpDropdownIndex === null) return;
-            const container = mcpDropdownRefs.current[openMcpDropdownIndex];
-            if (!container) return;
-            if (!container.contains(event.target as Node)) {
-                setOpenMcpDropdownIndex(null);
-            }
-        };
-        document.addEventListener("mousedown", onClickOutside);
-        return () => document.removeEventListener("mousedown", onClickOutside);
-    }, [openMcpDropdownIndex]);
-
-    useEffect(() => {
         if (!isOpen) return;
         const ctrl = new AbortController();
         (async () => {
@@ -1117,6 +1050,172 @@ export default function UpdateAgent({
     const getRemainingKnowledgeFileIds = () =>
         existingKnowledgeFiles.map((file) => file.id).filter(Boolean);
 
+    const getCurrentDraftConfig = () => ({
+        prompt_role: normalizeString(form.prompt_role),
+        prompt_objectives: normalizeString(form.prompt_objectives),
+        prompt_behavior: normalizeString(form.prompt_behavior),
+        prompt_output_format: normalizeString(form.prompt_output_format),
+        prompt_constraints: normalizeString(form.prompt_constraints),
+        prompt_safety: normalizeString(form.prompt_safety),
+        prompt_tools_instructions: normalizeString(form.prompt_tools_instructions),
+        prompt_policy: normalizeString(form.prompt_policy),
+        prompt_examples: normalizeString(form.prompt_examples) || null,
+        prompt_additional_info: normalizeString(form.prompt_additional_info) || null,
+        connector_config_ids: normalizeNestedList(connectorConfigIds),
+        mcp_server_ids: normalizeMcpServerIds(mcpServerIds),
+    });
+
+    const getExportAgentPayload = (): ExportAgentPayload => ({
+        name: normalizeString(form.agentName),
+        description: normalizeString(form.description),
+        prompt_role: normalizeString(form.prompt_role),
+        prompt_objectives: normalizeString(form.prompt_objectives),
+        prompt_behavior: normalizeString(form.prompt_behavior),
+        prompt_output_format: normalizeString(form.prompt_output_format),
+        prompt_constraints: normalizeString(form.prompt_constraints),
+        prompt_safety: normalizeString(form.prompt_safety),
+        prompt_tools_instructions: normalizeString(form.prompt_tools_instructions),
+        prompt_policy: normalizeString(form.prompt_policy),
+        prompt_examples: normalizeString(form.prompt_examples),
+        prompt_additional_info: normalizeString(form.prompt_additional_info),
+    });
+
+    const applyAgentDraft = (draft: AgentDraftPayload) => {
+        const nextName = getDraftStringValue(draft, "name");
+        const nextDescription = getDraftStringValue(draft, "description");
+        const nextAgentType = getDraftStringValue(draft, "type");
+        const nextPrimaryModelId = getDraftStringValue(draft, "primary_model_id");
+        const nextSecondaryModelId = getDraftStringValue(draft, "secondary_model_id");
+        const nextTertiaryModelId = getDraftStringValue(draft, "tertiary_model_id");
+        const nextMcpServerIds = getDraftStringArrayValue(draft, "mcp_server_ids");
+        const nextManualMcpServers = getDraftStringArrayValue(draft, "mcp_servers");
+        const nextConnectorConfigIds = getDraftStringArrayValue(draft, "connector_config_ids");
+        const nextSkillIds = getDraftStringArrayValue(draft, "skill_ids");
+        const nextSubAgentIds = getDraftStringArrayValue(draft, "sub_agents");
+        const nextDelegationType = getDraftStringValue(draft, "sub_agent_delegation_type");
+
+        setForm((current) => ({
+            ...current,
+            agentName: nextName ?? current.agentName,
+            description: nextDescription ?? current.description,
+            agentType:
+                nextAgentType &&
+                AGENT_TYPE_OPTIONS.some((option) => option.value === nextAgentType)
+                    ? nextAgentType
+                    : current.agentType,
+            prompt_role:
+                getDraftStringValue(draft, "prompt_role") ??
+                getDraftStringValue(draft, "instruction") ??
+                current.prompt_role,
+            prompt_objectives:
+                getDraftStringValue(draft, "prompt_objectives") ?? current.prompt_objectives,
+            prompt_behavior:
+                getDraftStringValue(draft, "prompt_behavior") ?? current.prompt_behavior,
+            prompt_output_format:
+                getDraftStringValue(draft, "prompt_output_format") ??
+                current.prompt_output_format,
+            prompt_constraints:
+                getDraftStringValue(draft, "prompt_constraints") ?? current.prompt_constraints,
+            prompt_safety:
+                getDraftStringValue(draft, "prompt_safety") ?? current.prompt_safety,
+            prompt_tools_instructions:
+                getDraftStringValue(draft, "prompt_tools_instructions") ??
+                current.prompt_tools_instructions,
+            prompt_policy:
+                getDraftStringValue(draft, "prompt_policy") ?? current.prompt_policy,
+            prompt_examples:
+                getDraftStringValue(draft, "prompt_examples") ?? current.prompt_examples,
+            prompt_additional_info:
+                getDraftStringValue(draft, "prompt_additional_info") ??
+                current.prompt_additional_info,
+        }));
+
+        if (nextPrimaryModelId !== undefined) {
+            setPrimaryUseCustom(Boolean(nextPrimaryModelId));
+            setPrimaryModelId(nextPrimaryModelId);
+        }
+
+        if (nextSecondaryModelId !== undefined) {
+            setSecondaryUseCustom(Boolean(nextSecondaryModelId));
+            setSecondaryModelId(nextSecondaryModelId);
+        }
+
+        if (nextTertiaryModelId !== undefined) {
+            setTertiaryUseCustom(Boolean(nextTertiaryModelId));
+            setTertiaryModelId(nextTertiaryModelId);
+        }
+
+        if (nextMcpServerIds !== undefined || nextManualMcpServers !== undefined) {
+            const serverIds = nextMcpServerIds ?? normalizeMcpServerIds(mcpServerIds);
+            const manualServers = nextManualMcpServers ?? normalizeManualMcpServers();
+            const selectedMcpServerLabels = serverIds.map((id) => {
+                const option = mcpOptions.find((item) => item.id === id);
+                return option?.name || option?.serverUrl || id;
+            });
+            const nextServers = [...selectedMcpServerLabels, ...manualServers];
+            setMcpServers(nextServers.length ? nextServers : [""]);
+            setMcpServerIds([
+                ...serverIds,
+                ...manualServers.map(() => ""),
+            ].length ? [
+                ...serverIds,
+                ...manualServers.map(() => ""),
+            ] : [""]);
+        }
+
+        if (nextConnectorConfigIds !== undefined) {
+            setConnectorConfigIds(
+                nextConnectorConfigIds.length
+                    ? nextConnectorConfigIds.map((id) => [id])
+                    : [[]]
+            );
+        }
+
+        if (nextSkillIds !== undefined) {
+            setSkillIds(nextSkillIds.length ? nextSkillIds : [""]);
+        }
+
+        if (nextSubAgentIds !== undefined) {
+            setSubAgentIds(nextSubAgentIds);
+        }
+
+        if (nextDelegationType === "full" || nextDelegationType === "task") {
+            setSubAgentDelegationType(nextDelegationType);
+        }
+    };
+
+    const handleGenerateAgentDraft = async (prompt: string) => {
+        const res = await fetch(`${base}/agent/orchestrate`, {
+            method: "PATCH",
+            headers: {
+                accept: "application/json",
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                prompt,
+                current_config: getCurrentDraftConfig(),
+            }),
+        });
+        const rawText = await res.text();
+        const parsedPayload = parsePossibleJson(rawText);
+
+        if (!res.ok) {
+            throw new Error(
+                getErrorMessage(parsedPayload, "Unable to generate update draft.")
+            );
+        }
+
+        const draftPayload = extractAgentDraftPayload(parsedPayload);
+        if (!draftPayload) {
+            throw new Error("Draft response did not include agent fields.");
+        }
+
+        applyAgentDraft(draftPayload);
+        setActiveAgentFormTab(0);
+        setHighlightDraftFields(true);
+        setIsPromptAgentOpen(false);
+    };
+
     const handleDownloadKnowledgeFile = async (file: KnowledgeFileRecord) => {
         try {
             const res = await fetch(`${base}/agent/files/${encodeURIComponent(file.id)}`);
@@ -1237,6 +1336,7 @@ export default function UpdateAgent({
                     mcp_servers: normalizeManualMcpServers(),
                     connector_config_ids: normalizeNestedList(connectorConfigIds),
                     sub_agents: subAgentIds,
+                    sub_agent_delegation_type: subAgentDelegationType,
                     isEnabled: form.isEnabled,
                     guardrail_sensitive_data: guardrailsEnabled,
                     guardrails_config: getGuardrailsConfig(),
@@ -1266,44 +1366,82 @@ export default function UpdateAgent({
         }
     };
 
+    const promptFields: Record<PromptFieldKey, string> = {
+        prompt_role: form.prompt_role,
+        prompt_objectives: form.prompt_objectives,
+        prompt_behavior: form.prompt_behavior,
+        prompt_output_format: form.prompt_output_format,
+        prompt_constraints: form.prompt_constraints,
+        prompt_safety: form.prompt_safety,
+        prompt_tools_instructions: form.prompt_tools_instructions,
+        prompt_policy: form.prompt_policy,
+        prompt_examples: form.prompt_examples,
+        prompt_additional_info: form.prompt_additional_info,
+    };
+
+    const capabilityMcpOptions = mcpOptions.map((option) => ({
+        ...option,
+        label:
+            option.name && option.serverUrl
+                ? `${option.name} | ${option.serverUrl}`
+                : option.name || option.serverUrl,
+    }));
+
     if (!isOpen) return null;
 
     return (
         <>
-        <ModalCard zIndexClassName="z-50" onBackdropClick={onClose}>
-            <ModalCardPanel maxWidthClassName="max-w-2xl" className="max-h-[92vh]">
+        <ModalCard
+            zIndexClassName="z-50"
+            onBackdropClick={isPromptAgentOpen ? () => setIsPromptAgentOpen(false) : onClose}
+        >
+            <ModalCardPanel
+                maxWidthClassName="max-w-5xl"
+                className={isPromptAgentOpen ? "hidden" : "max-h-[92vh]"}
+            >
                 <ModalCardHeader
-                    title="Update Agent"
+                    title={form.agentName || "Update Agent"}
                     subtitle="Modify agent configuration and settings"
                     icon={<Bot className="h-4 w-4" />}
+                    actions={
+                        <button
+                            type="button"
+                            onClick={() => setIsPromptAgentOpen(true)}
+                            className="inline-flex h-8 items-center gap-2 rounded-lg border border-white/25 bg-white/10 px-3 text-xs font-semibold text-white transition hover:bg-white/15"
+                        >
+                            <Sparkles className="h-3.5 w-3.5" />
+                            Draft with Agent
+                        </button>
+                    }
                     onClose={onClose}
                 />
 
-                <ModalCardBody className="flex flex-col gap-4 overflow-y-auto">
-                    <SectionLabel>Identity</SectionLabel>
-
-                    <Field label="Agent Name" required hint="Human-readable display name">
-                        <input
-                            className={inputClass}
-                            value={form.agentName}
-                            onChange={(e) => updateField("agentName", e.target.value)}
-                            placeholder="e.g. Support Bot"
-                        />
-                    </Field>
-
-                    <div className="grid grid-cols-2 gap-3">
-                        <Field
-                            label="Deployment Target"
-                            hint="Select where this agent will run"
-                        >
-                            <ThemedSingleDropdown
-                                value={form.deploymentTarget}
-                                options={DEPLOYMENT_TARGET_OPTIONS.map((option) => ({
-                                    value: option.value,
-                                    label: option.key,
-                                }))}
-                                placeholder="Select deployment target"
-                                onChange={(value) =>
+                <ModalCardBody className="flex-1 overflow-y-auto flex flex-col gap-4">
+                    <AgentFormPages
+                        activeTab={activeAgentFormTab}
+                        onTabChange={setActiveAgentFormTab}
+                        identity={(
+                            <Identity
+                                agentName={form.agentName}
+                                description={form.description}
+                                onAgentNameChange={(value) => updateField("agentName", value)}
+                                onDescriptionChange={(value) => updateField("description", value)}
+                                highlight={highlightDraftFields}
+                            />
+                        )}
+                        deployment={(
+                            <Deployment
+                                deploymentTarget={form.deploymentTarget}
+                                agentType={form.agentType}
+                                memoryEnabledValue={form.memoryEnabled}
+                                memoryToolType={form.memoryToolType}
+                                awsCredentialId={awsCredentialId}
+                                awsCredentialOptions={awsCredentialOptions}
+                                isAwsCredentialsLoading={isAwsCredentialsLoading}
+                                awsCredentialsLoadError={awsCredentialsLoadError}
+                                isAwsAgentCoreSelected={isAwsAgentCoreSelected}
+                                isVertexAgentEngineSelected={isVertexAgentEngineSelected}
+                                onDeploymentTargetChange={(value) =>
                                     setForm((prev) => ({
                                         ...prev,
                                         deploymentTarget: value,
@@ -1311,539 +1449,143 @@ export default function UpdateAgent({
                                             value === "vertex"
                                                 ? prev.memoryEnabled
                                                 : String(MEMORY_BANK_OPTIONS[1]?.value ?? false),
-                                        memoryToolType:
-                                            value === "vertex" ? prev.memoryToolType : "",
+                                        memoryToolType: value === "vertex" ? prev.memoryToolType : "",
                                     }))
                                 }
-                            />
-                        </Field>
-                        <Field
-                            label="Type"
-                            hint="Select the agent classification"
-                        >
-                            <ThemedSingleDropdown
-                                value={form.agentType}
-                                options={AGENT_TYPE_OPTIONS.map((option) => ({
-                                    value: option.value,
-                                    label: option.key,
-                                }))}
-                                placeholder="Select type"
-                                onChange={(value) => updateField("agentType", value)}
-                            />
-                        </Field>
-                    </div>
-
-                      {isAwsAgentCoreSelected ? (
-                          <AwsCredentialDropdown
-                              value={awsCredentialId}
-                              options={awsCredentialOptions}
-                              loading={isAwsCredentialsLoading}
-                              error={awsCredentialsLoadError}
-                              onChange={setAwsCredentialId}
-                          />
-                      ) : null}
-
-                      {isVertexAgentEngineSelected ? (
-                          <div className="grid grid-cols-2 gap-3">
-                              <Field
-                                  label="Memory Bank"
-                                  hint="Enable or disable memory for this Vertex agent"
-                              >
-                                      <ThemedSingleDropdown
-                                          value={form.memoryEnabled}
-                                          options={MEMORY_BANK_OPTIONS.map((option) => ({
-                                              value: String(option.value),
-                                              label: option.key,
-                                          }))}
-                                      placeholder="Select memory bank"
-                                      onChange={(value) =>
-                                          setForm((prev) => ({
-                                              ...prev,
-                                              memoryEnabled: value,
-                                              memoryToolType:
-                                                  value === "true" ? prev.memoryToolType : "",
-                                          }))
-                                      }
-                                  />
-                              </Field>
-
-                              {form.memoryEnabled === "true" ? (
-                                  <Field
-                                      label="Memory Retrieval"
-                                      hint="Choose how memory is retrieved for this Vertex agent"
-                                  >
-                                      <ThemedSingleDropdown
-                                          value={form.memoryToolType}
-                                          options={MEMORY_RETRIEVAL_OPTIONS.map((option) => ({
-                                              value: option.value,
-                                              label: option.key,
-                                          }))}
-                                          placeholder="Select memory retrieval"
-                                          onChange={(value) => updateField("memoryToolType", value)}
-                                      />
-                                  </Field>
-                              ) : (
-                                  <div />
-                              )}
-                          </div>
-                      ) : null}
-
-                    <Field
-                        label="Description"
-                        required
-                        hint="Brief summary of what this agent does"
-                    >
-                        <textarea
-                            className={`${inputClass} min-h-[76px] resize-y`}
-                            value={form.description}
-                            onChange={(e) => updateField("description", e.target.value)}
-                            placeholder="e.g. Handles customer support queries and escalations"
-                        />
-                    </Field>
-
-                    <SectionLabel>Behaviour</SectionLabel>
-
-                    <div className="grid grid-cols-2 gap-3">
-                        {PROMPT_FIELD_DEFINITIONS.map((field) => (
-                            <Field
-                                key={field.key}
-                                label={field.label}
-                                required={field.required}
-                                hint={`Define the ${field.label.toLowerCase()} for this agent`}
-                            >
-                                <textarea
-                                    className={`${inputClass} min-h-[108px] resize-y`}
-                                    value={form[field.key]}
-                                    onChange={(e) => updatePromptField(field.key, e.target.value)}
-                                    placeholder={`Enter ${field.label.toLowerCase()}`}
-                                />
-                            </Field>
-                        ))}
-                    </div>
-
-                    <div className="grid gap-3">
-                        {llmFields.map((field) => {
-                            const Icon = field.Logo
-                            const selectedOption =
-                                modelOptions.find((option) => option.value === field.effectiveModelId) ??
-                                field.defaultOption;
-                            const dropdownOptions =
-                                !field.useCustom && field.defaultOption
-                                    ? [
-                                        field.defaultOption,
-                                        ...modelOptions.filter(
-                                            (option) => option.value !== field.defaultOption?.value
-                                        ),
-                                    ]
-                                    : modelOptions;
-
-                            return (
-                                <div
-                                    key={field.key}
-                                >
-                                    <div className="flex items-start justify-between gap-4">
-                                        <div className="flex flex-col gap-1">
-                                            <label className="flex items-center gap-1 text-sm font-medium text-gray-700">
-                                                {Icon ? <Icon className="h-4 w-4" /> : null}
-                                                {field.label}
-                                                {field.key === "primary" ? (
-                                                    <span className="text-red-500">*</span>
-                                                ) : null}
-                                            </label>
-                                            <p className="text-xs leading-snug text-gray-400">
-                                                {field.useCustom
-                                                    ? `Choose a specific ${field.label.toLowerCase()} for this agent`
-                                                    : `Uses the global ${field.label.toLowerCase()} from LLM management`}
-                                            </p>
-                                        </div>
-
-                                        <label className="inline-flex shrink-0 items-center gap-2 py-1.5 text-xs font-medium text-indigo-700">
-                                            <input
-                                                type="checkbox"
-                                                checked={field.useCustom}
-                                                onChange={(event) => {
-                                                    field.setUseCustom(event.target.checked);
-                                                    if (!event.target.checked) {
-                                                        field.setModelId("");
-                                                    }
-                                                }}
-                                                className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                                            />
-                                            Custom LLM
-                                        </label>
-                                    </div>
-
-                                    <div className="mt-3">
-                                        <ModelSelect
-                                            value={field.effectiveModelId}
-                                            options={dropdownOptions}
-                                            placeholder={
-                                                field.useCustom
-                                                    ? `Choose ${field.label.toLowerCase()}`
-                                                    : selectedOption
-                                                        ? "Using global default"
-                                                        : "No global default configured"
-                                            }
-                                            loading={isModelsLoading || isDefaultsLoading}
-                                            disabled={
-                                                !field.useCustom ||
-                                                isModelsLoading ||
-                                                isDefaultsLoading ||
-                                                modelOptions.length === 0
-                                            }
-                                            onChange={field.setModelId}
-                                        />
-                                    </div>
-
-                                    <div className="mt-2 flex items-start justify-between gap-3">
-                                        <p className="text-xs text-gray-400">
-                                            {field.useCustom
-                                                ? "Checkbox enabled: this agent uses the selected LLM."
-                                                : selectedOption
-                                                    ? `Global default: ${selectedOption.label}`
-                                                    : "Global default is not configured for this slot."}
-                                        </p>
-                                        {selectedOption?.iconSrc ? (
-                                            <Image
-                                                src={selectedOption.iconSrc}
-                                                alt=""
-                                                width={20}
-                                                height={20}
-                                                className="h-5 w-5 shrink-0 object-contain"
-                                            />
-                                        ) : null}
-                                    </div>
-                                </div>
-                            );
-                        })}
-
-                        {defaultsLoadError ? (
-                            <p className="flex items-center gap-1.5 text-xs text-red-600">
-                                <svg
-                                    className="h-3.5 w-3.5 shrink-0"
-                                    viewBox="0 0 20 20"
-                                    fill="currentColor"
-                                >
-                                    <path
-                                        fillRule="evenodd"
-                                        d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z"
-                                        clipRule="evenodd"
-                                    />
-                                </svg>
-                                {defaultsLoadError}
-                            </p>
-                        ) : null}
-                    </div>
-
-                    <SectionLabel>Capabilities</SectionLabel>
-
-                    <div className="grid grid-cols-2 items-start gap-4">
-                    <Field
-                        label={
-                        <span className="flex items-center gap-2">
-                        <span className="relative h-4 w-4 shrink-0">
-                        <Image
-                            src="/img/mcp.png"
-                            alt="MCP"
-                            fill
-                            className="object-contain"
-                            />
-                        </span>
-                        <span>MCP Servers</span>
-                        </span>
-                        }
-                        hint="Type custom URL or select from registered MCP servers"
-                        >
-                            <div className="flex flex-col gap-2">
-                                {mcpServers.map((val, index) => (
-                                    <div key={index} className="flex items-center gap-2">
-                                        <div
-                                            ref={(node) => {
-                                                mcpDropdownRefs.current[index] = node;
-                                            }}
-                                            className="relative w-full"
-                                        >
-                                            <input
-                                                className={`${inputClass} pr-10`}
-                                                value={val}
-                                                placeholder="https://mcp.example.com/sse"
-                                                onChange={(e) => {
-                                                    updateList(setMcpServers, index, e.target.value);
-                                                    updateList(setMcpServerIds, index, "");
-                                                }}
-                                            />
-                                            <button
-                                                type="button"
-                                                onClick={() =>
-                                                    setOpenMcpDropdownIndex((current) => (current === index ? null : index))
-                                                }
-                                                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500"
-                                            >
-                                                <ChevronDown size={16} />
-                                            </button>
-                                            {openMcpDropdownIndex === index ? (
-                                                <div className="absolute z-50 mt-1 w-full rounded-lg border bg-white shadow-lg max-h-60 overflow-auto">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => {
-                                                            updateList(setMcpServerIds, index, "");
-                                                            updateList(setMcpServers, index, "");
-                                                            setOpenMcpDropdownIndex(null);
-                                                        }}
-                                                        className="w-full px-3 py-2 text-left text-sm text-gray-500 hover:bg-gray-50"
-                                                    >
-                                                        Select MCP
-                                                    </button>
-                                                    {isMcpLoading ? (
-                                                        <div className="px-3 py-2 text-sm text-gray-500">Loading MCP servers...</div>
-                                                    ) : mcpOptions.length === 0 ? (
-                                                        <div className="px-3 py-2 text-sm text-gray-500">No MCP servers found</div>
-                                                    ) : (
-                                                        mcpOptions.map((option) => (
-                                                            <button
-                                                                key={option.id}
-                                                                type="button"
-                                                                onClick={() => {
-                                                                    updateList(
-                                                                        setMcpServers,
-                                                                        index,
-                                                                        option.name || option.serverUrl
-                                                                    );
-                                                                    updateList(setMcpServerIds, index, option.id);
-                                                                    setOpenMcpDropdownIndex(null);
-                                                                }}
-                                                                className="w-full border-b px-3 py-2 text-left hover:bg-gray-50"
-                                                            >
-                                                                <div className="text-sm font-medium text-gray-900">
-                                                                    {option.name || option.serverUrl}
-                                                                </div>
-                                                                <div className="text-xs text-gray-500 break-all">
-                                                                    {option.serverUrl}
-                                                                </div>
-                                                            </button>
-                                                        ))
-                                                    )}
-                                                </div>
-                                            ) : null}
-                                        </div>
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                addToList(setMcpServers);
-                                                addToList(setMcpServerIds);
-                                            }}
-                                            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-600 transition hover:bg-indigo-100"
-                                        >
-                                            <Plus size={14} />
-                                        </button>
-                                        {mcpServers.length > 1 ? (
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    removeFromList(setMcpServers, index);
-                                                    removeFromList(setMcpServerIds, index);
-                                                    setOpenMcpDropdownIndex(null);
-                                                }}
-                                                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-500 transition hover:bg-red-100"
-                                            >
-                                                <Trash2 size={14} />
-                                            </button>
-                                        ) : null}
-                                    </div>
-                                ))}
-                                {customMcpServers.map((val, index) => (
-                                    <div key={`custom-${index}`} className="flex items-center gap-2">
-                                        <input
-                                            className={inputClass}
-                                            value={val}
-                                            placeholder="https://mcp.example.com/sse"
-                                            onChange={(e) =>
-                                                updateList(setCustomMcpServers, index, e.target.value)
-                                            }
-                                        />
-                                        <button
-                                            type="button"
-                                            onClick={() => addToList(setCustomMcpServers)}
-                                            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-600 transition hover:bg-indigo-100"
-                                        >
-                                            <Plus size={14} />
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() =>
-                                                setCustomMcpServers((previous) =>
-                                                    previous.filter((_, idx) => idx !== index)
-                                                )
-                                            }
-                                            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-500 transition hover:bg-red-100"
-                                        >
-                                            <Trash2 size={14} />
-                                        </button>
-                                    </div>
-                                ))}
-                            </div>
-                        </Field>
-                        <DynamicDropdownField
-                            Logo={Link2}
-                            label="Connector Config"
-                            hint="Choose from pre-configured connectors"
-                            values={connectorConfigIds}
-                            options={connectorOptions}
-                            configDataMap={configDataMap}
-                            placeholder="Select connector"
-                            onAdd={addConnector}
-                            onRemove={removeConnector}
-                            onChange={(index: number, value: string[] | string) =>
-                                updateConnectorList(index, Array.isArray(value) ? value : [value])
-                            }
-                        />
-                        <SimpleDropdownField
-                            Logo={Sparkles}
-                            label="Skill"
-                            hint={
-                                isSkillsLoading
-                                    ? "Loading registered skills"
-                                    : "Choose from registered skills"
-                            }
-                            values={skillIds}
-                            options={skillOptions}
-                            placeholder="Select skill"
-                            onAdd={() => setSkillIds((previous) => [...previous, ""])}
-                            onRemove={(index) =>
-                                setSkillIds((previous) =>
-                                    previous.length <= 1
-                                        ? previous
-                                        : previous.filter((_, idx) => idx !== index)
-                                )
-                            }
-                            onChange={(index, value) =>
-                                setSkillIds((previous) =>
-                                    previous.map((item, idx) => (idx === index ? value : item))
-                                )
-                            }
-                        />
-                        <div className="col-span-2">
-                            
-                             <Field
-                                label={
-                                <span className="flex items-center gap-2">
-                                <Bot size={18} />
-                                <span>Sub-Agents</span>
-                                </span>
+                                onAgentTypeChange={(value) => updateField("agentType", value)}
+                                onMemoryEnabledValueChange={(value) =>
+                                    setForm((prev) => ({
+                                        ...prev,
+                                        memoryEnabled: value,
+                                        memoryToolType: value === "true" ? prev.memoryToolType : "",
+                                    }))
                                 }
-                                hint="Choose child agents to include with this agent"
-                                >
-                                
-                                <DualListPicker
-                                    availableTitle="Available Agents"
-                                    selectedTitle="Selected Sub-Agents"
-                                    items={agentOptions
-                                        .filter((option) => option.id !== agent.agent_id)
-                                        .map((option) => ({
-                                            id: option.id,
-                                            name: option.name,
-                                            secondary: option.id,
-                                        }))}
-                                    selectedIds={subAgentIds}
-                                    disabled={isAgentOptionsLoading}
-                                    emptyAvailableMessage={
-                                        isAgentOptionsLoading
-                                            ? "Loading agents..."
-                                            : "No agents available"
-                                    }
-                                    emptySelectedMessage="No sub-agents selected"
-                                    onChange={setSubAgentIds}
-                                />
-                            </Field>
-                        </div>
-                        <GuardrailInput
-                            enabled={guardrailsEnabled}
-                            piiPatterns={guardrailPiiPatterns}
-                            sensitivePatternsText={guardrailSensitivePatternsText}
-                            harmfulKeywords={guardrailHarmfulKeywords}
-                            onEnabledChange={setGuardrailsEnabled}
-                            onPiiPatternsChange={setGuardrailPiiPatterns}
-                            onSensitivePatternsTextChange={setGuardrailSensitivePatternsText}
-                            onHarmfulKeywordsChange={setGuardrailHarmfulKeywords}
-                        />
-                        <AddKnowledge
-                            files={knowledgeFiles}
-                            onFilesChange={setKnowledgeFiles}
-                            existingFiles={existingKnowledgeFiles}
-                            onDownloadExistingFile={handleDownloadKnowledgeFile}
-                            onRemoveExistingFile={handleRemoveExistingKnowledgeFile}
-                        />
-                    </div>
-
-                    <SectionLabel>Status</SectionLabel>
-
-                    <div className="flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
-                        <div>
-                            <p className="text-sm font-medium text-gray-700">Agent Enabled</p>
-                            <p className="mt-0.5 text-xs text-gray-400">
-                                When disabled, this agent will not accept new requests
-                            </p>
-                        </div>
-                        <button
-                            type="button"
-                            role="switch"
-                            aria-checked={form.isEnabled}
-                            onClick={() => updateField("isEnabled", !form.isEnabled)}
-                            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${form.isEnabled ? "bg-indigo-600" : "bg-gray-200"
-                                }`}
-                        >
-                            <span
-                                className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-sm ring-0 transition-transform duration-200 ${form.isEnabled ? "translate-x-5" : "translate-x-0"
-                                    }`}
+                                onMemoryToolTypeChange={(value) => updateField("memoryToolType", value)}
+                                onAwsCredentialIdChange={setAwsCredentialId}
                             />
-                        </button>
-                    </div>
+                        )}
+                        promptInstructions={(
+                            <PromptInstructions
+                                promptFields={promptFields}
+                                onPromptFieldChange={updatePromptField}
+                            />
+                        )}
+                        models={(
+                            <Models
+                                llmFields={llmFields}
+                                modelOptions={modelOptions}
+                                isModelsLoading={isModelsLoading}
+                                isDefaultsLoading={isDefaultsLoading}
+                                modelsLoadError=""
+                                defaultsLoadError={defaultsLoadError}
+                            />
+                        )}
+                        capabilities={(
+                            <Capabilities
+                                mcpServers={mcpServers}
+                                mcpOptions={capabilityMcpOptions}
+                                isMcpLoading={isMcpLoading}
+                                openMcpDropdownIndex={openMcpDropdownIndex}
+                                mcpDropdownRefs={mcpDropdownRefs}
+                                connectorConfigIds={connectorConfigIds}
+                                connectorOptions={connectorOptions}
+                                configDataMap={configDataMap}
+                                skillIds={skillIds}
+                                skillOptions={skillOptions}
+                                isSkillsLoading={isSkillsLoading}
+                                onMcpValueChange={(index, value) => {
+                                    updateList(setMcpServers, index, value);
+                                    updateList(setMcpServerIds, index, "");
+                                }}
+                                onMcpDropdownToggle={(index) =>
+                                    setOpenMcpDropdownIndex((current) => (current === index ? null : index))
+                                }
+                                onMcpDropdownClose={() => setOpenMcpDropdownIndex(null)}
+                                onMcpClear={(index) => {
+                                    updateList(setMcpServers, index, "");
+                                    updateList(setMcpServerIds, index, "");
+                                    setOpenMcpDropdownIndex(null);
+                                }}
+                                onMcpSelect={(index, option) => {
+                                    updateList(setMcpServers, index, option.name || option.serverUrl);
+                                    updateList(setMcpServerIds, index, option.id);
+                                    setOpenMcpDropdownIndex(null);
+                                }}
+                                onMcpAdd={() => {
+                                    addToList(setMcpServers);
+                                    addToList(setMcpServerIds);
+                                }}
+                                onMcpRemove={(index) => {
+                                    removeFromList(setMcpServers, index);
+                                    removeFromList(setMcpServerIds, index);
+                                    setOpenMcpDropdownIndex(null);
+                                }}
+                                onConnectorAdd={addConnector}
+                                onConnectorRemove={removeConnector}
+                                onConnectorChange={(index, value) =>
+                                    updateConnectorList(index, Array.isArray(value) ? value : [value])
+                                }
+                                onSkillAdd={() => addToList(setSkillIds)}
+                                onSkillRemove={(index) => removeFromList(setSkillIds, index)}
+                                onSkillChange={(index, value) => updateList(setSkillIds, index, value)}
+                            />
+                        )}
+                        subAgents={(
+                            <SubAgents
+                                agentId={agent.agent_id ?? ""}
+                                subAgentIds={subAgentIds}
+                                subAgentDelegationType={subAgentDelegationType}
+                                agentOptions={agentOptions}
+                                isAgentOptionsLoading={isAgentOptionsLoading}
+                                onChange={setSubAgentIds}
+                                onDelegationTypeChange={setSubAgentDelegationType}
+                            />
+                        )}
+                        guardrails={(
+                            <Guardrails
+                                enabled={guardrailsEnabled}
+                                piiPatterns={guardrailPiiPatterns}
+                                sensitivePatternsText={guardrailSensitivePatternsText}
+                                harmfulKeywords={guardrailHarmfulKeywords}
+                                onEnabledChange={setGuardrailsEnabled}
+                                onPiiPatternsChange={setGuardrailPiiPatterns}
+                                onSensitivePatternsTextChange={setGuardrailSensitivePatternsText}
+                                onHarmfulKeywordsChange={setGuardrailHarmfulKeywords}
+                            />
+                        )}
+                        knowledgeSources={(
+                            <AddKnowledge
+                                files={knowledgeFiles}
+                                onFilesChange={setKnowledgeFiles}
+                                existingFiles={existingKnowledgeFiles}
+                                onDownloadExistingFile={handleDownloadKnowledgeFile}
+                                onRemoveExistingFile={handleRemoveExistingKnowledgeFile}
+                            />
+                        )}
+                    />
 
-                    {error && (
-                        <div className="flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                            <svg
-                                className="mt-0.5 h-4 w-4 shrink-0 text-red-500"
-                                viewBox="0 0 20 20"
-                                fill="currentColor"
-                            >
-                                <path
-                                    fillRule="evenodd"
-                                    d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z"
-                                    clipRule="evenodd"
-                                />
-                            </svg>
-                            <div>
-                                <p className="font-medium">Update failed</p>
-                                <p className="mt-0.5 text-red-600">{error}</p>
-                            </div>
+                    {error ? (
+                        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                            {error}
                         </div>
-                    )}
+                    ) : null}
 
-                    {success && (
-                        <div className="flex items-start gap-2.5 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
-                            <svg
-                                className="mt-0.5 h-4 w-4 shrink-0 text-green-500"
-                                viewBox="0 0 20 20"
-                                fill="currentColor"
-                            >
-                                <path
-                                    fillRule="evenodd"
-                                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
-                                    clipRule="evenodd"
-                                />
-                            </svg>
-                            <div>
-                                <p className="font-medium">Agent updated successfully</p>
-                                <p className="mt-0.5 text-green-600">
-                                    Your changes have been saved. Closing in a moment...
-                                </p>
-                            </div>
+                    {success ? (
+                        <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+                            {success}
                         </div>
-                    )}
+                    ) : null}
                 </ModalCardBody>
 
                 <ModalCardFooter className="shrink-0 justify-between">
-                    <ModalCardRequiredNote visible={!success} />
+                    <div className="flex items-center gap-3">
+                        <ExportAgent
+                            payload={getExportAgentPayload()}
+                            fileName={form.agentName || agent.name || agent.agent_id || "agent"}
+                            onExport={showToast}
+                        />
+                        <ModalCardRequiredNote visible={!success} />
+                    </div>
 
                     <div className="flex gap-2.5">
                         <button
@@ -1909,6 +1651,18 @@ export default function UpdateAgent({
                     </div>
                 </ModalCardFooter>
             </ModalCardPanel>
+            {isPromptAgentOpen ? (
+                <PromptAgent
+                    title={form.agentName || "Draft Agent Update"}
+                    subtitle="Draft updates for this agent"
+                    description="Describe what should change in this agent. We'll update the current configuration draft"
+                    buttonLabel="Generate Update Draft"
+                    loadingLabel="Updating Draft..."
+                    helperText="You can review and edit all generated changes before updating the agent."
+                    onClose={() => setIsPromptAgentOpen(false)}
+                    onGenerate={handleGenerateAgentDraft}
+                />
+            ) : null}
         </ModalCard>
         {isToastVisible ? (
             <div className="fixed bottom-6 right-6 z-[80]">
@@ -1930,3 +1684,4 @@ export default function UpdateAgent({
         </>
     );
 }
+
