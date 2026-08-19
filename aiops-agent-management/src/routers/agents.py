@@ -53,6 +53,7 @@ class AgentCreate(BaseModel):
     connector_config_ids: list[str] = []
     isEnabled: bool = True
     sub_agents: list[str] = []
+    sub_agent_delegation_type: Literal["task", "full"] = "task"
     type: str | None = "agent"
     prompt_role: str | None = None
     prompt_objectives: str | None = None
@@ -91,6 +92,7 @@ class AgentPatch(BaseModel):
     connector_config_ids: list[str] | None = None
     isEnabled: bool | None = None
     sub_agents: list[str] | None = None
+    sub_agent_delegation_type: Literal["task", "full"] | None = None
     type: str | None = None
     prompt_role: str | None = None
     prompt_objectives: str | None = None
@@ -107,6 +109,33 @@ class AgentPatch(BaseModel):
     guardrail_sensitive_data: bool | None = None
     guardrails_config: dict | None = None
     knowledge_file_ids: list[str] | None = None
+
+
+class OrchestrateCreate(BaseModel):
+    prompt: str
+
+
+class OrchestrateUpdate(BaseModel):
+    prompt: str
+    current_config: dict
+
+
+class OrchestrateResponse(BaseModel):
+    name: str | None = None
+    description: str | None = None
+    prompt_role: str | None = None
+    prompt_objectives: str | None = None
+    prompt_behavior: str | None = None
+    prompt_output_format: str | None = None
+    prompt_constraints: str | None = None
+    prompt_safety: str | None = None
+    prompt_tools_instructions: str | None = None
+    prompt_policy: str | None = None
+    prompt_examples: str | None = None
+    prompt_additional_info: str | None = None
+    connector_config_ids: list[str] = []
+    mcp_server_ids: list[str] = []
+    skill_ids: list[str] = []
 
 
 class WebhookCreate(BaseModel):
@@ -205,6 +234,7 @@ class AgentResponse(BaseModel):
     updated_at: datetime
     tags: str | None = None
     sub_agents: list[str] = []
+    sub_agent_delegation_type: str = "task"
     status: str = "active"
     type: str = "agent"
     memory_enabled: bool = False
@@ -305,6 +335,51 @@ def list_agent_templates():
     with TEMPLATES_FILE.open("r", encoding="utf-8") as templates_file:
         templates = json.load(templates_file)
     return templates
+
+
+@router.post("/orchestrate", response_model=OrchestrateResponse)
+async def orchestrate_create(
+    body: OrchestrateCreate, session: Session = Depends(get_session)
+):
+    from src.agent_runtime.adk.orchestrator import (
+        CREATE_INSTRUCTION,
+        build_connector_context,
+        run_orchestrator,
+    )
+
+    connector_ctx = build_connector_context(session)
+    full_prompt = f"{connector_ctx}\n\nUser request: {body.prompt}"
+    result = await run_orchestrator(CREATE_INSTRUCTION, full_prompt, session)
+    if not result:
+        raise HTTPException(
+            status_code=500, detail="Orchestrator returned empty response"
+        )
+    return OrchestrateResponse.model_validate(result)
+
+
+@router.patch("/orchestrate", response_model=OrchestrateResponse)
+async def orchestrate_update(
+    body: OrchestrateUpdate, session: Session = Depends(get_session)
+):
+    from src.agent_runtime.adk.orchestrator import (
+        PATCH_INSTRUCTION,
+        build_connector_context,
+        run_orchestrator,
+    )
+
+    connector_ctx = build_connector_context(session)
+    current = json.dumps(body.current_config)
+    full_prompt = (
+        f"{connector_ctx}\n\n"
+        f"Current agent configuration:\n{current}\n\n"
+        f"User request: {body.prompt}"
+    )
+    result = await run_orchestrator(PATCH_INSTRUCTION, full_prompt, session, patch=True)
+    if not result:
+        raise HTTPException(
+            status_code=500, detail="Orchestrator returned empty response"
+        )
+    return OrchestrateResponse.model_validate(result)
 
 
 @router.post("/", response_model=Agent)
@@ -431,8 +506,21 @@ def delete_agent(
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
     agent_snapshot = Agent.model_validate(agent.model_dump())
+
+    for webhook in session.exec(
+        select(Webhook).where(Webhook.agent_id == agent_id)
+    ).all():
+        session.delete(webhook)
+    for job in session.exec(select(Job).where(Job.agent_id == agent_id)).all():
+        session.delete(job)
+
     session.delete(agent)
     session.commit()
+
+    from src.agent_runtime.adk.adk_app import invalidate_cache
+
+    invalidate_cache(agent_id)
+
     enqueue_agent_runtime_reconcile(
         background_tasks,
         agent_id=None,
@@ -550,137 +638,133 @@ async def chat_agent(
     agent_id: str,
     body: ChatRequest,
     user_id: str = Depends(_resolve_chat_user_id),
+    runtime_session: Session = Depends(get_session),
 ):
-    with Session(engine) as runtime_session:
-        agent = runtime_session.get(Agent, agent_id)
-        if agent is None:
-            raise HTTPException(status_code=404, detail="Agent not found")
-        if not agent.isEnabled:
-            raise HTTPException(status_code=400, detail="Agent not enabled")
-        try:
-            target = (agent.deployment_target or "internal").lower()
-            if target == "adk":
-                target = "internal"
-            if target == "internal":
-                events, session_id = await chat_adk_agent(
-                    agent.agent_id,
-                    body.message,
-                    session_id=body.session_id,
-                )
-            elif target == "vertex":
-                from src.agent_runtime.vertex.service import (
-                    chat_agent as chat_vertex_agent,
-                )
+    agent = runtime_session.get(Agent, agent_id)
+    if agent is None:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    if not agent.isEnabled:
+        raise HTTPException(status_code=400, detail="Agent not enabled")
+    try:
+        target = (agent.deployment_target or "internal").lower()
+        if target == "adk":
+            target = "internal"
+        if target == "internal":
+            events, session_id = await chat_adk_agent(
+                agent.agent_id,
+                body.message,
+                session_id=body.session_id,
+            )
+        elif target == "vertex":
+            from src.agent_runtime.vertex.service import (
+                chat_agent as chat_vertex_agent,
+            )
 
-                events, session_id = await chat_vertex_agent(
-                    agent,
-                    body.message,
-                    session_id=body.session_id,
-                    user_id=user_id,
-                )
-            elif target == "bedrock_agentcore":
-                from src.agent_runtime.bedrock_agentcore.service import (
-                    chat_agent_invoke_script as chat_bedrock_agentcore_agent,
-                )
+            events, session_id = await chat_vertex_agent(
+                agent,
+                body.message,
+                session_id=body.session_id,
+                user_id=user_id,
+            )
+        elif target == "bedrock_agentcore":
+            from src.agent_runtime.bedrock_agentcore.service import (
+                chat_agent_invoke_script as chat_bedrock_agentcore_agent,
+            )
 
-                events, session_id = await chat_bedrock_agentcore_agent(
-                    agent,
-                    body.message,
-                    session_id=body.session_id,
-                    user_id=user_id,
-                )
-            else:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Unsupported deployment_target '{agent.deployment_target}'",
-                )
+            events, session_id = await chat_bedrock_agentcore_agent(
+                agent,
+                body.message,
+                session_id=body.session_id,
+                user_id=user_id,
+            )
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported deployment_target '{agent.deployment_target}'",
+            )
 
-            return {
-                "session_id": session_id,
-                "text": _extract_chat_text(events),
-                "events": events,
-            }
-        except Exception as exc:
-            logger.exception("Agent chat failed for agent %s", agent_id)
-            raise HTTPException(status_code=500, detail=str(exc)) from exc
+        return {
+            "session_id": session_id,
+            "text": _extract_chat_text(events),
+            "events": events,
+        }
+    except Exception as exc:
+        logger.exception("Agent chat failed for agent %s", agent_id)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @router.post("/{agent_id}/chat/sessions", response_model=ChatSessionCreateResponse)
 async def create_agent_chat_session(
     agent_id: str,
     user_id: str = Depends(_resolve_chat_user_id),
+    runtime_session: Session = Depends(get_session),
 ):
-    with Session(engine) as runtime_session:
-        agent = _get_chat_agent(agent_id, runtime_session)
-        try:
-            target = (agent.deployment_target or "internal").lower()
-            if target == "adk":
-                target = "internal"
-            if target == "internal":
-                return {
-                    "session_id": await create_adk_session(
-                        agent.agent_id, user_id=user_id
-                    )
-                }
-            if target == "vertex":
-                from src.agent_runtime.vertex.service import (
-                    create_session as create_vertex_session,
-                )
-
-                return {
-                    "session_id": await create_vertex_session(agent, user_id=user_id)
-                }
-            if target == "bedrock_agentcore":
-                from src.agent_runtime.bedrock_agentcore.service import (
-                    create_session as create_bedrock_agentcore_session,
-                )
-
-                return {
-                    "session_id": await create_bedrock_agentcore_session(
-                        agent, user_id=user_id
-                    )
-                }
-            raise HTTPException(
-                status_code=400,
-                detail=f"Unsupported deployment_target '{agent.deployment_target}'",
+    agent = _get_chat_agent(agent_id, runtime_session)
+    try:
+        target = (agent.deployment_target or "internal").lower()
+        if target == "adk":
+            target = "internal"
+        if target == "internal":
+            return {
+                "session_id": await create_adk_session(agent.agent_id, user_id=user_id)
+            }
+        if target == "vertex":
+            from src.agent_runtime.vertex.service import (
+                create_session as create_vertex_session,
             )
-        except Exception as exc:
-            logger.error(exc)
-            raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+            return {"session_id": await create_vertex_session(agent, user_id=user_id)}
+        if target == "bedrock_agentcore":
+            from src.agent_runtime.bedrock_agentcore.service import (
+                create_session as create_bedrock_agentcore_session,
+            )
+
+            return {
+                "session_id": await create_bedrock_agentcore_session(
+                    agent, user_id=user_id
+                )
+            }
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported deployment_target '{agent.deployment_target}'",
+        )
+    except Exception as exc:
+        logger.error(exc)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @router.get("/{agent_id}/chat/sessions")
 async def list_agent_chat_sessions(
     agent_id: str,
     user_id: str = Depends(_resolve_chat_user_id),
+    runtime_session: Session = Depends(get_session),
 ):
-    with Session(engine) as runtime_session:
-        agent = _get_chat_agent(agent_id, runtime_session)
-        try:
-            target = (agent.deployment_target or "internal").lower()
-            if target == "adk":
-                target = "internal"
-            if target == "internal":
-                return await list_adk_sessions(agent.agent_id, user_id=user_id)
-            if target == "vertex":
-                from src.agent_runtime.vertex.service import (
-                    list_sessions as list_vertex_sessions,
-                )
-
-                return await list_vertex_sessions(agent, user_id=user_id)
-            if target == "bedrock_agentcore":
-                from src.agent_runtime.bedrock_agentcore.service import (
-                    list_sessions as list_bedrock_agentcore_sessions,
-                )
-
-                return await list_bedrock_agentcore_sessions(agent, user_id=user_id)
-            raise HTTPException(
-                status_code=400,
-                detail=f"Unsupported deployment_target '{agent.deployment_target}'",
+    agent = _get_chat_agent(agent_id, runtime_session)
+    try:
+        target = (agent.deployment_target or "internal").lower()
+        if target == "adk":
+            target = "internal"
+        if target == "internal":
+            return await list_adk_sessions(agent.agent_id, user_id=user_id)
+        if target == "vertex":
+            from src.agent_runtime.vertex.service import (
+                list_sessions as list_vertex_sessions,
             )
-        except Exception as exc:
-            logger.error(exc)
-            raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+            return await list_vertex_sessions(agent, user_id=user_id)
+        if target == "bedrock_agentcore":
+            from src.agent_runtime.bedrock_agentcore.service import (
+                list_sessions as list_bedrock_agentcore_sessions,
+            )
+
+            return await list_bedrock_agentcore_sessions(agent, user_id=user_id)
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported deployment_target '{agent.deployment_target}'",
+        )
+    except Exception as exc:
+        logger.error(exc)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @router.get("/{agent_id}/chat/sessions/{session_id}")
@@ -688,40 +772,40 @@ async def get_agent_chat_session(
     agent_id: str,
     session_id: str,
     user_id: str = Depends(_resolve_chat_user_id),
+    runtime_session: Session = Depends(get_session),
 ):
-    with Session(engine) as runtime_session:
-        agent = _get_chat_agent(agent_id, runtime_session)
-        try:
-            target = (agent.deployment_target or "internal").lower()
-            if target == "adk":
-                target = "internal"
-            if target == "internal":
-                return await get_adk_session(
-                    agent.agent_id, user_id=user_id, session_id=session_id
-                )
-            if target == "vertex":
-                from src.agent_runtime.vertex.service import (
-                    get_session as get_vertex_session,
-                )
-
-                return await get_vertex_session(
-                    agent, user_id=user_id, session_id=session_id
-                )
-            if target == "bedrock_agentcore":
-                from src.agent_runtime.bedrock_agentcore.service import (
-                    get_session as get_bedrock_agentcore_session,
-                )
-
-                return await get_bedrock_agentcore_session(
-                    agent, user_id=user_id, session_id=session_id
-                )
-            raise HTTPException(
-                status_code=400,
-                detail=f"Unsupported deployment_target '{agent.deployment_target}'",
+    agent = _get_chat_agent(agent_id, runtime_session)
+    try:
+        target = (agent.deployment_target or "internal").lower()
+        if target == "adk":
+            target = "internal"
+        if target == "internal":
+            return await get_adk_session(
+                agent.agent_id, user_id=user_id, session_id=session_id
             )
-        except Exception as exc:
-            logger.error(exc)
-            raise HTTPException(status_code=500, detail=str(exc)) from exc
+        if target == "vertex":
+            from src.agent_runtime.vertex.service import (
+                get_session as get_vertex_session,
+            )
+
+            return await get_vertex_session(
+                agent, user_id=user_id, session_id=session_id
+            )
+        if target == "bedrock_agentcore":
+            from src.agent_runtime.bedrock_agentcore.service import (
+                get_session as get_bedrock_agentcore_session,
+            )
+
+            return await get_bedrock_agentcore_session(
+                agent, user_id=user_id, session_id=session_id
+            )
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported deployment_target '{agent.deployment_target}'",
+        )
+    except Exception as exc:
+        logger.error(exc)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @router.delete("/{agent_id}/chat/sessions/{session_id}")
@@ -729,42 +813,40 @@ async def delete_agent_chat_session(
     agent_id: str,
     session_id: str,
     user_id: str = Depends(_resolve_chat_user_id),
+    runtime_session: Session = Depends(get_session),
 ):
-    with Session(engine) as runtime_session:
-        agent = _get_chat_agent(agent_id, runtime_session)
-        try:
-            target = (agent.deployment_target or "internal").lower()
-            if target == "adk":
-                target = "internal"
-            if target == "internal":
-                await delete_adk_session(
-                    agent.agent_id, user_id=user_id, session_id=session_id
-                )
-            elif target == "vertex":
-                from src.agent_runtime.vertex.service import (
-                    delete_session as delete_vertex_session,
-                )
+    agent = _get_chat_agent(agent_id, runtime_session)
+    try:
+        target = (agent.deployment_target or "internal").lower()
+        if target == "adk":
+            target = "internal"
+        if target == "internal":
+            await delete_adk_session(
+                agent.agent_id, user_id=user_id, session_id=session_id
+            )
+        elif target == "vertex":
+            from src.agent_runtime.vertex.service import (
+                delete_session as delete_vertex_session,
+            )
 
-                await delete_vertex_session(
-                    agent, user_id=user_id, session_id=session_id
-                )
-            elif target == "bedrock_agentcore":
-                from src.agent_runtime.bedrock_agentcore.service import (
-                    delete_session as delete_bedrock_agentcore_session,
-                )
+            await delete_vertex_session(agent, user_id=user_id, session_id=session_id)
+        elif target == "bedrock_agentcore":
+            from src.agent_runtime.bedrock_agentcore.service import (
+                delete_session as delete_bedrock_agentcore_session,
+            )
 
-                await delete_bedrock_agentcore_session(
-                    agent, user_id=user_id, session_id=session_id
-                )
-            else:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Unsupported deployment_target '{agent.deployment_target}'",
-                )
-            return {"ok": True}
-        except Exception as exc:
-            logger.error(exc)
-            raise HTTPException(status_code=500, detail=str(exc)) from exc
+            await delete_bedrock_agentcore_session(
+                agent, user_id=user_id, session_id=session_id
+            )
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported deployment_target '{agent.deployment_target}'",
+            )
+        return {"ok": True}
+    except Exception as exc:
+        logger.error(exc)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 async def _invoke_agent_session_background(agent_id: str, prompt: str):

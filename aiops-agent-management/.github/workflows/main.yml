@@ -66,7 +66,31 @@ jobs:
           docker push ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE }}:${{ github.sha }}
           docker push ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE }}:latest
 
-      # ── 7. Deploy to Cloud Run ────────────────────────────────────────────
+      # ── 7. Set up Python (for Alembic) ─────────────────────────────────────
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # ── 8. Install uv ───────────────────────────────────────────────────────
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+      # ── 9. Install dependencies ─────────────────────────────────────────────
+      - name: Install dependencies
+        run: uv pip install --system --no-cache -r requirements.txt
+
+      # ── 10. Run database migrations against the target database ────────────
+      # Runs only after the new image has been built and pushed, so a failed
+      # migration means the (already-pushed) image simply never gets deployed.
+      - name: Run database migrations
+        env:
+          MAIN_SERVER_DATABASE_URL: ${{ secrets.MAIN_SERVER_DATABASE_URL }}
+        run: alembic upgrade head
+
+      # ── 11. Deploy to Cloud Run ──────────────────────────────────────────────
       - name: Deploy to Cloud Run
         run: |
           gcloud run deploy ${{ env.SERVICE_NAME }} \
@@ -84,7 +108,7 @@ jobs:
               ENCRYPTION_KEY=${{ secrets.ENCRYPTION_KEY }}" \
             --quiet
 
-      # ── 8. Route all traffic to the new revision ──────────────────────────
+      # ── 12. Route all traffic to the new revision ───────────────────────────
       - name: Update traffic to latest revision
         run: |
           gcloud run services update-traffic ${{ env.SERVICE_NAME }} \
@@ -92,7 +116,7 @@ jobs:
             --region=${{ env.REGION }} \
             --project=${{ env.PROJECT_ID }}
 
-      # ── 9. Print the deployed service URL ────────────────────────────────
+      # ── 13. Print the deployed service URL ──────────────────────────────────
       - name: Get Service URL
         run: |
           URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} \
