@@ -46,8 +46,11 @@ def list_connectors():
                 metadata_path = path_obj / "metadata.json"
                 if not metadata_path.exists():
                     continue
-                with metadata_path.open(encoding="utf-8") as f:
-                    meta = json.load(f)
+                try:
+                    with metadata_path.open(encoding="utf-8") as f:
+                        meta = json.load(f)
+                except (json.JSONDecodeError, OSError):
+                    continue
                 name = meta.get("name", dirname)
                 category = meta.get("category", "enterprise")
                 connectors.append({"id": dirname, "name": name, "category": category})
