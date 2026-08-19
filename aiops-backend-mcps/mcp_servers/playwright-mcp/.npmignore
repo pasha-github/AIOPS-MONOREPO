@@ -1,0 +1,9 @@
+**/*
+!README.md
+!LICENSE
+!cli.js
+!index.*
+!config.d.ts
+!custom-server.js
+!src/outlook-mail.js
+!.env.example
