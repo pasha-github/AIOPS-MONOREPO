@@ -40,8 +40,8 @@ export default function AgentAutomationJobsPage({
   onCancel = () => undefined,
 }: AgentAutomationJobsPageProps) {
   return (
-    <div className="grid gap-5 xl:grid-cols-[minmax(620px,1.35fr)_minmax(480px,0.95fr)]">
-      <div>
+    <div className="grid h-full min-h-0 gap-5 xl:grid-cols-[minmax(620px,1.35fr)_minmax(480px,0.95fr)]">
+      <div className="h-full min-h-0 overflow-y-auto pr-1">
         <ListJobs
           jobs={jobs}
           isLoading={isJobsLoading}
@@ -55,18 +55,20 @@ export default function AgentAutomationJobsPage({
         ) : null}
       </div>
 
-      <CreateJobs
-        jobPrompt={jobPrompt}
-        cronExpression={cronExpression}
-        intervalSeconds={intervalSeconds}
-        isCreatingJob={isCreatingJob}
-        jobCreateError={jobCreateError}
-        onJobPromptChange={onJobPromptChange}
-        onCronExpressionChange={onCronExpressionChange}
-        onIntervalSecondsChange={onIntervalSecondsChange}
-        onCreateJob={onCreateJob}
-        onCancel={onCancel}
-      />
+      <div className="h-full min-h-0 overflow-y-auto pr-1">
+        <CreateJobs
+          jobPrompt={jobPrompt}
+          cronExpression={cronExpression}
+          intervalSeconds={intervalSeconds}
+          isCreatingJob={isCreatingJob}
+          jobCreateError={jobCreateError}
+          onJobPromptChange={onJobPromptChange}
+          onCronExpressionChange={onCronExpressionChange}
+          onIntervalSecondsChange={onIntervalSecondsChange}
+          onCreateJob={onCreateJob}
+          onCancel={onCancel}
+        />
+      </div>
     </div>
   );
 }
