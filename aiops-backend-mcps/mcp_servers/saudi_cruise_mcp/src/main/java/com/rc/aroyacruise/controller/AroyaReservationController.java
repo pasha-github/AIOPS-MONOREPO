@@ -1,7 +1,9 @@
 package com.rc.aroyacruise.controller;
 
 import com.rc.aroyacruise.dto.request.NodeCreateReservationRequest;
+import com.rc.aroyacruise.dto.request.NodeReservationStoreRequest;
 import com.rc.aroyacruise.service.NodeAroyaReservationService;
+import com.rc.aroyacruise.service.NodeAroyaReservationStoreService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
@@ -14,6 +16,7 @@ import tools.jackson.databind.JsonNode;
 public class AroyaReservationController {
 
     private final NodeAroyaReservationService reservationService;
+    private final NodeAroyaReservationStoreService reservationStoreService;
 
     @PostMapping("/create")
     public JsonNode createReservation(
@@ -30,6 +33,15 @@ public class AroyaReservationController {
         return reservationService.createReservation(
                 request,
                 bearerToken
+        );
+    }
+
+    @PostMapping("/store")
+    public JsonNode storeReservation(
+            @Valid @RequestBody NodeReservationStoreRequest request
+    ) {
+        return reservationStoreService.storeReservation(
+                request
         );
     }
 }

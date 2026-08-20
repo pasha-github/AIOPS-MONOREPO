@@ -68,12 +68,16 @@ export default function SkillsPage() {
   return (
     <div className="space-y-8">
       <SkillsTopbar
+        apiBase={apiBase}
         totalSkills={hasMounted ? rows.length : 0}
         totalTools={0}
         totalConnectors={0}
         totalMcpInUse={0}
         isLoading={!hasMounted || isLoading}
         onCreate={() => setIsCreateOpen(true)}
+        onSkillUploaded={async () => {
+          await loadSkills();
+        }}
       />
       <CreateNewSkill
         isOpen={isCreateOpen}

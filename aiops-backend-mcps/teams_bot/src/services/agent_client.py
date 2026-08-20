@@ -1,6 +1,4 @@
-import asyncio
 import json
-import re
 from dataclasses import dataclass
 from typing import Awaitable, Callable
 from urllib.parse import quote
@@ -10,13 +8,15 @@ import httpx
 @dataclass
 class AgentReply:
     text: str
+    emitted_any: bool = False
 
 
 class AdkStreamError(RuntimeError):
     """Raised when ADK returns an explicit stream-level error payload."""
 
 
-EventCallback = Callable[[str], Awaitable[None]]
+# Receives each agent turn's text as soon as that turn completes.
+TextCallback = Callable[[str], Awaitable[None]]
 
 
 def _trim_base_url(value: str) -> str:
@@ -51,14 +51,6 @@ def _merge_streaming_text(current_text: str, incoming_text: str) -> str:
     if current_text.endswith(incoming_text):
         return current_text
     return f"{current_text}{incoming_text}"
-
-
-def _normalize_tool_name(raw_name: object) -> str:
-    value = str(raw_name or "").strip()
-    if not value:
-        return "unknown tool"
-    value = re.sub(r"[_-]+", " ", value)
-    return re.sub(r"\s+", " ", value).strip()
 
 
 def _extract_sse_payloads(raw_event: str) -> list[dict]:
@@ -110,7 +102,7 @@ async def _run_prompt_sse(
     user_id: str,
     session_id: str,
     message: str,
-    on_event: EventCallback | None = None,
+    on_text: TextCallback | None = None,
 ) -> AgentReply:
     request_payload = {
         "appName": app_name,
@@ -122,16 +114,55 @@ async def _run_prompt_sse(
             "parts": [{"text": message}],
         },
     }
-    stream_text = ""
-    sent_events: set[str] = set()
+    # ADK emits a run as a series of turns. Events with `partial=true` carry text deltas;
+    # any other event (a model turn closing with partial=false, or a tool-result event with
+    # partial absent) ends the current turn. Every turn's text is handed to on_text as soon
+    # as the turn closes, so the caller renders the run in the order it happened.
+    turn_text = ""
     event_buffer = ""
+    emitted_any = False
 
-    async def add_event_once(label: str) -> None:
-        cleaned = label.strip()
-        if cleaned and cleaned not in sent_events:
-            sent_events.add(cleaned)
-            if on_event:
-                await on_event(cleaned)
+    async def close_turn() -> None:
+        """Emit the finished turn's text, if it produced any."""
+        nonlocal turn_text, emitted_any
+        finished = turn_text.strip()
+        turn_text = ""
+        # Tool calls and tool results carry no text of their own.
+        if not finished:
+            return
+        emitted_any = True
+        if on_text:
+            await on_text(finished)
+
+    async def process_payload(payload: dict) -> None:
+        """Accumulate text deltas and flush each turn as it closes."""
+        nonlocal turn_text
+
+        error_text = str(payload.get("error") or "").strip()
+        if error_text:
+            raise AdkStreamError(error_text)
+
+        content = payload.get("content")
+        parts = content.get("parts") if isinstance(content, dict) else None
+        if not isinstance(parts, list):
+            parts = []
+
+        visible_parts = [
+            str(part.get("text") or "")
+            for part in parts
+            if isinstance(part, dict)
+            and isinstance(part.get("text"), str)
+            and not part.get("thought")
+        ]
+        if visible_parts:
+            # ADK's closing event re-sends the whole turn's accumulated text rather than a
+            # delta (StreamingResponseAggregator.close), so merge instead of appending.
+            turn_text = _merge_streaming_text(turn_text, "".join(visible_parts))
+
+        # Deltas arrive with partial=true; anything else ends the turn. Tool-result events
+        # omit the field entirely, so test for "not true" rather than "false".
+        if payload.get("partial") is not True:
+            await close_turn()
 
     async with client.stream(
         "POST",
@@ -152,95 +183,18 @@ async def _run_prompt_sse(
             while "\n\n" in event_buffer:
                 raw_event, event_buffer = event_buffer.split("\n\n", 1)
                 for payload in _extract_sse_payloads(raw_event):
-                    error_text = str(payload.get("error") or "").strip()
-                    if error_text:
-                        raise AdkStreamError(error_text)
-
-                    actions = payload.get("actions")
-                    if isinstance(actions, dict):
-                        confirmations = actions.get("requestedToolConfirmations")
-                        if isinstance(confirmations, dict) and confirmations:
-                            await add_event_once("Awaiting tool confirmation")
-
-                    content = payload.get("content")
-                    if not isinstance(content, dict):
-                        continue
-                    parts = content.get("parts")
-                    if not isinstance(parts, list):
-                        continue
-
-                    for part in parts:
-                        if not isinstance(part, dict):
-                            continue
-                        function_call = part.get("functionCall")
-                        if isinstance(function_call, dict):
-                            await add_event_once(
-                                f"Running {_normalize_tool_name(function_call.get('name'))}"
-                            )
-                        function_response = part.get("functionResponse")
-                        if isinstance(function_response, dict):
-                            await add_event_once(
-                                f"Received {_normalize_tool_name(function_response.get('name'))} results"
-                            )
-
-                    visible_parts = [
-                        str(part.get("text") or "")
-                        for part in parts
-                        if isinstance(part, dict)
-                        and isinstance(part.get("text"), str)
-                        and not part.get("thought")
-                    ]
-                    if visible_parts:
-                        stream_text = _merge_streaming_text(
-                            stream_text, "".join(visible_parts)
-                        )
+                    await process_payload(payload)
 
     if event_buffer.strip():
         for payload in _extract_sse_payloads(event_buffer):
-            error_text = str(payload.get("error") or "").strip()
-            if error_text:
-                raise AdkStreamError(error_text)
+            await process_payload(payload)
 
-            actions = payload.get("actions")
-            if isinstance(actions, dict):
-                confirmations = actions.get("requestedToolConfirmations")
-                if isinstance(confirmations, dict) and confirmations:
-                    await add_event_once("Awaiting tool confirmation")
+    # A stream cut off before its closing event still has text worth showing.
+    await close_turn()
 
-            content = payload.get("content")
-            if not isinstance(content, dict):
-                continue
-            parts = content.get("parts")
-            if not isinstance(parts, list):
-                continue
-
-            for part in parts:
-                if not isinstance(part, dict):
-                    continue
-                function_call = part.get("functionCall")
-                if isinstance(function_call, dict):
-                    await add_event_once(
-                        f"Running {_normalize_tool_name(function_call.get('name'))}"
-                    )
-                function_response = part.get("functionResponse")
-                if isinstance(function_response, dict):
-                    await add_event_once(
-                        f"Received {_normalize_tool_name(function_response.get('name'))} results"
-                    )
-
-            visible_parts = [
-                str(part.get("text") or "")
-                for part in parts
-                if isinstance(part, dict)
-                and isinstance(part.get("text"), str)
-                and not part.get("thought")
-            ]
-            if visible_parts:
-                stream_text = _merge_streaming_text(stream_text, "".join(visible_parts))
-
-    if stream_text.strip():
-        return AgentReply(text=stream_text)
-    return AgentReply(text="I received an empty response from the agent service.")
+    # Every turn was already delivered through on_text, so there is nothing left to post.
+    # An empty flag lets the caller show a fallback when the agent produced no text at all.
+    return AgentReply(text="", emitted_any=emitted_any)
 
 
 async def fetch_agent_reply(
@@ -249,7 +203,7 @@ async def fetch_agent_reply(
     user_id: str,
     session_id: str,
     message: str,
-    on_event: EventCallback | None = None,
+    on_text: TextCallback | None = None,
 ) -> AgentReply:
     """Call ADK session+SSE endpoints without replaying a submitted user message."""
     adk_session_id = str(session_id or "").strip()
@@ -280,5 +234,5 @@ async def fetch_agent_reply(
             user_id=adk_user_id,
             session_id=adk_session_id,
             message=message,
-            on_event=on_event,
+            on_text=on_text,
         )
