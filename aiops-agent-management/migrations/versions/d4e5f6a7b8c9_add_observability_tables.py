@@ -17,70 +17,75 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    op.create_table(
-        "observability_span",
-        sa.Column("observability_span_id", sa.Uuid(), nullable=False),
-        sa.Column("agent_id", sa.String(), nullable=False),
-        sa.Column("session_id", sa.String(), nullable=False),
-        sa.Column("name", sa.String(), nullable=False),
-        sa.Column("span_id", sa.String(), nullable=False),
-        sa.Column("trace_id", sa.String(), nullable=False),
-        sa.Column("start_time", sa.BigInteger(), nullable=True),
-        sa.Column("end_time", sa.BigInteger(), nullable=True),
-        sa.Column("attributes", sa.JSON(), nullable=True),
-        sa.Column("parent_span_id", sa.String(), nullable=True),
-        sa.Column("created_at", sa.DateTime(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(), nullable=False),
-        sa.PrimaryKeyConstraint("observability_span_id"),
-        sa.UniqueConstraint(
-            "agent_id", "session_id", "span_id", name="uq_span_session"
-        ),
-    )
-    op.create_index(
-        op.f("ix_observability_span_agent_id"),
-        "observability_span",
-        ["agent_id"],
-        unique=False,
-    )
-    op.create_index(
-        op.f("ix_observability_span_session_id"),
-        "observability_span",
-        ["session_id"],
-        unique=False,
-    )
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
 
-    op.create_table(
-        "observability_token_usage",
-        sa.Column("token_usage_id", sa.Uuid(), nullable=False),
-        sa.Column("agent_id", sa.String(), nullable=False),
-        sa.Column("session_id", sa.String(), nullable=False),
-        sa.Column("llm_model", sa.String(), nullable=False),
-        sa.Column("input_tokens", sa.Integer(), nullable=False),
-        sa.Column("output_tokens", sa.Integer(), nullable=False),
-        sa.Column("total_tokens", sa.Integer(), nullable=False),
-        sa.Column("invocation_id", sa.String(), nullable=True),
-        sa.Column("event_id", sa.String(), nullable=True),
-        sa.Column("created_at", sa.DateTime(), nullable=False),
-        sa.PrimaryKeyConstraint("token_usage_id"),
-    )
-    op.create_index(
-        op.f("ix_observability_token_usage_agent_id"),
-        "observability_token_usage",
-        ["agent_id"],
-        unique=False,
-    )
-    op.create_index(
-        op.f("ix_observability_token_usage_llm_model"),
-        "observability_token_usage",
-        ["llm_model"],
-        unique=False,
-    )
-    op.create_index(
-        op.f("ix_observability_token_usage_session_id"),
-        "observability_token_usage",
-        ["session_id"],
-        unique=False,
-    )
+    if not inspector.has_table("observability_span"):
+        op.create_table(
+            "observability_span",
+            sa.Column("observability_span_id", sa.Uuid(), nullable=False),
+            sa.Column("agent_id", sa.String(), nullable=False),
+            sa.Column("session_id", sa.String(), nullable=False),
+            sa.Column("name", sa.String(), nullable=False),
+            sa.Column("span_id", sa.String(), nullable=False),
+            sa.Column("trace_id", sa.String(), nullable=False),
+            sa.Column("start_time", sa.BigInteger(), nullable=True),
+            sa.Column("end_time", sa.BigInteger(), nullable=True),
+            sa.Column("attributes", sa.JSON(), nullable=True),
+            sa.Column("parent_span_id", sa.String(), nullable=True),
+            sa.Column("created_at", sa.DateTime(), nullable=False),
+            sa.Column("updated_at", sa.DateTime(), nullable=False),
+            sa.PrimaryKeyConstraint("observability_span_id"),
+            sa.UniqueConstraint(
+                "agent_id", "session_id", "span_id", name="uq_span_session"
+            ),
+        )
+        op.create_index(
+            op.f("ix_observability_span_agent_id"),
+            "observability_span",
+            ["agent_id"],
+            unique=False,
+        )
+        op.create_index(
+            op.f("ix_observability_span_session_id"),
+            "observability_span",
+            ["session_id"],
+            unique=False,
+        )
+
+    if not inspector.has_table("observability_token_usage"):
+        op.create_table(
+            "observability_token_usage",
+            sa.Column("token_usage_id", sa.Uuid(), nullable=False),
+            sa.Column("agent_id", sa.String(), nullable=False),
+            sa.Column("session_id", sa.String(), nullable=False),
+            sa.Column("llm_model", sa.String(), nullable=False),
+            sa.Column("input_tokens", sa.Integer(), nullable=False),
+            sa.Column("output_tokens", sa.Integer(), nullable=False),
+            sa.Column("total_tokens", sa.Integer(), nullable=False),
+            sa.Column("invocation_id", sa.String(), nullable=True),
+            sa.Column("event_id", sa.String(), nullable=True),
+            sa.Column("created_at", sa.DateTime(), nullable=False),
+            sa.PrimaryKeyConstraint("token_usage_id"),
+        )
+        op.create_index(
+            op.f("ix_observability_token_usage_agent_id"),
+            "observability_token_usage",
+            ["agent_id"],
+            unique=False,
+        )
+        op.create_index(
+            op.f("ix_observability_token_usage_llm_model"),
+            "observability_token_usage",
+            ["llm_model"],
+            unique=False,
+        )
+        op.create_index(
+            op.f("ix_observability_token_usage_session_id"),
+            "observability_token_usage",
+            ["session_id"],
+            unique=False,
+        )
 
 
 def downgrade() -> None:
