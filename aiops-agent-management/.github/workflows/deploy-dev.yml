@@ -66,7 +66,31 @@ jobs:
           docker push ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE }}:${{ github.sha }}
           docker push ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE }}:latest
 
-      # ── 7. Deploy to Cloud Run ────────────────────────────────────────────
+      # ── 7. Set up Python (for Alembic) ─────────────────────────────────────
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # ── 8. Install uv ───────────────────────────────────────────────────────
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+      # ── 9. Install dependencies ─────────────────────────────────────────────
+      - name: Install dependencies
+        run: uv pip install --system --no-cache -r requirements.txt
+
+      # ── 10. Run database migrations against the target database ────────────
+      # Runs only after the new image has been built and pushed, so a failed
+      # migration means the (already-pushed) image simply never gets deployed.
+      - name: Run database migrations
+        env:
+          MAIN_SERVER_DATABASE_URL: ${{ secrets.MAIN_SERVER_DATABASE_URL_DEV }}
+        run: alembic upgrade head
+
+      # ── 11. Deploy to Cloud Run ──────────────────────────────────────────────
       - name: Deploy to Cloud Run
         run: |
           gcloud run deploy ${{ env.SERVICE_NAME }} \
@@ -82,10 +106,29 @@ jobs:
               ENV=${{ secrets.ENV }},\
               A2A=${{ secrets.A2A }},\
               POSTGRES_AGENT_SERVER_DATABASE_URL=${{ secrets.POSTGRES_AGENT_SERVER_DATABASE_URL }},\
-              ENCRYPTION_KEY=${{ secrets.ENCRYPTION_KEY }}" \
+              ENCRYPTION_KEY=${{ secrets.ENCRYPTION_KEY }}, \
+              SOP_EMBEDDING_MODEL=${{ secrets.SOP_EMBEDDING_MODEL }},\
+              SOP_EMBEDDING_DIM=${{ secrets.SOP_EMBEDDING_DIM }},\
+              OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }},\
+              INGEST_ON_STARTUP=${{ secrets.INGEST_ON_STARTUP }},\
+              SHP_ID_APP=${{ secrets.SHP_ID_APP }},\
+              SHP_ID_APP_SECRET=${{ secrets.SHP_ID_APP_SECRET }},\
+              SHP_TENANT_ID=${{ secrets.SHP_TENANT_ID }},\
+              SHP_SITE_URL=${{ secrets.SHP_SITE_URL }},\
+              SHP_DOC_LIBRARY=${{ secrets.SHP_DOC_LIBRARY }},\
+              CF_DOMAIN=${{ secrets.CF_DOMAIN }},\
+              CF_EMAIL=${{ secrets.CF_EMAIL }},\
+              CF_API_TOKEN=${{ secrets.CF_API_TOKEN }},\
+              CF_SPACE_KEY=${{ secrets.CF_SPACE_KEY }},\
+              OD_ID_APP=${{ secrets.OD_ID_APP }},\
+              OD_ID_APP_SECRET=${{ secrets.OD_ID_APP_SECRET }},\
+              OD_TENANT_ID=${{ secrets.OD_TENANT_ID }},\
+              OD_TENANT=${{ secrets.OD_TENANT }},\
+              OD_USER_EMAIL=${{ secrets.OD_USER_EMAIL }},\
+              OD_FOLDER=${{ secrets.OD_FOLDER }}" \
             --quiet
 
-      # ── 8. Route all traffic to the new revision ──────────────────────────
+      # ── 12. Route all traffic to the new revision ───────────────────────────
       - name: Update traffic to latest revision
         run: |
           gcloud run services update-traffic ${{ env.SERVICE_NAME }} \
@@ -93,7 +136,7 @@ jobs:
             --region=${{ env.REGION }} \
             --project=${{ env.PROJECT_ID }}
 
-      # ── 9. Print the deployed service URL ────────────────────────────────
+      # ── 13. Print the deployed service URL ──────────────────────────────────
       - name: Get Service URL
         run: |
           URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} \
