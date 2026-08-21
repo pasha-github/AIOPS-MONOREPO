@@ -544,6 +544,92 @@ def test_agent_loader_uses_global_defaults_for_model_stack(
     ]
 
 
+def test_full_delegation_sub_agent_not_cached_and_rebuildable(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """Regression: rebuilding a supervisor must not fail because a full-delegation
+    sub-agent is still cached with a parent from the previous build.
+
+    ADK binds each sub-agent to exactly one parent; reusing a cached, already-
+    parented instance under a rebuilt parent raises "already has a parent agent".
+    Full-delegation sub-agents must therefore be built fresh and never cached.
+    """
+    _patch_common_runtime(monkeypatch)
+
+    class _ParentBindingLlmAgent:
+        """Mimics ADK's LlmAgent parent binding (and its guard error)."""
+
+        def __init__(self, **kwargs):
+            self.kwargs = kwargs
+            self.name = kwargs.get("name")
+            self.parent_agent = None
+            for sub in kwargs.get("sub_agents") or []:
+                existing = getattr(sub, "parent_agent", None)
+                if existing is not None:
+                    raise ValueError(
+                        f"Agent {sub.name} already has a parent agent, current "
+                        f"parent: {existing.name}, trying to add: {self.name}"
+                    )
+                sub.parent_agent = self
+
+    monkeypatch.setattr(agent_loader_module, "LlmAgent", _ParentBindingLlmAgent)
+
+    supervisor_cfg = _agent_cfg(
+        agent_id="supervisor",
+        name="Supervisor",
+        sub_agents=["l1_agent"],
+        sub_agent_delegation_type="full",
+    )
+    l1_cfg = _agent_cfg(agent_id="l1_agent", name="L1")
+    configs = {"supervisor": supervisor_cfg, "l1_agent": l1_cfg}
+    model = _model_cfg()
+
+    def _lookup(statement):
+        # Pull the agent_id bound in `.where(Agent.agent_id == name)`.
+        try:
+            return configs.get(statement.whereclause.right.value)
+        except Exception:
+            return None
+
+    class _MultiSession(_FakeSession):
+        def exec(self, statement):
+            return _FakeResult(first_value=_lookup(statement))
+
+        def get(self, model_cls, key):
+            if getattr(model_cls, "__name__", "") == "Model":
+                return model
+            return super().get(model_cls, key)
+
+    monkeypatch.setattr(agent_loader_module, "Session", lambda _engine: _MultiSession())
+    fake_cache = _FakeCache()
+    monkeypatch.setattr(agent_loader_module, "cache", fake_cache)
+
+    loader = DatabaseAgentLoader()
+
+    # First build: supervisor is cached, but the full-delegation sub-agent is not.
+    supervisor = loader.load_agent("supervisor")
+    assert supervisor is not None
+    assert fake_cache.get_agent("supervisor") is supervisor
+    assert fake_cache.get_agent("l1_agent") is None
+
+    # Seed a stale, already-parented sub-agent into the cache: the loader must
+    # bypass it when rebuilding, never re-attach it (that is the original crash).
+    stale = _ParentBindingLlmAgent(name="l1_agent")
+    stale.parent_agent = _ParentBindingLlmAgent(name="old_supervisor")
+    fake_cache.set_agent("l1_agent", stale)
+
+    # Simulate "supervisor updated": only its own cache entry is invalidated.
+    fake_cache.remove_agent("supervisor")
+
+    # Rebuild must succeed with a fresh sub-agent — no "already has a parent".
+    rebuilt = loader.load_agent("supervisor")
+    assert rebuilt is not None
+    sub_agents = rebuilt.kwargs["sub_agents"]
+    assert len(sub_agents) == 1
+    assert sub_agents[0] is not stale
+    assert sub_agents[0].parent_agent is rebuilt
+
+
 def test_agent_loader_attaches_skill_toolset(monkeypatch: pytest.MonkeyPatch):
     _patch_common_runtime(monkeypatch)
     connector_id = str(uuid4())
