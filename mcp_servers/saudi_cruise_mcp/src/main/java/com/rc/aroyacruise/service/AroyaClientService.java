@@ -1,10 +1,12 @@
 package com.rc.aroyacruise.service;
 
 import com.rc.aroyacruise.config.AroyaApiProperties;
+import com.rc.aroyacruise.config.AroyaNodeApiProperties;
 import com.rc.aroyacruise.dto.external.GraphQlError;
 import com.rc.aroyacruise.dto.external.IntegrationTaskRequest;
 import com.rc.aroyacruise.dto.external.IntegrationTaskResponse;
 import com.rc.aroyacruise.exception.AroyaClientException;
+import lombok.RequiredArgsConstructor;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -17,15 +19,12 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
+@RequiredArgsConstructor
 public class AroyaClientService {
 
     private final RestClient restClient;
     private final AroyaApiProperties properties;
-
-    public AroyaClientService(RestClient restClient, AroyaApiProperties properties) {
-        this.restClient = restClient;
-        this.properties = properties;
-    }
+    private final AroyaNodeApiProperties nodeApiProperties;
 
     public <T> IntegrationTaskResponse<T> postIntegrationTask(
             String query,
@@ -70,6 +69,49 @@ public class AroyaClientService {
             throw new AroyaClientException("Failed to call Aroya integration-tasks endpoint", ex);
         }
     }
+
+    public <T> IntegrationTaskResponse<T> nodePostIntegrationTask(
+            String query,
+            Map<String, Object> variables,
+            String bearerToken,
+            ParameterizedTypeReference<IntegrationTaskResponse<T>> responseType
+    ) {
+        try {
+            IntegrationTaskRequest request = new IntegrationTaskRequest(
+                    query,
+                    variables == null ? Map.of() : variables
+            );
+
+            RestClient.RequestBodySpec spec = restClient.post()
+                    .uri(nodeApiProperties.graphqlUrl())
+                    .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE);
+
+            if (StringUtils.hasText(bearerToken)) {
+                spec.header(HttpHeaders.AUTHORIZATION, buildBearerToken(bearerToken));
+            }
+
+            IntegrationTaskResponse<T> response = spec
+                    .body(request)
+                    .retrieve()
+                    .body(responseType);
+
+            if (response == null) {
+                throw new AroyaClientException("Null response received from Aroya integration-tasks endpoint");
+            }
+
+            if (response.errors() != null && !response.errors().isEmpty()) {
+                throw new AroyaClientException(extractErrors(response.errors()));
+            }
+
+            return response;
+        } catch (Exception ex) {
+            if (ex instanceof AroyaClientException) {
+                throw ex;
+            }
+            throw new AroyaClientException("Failed to call Aroya integration-tasks endpoint", ex);
+        }
+    }
+
 
     private String buildBearerToken(String token) {
         return token.startsWith("Bearer ") ? token : "Bearer " + token;
