@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DocFlow AI — Lite DMS (POC)</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- ================= LOGIN ================= -->
+<div id="login-screen">
+  <div class="login-left">
+    <div class="brand-row">
+      <div class="logo-badge">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h10l6 6v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z"/><path d="M14 4v6h6"/><path d="M8 13h8M8 17h5"/></svg>
+      </div>
+      <div class="brand-name">DocFlow AI</div>
+    </div>
+    <div class="login-hero">
+      <div class="overline">Enterprise document control</div>
+      <h1>Every drawing, RFI and approval — traceable and audit-ready.</h1>
+      <p>A lite DMS for EPC and construction teams: review codes 1–4, revision control, role-based access and a full audit trail on every action.</p>
+    </div>
+    <div class="login-feats">
+      <span><svg viewBox="0 0 24 24" fill="none" stroke="var(--orange)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> Role-based access</span>
+      <span><svg viewBox="0 0 24 24" fill="none" stroke="var(--orange)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8v4l3 2"/><circle cx="12" cy="12" r="9"/></svg> Full audit trail</span>
+      <span><svg viewBox="0 0 24 24" fill="none" stroke="var(--orange)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> WCAG AA</span>
+    </div>
+  </div>
+
+  <div class="login-right">
+    <div class="login-card">
+      <h2>Sign in</h2>
+      <p class="sub">Access is scoped to your role, project and discipline.</p>
+
+      <div id="login-error" class="alert-box" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v5M12 16h.01"/></svg>
+        <span id="login-error-text"></span>
+      </div>
+
+      <form id="login-form" autocomplete="off">
+        <label class="fld" for="login-user">Username or email</label>
+        <input class="df-in" type="text" id="login-user" placeholder="e.g. khalid" required>
+
+        <label class="fld" for="login-pass">Password</label>
+        <input class="df-in" type="password" id="login-pass" placeholder="demo123" required>
+
+        <label class="fld" for="login-project">Project / organization</label>
+        <select class="df-in" id="login-project">
+          <option value="SPCL">SPCL — Shapoorji Tower Project (EPC)</option>
+          <option value="LTRM">LTRM — Metro Depot (EPC)</option>
+        </select>
+
+        <button type="submit" id="login-submit" class="btn primary lg block" disabled>Connecting…</button>
+      </form>
+
+      <div class="demo-block">
+        <div class="demo-title">Demo users · password demo123</div>
+        <div class="demo-grid" id="demo-grid"></div>
+        <div class="demo-hint">Tap a user to fill the form, then Sign in.</div>
+        <!-- Only ever shown when the shared store is unreachable; the normal
+             connected case says nothing. The Sign in button already reads
+             "Connecting…" while the first /api/state round-trip is in flight. -->
+        <div class="storage-mode" id="storage-mode" hidden></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= APP SHELL ================= -->
+<div id="app" hidden>
+  <header id="topbar">
+    <div class="brand-row">
+      <div class="logo-badge">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h10l6 6v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z"/><path d="M14 4v6h6"/><path d="M8 13h8M8 17h5"/></svg>
+      </div>
+      <span class="brand-name">DocFlow AI</span>
+    </div>
+    <div class="hdr-div"></div>
+    <nav class="crumb" aria-label="Breadcrumb">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5 12 3l9 6.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>
+      <span id="crumb">Project SPCL</span>
+    </nav>
+    <div class="hdr-spacer"></div>
+
+    <button id="bell" class="iconbtn" title="Notifications" aria-label="Notifications">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+      <span id="bell-count" class="badge-dot" hidden></span>
+    </button>
+
+    <button id="audit-btn" class="iconbtn" title="Audit trail" aria-label="Audit trail" hidden>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+    </button>
+
+    <div class="user-chip">
+      <div class="avatar" id="user-avatar">?</div>
+      <div class="u-meta">
+        <div class="u-name" id="user-name"></div>
+        <div class="u-role" id="user-role"></div>
+      </div>
+      <button id="logout-btn" class="signout" title="Sign out" aria-label="Sign out">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <div class="df-shell">
+
+    <!-- ===== sidebar ===== -->
+    <aside class="df-sidebar">
+      <div class="side-group">Views</div>
+      <button class="navitem" data-view="all">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h10l6 6v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z"/><path d="M14 4v6h6"/></svg>
+        <span>All my documents</span><span class="nc" id="count-all">0</span>
+      </button>
+      <button class="navitem" data-view="pending">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+        <span>Awaiting my review</span><span class="nc" id="count-pending">0</span>
+      </button>
+      <button class="navitem alert" data-view="overdue">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>
+        <span>Overdue</span><span class="nc" id="count-overdue">0</span>
+      </button>
+      <button class="navitem" data-view="mine">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+        <span>Submitted by me</span><span class="nc" id="count-mine">0</span>
+      </button>
+
+      <div class="side-group later">Disciplines</div>
+      <div id="disc-nav"></div>
+
+      <div class="side-spacer"></div>
+      <div class="side-foot">
+        <span class="ai-dot"></span>
+        <span>All actions audit-logged</span>
+      </div>
+    </aside>
+
+    <!-- ===== main ===== -->
+    <main class="df-content">
+      <div class="content-head">
+        <div class="head-row">
+          <div>
+            <h1 id="view-title">All my documents</h1>
+            <div class="result-line" id="result-line"></div>
+          </div>
+          <div class="head-actions">
+            <div class="search-box">
+              <svg viewBox="0 0 24 24" fill="none" stroke="var(--fg-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+              <input class="df-in" type="search" id="filter-q" placeholder="Filter by keyword or doc no.">
+            </div>
+            <button id="new-doc-btn" class="btn primary md" hidden>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+              New document
+            </button>
+          </div>
+        </div>
+        <div class="tiles">
+          <button class="tile" data-view="all"><span class="tn" id="tile-total">0</span><span class="tl">In my scope</span></button>
+          <button class="tile" data-view="pending"><span class="tn" id="tile-awaiting">0</span><span class="tl">Awaiting my action</span></button>
+          <button class="tile" data-view="mine"><span class="tn" id="tile-mine">0</span><span class="tl">Submitted by me</span></button>
+          <button class="tile" data-view="overdue" id="tile-overdue-btn"><span class="tn" id="tile-overdue">0</span><span class="tl">Overdue</span></button>
+        </div>
+      </div>
+
+      <div class="table-area">
+        <div class="panel" id="doc-panel"></div>
+      </div>
+    </main>
+
+    <!-- ===== assistant (open) ===== -->
+    <aside id="chat" class="df-assistant">
+      <div class="chat-head">
+        <span class="ai-dot"></span>
+        <div class="ch-meta">
+          <div class="ch-title">DocFlow assistant</div>
+          <div class="ch-sub">tool-backed · audit-logged</div>
+        </div>
+        <div class="spacer"></div>
+        <button id="chat-toggle" class="panelbtn" title="Collapse assistant" aria-label="Collapse assistant">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+        </button>
+      </div>
+      <div id="chat-log"></div>
+      <div class="chat-foot">
+        <form id="chat-form">
+          <input class="df-in" type="text" id="chat-input" placeholder='Try: "show my documents"' autocomplete="off">
+          <button type="submit" class="btn primary md">Send</button>
+        </form>
+      </div>
+    </aside>
+
+    <!-- ===== assistant (collapsed rail) ===== -->
+    <aside id="chat-rail" hidden>
+      <button id="chat-open" class="openbtn" title="Open assistant" aria-label="Open assistant">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <span id="chat-unread" class="unread-dot" hidden></span>
+      </button>
+      <div class="rail-label">Assistant</div>
+    </aside>
+  </div>
+
+  <!-- ===== notifications popover ===== -->
+  <div id="bell-scrim" hidden></div>
+  <div id="bell-pop" hidden></div>
+
+  <!-- ===== document detail drawer ===== -->
+  <div id="drawer-backdrop" hidden></div>
+  <div id="drawer" hidden>
+    <div class="drawer-head">
+      <div class="dh-row">
+        <div class="dh-main" id="drawer-title"></div>
+        <button id="drawer-close" class="closebtn" aria-label="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+    </div>
+    <div id="drawer-tabs">
+      <button class="dtab on" data-tab="overview">Overview</button>
+      <button class="dtab" data-tab="comments">Comments</button>
+      <button class="dtab" data-tab="revisions">Revision history</button>
+      <button class="dtab" data-tab="workflow">Workflow trail</button>
+      <button class="dtab" data-tab="attachments">Attachments</button>
+    </div>
+    <div id="drawer-body"></div>
+    <div id="drawer-actions"></div>
+  </div>
+
+  <!-- ===== audit modal ===== -->
+  <div id="audit-modal" class="modal-back" hidden>
+    <div class="modal-card audit-card">
+      <div class="audit-head">
+        <svg class="shield" viewBox="0 0 24 24" fill="none" stroke="var(--orange)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+        <div>
+          <div class="a-title">Audit trail</div>
+          <div class="a-sub">Every login, view, search and write — user + timestamp. Persisted locally; Admin only.</div>
+        </div>
+        <div class="spacer"></div>
+        <button id="audit-close" class="closebtn" aria-label="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="audit-body" id="audit-body"></div>
+    </div>
+  </div>
+
+  <!-- ===== new document modal ===== -->
+  <div id="newdoc-modal" class="modal-back" hidden>
+    <div class="modal-card newdoc-card">
+      <div class="audit-head">
+        <svg class="shield" viewBox="0 0 24 24" fill="none" stroke="var(--orange)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h10l6 6v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z"/><path d="M14 4v6h6"/><path d="M12 12v6M9 15h6"/></svg>
+        <div>
+          <div class="a-title">New document</div>
+          <div class="a-sub">Creates Rev A/0, routes it to the right reviewer and is logged for audit.</div>
+        </div>
+        <div class="spacer"></div>
+        <button id="newdoc-close" class="closebtn" aria-label="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <form id="newdoc-form" class="newdoc-body" autocomplete="off">
+        <div id="nd-error" class="alert-box" hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v5M12 16h.01"/></svg>
+          <span id="nd-error-text"></span>
+        </div>
+
+        <label class="fld" for="nd-title">Title</label>
+        <input class="df-in" id="nd-title" placeholder="e.g. Chilled Water Piping Layout — Tower B, Levels 12–18" required>
+
+        <div class="fld-row">
+          <div>
+            <label class="fld" for="nd-type">Document type</label>
+            <select class="df-in" id="nd-type"></select>
+          </div>
+          <div>
+            <label class="fld" for="nd-disc">Discipline</label>
+            <select class="df-in" id="nd-disc"></select>
+          </div>
+        </div>
+
+        <div class="fld-row">
+          <div>
+            <label class="fld" for="nd-project">Project</label>
+            <select class="df-in" id="nd-project"></select>
+          </div>
+          <div>
+            <label class="fld" for="nd-conf">Confidentiality</label>
+            <select class="df-in" id="nd-conf">
+              <option>Internal</option>
+              <option>Restricted</option>
+              <option>Commercial-in-confidence</option>
+              <option>Public</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="fld-row">
+          <div>
+            <label class="fld" for="nd-due">Due date (optional)</label>
+            <input class="df-in" type="date" id="nd-due">
+          </div>
+          <div>
+            <label class="fld" for="nd-file">Initial attachment (optional)</label>
+            <input class="df-in" type="file" id="nd-file">
+          </div>
+        </div>
+
+        <label class="fld">Additional recipients</label>
+        <div class="hint nd-dist-hint">The originator, assigned reviewer, Document Controller and Admin are added automatically.</div>
+        <div id="nd-dist" class="nd-dist-grid"></div>
+      </form>
+      <div class="confirm-foot">
+        <button id="nd-cancel" type="button" class="btn ghost md">Cancel</button>
+        <button id="nd-submit" type="submit" form="newdoc-form" class="btn primary md">Create document</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== confirm modal ===== -->
+  <div id="confirm-modal" class="modal-back" hidden>
+    <div class="modal-card confirm-card">
+      <div class="confirm-body">
+        <div class="confirm-title" id="confirm-title"></div>
+        <div class="confirm-msg" id="confirm-msg"></div>
+      </div>
+      <div class="confirm-foot">
+        <button id="confirm-no" class="btn ghost md">Cancel</button>
+        <button id="confirm-yes" class="btn primary md">Confirm</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="data.js"></script>
+<script src="api.js"></script>
+<script src="dms.js"></script>
+<script src="pdfgen.js"></script>
+<script src="chat.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

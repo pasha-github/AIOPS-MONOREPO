@@ -18,7 +18,7 @@ public class NodeAddGuestsQuery implements AroyaQuery {
     @Override
     public String query() {
         return """
-                mutation ProcessGuestIdentity($guests: [GuestIdentityInput!]!) {
+                mutation ProcessGuestIdentity($guests: [JSON!]!) {
                   processGuestIdentity(guests: $guests)
                 }
                 """;
