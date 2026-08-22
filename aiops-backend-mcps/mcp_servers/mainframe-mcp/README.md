@@ -46,7 +46,7 @@ Each workflow name is randomized with a UUID, so concurrent runs don't collide.
 |----------|----------|---------|-------------|
 | `MAINFRAME_BASE_URL` | **yes** | — | z/OSMF base URL, e.g. `https://192.168.18.246:10443` |
 | `MAINFRAME_USER` | no | `ADCDMST` | Mainframe user id |
-| `MAINFRAME_PASSWORD` | no | `RC2026` | Mainframe password |
+| `MAINFRAME_PASSWORD` | no | `RC2027` | Mainframe password |
 | `MAINFRAME_SYSTEM` | no | `S0W1` | z/OSMF system nickname |
 | `MAINFRAME_OWNER` | no | `ADCDMST` | Workflow owner / default notify user |
 | `MAINFRAME_INFO_DEF_FILE` | no | `/u/adcdmst/workflows/b37_info_retrieve.xml` | Workflow1 definition file |
@@ -82,7 +82,7 @@ Stdio:
 ```bash
 export MAINFRAME_BASE_URL="https://192.168.18.246:10443"
 export MAINFRAME_USER="ADCDMST"
-export MAINFRAME_PASSWORD="RC2026"
+export MAINFRAME_PASSWORD="RC2027"
 go run .
 ```
 
@@ -105,7 +105,7 @@ docker build -t mainframe-mcp .
 docker run --rm -p 8080:8080 \
   -e MAINFRAME_BASE_URL="https://192.168.18.246:10443" \
   -e MAINFRAME_USER="ADCDMST" \
-  -e MAINFRAME_PASSWORD="RC2026" \
+  -e MAINFRAME_PASSWORD="RC2027" \
   mainframe-mcp
 ```
 
@@ -158,7 +158,7 @@ Stdio client:
         "-e", "MCP_TRANSPORT=stdio",
         "-e", "MAINFRAME_BASE_URL=https://192.168.18.246:10443",
         "-e", "MAINFRAME_USER=ADCDMST",
-        "-e", "MAINFRAME_PASSWORD=RC2026",
+        "-e", "MAINFRAME_PASSWORD=RC2027",
         "mainframe-mcp"
       ]
     }

@@ -2,8 +2,20 @@
 
 import { Bot, Check, Copy, Mic, Plus, RotateCcw, Send, ThumbsDown, ThumbsUp, User } from "lucide-react";
 import { forwardRef } from "react";
-import { formatTime, renderMarkdownBlocks, renderMilestones } from "../chat_helpers";
+import {
+  formatTime,
+  renderMarkdownBlocks,
+  renderMilestones,
+  renderStreamingMilestone,
+} from "../chat_helpers";
 import type { ChatMessagesProps } from "../types";
+
+const resizeComposerTextarea = (element: HTMLTextAreaElement, maxHeight: number) => {
+  element.style.height = "auto";
+  const nextHeight = Math.min(element.scrollHeight, maxHeight);
+  element.style.height = `${nextHeight}px`;
+  element.style.overflowY = element.scrollHeight > maxHeight ? "auto" : "hidden";
+};
 
 
 
@@ -74,19 +86,22 @@ const ChatMessages = forwardRef<HTMLDivElement, ChatMessagesProps>(
                 What&apos;s on the agenda today?
               </h3>
               <div className="rounded-[2rem] border border-[#dbe2f0] bg-white p-5 shadow-[0_24px_60px_-42px_rgba(16,24,40,0.35)]">
-                <input
-                  type="text"
+                <textarea
+                  rows={1}
                   value={draft}
-                  onChange={(e) => onDraftChange?.(e.target.value)}
+                  onChange={(e) => {
+                    onDraftChange?.(e.target.value);
+                    resizeComposerTextarea(e.currentTarget, 160);
+                  }}
                   onKeyDown={(e) => {
                     if ((e.nativeEvent as KeyboardEvent).isComposing) return;
-                    if (e.key === "Enter") {
+                    if (e.key === "Enter" && !e.shiftKey) {
                       e.preventDefault();
                       onSend?.();
                     }
                   }}
                   placeholder="Ask anything"
-                  className="w-full bg-transparent text-3xl text-[#111827] outline-none placeholder:text-[#9ca3af]"
+                  className="max-h-40 min-h-[40px] w-full resize-none bg-transparent text-3xl leading-tight text-[#111827] outline-none placeholder:text-[#9ca3af]"
                 />
                 <div className="mt-5 flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -225,9 +240,7 @@ const ChatMessages = forwardRef<HTMLDivElement, ChatMessagesProps>(
                     <span>{formatTime()}</span>
                   </div>
 
-                  {streamSteps.length > 0
-                    ? renderMilestones(streamSteps, expandedMilestones, onToggleMilestone)
-                    : null}
+                  {streamSteps.length > 0 ? renderStreamingMilestone(streamSteps) : null}
 
                   <div className="space-y-3 break-words">
                     {streamingText ? (
