@@ -36,5 +36,15 @@ BEDROCK_AGENTCORE_AUTO_CREATE_ECR = (
 
 GOOGLE_GCP_AGENT_EVAL_BUCKET = os.getenv("GOOGLE_GCP_AGENT_EVAL_BUCKET", None)
 
+# SOP ingestion: run a background ingestion pass on startup when enabled.
+INGEST_ON_STARTUP = os.getenv("INGEST_ON_STARTUP", "false").lower() == "true"
+
+# SOP embedding vector dimension. Baked into the pgvector `vector(N)` column and
+# its HNSW index on Postgres, so it MUST match the configured SOP_EMBEDDING_MODEL
+# (text-embedding-3-small = 1536, text-embedding-3-large = 3072,
+# vertex text-embedding-004 = 768). Changing it requires a migration + re-embed.
+# On SQLite the column is plain JSON, so this is ignored there.
+SOP_EMBEDDING_DIM = int(os.getenv("SOP_EMBEDDING_DIM", "1536"))
+
 # Derived constants
 WEB = ENV == "DEV"

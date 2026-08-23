@@ -1,0 +1,25 @@
+{
+  "id": "manageengine_servicedesk_connector",
+  "name": "ManageEngine ServiceDesk Plus Cloud",
+  "description": "CRUD connector for ServiceDesk Plus Cloud API v3 requests and changes.",
+  "version": "1.0.0",
+  "config_variables": [
+    {"name": "CLIENT_ID", "label": "Self Client ID", "required": true, "secret": false, "placeholder": "Zoho Self Client ID"},
+    {"name": "CLIENT_SECRET", "label": "Self Client Secret", "required": true, "secret": true, "placeholder": "Zoho Self Client secret"},
+    {"name": "API_DOMAIN", "label": "ServiceDesk API Domain", "required": true, "secret": false, "placeholder": "https://sdpondemand.manageengine.in"},
+    {"name": "ACCOUNTS_SERVER_URL", "label": "Zoho Accounts Server URL", "required": true, "secret": false, "placeholder": "https://accounts.zoho.in"},
+    {"name": "PORTAL", "label": "ESM Portal URL Name", "required": false, "secret": false, "placeholder": "itdesk"}
+  ],
+  "tools": [
+    {"name": "create_request", "documentation": "Create a service desk request. The response includes request_id_for_updates, which is the internal ID to use for later updates."},
+    {"name": "update_request", "documentation": "Update a service desk request using either the internal ID or the displayed request number."},
+    {"name": "get_request", "documentation": "Get a service desk request using either the internal ID or the displayed request number."},
+    {"name": "list_requests", "documentation": "List service desk requests. Responses include request_id_for_updates values for later update/delete calls."},
+    {"name": "delete_request", "documentation": "Delete a service desk request using either the internal ID or the displayed request number."},
+    {"name": "create_change", "documentation": "Create a service desk change."},
+    {"name": "update_change", "documentation": "Update a service desk change."},
+    {"name": "get_change", "documentation": "Get a service desk change."},
+    {"name": "list_changes", "documentation": "List service desk changes."},
+    {"name": "delete_change", "documentation": "Delete a service desk change."}
+  ]
+}
