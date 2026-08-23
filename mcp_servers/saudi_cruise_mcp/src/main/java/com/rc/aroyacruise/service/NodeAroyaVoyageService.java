@@ -1,147 +1,135 @@
 package com.rc.aroyacruise.service;
 
-import com.rc.aroyacruise.config.AroyaNodeApiProperties;
+import com.rc.aroyacruise.dto.external.IntegrationTaskResponse;
 import com.rc.aroyacruise.dto.request.NodeAvailableVoyagesRequest;
-import com.rc.aroyacruise.exception.AroyaClientException;
-import com.rc.aroyacruise.service.NodeVoyageResponseHelper;
+import com.rc.aroyacruise.mapper.NodeAvailableVoyagesMarkdownMapper;
 import com.rc.aroyacruise.query.NodeAvailableVoyageByKeyQuery;
 import com.rc.aroyacruise.query.NodeAvailableVoyagesQuery;
 import com.rc.aroyacruise.util.Utility;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestClient;
 import tools.jackson.databind.JsonNode;
-
-import java.util.Map;
+import tools.jackson.databind.node.JsonNodeFactory;
+import tools.jackson.databind.node.ObjectNode;
 
 @Service
 @RequiredArgsConstructor
 public class NodeAroyaVoyageService {
 
-    private final RestClient restClient;
-    private final AroyaNodeApiProperties properties;
-    private final NodeVoyageResponseHelper responseHelper;
+    private static final JsonNodeFactory JSON = JsonNodeFactory.instance;
+
+    private static final String VOYAGES_NOT_AVAILABLE_MESSAGE =
+            "voyages of that dates and destionation not available please try another date";
+
+    private final AroyaClientService clientService;
+    private final AroyaService aroyaService;
+    private final NodeAvailableVoyagesMarkdownMapper availableVoyagesMarkdownMapper;
 
     public JsonNode getAvailableVoyages(
             NodeAvailableVoyagesRequest request
     ) {
+        String token = aroyaService.resolveToken(null);
+
         NodeAvailableVoyagesQuery query =
                 new NodeAvailableVoyagesQuery(request);
 
-        Map<String, Object> body = Map.of(
-                "query", query.query(),
-                "variables", query.variables()
-        );
+        IntegrationTaskResponse<JsonNode> response =
+                clientService.nodePostIntegrationTask(
+                        query.query(),
+                        query.variables(),
+                        token,
+                        new ParameterizedTypeReference<>() {
+                        }
+                );
 
-        JsonNode response = restClient.post()
-                .uri(properties.graphqlUrl())
-                .header(
-                        HttpHeaders.CONTENT_TYPE,
-                        MediaType.APPLICATION_JSON_VALUE
-                )
-                .body(body)
-                .retrieve()
-                .body(JsonNode.class);
-
-        if (response == null) {
-            return responseHelper.mockAvailableVoyagesResponse(
-                    request,
-                    "Aroya availableVoyages response is null"
-            );
-        }
-
-        if (responseHelper.hasGraphQlErrors(response)) {
-            throw new AroyaClientException(
-                    "Aroya node GraphQL API returned errors: "
-                            + response.get("errors")
-            );
-        }
-
-        JsonNode data = response.get("data");
+        JsonNode data = response.data();
 
         if (data == null || data.isNull()) {
-            return responseHelper.mockAvailableVoyagesResponse(
-                    request,
-                    "Aroya availableVoyages response data is missing"
-            );
+            return voyagesNotAvailableResponse(request);
         }
 
-        if (!responseHelper.hasAvailableVoyagesCmsData(data)) {
-            return responseHelper.mockAvailableVoyagesResponse(
-                    request,
-                    "Aroya availableVoyages CMS data is missing"
-            );
+        JsonNode results = data
+                .path("availableVoyages")
+                .path("results");
+
+        if (!results.isArray() || results.size() == 0) {
+            return voyagesNotAvailableResponse(request);
         }
 
         return Utility.removeNulls(data);
+    }
+    public String getAvailableVoyagesMD(NodeAvailableVoyagesRequest request){
+        JsonNode response = getAvailableVoyages(
+                request
+                );
+
+        return availableVoyagesMarkdownMapper.toMarkdown(response);
     }
 
     public JsonNode getAvailableVoyageByPackageKey(
             String packageKey
     ) {
+        String token = aroyaService.resolveToken(null);
+
         NodeAvailableVoyageByKeyQuery query =
                 new NodeAvailableVoyageByKeyQuery(packageKey);
 
-        Map<String, Object> body = Map.of(
-                "query", query.query(),
-                "variables", query.variables()
-        );
+        IntegrationTaskResponse<JsonNode> response =
+                clientService.nodePostIntegrationTask(
+                        query.query(),
+                        query.variables(),
+                        token,
+                        new ParameterizedTypeReference<>() {
+                        }
+                );
 
-        JsonNode response = restClient.post()
-                .uri(properties.graphqlUrl())
-                .header(
-                        HttpHeaders.CONTENT_TYPE,
-                        MediaType.APPLICATION_JSON_VALUE
-                )
-                .header("client_channel", "web")
-                .header("client_realtime", "true")
-                .body(body)
-                .retrieve()
-                .body(JsonNode.class);
-
-        if (response == null) {
-            return responseHelper.mockAvailableVoyageByPackageKeyResponse(
-                    packageKey,
-                    "Aroya availableVoyage response is null"
-            );
-        }
-
-        if (responseHelper.hasGraphQlErrors(response)) {
-            throw new AroyaClientException(
-                    "Aroya availableVoyage API returned errors: "
-                            + response.get("errors")
-            );
-        }
-
-        JsonNode data = response.get("data");
+        JsonNode data = response.data();
 
         if (data == null || data.isNull()) {
-            return responseHelper.mockAvailableVoyageByPackageKeyResponse(
-                    packageKey,
-                    "Aroya availableVoyage response data is missing"
-            );
+            return availableVoyageNotFoundResponse(packageKey);
         }
 
         JsonNode availableVoyage = data.get("availableVoyage");
 
         if (availableVoyage == null || availableVoyage.isNull()) {
-            return responseHelper.mockAvailableVoyageByPackageKeyResponse(
-                    packageKey,
-                    "availableVoyage result not found for packageKey: "
-                            + packageKey
-            );
-        }
-
-        if (!responseHelper.hasAvailableVoyageCmsData(data)) {
-            return responseHelper.mockAvailableVoyageByPackageKeyResponse(
-                    packageKey,
-                    "Aroya availableVoyage CMS data is missing for packageKey: "
-                            + packageKey
-            );
+            return availableVoyageNotFoundResponse(packageKey);
         }
 
         return Utility.removeNulls(data);
+    }
+
+    private JsonNode voyagesNotAvailableResponse(
+            NodeAvailableVoyagesRequest request
+    ) {
+        ObjectNode response = JSON.objectNode();
+
+        response.put("success", false);
+        response.put("message", VOYAGES_NOT_AVAILABLE_MESSAGE);
+
+        ObjectNode searchCriteria = JSON.objectNode();
+
+        searchCriteria.put("startDateFrom", request.startDateFrom());
+        searchCriteria.put("startDateTo", request.startDateTo());
+        searchCriteria.set("destinations", JSON.pojoNode(request.destinations()));
+        searchCriteria.set("departurePorts", JSON.pojoNode(request.departurePorts()));
+
+        response.set("searchCriteria", searchCriteria);
+
+        return response;
+    }
+
+    private JsonNode availableVoyageNotFoundResponse(
+            String packageKey
+    ) {
+        ObjectNode response = JSON.objectNode();
+
+        response.put("success", false);
+        response.put(
+                "message",
+                "Voyage is not available for packageKey: " + packageKey
+        );
+
+        return response;
     }
 }

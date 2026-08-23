@@ -25,6 +25,7 @@ MISSING_USER_EMAIL_MESSAGE = (
     "I could not determine a stable identity from Teams, so I cannot start the agent session."
 )
 AGENT_UNAVAILABLE_MESSAGE = "I could not reach the configured agent service right now."
+EMPTY_AGENT_RESPONSE_MESSAGE = "I received an empty response from the agent service."
 TRANSIENT_SEND_STATUS_CODES = {502, 503, 504}
 TRANSIENT_SEND_ATTEMPTS = 3
 TYPING_INDICATOR_INTERVAL_SECONDS = 4
@@ -226,7 +227,8 @@ def register_handlers(app: App, config: Config) -> None:
             )
             return
 
-        status_activity = None
+        # Messages already posted, as (activity, text) for reply caching.
+        delivered_activities: list[tuple] = []
         typing_task = asyncio.create_task(keep_sending_typing(ctx, app))
 
         try:
@@ -234,10 +236,19 @@ def register_handlers(app: App, config: Config) -> None:
                 ctx.activity.conversation.id, scope
             ) or (ctx.activity.conversation.id or "").strip()
             reply_message_id = _extract_message_id_from_conversation_id(conversation_id)
+            thread_reply_to_id = (
+                _safe_activity_value(ctx, "reply_to_id")
+                or _safe_activity_value(ctx, "replyToId")
+            )
+            # One Teams thread == one ADK session, so the agent keeps its own history and
+            # a reply like "Hi" is understood in context. Both the root's messageid= and a
+            # reply's reply_to_id identify the thread root, so either keeps every message
+            # in a thread on the same session id.
+            thread_root_id = thread_reply_to_id or reply_message_id
             session_id = (
                 "teams_session"
                 if scope == "personal"
-                else (reply_message_id or conversation_session_id)
+                else (thread_root_id or conversation_session_id)
             )
             candidate_emails = await collect_candidate_emails(ctx)
             fallback_user_id = str(getattr(ctx.activity.from_, "id", "") or "").strip()
@@ -261,52 +272,64 @@ def register_handlers(app: App, config: Config) -> None:
                 {"scope": scope, "adk_user_id": adk_user_id, "session_id": session_id},
                 flush=True,
             )
-            status_lines: list[str] = []
+            async def send_agent_turn(turn_text: str) -> None:
+                """Post each agent turn as its own Teams message, in stream order.
 
-            async def send_progress_event(event_label: str) -> None:
-                nonlocal status_activity
-                status_lines.append(f"- {event_label}")
-                status_text = "Agent status:\n" + "\n".join(status_lines)
-                if status_activity is None:
-                    status_activity = await send_with_retry(
-                        ctx,
-                        app,
-                        status_text,
-                        label="agent status message",
-                        required=False,
-                    )
-                    return
-                updated_activity = await send_with_retry(
+                ADK emits one text event per step the agent narrates plus one for its
+                final answer; tool calls and tool results carry no text. Posting each as
+                it arrives lets the user watch the run progress.
+                """
+                # Best-effort: a turn that fails to send must not abort the stream, or a
+                # single rejected narration message would surface as "agent unavailable"
+                # while the real answer was still coming.
+                turn_activity = await send_with_retry(
                     ctx,
                     app,
-                    MessageActivityInput(text=status_text).with_id(status_activity.id),
-                    label="agent status update",
+                    turn_text,
+                    label="agent turn message",
                     required=False,
                 )
-                if updated_activity is not None:
-                    status_activity = updated_activity
+                if turn_activity is not None:
+                    delivered_activities.append((turn_activity, turn_text))
 
-            reply_to_id = (
-                _safe_activity_value(ctx, "reply_to_id")
-                or _safe_activity_value(ctx, "replyToId")
-            )
-            parent_ref_id = reply_to_id or reply_message_id
-            parent_text = fetch_activity_text(parent_ref_id) if parent_ref_id else ""
-            if not parent_text and parent_ref_id:
-                parent_text = get_cached_activity_text(parent_ref_id)
+            # The ADK session covers turns that went through the agent, but proactive
+            # alerts are posted straight to Teams and never reach it, so their text is
+            # only in the activity store. Quote the thread parent so an approval like
+            # "APPROVED to proceed with Action 1" has something to refer to.
+            #
+            # Teams leaves reply_to_id empty on incoming channel activities and carries
+            # the thread root in the conversation id as ';messageid=...', so
+            # reply_message_id is the value that actually resolves; reply_to_id is kept
+            # first in case a client does populate it.
+            parent_ref_id = thread_reply_to_id or reply_message_id
+            # On a root post that messageid= is this activity's own id, so quoting it
+            # would feed the user's own message back to the agent twice.
+            if parent_ref_id == incoming_activity_id:
+                parent_ref_id = ""
+            parent_text = ""
+            if parent_ref_id:
+                parent_text = fetch_activity_text(
+                    parent_ref_id
+                ) or get_cached_activity_text(parent_ref_id)
             if parent_text:
-                message_for_agent = f"{parent_text}\n{user_text}"
+                # Label both halves so the agent can tell quoted context from the new
+                # message instead of reading one run-on user turn.
+                message_for_agent = (
+                    f"[Replying to this earlier message]\n{parent_text}\n\n"
+                    f"[User's reply]\n{user_text}"
+                )
             else:
                 message_for_agent = user_text
             print(
                 "[teams_bot] agent_payload",
                 {
                     "activity_id": incoming_activity_id,
-                    "reply_to_id": reply_to_id,
+                    "reply_to_id": thread_reply_to_id,
                     "reply_message_id": reply_message_id,
+                    "thread_root_id": thread_root_id,
+                    "session_id": session_id,
                     "parent_ref_id": parent_ref_id,
                     "has_parent_text": bool(parent_text),
-                    "parent_text": parent_text,
                     "user_text": user_text,
                     "message_for_agent": message_for_agent,
                 },
@@ -319,50 +342,39 @@ def register_handlers(app: App, config: Config) -> None:
                 user_id=adk_user_id,
                 session_id=session_id,
                 message=message_for_agent,
-                on_event=send_progress_event,
+                on_text=send_agent_turn,
             )
         except Exception:
             typing_task.cancel()
             await asyncio.gather(typing_task, return_exceptions=True)
             app.logger.exception("Failed to call configured agent chat endpoint.")
-            if status_activity is None:
-                await send_with_retry(
-                    ctx,
-                    app,
-                    AGENT_UNAVAILABLE_MESSAGE,
-                    label="agent-unavailable message",
-                    required=True,
-                )
-            else:
-                await send_with_retry(
-                    ctx,
-                    app,
-                    MessageActivityInput(text=AGENT_UNAVAILABLE_MESSAGE).with_id(
-                        status_activity.id
-                    ),
-                    label="agent-unavailable update",
-                    required=True,
-                )
+            # Turns already posted stand on their own, so report the failure as a new
+            # message rather than overwriting whatever the agent managed to say.
+            await send_with_retry(
+                ctx,
+                app,
+                AGENT_UNAVAILABLE_MESSAGE,
+                label="agent-unavailable message",
+                required=True,
+            )
             return
         typing_task.cancel()
         await asyncio.gather(typing_task, return_exceptions=True)
 
-        if status_activity is None:
-            sent_activity = await send_with_retry(
+        # Each turn was already posted as it completed, so there is no final reply to send.
+        # Only a run that produced no text at all needs a message here.
+        if not agent_response.emitted_any or not delivered_activities:
+            empty_activity = await send_with_retry(
                 ctx,
                 app,
-                agent_response.text,
-                label="agent response",
+                EMPTY_AGENT_RESPONSE_MESSAGE,
+                label="empty agent response",
                 required=True,
             )
-        else:
-            sent_activity = await send_with_retry(
-                ctx,
-                app,
-                agent_response.text,
-                label="agent response",
-                required=True,
-            )
-        sent_activity_id = str(getattr(sent_activity, "id", "") or "").strip()
-        if sent_activity_id:
-            cache_activity_text(sent_activity_id, agent_response.text)
+            delivered_activities.append((empty_activity, EMPTY_AGENT_RESPONSE_MESSAGE))
+
+        # Cache each delivered message so replies in this thread can quote it to the agent.
+        for delivered_activity, delivered_text in delivered_activities:
+            delivered_id = str(getattr(delivered_activity, "id", "") or "").strip()
+            if delivered_id:
+                cache_activity_text(delivered_id, delivered_text)
