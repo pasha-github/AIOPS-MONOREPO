@@ -1,9 +1,18 @@
 from datetime import datetime
-from typing import ClassVar
+from typing import Any, ClassVar
 from uuid import UUID, uuid4
 
+from pgvector.sqlalchemy import Vector
 from sqlalchemy import BigInteger, LargeBinary
 from sqlmodel import JSON, Column, Field, SQLModel, UniqueConstraint
+
+from src.utils.constants import SOP_EMBEDDING_DIM
+
+# Embedding column type. Real pgvector `vector(N)` on PostgreSQL (enables the
+# HNSW ANN index + `<=>` cosine operator); transparent JSON fallback on SQLite
+# (dev/CI) where the `vector` type does not exist. Same Python value (list[float])
+# round-trips through both.
+_EMBEDDING_COLUMN = JSON().with_variant(Vector(SOP_EMBEDDING_DIM), "postgresql")
 
 
 class Agent(SQLModel, table=True):
@@ -42,6 +51,9 @@ class Agent(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=datetime.now)
     tags: str | None = None
     sub_agents: list[str] = Field(default_factory=list, sa_column=Column(JSON))
+    sub_agent_delegation_type: str = Field(
+        default="task"
+    )  # "task" = AgentTool, "full" = LlmAgent sub_agents
     status: str = "active"
     type: str = Field(default="agent")
     prompt_role: str | None = None
@@ -157,8 +169,10 @@ class Webhook(SQLModel, table=True):
 
 class Job(SQLModel, table=True):
     job_id: UUID = Field(default_factory=uuid4, primary_key=True)
-    agent_id: str = Field(foreign_key="agent.agent_id")
-    prompt: str
+    job_type: str = Field(default="agent")  # "agent" | "ingestion"
+    # agent_id/prompt are only set for agent jobs; ingestion jobs have neither.
+    agent_id: str | None = Field(default=None, foreign_key="agent.agent_id")
+    prompt: str | None = None
     cron_expression: str | None = None
     interval_seconds: int | None = None
     created_at: datetime = Field(default_factory=datetime.now)
@@ -216,3 +230,226 @@ class ObservabilityTokenUsage(SQLModel, table=True):
     invocation_id: str | None = None
     event_id: str | None = None
     created_at: datetime = Field(default_factory=datetime.now)
+
+
+# ---------------------------------------------------------------------------
+# SOP ingestion / retrieval
+#
+# Two planes (see docs/claude-ingestion.md, docs/claude-retrieval.md):
+#   · Data plane (agent-readable): SopDocument, SopSection, SopElement,
+#     SopSectionEmbedding — the parsed content agents search and read.
+#   · Control plane (ingestion-only): IngestionSource (where SOPs come from)
+#     and IngestedDocument (per-document provenance + change-detection). Agents
+#     never read these tables.
+#
+# Two units, two roles (two-pass design):
+#   · SopSection = retrieval / embedding unit. Returned WHOLE so a procedure is
+#     never half-retrieved. Flat, keyed by reading-order `section_index`.
+#   · SopElement = citation / edit unit. Verbatim, immutable text; the agent
+#     cites and proposes edits at element granularity.
+#
+# Tenancy: NONE of these tables carry a tenant_id — the platform is
+# single-tenant-per-deployment (one instance per client, like every other table
+# here). Per-user visibility is enforced at RETRIEVAL (JWT role/group claims +
+# the read-only `sop_reader` DB role granted on the data plane only), never at
+# ingestion (which runs as a system identity). If intra-company segmentation is
+# ever needed, add an `access_group` column on SopDocument and match it against
+# JWT groups at retrieval — not a tenant_id.
+#
+# SOP sources live in their own IngestionSource table — NOT in ConnectorConfig.
+#
+# Embedding storage: `embedding` is a portable JSON list[float] for now (works
+# on SQLite + Postgres). On Postgres, migrate to a pgvector `vector(dim)` column
+# with a per-model ANN index when ANN search is enabled (needs the `pgvector`
+# dependency + extension).
+# ---------------------------------------------------------------------------
+
+
+class SopDocument(SQLModel, table=True):
+    """Agent-readable SOP. One row per logical document."""
+
+    __tablename__: ClassVar[str] = "sop_document"
+
+    sop_document_id: UUID = Field(default_factory=uuid4, primary_key=True)
+    title: str
+    description: str | None = None
+    # SHA-256 over concatenated element texts (Pass 1). Validator anchor; null
+    # until the real parser/storage runs.
+    groundtruth_hash: str | None = None
+    # Which Pass-2 path produced the sections: "normalized" | "fallback_flat".
+    normalization_status: str = Field(default="fallback_flat")
+    # Stable, human-readable identity; natural upsert key (globally unique —
+    # single-tenant deployment).
+    slug: str = Field(index=True, unique=True)
+    created_at: datetime = Field(default_factory=datetime.now)
+    updated_at: datetime = Field(default_factory=datetime.now)
+
+
+class SopSection(SQLModel, table=True):
+    """Retrieval/embedding unit: a self-contained procedure (trigger + steps).
+
+    Owns an ordered list of SopElement rows; Markdown is rendered from them on
+    demand (store JSON, render Markdown). Re-ingestion is delete-all-for-document
+    + reinsert, since parser refs are positional and not stable across runs.
+    """
+
+    __tablename__: ClassVar[str] = "sop_section"
+    __table_args__ = (
+        UniqueConstraint(
+            "sop_document_id", "section_index", name="uq_sop_section_order"
+        ),
+    )
+
+    sop_section_id: UUID = Field(default_factory=uuid4, primary_key=True)
+    sop_document_id: UUID = Field(
+        foreign_key="sop_document.sop_document_id",
+        ondelete="CASCADE",
+        index=True,
+    )
+    # Position in document reading order.
+    section_index: int
+    # Docling self_ref of the heading element that titles this section (Pass 2).
+    title_element_ref: str | None = None
+    # SHA-256 of this section's concatenated element text — skip re-embedding
+    # when unchanged (compared against SopSectionEmbedding.source_text_hash).
+    content_hash: str | None = None
+    title: str | None = None
+    # Error signature(s) for search; pg_trgm GIN index (PostgreSQL only).
+    trigger_text: str | None = None
+    # "table" | "image" | null (null means ordinary text section).
+    section_type: str | None = Field(default=None)
+    created_at: datetime = Field(default_factory=datetime.now)
+    updated_at: datetime = Field(default_factory=datetime.now)
+
+
+class SopElement(SQLModel, table=True):
+    """Citation/edit unit: one verbatim text element of a section, in order.
+
+    `text` is copied byte-for-byte from the layout parser and is immutable — the
+    groundtruth. `element_ref` is NOT unique (a split bullet yields two rows that
+    share `#/texts/N`); ordering is by (sop_section_id, element_index).
+    """
+
+    __tablename__: ClassVar[str] = "sop_element"
+    __table_args__ = (
+        UniqueConstraint(
+            "sop_section_id", "element_index", name="uq_sop_element_order"
+        ),
+    )
+
+    sop_element_id: UUID = Field(default_factory=uuid4, primary_key=True)
+    sop_section_id: UUID = Field(
+        foreign_key="sop_section.sop_section_id",
+        ondelete="CASCADE",
+        index=True,
+    )
+    # Docling self_ref (e.g. "#/texts/11"). Not unique — splits share it.
+    element_ref: str
+    # Order within the section.
+    element_index: int
+    # Char offsets into the original element text when Pass 2 split one element
+    # into several (the substrings stay byte-identical). Null when not a split.
+    char_start: int | None = None
+    char_end: int | None = None
+    # section_header | list_item | text | step
+    label: str
+    # Verbatim, immutable.
+    text: str
+    # Provenance: {page_no, bbox}.
+    prov_json: dict = Field(default_factory=dict, sa_column=Column(JSON))
+    created_at: datetime = Field(default_factory=datetime.now)
+    updated_at: datetime = Field(default_factory=datetime.now)
+
+
+class SopSectionEmbedding(SQLModel, table=True):
+    """One embedding vector per (section, model). One vector covers the whole
+    section (concat of its elements)."""
+
+    __tablename__: ClassVar[str] = "sop_section_embedding"
+    __table_args__ = (
+        UniqueConstraint(
+            "sop_section_id", "embedding_model", name="uq_sop_embedding_model"
+        ),
+    )
+
+    sop_section_embedding_id: UUID = Field(default_factory=uuid4, primary_key=True)
+    sop_section_id: UUID = Field(
+        foreign_key="sop_section.sop_section_id",
+        ondelete="CASCADE",
+        index=True,
+    )
+    embedding_model: str
+    dim: int
+    # pgvector vector(SOP_EMBEDDING_DIM) on Postgres (HNSW ANN + `<=>`); JSON on
+    # SQLite. Annotated Any because Postgres reads back a numpy array, JSON a list.
+    embedding: Any = Field(default=None, sa_column=Column(_EMBEDDING_COLUMN))
+    # Hash of the section text this vector was computed from (== section
+    # content_hash at embed time); lets ingestion skip unchanged re-embeds.
+    source_text_hash: str | None = None
+    created_at: datetime = Field(default_factory=datetime.now)
+    updated_at: datetime = Field(default_factory=datetime.now)
+
+
+class IngestionSource(SQLModel, table=True):
+    """A registered place SOPs are ingested from (control plane).
+
+    Dedicated to ingestion — independent of the agent-facing ConnectorConfig
+    registry. `source_type` selects the fetcher (sharepoint | confluence | …);
+    `parser_backend` selects the parser (docling | azure | gcp | aws); `config`
+    carries source credentials/settings as a list of {name, value} pairs.
+    """
+
+    __tablename__: ClassVar[str] = "ingestion_source"
+
+    ingestion_source_id: UUID = Field(default_factory=uuid4, primary_key=True)
+    source_name: str
+    source_type: str = Field(default="sharepoint")
+    config: list[dict[str, str]] = Field(default_factory=list, sa_column=Column(JSON))
+    parser_backend: str = Field(default="docling")
+    is_enabled: bool = True
+    created_at: datetime = Field(default_factory=datetime.now)
+    updated_at: datetime = Field(default_factory=datetime.now)
+
+
+class IngestedDocument(SQLModel, table=True):
+    """Ingestion-only provenance + change-detection for a SopDocument.
+
+    One row per ingested source file (1:1 with SopDocument).
+    """
+
+    __tablename__: ClassVar[str] = "ingested_document"
+    __table_args__ = (
+        UniqueConstraint("ingestion_source_id", "path", name="uq_sop_source_location"),
+        UniqueConstraint("sop_document_id", name="uq_ingested_document_doc"),
+    )
+
+    ingested_document_id: UUID = Field(default_factory=uuid4, primary_key=True)
+    sop_document_id: UUID = Field(
+        foreign_key="sop_document.sop_document_id",
+        ondelete="CASCADE",
+        index=True,
+    )
+    # The IngestionSource this document came from. RESTRICT: deleting a source
+    # must not silently wipe ingest history.
+    ingestion_source_id: UUID = Field(
+        foreign_key="ingestion_source.ingestion_source_id",
+        ondelete="RESTRICT",
+        index=True,
+    )
+    path: str
+    file_name: str
+    mime_type: str | None = None
+    # Change detection uses Graph API list metadata (no byte checksum):
+    # source_modified (lastModifiedDateTime), version (eTag/cTag), size.
+    source_modified: datetime | None = None
+    size: int | None = None
+    version: str | None = None
+    # Direct browser-accessible URL to the original document (e.g. SharePoint
+    # webUrl, OneDrive webUrl, Confluence _links.webui). Populated at ingest
+    # time so retrieval never needs to touch the control-plane config.
+    web_url: str | None = None
+    last_ingested_at: datetime | None = None
+    ingest_status: str = Field(default="pending")  # pending|ingested|error|skipped
+    ingest_error: str | None = None
+    created_at: datetime = Field(default_factory=datetime.now)
+    updated_at: datetime = Field(default_factory=datetime.now)
